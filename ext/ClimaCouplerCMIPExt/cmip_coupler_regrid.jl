@@ -4,8 +4,9 @@
 # GPU: `LinearAlgebra.mul!` on `CUDA.CUSPARSE.CuSparseMatrixCSC` falls back to scalar indexing; we call
 # `CUDA.CUSPARSE.mv!` instead when the intersection matrix lives on CUDA.CUSPARSE.
 #
-# Remap math matches `ClimaCoupler.ConservativeRegridMath` but is inlined here so `ClimaCouplerCMIPExt`
-# does not rely on that submodule being present in a precompiled `ClimaCoupler` build.
+# Weights for remapping MUST come from `_conservative_weights_alias` / `_cmip_conservative_weights` below.
+# Do not call the optional `ConservativeRegridMath` submodule on `ClimaCoupler` from this file — it is not
+# guaranteed to exist in every precompiled or `] dev` checkout (UndefVarError at `construct_...`).
 
 const _CUDA_PKGID = Base.PkgId(Base.UUID("052768ef-5323-5732-b1bb-66c8b64840ba"), "CUDA")
 
@@ -45,7 +46,7 @@ function _intersection_spmv!(y::AbstractVector, A, x::AbstractVector, trans::Cha
     return y
 end
 
-"""Alias regridder fields (same as `ConservativeRegridMath.precompute_from_regridder(...; copy_arrays=false)`)."""
+"""Alias regridder fields (equivalent to `precompute_from_regridder(...; copy_arrays = false)` in tests)."""
 function _conservative_weights_alias(remapper::CR.Regridder)
     return (;
         A = remapper.intersections,
@@ -53,6 +54,9 @@ function _conservative_weights_alias(remapper::CR.Regridder)
         src_areas = remapper.src_areas,
     )
 end
+
+"""Public name used from `construct_conservative_ocean_coupler_remapping` (single place to change if needed)."""
+_cmip_conservative_weights(remapper::CR.Regridder) = _conservative_weights_alias(remapper)
 
 function cmip_conservative_regridding_cc_ext()
     ext = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
@@ -93,7 +97,7 @@ function construct_conservative_ocean_coupler_remapping(grid, boundary_space)
         threaded = false,
     )
     remapper_oc_to_cc = OC.on_architecture(OC.architecture(grid), remapper_oc_to_cc)
-    conservative_weights = _conservative_weights_alias(remapper_oc_to_cc)
+    conservative_weights = _cmip_conservative_weights(remapper_oc_to_cc)
 
     FT = CC.Spaces.undertype(boundary_space)
     field_ones_cc = CC.Fields.ones(boundary_space)

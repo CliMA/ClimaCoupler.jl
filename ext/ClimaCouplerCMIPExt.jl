@@ -21,6 +21,7 @@ import Oceananigans as OC
 import ClimaOcean as CO
 import ClimaSeaIce as CSI
 import ClimaCore as CC
+import ClimaComms
 import ClimaParams as CP
 import ConservativeRegridding as CR
 import Adapt

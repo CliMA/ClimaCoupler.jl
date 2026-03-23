@@ -50,6 +50,27 @@ function cmip_conservative_regridding_cc_ext()
     return ext
 end
 
+### `Interfacer.remap` extensions (Oceananigans Field ⟷ ClimaCore Field) with explicit regridding context
+
+function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
+    regridding = remapping.regridding
+    regridding === :conservative ||
+        error(
+            "remap!(::Oceananigans.Field, ::ClimaCore.Field, remapping) is only defined for `regridding === :conservative` (got $(repr(regridding))).",
+        )
+    CRX = cmip_conservative_regridding_cc_ext()
+    CRX.get_value_per_element!(
+        remapping.value_per_element_cc,
+        source_field,
+        remapping.field_ones_cc,
+    )
+    z = size(target_field, 3)
+    dst = vec(OC.interior(target_field, :, :, z))
+    src = remapping.value_per_element_cc
+    CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
+    return nothing
+end
+
 """
     construct_conservative_ocean_coupler_remapping(grid, boundary_space)
 

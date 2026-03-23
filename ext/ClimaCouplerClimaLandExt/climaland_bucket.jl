@@ -12,12 +12,8 @@ It contains the following objects:
 - `area_fraction::A`: A ClimaCore Field on the boundary space representing the surface area fraction of this component model.
 - `output_writer`: The diagnostic file writer.
 """
-struct BucketSimulation{
-    M <: CL.Bucket.BucketModel,
-    I <: SciMLBase.AbstractODEIntegrator,
-    A <: CC.Fields.Field,
-    OW,
-} <: Interfacer.AbstractLandSimulation
+struct BucketSimulation{M <: CL.Bucket.BucketModel, I, A <: CC.Fields.Field, OW} <:
+       Interfacer.AbstractLandSimulation
     model::M
     integrator::I
     area_fraction::A

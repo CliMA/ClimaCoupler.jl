@@ -18,7 +18,15 @@ coupler grid) and the ocean model's horizontal `LatitudeLongitudeGrid` (underlyi
 function construct_conservative_ocean_coupler_remapping(grid, boundary_space)
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), grid.underlying_grid)
     boundary_space_cpu = Adapt.adapt_structure(Array, boundary_space)
+    # ConservativeRegridding requires identical manifold types for src/dst.
+    # Force a shared spherical manifold to avoid Float32 vs Float64 radius mismatch.
+    radius = try
+        Float64(CC.Spaces.topology(boundary_space).mesh.domain.radius)
+    catch
+        6.371e6
+    end
     remapper_oc_to_cc = CR.Regridder(
+        CR.Spherical(; radius),
         boundary_space_cpu,
         grid_oc_underlying_cpu;
         normalize = false,

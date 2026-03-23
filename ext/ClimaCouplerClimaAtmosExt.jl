@@ -100,8 +100,14 @@ function ClimaAtmosSimulation(atmos_config)
 
     microphysics_model = integrator.p.atmos.microphysics_model
     if microphysics_model isa CA.EquilibriumMicrophysics0M
-        integrator.p.precomputed.ᶜρ_dq_tot_dt .= FT(0)
-        integrator.p.precomputed.ᶜρ_de_tot_dt .= FT(0)
+        # ClimaAtmos cache fields can differ across versions/configs.
+        # Zero these tendencies only when present.
+        if hasproperty(integrator.p.precomputed, Symbol("ᶜρ_dq_tot_dt"))
+            getproperty(integrator.p.precomputed, Symbol("ᶜρ_dq_tot_dt")) .= FT(0)
+        end
+        if hasproperty(integrator.p.precomputed, Symbol("ᶜρ_de_tot_dt"))
+            getproperty(integrator.p.precomputed, Symbol("ᶜρ_de_tot_dt")) .= FT(0)
+        end
     end
     if hasradiation(integrator)
         ᶠradiation_flux = integrator.p.radiation.ᶠradiation_flux

@@ -32,6 +32,7 @@ struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.AbstractSeaIce
     remapping::REMAP
     ocean_ice_interface::NT
     ice_properties::IP
+    start_date::DateTime
 end
 
 """
@@ -77,7 +78,7 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
 
     advection = ocean.ocean.model.advection.T
-    ice = sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection)
+    ice = sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection, start_date)
 
     ocean_ice_flux_formulation =
         CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)
@@ -161,6 +162,7 @@ function ClimaSeaIceSimulation(
         remapping,
         ocean_ice_interface,
         ice_properties,
+        start_date,
     )
 
     # Ensure ocean temperature is above freezing where there is sea ice
@@ -172,6 +174,7 @@ function sea_ice_simulation(
     grid,
     ocean = nothing;
     Δt = 5 * 60.0, # 5 minutes
+    start_date,
     ice_salinity = 4, # psu
     advection = nothing, # for the moment
     tracers = (),
@@ -215,7 +218,7 @@ function sea_ice_simulation(
     )
 
     # Build the simulation
-    return OC.Simulation(sea_ice_model; Δt)
+    return OC.Simulation(sea_ice_model; Δt, clock = OC.Clock{DateTime}(time = start_date))
 end
 
 ###############################################################################
@@ -223,8 +226,11 @@ end
 ###############################################################################
 
 # Timestep the simulation forward to time `t`
-Interfacer.step!(sim::ClimaSeaIceSimulation, t) =
-    OC.time_step!(sim.ice, float(t) - sim.ice.model.clock.time)
+Interfacer.step!(sim::ClimaSeaIceSimulation, t) = begin
+    current_time = sim.start_date + Dates.Second(float(t))
+    Δt = current_time - sim.ice.model.clock.time
+    OC.time_step!(sim.ice, Δt)
+end
 
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}) = sim.area_fraction
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_concentration}) =

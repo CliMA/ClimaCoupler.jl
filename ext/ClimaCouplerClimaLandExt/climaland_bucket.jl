@@ -311,6 +311,19 @@ end
 Interfacer.close_output_writers(sim::BucketSimulation) =
     isnothing(sim.output_writer) || close(sim.output_writer)
 
+"""
+    FieldExchanger.import_atmos_fields!(csf, sim::BucketSimulation, atmos_sim)
+
+Import non-default coupler fields from the atmosphere simulation into the coupler fields.
+This includes the air pressure, which is needed to compute humidity internally.
+
+The default coupler fields are imported by the default method implemented in
+FieldExchanger.jl.
+"""
+function FieldExchanger.import_atmos_fields!(csf, ::BucketSimulation, atmos_sim)
+    Interfacer.get_field!(csf.P_atmos, atmos_sim, Val(:air_pressure))
+    return nothing
+end
 
 function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields::NamedTuple)
     (; F_lh, F_sh, F_turb_moisture) = fields
@@ -440,20 +453,6 @@ function FieldExchanger.update_sim!(sim::BucketSimulation, csf)
     Interfacer.update_field!(sim, Val(:air_temperature), csf.T_atmos)
     Interfacer.update_field!(sim, Val(:air_pressure), csf.P_atmos)
     Interfacer.update_field!(sim, Val(:air_humidity), csf.q_tot_atmos)
-    return nothing
-end
-
-"""
-    FieldExchanger.import_atmos_fields!(csf, sim::BucketSimulation, atmos_sim)
-
-Import non-default coupler fields from the atmosphere simulation into the coupler fields.
-This includes the air pressure, which is needed to compute humidity internally.
-
-The default coupler fields are imported by the default method implemented in
-FieldExchanger.jl.
-"""
-function FieldExchanger.import_atmos_fields!(csf, ::BucketSimulation, atmos_sim)
-    Interfacer.get_field!(csf.P_atmos, atmos_sim, Val(:air_pressure))
     return nothing
 end
 

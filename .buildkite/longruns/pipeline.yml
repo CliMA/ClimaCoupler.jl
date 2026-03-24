@@ -156,7 +156,7 @@ steps:
       - label: "GPU AMIP + prog. EDMF + 1M + integrated land"
         key: "amip_progedmf_1m_land"
         command:
-          - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_amip.jl --config_file $CONFIG_PATH/amip_progedmf_1m_land.yml --job_id amip_progedmf_1m_land"
+          - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_progedmf_1m_land.yml --job_id amip_progedmf_1m_land"
         artifact_paths: "output/amip_progedmf_1m_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -174,7 +174,7 @@ steps:
       - label: "GPU CMIP: ED only + bucket"
         key: "cmip_edonly_bucket"
         command:
-            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_bucket.yml --job_id cmip_edonly_bucket"
+            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_edonly_bucket.yml --job_id cmip_edonly_bucket"
         artifact_paths: "output/cmip_edonly_bucket/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -198,7 +198,7 @@ steps:
       - label: "GPU CMIP: diag. EDMF + integrated land"
         key: "cmip_diagedmf_land"
         command:
-            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_amip.jl --config_file $CONFIG_PATH/cmip_diagedmf_land.yml --job_id cmip_diagedmf_land"
+            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_diagedmf_land.yml --job_id cmip_diagedmf_land"
         artifact_paths: "output/cmip_diagedmf_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -210,7 +210,7 @@ steps:
       - label: "GPU CMIP: prog. EDMF + integrated land"
         key: "cmip_progedmf_land"
         command:
-            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_amip.jl --config_file $CONFIG_PATH/cmip_progedmf_land.yml --job_id cmip_progedmf_land"
+            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_progedmf_land.yml --job_id cmip_progedmf_land"
         artifact_paths: "output/cmip_progedmf_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"

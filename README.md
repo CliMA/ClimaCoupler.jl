@@ -75,7 +75,8 @@ Note: If you want to set the configuration file to something other than the defa
 while running the driver interactively, you'll need to
 manually set the value for `config_file`.
 
-For example, to use the configuration file found at `config/ci_configs/amip_default.yml`, you would set `config_file` as follows in the `run_amip` driver:
+For example, to use the configuration file found at `config/ci_configs/amip_default.yml`, you would set `config_file`
+as follows in the `run_simulation.jl` driver:
 ```
 config_file = "config/ci_configs/amip_default.yml"
 ```

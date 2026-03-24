@@ -4,9 +4,7 @@
 # GPU: `LinearAlgebra.mul!` on `CUDA.CUSPARSE.CuSparseMatrixCSC` falls back to scalar indexing; we call
 # `CUDA.CUSPARSE.mv!` instead when the intersection matrix lives on CUDA.CUSPARSE.
 #
-# Weights for remapping MUST come from `_conservative_weights_alias` / `_cmip_conservative_weights` below.
-# Do not call the optional `ConservativeRegridMath` submodule on `ClimaCoupler` from this file — it is not
-# guaranteed to exist in every precompiled or `] dev` checkout (UndefVarError at `construct_...`).
+# Weights for remapping come from `_conservative_weights_alias` / `_cmip_conservative_weights` below.
 
 const _CUDA_PKGID = Base.PkgId(Base.UUID("052768ef-5323-5732-b1bb-66c8b64840ba"), "CUDA")
 

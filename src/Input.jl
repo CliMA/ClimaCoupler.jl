@@ -259,6 +259,10 @@ function argparse_settings()
         help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`, `nothing`]"
         arg_type = String
         default = "prescribed"
+        "--sea_ice_dynamics_enabled"
+        help = "For `clima_seaice` only: if `false`, use thermodynamic sea ice only (no momentum/rheology). Default `true`."
+        arg_type = Bool
+        default = true
         "--land_fraction_source"
         help = "Source for land fraction data. [`etopo` (default) uses ETOPO-derived landsea_mask artifact, `era5` uses ERA5 land fraction artifact]"
         arg_type = String
@@ -510,6 +514,7 @@ function get_coupler_args(config_dict::Dict)
 
     # Ice model-specific information
     ice_model = Val(Symbol(config_dict["ice_model"]))
+    sea_ice_dynamics_enabled = get(config_dict, "sea_ice_dynamics_enabled", true)
 
     # Validate and correct model types based on simulation mode
     ocean_model, ice_model, land_model =
@@ -561,6 +566,7 @@ function get_coupler_args(config_dict::Dict)
         sst_adjustment,
         cmip_ocean_coupler_regridding,
         ice_model,
+        sea_ice_dynamics_enabled,
         land_fraction_source,
         binary_area_fraction,
     )

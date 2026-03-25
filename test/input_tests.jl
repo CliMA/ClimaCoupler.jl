@@ -124,6 +124,7 @@ end
     @test args.land_model == Val(:bucket)
     @test args.ocean_model == Val(:prescribed)
     @test args.ice_model == Val(:prescribed)
+    @test args.sea_ice_dynamics_enabled == true
     @test args.land_fraction_source == "etopo"
     @test args.sst_adjustment == 2.0
 

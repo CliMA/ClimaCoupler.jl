@@ -62,6 +62,7 @@ after each flux computation (see `compute_surface_fluxes!`).
 - `start_date`: [Date] the start date to initialize the sea ice concentration and thickness.
 - `coupled_param_dict`: [Dict{String, Any}] the coupled parameters.
 - `dt`: [Float64] the time step.
+- `sea_ice_dynamics_enabled`: [Bool] if `true` (default), use `ClimaOcean` sea-ice momentum/rheology; if `false`, thermodynamics only.
 """
 function ClimaSeaIceSimulation(
     ::Type{FT};
@@ -70,6 +71,7 @@ function ClimaSeaIceSimulation(
     start_date = nothing,
     coupled_param_dict = CP.create_toml_dict(FT),
     dt = 5 * 60.0, # 5 minutes
+    sea_ice_dynamics_enabled::Bool = true,
     extra_kwargs...,
 ) where {FT}
     # Initialize the sea ice with the same grid as the ocean
@@ -77,7 +79,12 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
 
     advection = ocean.ocean.model.advection.T
-    ice = sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection)
+    dynamics = if sea_ice_dynamics_enabled
+        CO.SeaIces.sea_ice_dynamics(grid, ocean.ocean)
+    else
+        nothing
+    end
+    ice = sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection, dynamics)
 
     ocean_ice_flux_formulation =
         CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)
@@ -463,16 +470,17 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
         F_turb_ρτyz_cell = rm.scratch_cc2
     end
 
-    # Set the momentum flux BCs at the correct locations using the remapped scratch fields
-    # Note that this requires the sea ice model to always be run with dynamics turned on
-    si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
-    si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
-    set_from_extrinsic_vector!(
-        (; u = si_flux_u, v = si_flux_v),
-        grid,
-        F_turb_ρτxz_cell,
-        F_turb_ρτyz_cell,
-    )
+    # Set the momentum flux BCs when sea-ice dynamics are enabled (momentum equation active).
+    if !isnothing(sim.ice.model.dynamics)
+        si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
+        si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
+        set_from_extrinsic_vector!(
+            (; u = si_flux_u, v = si_flux_v),
+            grid,
+            F_turb_ρτxz_cell,
+            F_turb_ρτyz_cell,
+        )
+    end
 
     if rm.regridding === :conservative
         Interfacer.remap!(rm.scratch_field_oc1, F_lh, rm)

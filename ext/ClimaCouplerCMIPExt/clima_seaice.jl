@@ -99,7 +99,7 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
 
     advection = ocean.ocean.model.advection.T
-    ice = sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection)
+    ice = sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection, dynamics = nothing)
 
     ocean_ice_flux_formulation =
         CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)
@@ -311,14 +311,16 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     # Note that this requires the sea ice model to always be run with dynamics turned on
-    si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
-    si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
-    set_from_extrinsic_vector!(
-        (; u = si_flux_u, v = si_flux_v),
-        grid,
-        F_turb_ρτxz_oc,
-        F_turb_ρτyz_oc,
-    )
+    if !isnothing(sim.ice.model.dynamics)
+        si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
+        si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
+        set_from_extrinsic_vector!(
+            (; u = si_flux_u, v = si_flux_v),
+            grid,
+            F_turb_ρτxz_oc,
+            F_turb_ρτyz_oc,
+        )
+    end
 
     # Remap the latent and sensible heat fluxes using scratch arrays
     Interfacer.remap!(sim.remapping.scratch_field_oc1, F_lh, sim.remapping) # latent heat flux

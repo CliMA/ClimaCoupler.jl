@@ -271,6 +271,13 @@ via the `update_T_sfc` callback to satisfy the skin-temperature flux balance.
 
 The diagnosed T_sfc is written back to ClimaSeaIce's `top_surface_temperature`
 (used by `PrescribedTemperature`) so the ice thermodynamics stays consistent.
+
+**Scratch discipline:** `scalar_temp1`–`scalar_temp4` hold ``δ``, ``T_i``, ``ϵ``, and ``α``
+until after `FluxCalculator.get_surface_fluxes` returns (so `update_T_sfc` never sees
+overwritten thickness or interior temperature). The surface-temperature guess uses
+`csf.T_sfc`; saturation humidity uses `scalar_temp5`. For `:constant` roughness,
+`scalar_temp3`/`scalar_temp4` hold ``z_{0m}``, ``z_{0b}`` only until emissivity and
+albedo are loaded into the same slots.
 """
 function FluxCalculator.compute_surface_fluxes!(
     csf,
@@ -284,8 +291,23 @@ function FluxCalculator.compute_surface_fluxes!(
 
     uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
 
-    # Sea ice parameters for the update_T_sfc callback (load into boundary-space scratch
-    # Fields first to avoid GPU scalar indexing when building the callback)
+    # Roughness first when it uses scalar_temp3/4, so we do not clobber ϵ/α below.
+    gustiness = ones(boundary_space)
+    roughness_model = Interfacer.get_field(sim, Val(:roughness_model))
+    roughness_params = if roughness_model == :coare3
+        Interfacer.get_field(sim, Val(:coare3_roughness_params))
+    elseif roughness_model == :constant
+        Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_momentum))
+        z0m = csf.scalar_temp3
+        Interfacer.get_field!(csf.scalar_temp4, sim, Val(:roughness_buoyancy))
+        z0b = csf.scalar_temp4
+        SF.ConstantRoughnessParams.(z0m, z0b)
+    else
+        error("Unknown roughness_model: $roughness_model. Must be :coare3 or :constant")
+    end
+    config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
+
+    # Skin callback inputs (boundary-space Fields; keep stable through get_surface_fluxes)
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:ice_thickness))
     Interfacer.get_field!(csf.scalar_temp2, sim, Val(:internal_temperature))
     Interfacer.get_field!(csf.scalar_temp3, sim, Val(:emissivity))
@@ -305,15 +327,12 @@ function FluxCalculator.compute_surface_fluxes!(
     LW_d = csf.LW_d
     T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
 
-    # Build element-wise update_T_sfc callbacks (each closes over local ice parameters)
     update_T_sfc_callback =
         ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
 
-    # Surface temperature guess from last timestep
-    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
-    T_sfc = csf.scalar_temp1
+    Interfacer.get_field!(csf.T_sfc, sim, Val(:surface_temperature))
+    T_sfc = csf.T_sfc
 
-    # Surface humidity
     ρ_sfc =
         SF.surface_density.(
             surface_fluxes_params,
@@ -325,24 +344,8 @@ function FluxCalculator.compute_surface_fluxes!(
             0,
             0,
         )
-    csf.scalar_temp2 .= TD.q_vap_saturation.(thermo_params, T_sfc, ρ_sfc, 0, 0)
-    q_sfc = csf.scalar_temp2
-
-    # Roughness and gustiness configuration
-    gustiness = ones(boundary_space)
-    roughness_model = Interfacer.get_field(sim, Val(:roughness_model))
-    roughness_params = if roughness_model == :coare3
-        Interfacer.get_field(sim, Val(:coare3_roughness_params))
-    elseif roughness_model == :constant
-        Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_momentum))
-        z0m = csf.scalar_temp3
-        Interfacer.get_field!(csf.scalar_temp4, sim, Val(:roughness_buoyancy))
-        z0b = csf.scalar_temp4
-        SF.ConstantRoughnessParams.(z0m, z0b)
-    else
-        error("Unknown roughness_model: $roughness_model. Must be :coare3 or :constant")
-    end
-    config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
+    csf.scalar_temp5 .= TD.q_vap_saturation.(thermo_params, T_sfc, ρ_sfc, 0, 0)
+    q_sfc = csf.scalar_temp5
 
     fluxes =
         FluxCalculator.get_surface_fluxes.(

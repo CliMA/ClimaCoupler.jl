@@ -140,6 +140,7 @@ default_coupler_fields() = [
     :scalar_temp2,
     :scalar_temp3,
     :scalar_temp4,
+    :scalar_temp5,
 ]
 
 """

@@ -97,7 +97,7 @@ function OceananigansSimulation(
     download_dataset(en4_salinity)
 
     # Set up ocean grid (1 degree)
-    resolution_points = (128, 60, 32)
+    resolution_points = (360, 180, 32)
     Nz = last(resolution_points)
     depth = 4000 # meters
     z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 0.85 * depth)
@@ -115,7 +115,7 @@ function OceananigansSimulation(
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
         minimum_depth = 30,
-        interpolation_passes = 20,
+        interpolation_passes = 5,
         major_basins = 1,
     )
 

@@ -25,6 +25,7 @@ steps:
       # For this pipeline, use the main branches of certain upstream packages
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaAtmos\", rev=\"main\"))'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaCore\", rev=\"tr/matmul\"))'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaUtilities\", rev=\"tr/wt_cb\"))'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaTimeSteppers\", rev=\"main\"))'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"Thermodynamics\", rev=\"f2aef12994b88fa4179a8febd77b572fcd978f03\"))'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"SurfaceFluxes\", rev=\"main\"))'"

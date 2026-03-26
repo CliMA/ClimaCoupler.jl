@@ -358,22 +358,32 @@ function compute_surface_fluxes!(
 end
 
 """
-    ocean_seaice_fluxes!(cs::CoupledSimulation)
-    ocean_seaice_fluxes!(ocean_sim, ice_sim)
+    ocean_seaice_fluxes!(cs::CoupledSimulation; kwargs...)
+    ocean_seaice_fluxes!(ocean_sim, ice_sim; kwargs...)
 
 Compute the fluxes between the ocean and sea ice simulations.
 This function does nothing by default - it should be extended
 for any ocean and sea ice models that support flux calculations.
+
+# Optional keyword arguments (CMIP / Oceananigans + ClimaSeaIce extension)
+
+Keyword arguments are forwarded to specialized methods when present. Stubs ignore them.
+
+- `diagnose_ocean_seaice_fluxes::Bool`: if `true`, log a detailed `@info` report each call
+  (frazil/interface flux extrema, ocean surface subcooling, interface and top ice temperatures).
+- `warn_if_ocean_seaice_bottom_flux_exceeds`: threshold (W/m²) for ``|Q_f + Q_i|`` warnings; use
+  `nothing` to disable. The Oceananigans + ClimaSeaIce extension defaults to `500_000`.
 """
-function ocean_seaice_fluxes!(cs::Interfacer.CoupledSimulation)
-    haskey(cs.model_sims, :ocean_sim) &&
-        haskey(cs.model_sims, :ice_sim) &&
-        ocean_seaice_fluxes!(cs.model_sims.ocean_sim, cs.model_sims.ice_sim)
+function ocean_seaice_fluxes!(cs::Interfacer.CoupledSimulation; kwargs...)
+    if haskey(cs.model_sims, :ocean_sim) && haskey(cs.model_sims, :ice_sim)
+        ocean_seaice_fluxes!(cs.model_sims.ocean_sim, cs.model_sims.ice_sim; kwargs...)
+    end
     return nothing
 end
 function ocean_seaice_fluxes!(
     ocean_sim::Union{Interfacer.AbstractOceanSimulation, Interfacer.AbstractSurfaceStub},
-    ice_sim::Union{Interfacer.AbstractSeaIceSimulation, Interfacer.AbstractSurfaceStub},
+    ice_sim::Union{Interfacer.AbstractSeaIceSimulation, Interfacer.AbstractSurfaceStub};
+    kwargs...,
 )
     return nothing
 end

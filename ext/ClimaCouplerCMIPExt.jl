@@ -26,6 +26,7 @@ import ClimaParams as CP
 import ConservativeRegridding as CR
 import Adapt
 import LinearAlgebra
+import Logging
 using KernelAbstractions: @kernel, @index, @inbounds
 
 # Include helper functions first (used by both oceananigans.jl and clima_seaice.jl)

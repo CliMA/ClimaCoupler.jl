@@ -1,3 +1,4 @@
+using ClimaSeaIce.SeaIceThermodynamics: melting_temperature
 using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions:
     IceWaterThermalEquilibrium, PrescribedTemperature, get_tracer
 import ClimaComms
@@ -566,6 +567,85 @@ function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
     return nothing
 end
 
+function _ocean_sea_ice_flux_report_nt(ocean_sim, ice_sim, Qf, Qi)
+    t = ocean_sim.ocean.model.clock.time
+    qf_min = OC.minimum(Qf)
+    qf_max = OC.maximum(Qf)
+    qi_min = OC.minimum(Qi)
+    qi_max = OC.maximum(Qi)
+    qf_i = OC.interior(Qf, :, :, 1)
+    qi_i = OC.interior(Qi, :, :, 1)
+    qb_abs_max = maximum(abs, qf_i .+ qi_i)
+    pt = ice_sim.ice.model.ice_thermodynamics.phase_transitions
+    L = pt.reference_latent_heat
+    lq = pt.liquidus
+    Ttr = ocean_sim.ocean.model.tracers.T
+    Str = ocean_sim.ocean.model.tracers.S
+    Nz = size(Ttr.grid, 3)
+    Ts = OC.interior(Ttr, :, :, Nz:Nz)
+    Ss = OC.interior(Str, :, :, Nz:Nz)
+    Tm = @. melting_temperature(lq, Ss)
+    max_surface_subcooling = maximum(@. max(zero(eltype(Ts)), Tm - Ts))
+    Tiface = ice_sim.ocean_ice_interface.temperature
+    Siface = ice_sim.ocean_ice_interface.salinity
+    Tu = ice_sim.ice.model.ice_thermodynamics.top_surface_temperature
+    return (;
+        ocean_time = t,
+        qf_min,
+        qf_max,
+        qi_min,
+        qi_max,
+        qb_abs_max,
+        reference_latent_heat = L,
+        max_surface_subcooling,
+        Tstar_min = OC.minimum(Tiface),
+        Tstar_max = OC.maximum(Tiface),
+        Sstar_min = OC.minimum(Siface),
+        Sstar_max = OC.maximum(Siface),
+        Tu_min = OC.minimum(Tu),
+        Tu_max = OC.maximum(Tu),
+    )
+end
+
+function _ocean_sea_ice_flux_diagnostics!(
+    ocean_sim,
+    ice_sim,
+    Qf,
+    Qi;
+    diagnose_ocean_seaice_fluxes::Bool,
+    warn_if_ocean_seaice_bottom_flux_exceeds::Union{Nothing, Real},
+)
+    logger = Logging.current_logger()
+    debug_on = Logging.min_enabled_level(logger) <= Logging.Debug
+    warn_th = warn_if_ocean_seaice_bottom_flux_exceeds
+
+    if !diagnose_ocean_seaice_fluxes && !debug_on
+        if warn_th === nothing
+            return nothing
+        end
+        qf_i = OC.interior(Qf, :, :, 1)
+        qi_i = OC.interior(Qi, :, :, 1)
+        qb_abs_max = maximum(abs, qf_i .+ qi_i)
+        if qb_abs_max > warn_th
+            t_warn = ocean_sim.ocean.model.clock.time
+            Logging.@warn "ClimaCoupler: large ocean–ice bottom heat flux (|Q_f + Q_i|)" qb_abs_max ocean_time=t_warn threshold=warn_th
+        end
+        return nothing
+    end
+
+    r = _ocean_sea_ice_flux_report_nt(ocean_sim, ice_sim, Qf, Qi)
+    if warn_th !== nothing && r.qb_abs_max > warn_th
+        Logging.@warn "ClimaCoupler: large ocean–ice bottom heat flux (|Q_f + Q_i|)" report=r ocean_time=r.ocean_time threshold=warn_th
+    end
+    if diagnose_ocean_seaice_fluxes
+        Logging.@info "ClimaCoupler: ocean–ice flux diagnostic" report = r
+    end
+    if debug_on
+        Logging.@debug "ClimaCoupler: ocean–ice flux diagnostic" report = r
+    end
+    return nothing
+end
+
 """
     ocean_seaice_fluxes!(ocean_sim::OceananigansSimulation, ice_sim::ClimaSeaIceSimulation)
 
@@ -582,10 +662,22 @@ ocean-sea ice interactions to the existing fluxes, rather than overwriting all f
     This function must be called after the turbulent fluxes have been updated in both
     simulations. Here only the contributions from the sea ice/ocean interactions
     are added to the fluxes.
+
+# Diagnostics
+
+- Enable **`Logging.Debug`** (e.g. `using Logging; global_logger(ConsoleLogger(stderr, Logging.Debug))`)
+  to log extrema of `Qf`, `Qi`, ``|Q_f+Q_i|``, reference latent heat, ocean surface subcooling
+  vs the ice liquidus, and ice top / interface ``T^\\star, S^\\star`` each call (evaluated only
+  when debug logging is active).
+- Or pass **`diagnose_ocean_seaice_fluxes = true`** for an explicit **`@info`** report each call.
+- **`warn_if_ocean_seaice_bottom_flux_exceeds`** (default ``5 \\times 10^5\\ \\mathrm{W}/\\mathrm{m}^2``):
+  emit **`@warn`** when ``\\max |Q_f + Q_i|`` exceeds the threshold; pass `nothing` to disable.
 """
 function FluxCalculator.ocean_seaice_fluxes!(
     ocean_sim::OceananigansSimulation,
-    ice_sim::ClimaSeaIceSimulation,
+    ice_sim::ClimaSeaIceSimulation;
+    diagnose_ocean_seaice_fluxes::Bool = false,
+    warn_if_ocean_seaice_bottom_flux_exceeds::Union{Nothing, Real} = 500_000,
 )
     grid = ocean_sim.ocean.model.grid
     ocean_properties = ocean_sim.ocean_properties
@@ -609,6 +701,15 @@ function FluxCalculator.ocean_seaice_fluxes!(
     Qf = ice_sim.ocean_ice_interface.fluxes.frazil_heat        # frazil heat flux
     Qi = ice_sim.ocean_ice_interface.fluxes.interface_heat     # interfacial heat flux
     bottom_heat_flux .= Qf .+ Qi
+
+    _ocean_sea_ice_flux_diagnostics!(
+        ocean_sim,
+        ice_sim,
+        Qf,
+        Qi;
+        diagnose_ocean_seaice_fluxes,
+        warn_if_ocean_seaice_bottom_flux_exceeds,
+    )
 
     ## Update the internals of the ocean model
     ρₒ⁻¹ = 1 / ocean_sim.ocean_properties.reference_density

@@ -77,7 +77,7 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
 
     advection = ocean.ocean.model.advection.T
-    ice = sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection)
+    ice = CO.SeaIces.sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection)
 
     ocean_ice_flux_formulation =
         CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)
@@ -166,56 +166,6 @@ function ClimaSeaIceSimulation(
     # Ensure ocean temperature is above freezing where there is sea ice
     CO.OceanSeaIceModels.above_freezing_ocean_temperature!(ocean.ocean, grid, ice)
     return sim
-end
-
-function sea_ice_simulation(
-    grid,
-    ocean = nothing;
-    Δt = 5 * 60.0, # 5 minutes
-    ice_salinity = 4, # psu
-    advection = nothing, # for the moment
-    tracers = (),
-    ice_heat_capacity = 2100, # J kg⁻¹ K⁻¹
-    ice_consolidation_thickness = 0.05, # m
-    ice_density = 900, # kg m⁻³
-    dynamics = CO.SeaIces.sea_ice_dynamics(grid, ocean),
-    phase_transitions = CSI.PhaseTransitions(; ice_heat_capacity, ice_density),
-    conductivity = 2, # kg m s⁻³ K⁻¹
-    internal_heat_flux = CSI.ConductiveFlux(; conductivity),
-)
-    FT = eltype(grid)
-
-    top_sfc_temp = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    OC.set!(top_sfc_temp, FT(0))
-    top_heat_boundary_condition = PrescribedTemperature(top_sfc_temp)
-    kᴺ = size(grid, 3)
-    surface_ocean_salinity = OC.interior(ocean.model.tracers.S, :, :, (kᴺ:kᴺ))
-    bottom_heat_boundary_condition = IceWaterThermalEquilibrium(surface_ocean_salinity)
-
-    ice_thermodynamics = CSI.SlabSeaIceThermodynamics(
-        grid;
-        internal_heat_flux,
-        phase_transitions,
-        top_heat_boundary_condition,
-        bottom_heat_boundary_condition,
-    )
-
-    bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-
-    # Build the sea ice model
-    sea_ice_model = CSI.SeaIceModel(
-        grid;
-        ice_salinity,
-        advection,
-        tracers,
-        ice_consolidation_thickness,
-        ice_thermodynamics,
-        dynamics,
-        bottom_heat_flux,
-    )
-
-    # Build the simulation
-    return OC.Simulation(sea_ice_model; Δt)
 end
 
 ###############################################################################

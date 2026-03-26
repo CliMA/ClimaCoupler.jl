@@ -236,7 +236,7 @@ end
 # Trim numerically negligible ice before each sea-ice step. ClimaSeaIce uses expressions that
 # behave like 1/h (conductive flux) and ℵ/(2h) (melting branch of concentration evolution); values
 # of h of order 1e-7–1e-9 m are not meaningful ice but can drive O(1) m/s volume tendencies.
-@kernel function _sanitize_ice_state!(h, ℵ, V_min::FT, h_floor::FT, ℵ_floor::FT) where {FT}
+@kernel function _sanitize_ice_state!(h, ℵ, V_min, h_floor, ℵ_floor)
     i, j = @index(Global, NTuple)
     hᵢ = @inbounds h[i, j, 1]
     ℵᵢ = @inbounds ℵ[i, j, 1]

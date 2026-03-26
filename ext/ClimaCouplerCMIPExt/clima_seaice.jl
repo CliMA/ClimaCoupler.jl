@@ -236,23 +236,26 @@ end
 # Trim numerically negligible ice before each sea-ice step. ClimaSeaIce uses expressions that
 # behave like 1/h (conductive flux) and ℵ/(2h) (melting branch of concentration evolution); values
 # of h of order 1e-7–1e-9 m are not meaningful ice but can drive O(1) m/s volume tendencies.
-@kernel function _sanitize_ice_state!(h, ℵ, V_min, h_floor, ℵ_floor)
+#
+# Fully ASCII kernel signature: some KA/Oceananigans combinations fail to emit `f(backend, sizes...)`
+# when the `@kernel` args use Unicode (e.g. ℵ) or certain `_` name patterns.
+@kernel function coupler_sanitize_sea_ice_ghosts!(h, ice_conc, @Const(V_min), @Const(h_floor), @Const(c_floor))
     i, j = @index(Global, NTuple)
     hᵢ = @inbounds h[i, j, 1]
-    ℵᵢ = @inbounds ℵ[i, j, 1]
+    cᵢ = @inbounds ice_conc[i, j, 1]
 
-    Vᵢ = hᵢ * ℵᵢ
-    has_ice = (hᵢ > 0) | (ℵᵢ > 0)
+    Vᵢ = hᵢ * cᵢ
+    has_ice = (hᵢ > 0) | (cᵢ > 0)
     bad =
         !isfinite(hᵢ) |
-        !isfinite(ℵᵢ) |
+        !isfinite(cᵢ) |
         (has_ice & (Vᵢ < V_min)) |
         (has_ice & (hᵢ < h_floor)) |
-        (has_ice & (ℵᵢ < ℵ_floor))
+        (has_ice & (cᵢ < c_floor))
 
     @inbounds begin
         h[i, j, 1] = ifelse(bad, zero(hᵢ), hᵢ)
-        ℵ[i, j, 1] = ifelse(bad, zero(ℵᵢ), ℵᵢ)
+        ice_conc[i, j, 1] = ifelse(bad, zero(cᵢ), cᵢ)
     end
 end
 
@@ -269,19 +272,19 @@ function Interfacer.step!(sim::ClimaSeaIceSimulation, t)
     V_min = FT(1e-8)
     # Below this thickness, 1/h in conductive / concentration terms dominates roundoff.
     h_floor = FT(1e-5)
-    ℵ_floor = FT(1e-8)
+    c_floor = FT(1e-8)
 
     arch = OC.Architectures.architecture(sim.ice.model.grid)
     OC.Utils.launch!(
         arch,
         sim.ice.model.grid,
         :xy,
-        _sanitize_ice_state!,
+        coupler_sanitize_sea_ice_ghosts!,
         h,
         ℵ,
         V_min,
         h_floor,
-        ℵ_floor,
+        c_floor,
     )
 
     return OC.time_step!(sim.ice, float(t) - sim.ice.model.clock.time)

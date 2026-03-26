@@ -233,9 +233,59 @@ end
 ### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###############################################################################
 
-# Timestep the simulation forward to time `t`
-Interfacer.step!(sim::ClimaSeaIceSimulation, t) =
-    OC.time_step!(sim.ice, float(t) - sim.ice.model.clock.time)
+# Trim numerically negligible ice before each sea-ice step. ClimaSeaIce uses expressions that
+# behave like 1/h (conductive flux) and ℵ/(2h) (melting branch of concentration evolution); values
+# of h of order 1e-7–1e-9 m are not meaningful ice but can drive O(1) m/s volume tendencies.
+@kernel function _sanitize_ice_state!(h, ℵ, V_min::FT, h_floor::FT, ℵ_floor::FT) where {FT}
+    i, j = @index(Global, NTuple)
+    hᵢ = @inbounds h[i, j, 1]
+    ℵᵢ = @inbounds ℵ[i, j, 1]
+
+    Vᵢ = hᵢ * ℵᵢ
+    has_ice = (hᵢ > 0) | (ℵᵢ > 0)
+    bad =
+        !isfinite(hᵢ) |
+        !isfinite(ℵᵢ) |
+        (has_ice & (Vᵢ < V_min)) |
+        (has_ice & (hᵢ < h_floor)) |
+        (has_ice & (ℵᵢ < ℵ_floor))
+
+    @inbounds begin
+        h[i, j, 1] = ifelse(bad, zero(hᵢ), hᵢ)
+        ℵ[i, j, 1] = ifelse(bad, zero(ℵᵢ), ℵᵢ)
+    end
+end
+
+# Timestep the simulation forward to time `t`.
+#
+# Guard against pathological "ghost ice": tiny positive h/ℵ or tiny volume V = h ℵ. This is
+# numerical hygiene (below ~10 µm thickness or ~1e-8 m ice-equivalent volume is not resolved ice).
+function Interfacer.step!(sim::ClimaSeaIceSimulation, t)
+    h = sim.ice.model.ice_thickness
+    ℵ = sim.ice.model.ice_concentration
+    FT = eltype(h)
+
+    # Volume floor: ice-equivalent meters per grid cell (same units as h*ℵ in the slab).
+    V_min = FT(1e-8)
+    # Below this thickness, 1/h in conductive / concentration terms dominates roundoff.
+    h_floor = FT(1e-5)
+    ℵ_floor = FT(1e-8)
+
+    arch = OC.Architectures.architecture(sim.ice.model.grid)
+    OC.Utils.launch!(
+        arch,
+        sim.ice.model.grid,
+        :xy,
+        _sanitize_ice_state!,
+        h,
+        ℵ,
+        V_min,
+        h_floor,
+        ℵ_floor,
+    )
+
+    return OC.time_step!(sim.ice, float(t) - sim.ice.model.clock.time)
+end
 
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}) = sim.area_fraction
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_concentration}) =

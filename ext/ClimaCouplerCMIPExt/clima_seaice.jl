@@ -654,9 +654,7 @@ function FluxCalculator.ocean_seaice_fluxes!(
 
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
     salt_contrib = OC.interior(ocean_sim.remapping.scratch_cc2, :, :, 1)
-    salt_contrib .=
-        OC.interior(ice_concentration, :, :, 1) .*
-        OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
+    salt_contrib .= OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
     salt_contrib .= ifelse.(polar_excl_centers .≈ 0, zero(salt_contrib), salt_contrib)
     OC.interior(oc_flux_S, :, :, 1) .+= salt_contrib
 

@@ -4,11 +4,14 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Remove perfect model calibration experiment PR[#1835](https://github.com/CliMA/ClimaCoupler.jl/pull/1835)
+Remove some GPU jobs from CI to reduce impact of long wait times.
+Also deletes the perfect model calibration altogether, which is
+not planned to be developed further.
+
 #### Remove `experiments/ClimaCore` PR[#1704](https://github.com/CliMA/ClimaCoupler.jl/pull/1809)
 The `experiments/ClimaCore/` directory and its coupling examples
 (heat diffusion and sea breeze) have been removed.
-
-### ClimaCoupler features
 
 #### Add an extension for CMIP models PR[#1704](https://github.com/CliMA/ClimaCoupler.jl/pull/1704)
 This extension contains the methods that extend the ClimaCoupler.jl interface

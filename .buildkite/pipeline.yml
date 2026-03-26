@@ -250,26 +250,6 @@ steps:
           slurm_gpus: 1
 
       # GPU RUNS: AMIP
-      - label: "GPU AMIP: ED only + integrated land"
-        key: "gpu_amip_edonly_integrated_land"
-        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_edonly_integrated_land.yml --job_id gpu_amip_edonly_integrated_land"
-        artifact_paths: "output/gpu_amip_edonly_integrated_land/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
-
-      - label: "GPU AMIP: ED only + bucket"
-        key: "gpu_amip_edonly_bucket"
-        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_edonly_bucket.yml --job_id gpu_amip_edonly_bucket"
-        artifact_paths: "output/gpu_amip_edonly_bucket/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
-
       - label: "GPU AMIP: diag. EDMF + integrated land"
         key: "gpu_amip_diagedmf_integrated_land"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_diagedmf_integrated_land.yml --job_id gpu_amip_diagedmf_integrated_land"
@@ -280,31 +260,10 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-      - label: "GPU AMIP: diag. EDMF + bucket"
-        key: "gpu_amip_diagedmf_bucket"
-        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_diagedmf_bucket.yml --job_id gpu_amip_diagedmf_bucket"
-        artifact_paths: "output/gpu_amip_diagedmf_bucket/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
-
       - label: "GPU AMIP: prog. EDMF + bucket"
         key: "gpu_amip_progedmf_bucket"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_progedmf_bucket.yml --job_id gpu_amip_progedmf_bucket"
         artifact_paths: "output/gpu_amip_progedmf_bucket/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
-
-
-      - label: "GPU AMIP test: albedo from function"
-        key: "gpu_amip_albedo_function"
-        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_albedo_function.yml --job_id gpu_amip_albedo_function"
-        artifact_paths: "output/gpu_amip_albedo_function/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -323,17 +282,6 @@ steps:
 
   - group: "CMIP"
     steps:
-
-      - label: "GPU CMIP: ClimaAtmos + bucket land + Oceananigans + ClimaSeaIce"
-        key: "gpu_cmip_oceananigans_climaseaice_bucket"
-        command: "julia -O0 --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice_bucket.yml --job_id gpu_cmip_oceananigans_climaseaice_bucket"
-        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_bucket/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
-
       - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce"
         key: "gpu_cmip_oceananigans_climaseaice"
         command: "julia -O0 --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice.yml --job_id gpu_cmip_oceananigans_climaseaice"
@@ -343,23 +291,6 @@ steps:
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
-
-  - group: "Calibration experiments"
-    steps:
-      - label: "Perfect model calibration test"
-        key: "amip_pm_calibration"
-        command:
-          - "julia -O0 --color=yes --project=experiments/AMIP experiments/calibration/perfect_model/run_calibration.jl"
-        artifact_paths: "experiments/calibration/output/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-          CLIMACOMMS_CONTEXT: "SINGLETON"
-          SHORT_RUN: ""
-        agents:
-          slurm_mem: 64GB
-          slurm_ntasks: 3
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
 
   - wait
 

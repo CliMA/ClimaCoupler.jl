@@ -26,7 +26,7 @@ import ClimaParams as CP
 import ConservativeRegridding as CR
 import Adapt
 import LinearAlgebra
-using KernelAbstractions: @Const, @kernel, @index, @inbounds
+using KernelAbstractions: @kernel, @index, @inbounds
 
 # Include helper functions first (used by both oceananigans.jl and clima_seaice.jl)
 include("ClimaCouplerCMIPExt/climaocean_helpers.jl")

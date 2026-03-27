@@ -158,7 +158,7 @@ over ocean/sea ice regions, so it cannot be used in simulations that ignore the 
 This extension is loaded when [Oceananigans.jl](https://github.com/CliMA/Oceananigans.jl),
 [ClimaOcean.jl](https://github.com/CliMA/ClimaOcean.jl),
 [ClimaSeaIce.jl](https://github.com/CliMA/ClimaSeaIce.jl),
-and KernelAbstractions.jl are available. It provides:
+KernelAbstractions.jl, ConservativeRegridding.jl, and Adapt.jl are available. It provides:
 
 - **`OceananigansSimulation`**: A full ocean circulation model implemented in Oceananigans.jl and
   initialized from EN4 or ECCO reanalysis data via ClimaOcean.jl. The ocean evolves

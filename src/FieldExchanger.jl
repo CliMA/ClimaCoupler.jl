@@ -258,7 +258,8 @@ end
 """
     update_model_sims!(model_sims, csf)
 
-Iterates `update_sim!` over all component model simulations saved in `cs.model_sims`.
+For each component simulation, resets accumulated surface fluxes via
+[`FluxCalculator.reset_fluxes!`](@ref), then iterates `update_sim!`.
 
 # Arguments
 - `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
@@ -266,6 +267,7 @@ Iterates `update_sim!` over all component model simulations saved in `cs.model_s
 """
 function update_model_sims!(model_sims, csf)
     for sim in model_sims
+        FluxCalculator.reset_fluxes!(sim)
         update_sim!(sim, csf)
     end
 end

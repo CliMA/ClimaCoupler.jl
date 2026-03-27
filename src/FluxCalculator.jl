@@ -17,6 +17,7 @@ import ..Interfacer, ..Utilities
 export turbulent_fluxes!,
     get_surface_params,
     update_turbulent_fluxes!,
+    reset_fluxes!,
     compute_surface_fluxes!,
     ocean_seaice_fluxes!
 
@@ -192,6 +193,21 @@ function update_turbulent_fluxes!(sim::Interfacer.AbstractComponentSimulation, f
 end
 
 update_turbulent_fluxes!(sim::Interfacer.AbstractSurfaceStub, fields::NamedTuple) = nothing
+
+"""
+    reset_fluxes!(sim::Interfacer.AbstractComponentSimulation)
+
+Re-initialize surface flux fields in `sim` that are accumulated over the course of one
+coupler timestep (via `FieldExchanger.update_sim!`, `update_turbulent_fluxes!`,
+`ocean_seaice_fluxes!`, etc.).
+
+This is invoked at the beginning of each [`FieldExchanger.update_model_sims!`](@ref) call,
+before [`FieldExchanger.update_sim!`](@ref). The default implementation does nothing;
+ocean and other models that use additive surface flux boundary conditions should extend it.
+"""
+function reset_fluxes!(sim::Interfacer.AbstractComponentSimulation)
+    return nothing
+end
 
 """
     compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)

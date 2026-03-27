@@ -98,11 +98,14 @@ function ClimaSeaIceSimulation(
     grid = ocean.ocean.model.grid
     arch = OC.Architectures.architecture(grid)
 
+    # TODO try updated dynamics drag coefficient, advection
     advection = ocean.ocean.model.advection.T
+    # advection = OC.WENO(order = 5, minimum_buffer_upwind_order = 1)
     ice = sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection, dynamics = nothing)
 
-    ocean_ice_flux_formulation =
-        CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)
+    # TODO try with simpler flux calculation
+    ocean_ice_flux_formulation = CO.OceanSeaIceModels.InterfaceComputations.IceBathHeatFlux(friction_velocity = 0.002)
+        # CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)
     interface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     interface_salinity = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
@@ -200,7 +203,7 @@ function sea_ice_simulation(
     ice_heat_capacity = 2100, # J kg⁻¹ K⁻¹
     ice_consolidation_thickness = 0.05, # m
     ice_density = 900, # kg m⁻³
-    dynamics = CO.SeaIces.sea_ice_dynamics(grid, ocean),
+    dynamics = CO.SeaIces.sea_ice_dynamics(grid, ocean; sea_ice_ocean_drag_coefficient = 2.5e-3),
     phase_transitions = CSI.PhaseTransitions(; ice_heat_capacity, ice_density),
     conductivity = 2, # kg m s⁻³ K⁻¹
     internal_heat_flux = CSI.ConductiveFlux(; conductivity),
@@ -465,22 +468,27 @@ function FluxCalculator.ocean_seaice_fluxes!(
     flux_u .= ifelse.(polar_excl_u .≈ 0, zero(flux_u), flux_u)
     flux_v .= ifelse.(polar_excl_v .≈ 0, zero(flux_v), flux_v)
 
+    # TODO remove both sic masks here
     oc_flux_T = surface_flux(ocean_sim.ocean.model.tracers.T)
     qi_masked = OC.interior(ocean_sim.remapping.scratch_field_oc1, :, :, 1)
-    qi_masked .=
-        OC.interior(ice_concentration, :, :, 1) .* OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
+    qi_masked .= OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
     qi_masked .= ifelse.(polar_excl_centers .≈ 0, zero(qi_masked), qi_masked)
     OC.interior(oc_flux_T, :, :, 1) .+= qi_masked
 
+    # The melt rate is computed from the heat flux, so it already includes the SIC masking
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
     salt_contrib = OC.interior(ocean_sim.remapping.scratch_field_oc2, :, :, 1)
-    salt_contrib .=
-        OC.interior(ice_concentration, :, :, 1) .*
-        OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
+    salt_contrib .= OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
     salt_contrib .= ifelse.(polar_excl_centers .≈ 0, zero(salt_contrib), salt_contrib)
     OC.interior(oc_flux_S, :, :, 1) .+= salt_contrib
 
     return nothing
+end
+
+@kernel function adjust_ocean_melting_temperature!(oc_T, grid, oc_S, ice_concentration)
+    i, j = @index(Global, NTuple)
+    # Set ocean temp to melting/freezing temp if there is sea ice
+    oc_T[i, j, grid.Nz] = ifelse(ice_concentration[i, j, 1] > 0, oc_S[i, j, grid.Nz] * -0.054, oc_T[i, j, grid.Nz])
 end
 
 """

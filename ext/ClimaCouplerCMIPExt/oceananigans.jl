@@ -100,7 +100,7 @@ function OceananigansSimulation(
     CO.EN4.download_dataset(en4_temperature)
     CO.EN4.download_dataset(en4_salinity)
 
-    # Set up tripolar ocean grid (1 degree)
+    # Set up tripolar ocean grid (1/2 degree)
     Nx = 720
     Ny = 360
     Nz = 100
@@ -537,8 +537,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     # polar-exclusion mask
     @. remapped_F_lh = ifelse(polar_excl_centers .≈ 0, zero(remapped_F_lh), remapped_F_lh)
     @. remapped_F_sh = ifelse(polar_excl_centers .≈ 0, zero(remapped_F_sh), remapped_F_sh)
-    OC.interior(oc_flux_T, :, :, 1) .=
-        OC.interior(oc_flux_T, :, :, 1) .+
+    OC.interior(oc_flux_T, :, :, 1) .+=
         (1.0 .- ice_concentration) .* (remapped_F_lh .+ remapped_F_sh) ./
         (reference_density * heat_capacity)
 
@@ -555,8 +554,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
         zero(moisture_fresh_water_flux),
         moisture_fresh_water_flux,
     )
-    OC.interior(oc_flux_S, :, :, 1) .=
-        OC.interior(oc_flux_S, :, :, 1) .-
+    OC.interior(oc_flux_S, :, :, 1) .-=
         (1.0 .- ice_concentration) .* surface_salinity .* moisture_fresh_water_flux
     return nothing
 end
@@ -590,7 +588,13 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     grid = sim.ocean.model.grid
     Nz = grid.Nz
     ice_concentration = OC.interior(sim.ice_concentration, :, :, 1)
+
+    # Reset fluxes to zero before updating
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
+    OC.interior(oc_flux_T, :, :, 1) .= 0
+    oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
+    OC.interior(oc_flux_S, :, :, 1) .= 0
+
     # polar-exclusion mask
     polar_excl_centers = sim.remapping.polar_exclusion_flux_mask_centers
 
@@ -616,7 +620,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
             )
         ) ./ (reference_density * heat_capacity)
     rad_T_flux .= ifelse.(polar_excl_centers .≈ 0, zero(rad_T_flux), rad_T_flux)
-    OC.interior(oc_flux_T, :, :, 1) .= rad_T_flux
+    OC.interior(oc_flux_T, :, :, 1) .+= rad_T_flux
 
     # Remap precipitation fields onto scratch fields; rename for clarity
     Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.P_liq, sim.remapping) # liquid precipitation
@@ -628,11 +632,9 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     remapped_P_snow =
         ifelse.(polar_excl_centers .≈ 0, zero(remapped_P_snow), remapped_P_snow)
 
-    # Virtual salt flux
-    oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
+    # Virtual salt flux (note we subtract instead of adding for sign convention consistency)
     # polar-exclusion mask
-    OC.interior(oc_flux_S, :, :, 1) .=
-        OC.interior(oc_flux_S, :, :, 1) .-
+    OC.interior(oc_flux_S, :, :, 1) .-=
         OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
         (remapped_P_liq .+ remapped_P_snow) ./ reference_density
     return nothing

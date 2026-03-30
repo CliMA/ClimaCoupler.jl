@@ -15,12 +15,13 @@ extra_atmos_diagnostics:
     reduction_time: average
     pressure_coordinates: true
     compute_every: 6hours
+implicit_microphysics: false
 initial_condition: "AMIPFromERA5"
 land_model: "integrated"
 mode_name: "amip"
 netcdf_output_at_levels: true
 microphysics_model: "1M"
-ode_algo: "ARS232"
+ode_algo: "ARS343"
 output_default_diagnostics: true
 rmse_check: true
 start_date: "20100101"

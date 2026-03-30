@@ -19,5 +19,5 @@ To run a pipeline on a Slurm cluster, ensure that the given runscript
 `experiments/calibration/<pipeline>/run_calibration.jl` is configured for your
 cluster and run:
 ```
-julia --project=experiments/ClimaEarth experiments/calibration/<pipeline>/run_calibration.jl
+julia --project=experiments/AMIP experiments/calibration/<pipeline>/run_calibration.jl
 ```

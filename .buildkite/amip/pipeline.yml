@@ -1,7 +1,7 @@
 agents:
   queue: clima
   slurm_time: 96:00:00
-  modules: climacommon/2026_02_18
+  modules: climacommon/2025_05_15
 
 env:
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100
@@ -19,10 +19,10 @@ steps:
       - "echo $$JULIA_DEPOT_PATH"
 
       - echo "--- Instantiate AMIP env"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.add(\"MPI\")'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/ClimaEarth/ -e 'using Pkg; Pkg.status()'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 
     agents:
       slurm_gpus: 1
@@ -41,7 +41,7 @@ steps:
         key: "amip"
         command:
           - echo "--- Run simulation"
-          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/run_amip.jl --config_file $CONFIG_PATH/amip_land.yml --job_id amip"
+          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_land.yml --job_id amip"
         artifact_paths: "output/amip/artifacts/*"
         timeout_in_minutes: 5760
         env:
@@ -60,11 +60,11 @@ steps:
 
       - label: "Send simulation output to Azure VM for visualization"
         command:
-          - rsync -avz experiments/ClimaEarth/output/amip/output_active/* azure-arenchon:/home/arenchon/GitHub/ClimaViz.jl/data/climacoupler-amip/
+          - rsync -avz output/amip/output_active/* azure-arenchon:/home/arenchon/GitHub/ClimaViz.jl/data/climacoupler-amip/
 
       - label: ":envelope: Slack report: current AMIP"
         command:
           - |
-            find experiments/ClimaEarth/output/amip/artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
+            find output/amip/artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
               slack-upload -c C04S6MBSDC4 -f "$$file" -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
             done

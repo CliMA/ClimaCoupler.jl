@@ -1,0 +1,25 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
+checkpoint_dt: "1months"
+coupler_toml: ["toml/amip_progedmf.toml"]
+dt: "120secs"
+dt_cpl: "120secs"
+energy_check: false
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: 1months
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
+land_model: "integrated"
+mode_name: "amip"
+netcdf_output_at_levels: true
+ode_algo: "ARS222"
+output_default_diagnostics: true
+radiation_reset_rng_seed: true
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+t_end: "186days"
+topo_smoothing: true
+topography: "Earth"

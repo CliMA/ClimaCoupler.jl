@@ -65,7 +65,7 @@ function argparse_settings()
         "--coupler_toml"
         help = "An optional list of paths to toml files used to overwrite the default model parameters."
         arg_type = Vector{String}
-        default = []
+        default = String[]
         # Computational simulation setup information
         "--unique_seed"
         help = "Boolean flag indicating whether to set the random number seed to a unique value [`false` (default), `true`]"
@@ -202,7 +202,7 @@ function argparse_settings()
         "--extra_atmos_diagnostics"
         help = "List of dictionaries containing information about additional atmosphere diagnostics to output [nothing (default)]"
         arg_type = Vector{Dict{Any, Any}}
-        default = []
+        default = Dict{Any, Any}[]
         ### ClimaLand specific
         "--land_model"
         help = "Land model to use. [`bucket` (default), `integrated`, `nothing`]"

@@ -1,0 +1,32 @@
+FLOAT_TYPE: "Float64"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
+checkpoint_dt: "1months"
+coupler_toml: ["toml/amip_progedmf.toml"]
+dt_atmos: "120secs" # 2 minutes
+dt_cloud_fraction: "1hours"
+dt_cpl: "1800secs" # 30 minutes
+dt_land: "120secs" # 2 minutes
+dt_ocean: "1800secs" # 30 minutes
+dt_rad: "1hours"
+dt_seaice: "1800secs" # 30 minutes
+energy_check: false
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: 1months
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
+ice_model: "clima_seaice"
+insolation: "timevarying"
+land_model: "integrated"
+land_spun_up_ic: false
+mode_name: "cmip"
+ocean_model: "oceananigans"
+output_default_diagnostics: true
+rmse_check: true
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+t_end: "186days"
+topo_smoothing: true
+topography: "Earth"

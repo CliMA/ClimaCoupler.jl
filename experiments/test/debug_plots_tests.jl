@@ -1,0 +1,112 @@
+# testing functions used to produce user-defined debugging plots for AMIP experiments
+import Test: @test, @testset, @test_logs
+import ClimaCore as CC
+import ClimaParams as CP
+import ClimaCoupler: Interfacer, Plotting
+import ClimaComms
+ClimaComms.@import_required_backends
+
+using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, Poppler_jll, Printf # trigger ClimaCouplerMakieExt extension
+
+# Prevent GKS headless operation mode warning
+ENV["GKSwstype"] = "nul"
+FT = Float64
+
+struct ClimaAtmosSimulation{C} <: Interfacer.AbstractAtmosSimulation
+    cache::C
+end
+Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:atmos_field}) = sim.cache.atmos_field
+
+struct BucketSimulation{C} <: Interfacer.AbstractSurfaceSimulation
+    cache::C
+end
+
+struct ClimaLandSimulation{C} <: Interfacer.AbstractSurfaceSimulation
+    cache::C
+end
+
+Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_field}) = sim.cache.surface_field
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_field}) =
+    sim.cache.surface_field
+Interfacer.get_field(sim::Interfacer.SurfaceStub, ::Val{:stub_field}) = sim.cache.stub_field
+
+Plotting.debug_plot_fields(sim::ClimaAtmosSimulation) = (:atmos_field,)
+Plotting.debug_plot_fields(sim::BucketSimulation) = (:surface_field,)
+Plotting.debug_plot_fields(sim::ClimaLandSimulation) = (:surface_field,)
+Plotting.debug_plot_fields(sim::Interfacer.SurfaceStub) = (:stub_field,)
+
+@testset "import_atmos_fields!" begin
+    coupled_param_dict = CP.create_toml_dict(FT)
+
+    boundary_space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = coupled_param_dict["planet_radius"], # in meters
+        n_quad_points = 4,
+        h_elem = 4,
+    )
+    coupler_names = [
+        :surface_direct_albedo,
+        :surface_diffuse_albedo,
+        :SW_d,
+        :LW_d,
+        :F_lh,
+        :F_sh,
+        :F_turb_moisture,
+        :F_turb_ρτxz,
+        :F_turb_ρτyz,
+        :P_liq,
+        :P_snow,
+        :T_sfc,
+    ]
+    atmos_names = (:atmos_field,)
+    surface_names = (:surface_field,)
+    stub_names = (:stub_field,)
+
+    atmos_fields = NamedTuple{atmos_names}(
+        ntuple(i -> CC.Fields.zeros(boundary_space), length(atmos_names)),
+    )
+    surface_fields = NamedTuple{surface_names}(
+        ntuple(i -> CC.Fields.zeros(boundary_space), length(surface_names)),
+    )
+    stub_fields = NamedTuple{stub_names}(
+        ntuple(i -> CC.Fields.zeros(boundary_space), length(stub_names)),
+    )
+    coupler_fields = Interfacer.init_coupler_fields(FT, coupler_names, boundary_space)
+
+    model_sims = (;
+        atmos_sim = ClimaAtmosSimulation(atmos_fields),
+        surface_sim = BucketSimulation(surface_fields),
+        surface_sim2 = ClimaLandSimulation(surface_fields),
+        ice_sim = Interfacer.SurfaceStub(stub_fields),
+    )
+    cs = Interfacer.CoupledSimulation{FT}(
+        nothing, # dates
+        coupler_fields, # fields
+        nothing, # conservation_checks
+        (Int(0), Int(1)), # tspan
+        Int(200), # Δt_cpl
+        Ref(Int(0)), # t
+        Ref(-1), # prev_checkpoint_t
+        model_sims, # model_sims
+        (;), # callbacks
+        (;), # dir_paths
+        nothing, # thermo_params
+        nothing, # diags_handler
+        true, # save_cache
+    )
+
+    output_plots = "test_debug"
+    mkpath(output_plots)
+    @test_logs (:info, "plotting debug in test_debug") match_mode = :any Plotting.debug(
+        cs,
+        output_plots,
+    )
+    @test isfile("test_debug/debug_ClimaAtmosSimulation.png")
+    @test isfile("test_debug/debug_BucketSimulation.png")
+    @test isfile("test_debug/debug_ClimaLandSimulation.png")
+    @test isfile("test_debug/debug_SurfaceStub.png")
+    @test isfile("test_debug/debug_coupler.png")
+
+    # remove output
+    rm(output_plots; recursive = true)
+end

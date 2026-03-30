@@ -48,16 +48,12 @@ jobs:
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
       - name: Submit coverage
-        if: ${{ matrix.version == '1.12' }} && ${{ matrix.os == 'ubuntu-latest' }}
+        if: matrix.version == '1.12' && matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v5
         with:
           token: ${{secrets.CODECOV_TOKEN}}
           file: lcov.info
       - run: |
-          julia -O0 --color=yes --project=experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate()'
-          julia -O0 --color=yes --project=experiments/ClimaEarth -e 'using Pkg; Pkg.develop(; path = ".")'
-          julia -O0 --color=yes --project=experiments/ClimaEarth experiments/ClimaEarth/test/runtests.jl
-      - run: |
-          julia -O0 --color=yes --project=experiments/ClimaCore -e 'using Pkg; Pkg.instantiate()'
-          julia -O0 --color=yes --project=experiments/ClimaCore -e 'using Pkg; Pkg.develop(; path = ".")'
-          julia -O0 --color=yes --project=experiments/ClimaCore experiments/ClimaCore/test/runtests.jl
+          julia -O0 --color=yes --project=experiments/AMIP -e 'using Pkg; Pkg.instantiate()'
+          julia -O0 --color=yes --project=experiments/AMIP -e 'using Pkg; Pkg.develop(; path = ".")'
+          julia -O0 --color=yes --project=experiments/AMIP experiments/test/runtests.jl

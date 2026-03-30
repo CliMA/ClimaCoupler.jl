@@ -384,8 +384,9 @@ function FluxCalculator.compute_surface_fluxes!(
     T_sfc = csf.scalar_temp1
     Interfacer.remap!(csf.scalar_temp2, CL.component_specific_humidity(model, Y, p))
     q_sfc = csf.scalar_temp2
+    h_sfc = csf.height_sfc
     Interfacer.remap!(csf.scalar_temp3, CL.surface_displacement_height(model, Y, p))
-    h_disp = csf.scalar_temp3
+    displ = csf.scalar_temp3
 
     # Get update surface temperature and humidity functions
     update_T_sfc = CL.get_update_surface_temperature_function(model, Y, p)
@@ -403,10 +404,6 @@ function FluxCalculator.compute_surface_fluxes!(
             SF.ConstantGustinessSpec.(coupled_atmos.gustiness),
         )
 
-    # TODO do I need these?
-    # update_∂T_sfc∂T = CL.get_∂T_sfc∂T_function(model, Y, p)
-    # update_∂q_sfc∂T = CL.get_∂q_sfc∂T_function(model, Y, p)
-
     fluxes =
         FluxCalculator.get_surface_fluxes.(
             surface_fluxes_params,
@@ -420,8 +417,8 @@ function FluxCalculator.compute_surface_fluxes!(
             uv_int .* FT(0), # uv_sfc
             T_sfc,
             q_sfc,
-            csf.height_sfc, # h_sfc
-            h_disp, # d
+            h_sfc,
+            displ, # d (displacement height)
             config,
             update_T_sfc,
             update_q_sfc,

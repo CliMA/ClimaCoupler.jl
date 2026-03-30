@@ -139,11 +139,11 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 32GB
 
-      - label: "GPU AMIP + prog. EDMF + bucket"
-        key: "amip_progedmf"
+      - label: "GPU AMIP + prog. EDMF + integrated land"
+        key: "amip_progedmf_land"
         command:
-          - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_progedmf.yml --job_id amip_progedmf"
-        artifact_paths: "output/amip_progedmf/artifacts/*"
+          - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_progedmf_land.yml --job_id amip_progedmf_land"
+        artifact_paths: "output/amip_progedmf_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

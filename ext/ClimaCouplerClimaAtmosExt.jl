@@ -323,11 +323,11 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d})
     )
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:total_specific_humidity}) =
-    CC.Fields.level(sim.integrator.p.precomputed.ᶜq_tot_safe, 1)
+    CC.Fields.level(sim.integrator.p.precomputed.ᶜq_tot_nonneg, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_specific_humidity}) =
-    CC.Fields.level(sim.integrator.p.precomputed.ᶜq_liq_rai, 1)
+    CC.Fields.level(sim.integrator.p.precomputed.ᶜq_liq, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ice_specific_humidity}) =
-    CC.Fields.level(sim.integrator.p.precomputed.ᶜq_ice_sno, 1)
+    CC.Fields.level(sim.integrator.p.precomputed.ᶜq_ice, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
     surface_snow_flux(sim.integrator.p.atmos.microphysics_model, sim.integrator)
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})

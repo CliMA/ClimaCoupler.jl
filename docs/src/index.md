@@ -15,7 +15,7 @@ Key functionality of ClimaCoupler.jl includes:
 - **Time stepping**: Coupled system time stepping control allowing for component models to use
   various timesteps individually.
 - **Flux calculation**: Flux calculation between the atmosphere and each surface models
-  utilizing SurfaceFluxees.jl.
+  utilizing SurfaceFluxes.jl.
 - **Information exchange**: A generic interface to retrieve information from component models that is
   needed to compute surface fluxes, and to update component models with the
   resulting fluxes.

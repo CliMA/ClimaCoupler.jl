@@ -89,8 +89,7 @@ steps:
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
-          slurm_ntasks: 1
-          slurm_gres: "gpu:1"
+          slurm_gpus: 1
           slurm_mem: 24GB
 
   - group: "Experiment tests"
@@ -120,8 +119,7 @@ steps:
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
-          slurm_ntasks: 1
-          slurm_gres: "gpu:1"
+          slurm_gpus: 1
           slurm_mem: 32GB
 
       - label: "GPU restarts (state only)"
@@ -129,8 +127,7 @@ steps:
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
-          slurm_ntasks: 1
-          slurm_gres: "gpu:1"
+          slurm_gpus: 1
           slurm_mem: 32GB
 
   - group: "Integration Tests"
@@ -239,15 +236,17 @@ steps:
   - group: "GPU integration tests"
     steps:
       # GPU RUNS: slabplanet
-      - label: "GPU Slabplanet: albedo from function"
-        key: "gpu_slabplanet_albedo_function"
-        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_albedo_function.yml --job_id gpu_slabplanet_albedo_function"
-        artifact_paths: "output/gpu_slabplanet_albedo_function/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
+
+      # This run doesn't have enough parameter memory on the P100, so it's disabled for now
+      # - label: "GPU Slabplanet: albedo from function"
+      #   key: "gpu_slabplanet_albedo_function"
+      #   command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_albedo_function.yml --job_id gpu_slabplanet_albedo_function"
+      #   artifact_paths: "output/gpu_slabplanet_albedo_function/artifacts/*"
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #   agents:
+      #     slurm_mem: 20GB
+      #     slurm_gpus: 1
 
       # GPU RUNS: AMIP
       - label: "GPU AMIP: diag. EDMF + integrated land"
@@ -270,15 +269,16 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-      - label: "GPU AMIP: albedo from temporal map + 0M"
-        key: "gpu_amip_albedo_temporal_map"
-        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_albedo_temporal_map.yml --job_id gpu_amip_albedo_temporal_map"
-        artifact_paths: "output/gpu_amip_albedo_temporal_map/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
+      # This run doesn't have enough parameter memory on the P100, so it's disabled for now
+      # - label: "GPU AMIP: albedo from temporal map + 0M"
+      #   key: "gpu_amip_albedo_temporal_map"
+      #   command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_albedo_temporal_map.yml --job_id gpu_amip_albedo_temporal_map"
+      #   artifact_paths: "output/gpu_amip_albedo_temporal_map/artifacts/*"
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #   agents:
+      #     slurm_mem: 20GB
+      #     slurm_gpus: 1
 
   - group: "CMIP"
     steps:

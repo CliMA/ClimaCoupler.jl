@@ -312,10 +312,14 @@ function Interfacer.update_field!(
 end
 
 function Interfacer.step!(sim::BucketSimulation, t)
-    while float(sim.integrator.t) < float(t)
-        Interfacer.step!(sim.integrator)
+    # Don't step if we haven't reached a step boundary
+    # (This can happen if the coupler dt is less than this model's)
+    Δt = t - sim.integrator.t
+    if isapprox(Δt, sim.integrator.dt) || Δt > sim.integrator.dt
+        while sim.integrator.t < t
+            Interfacer.step!(sim.integrator)
+        end
     end
-    return nothing
 end
 Interfacer.close_output_writers(sim::BucketSimulation) =
     isnothing(sim.output_writer) || close(sim.output_writer)

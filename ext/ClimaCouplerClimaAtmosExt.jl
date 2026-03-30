@@ -513,11 +513,23 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
 end
 
 # extensions required by FieldExchanger
-Interfacer.step!(sim::ClimaAtmosSimulation, t::Real) =
-    Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+function Interfacer.step!(sim::ClimaAtmosSimulation, t::Real)
+    Δt = t - sim.integrator.t
+    if Δt < sim.integrator.dt   # don't step if we haven't reached a step boundary
+        # (can happen if the coupler dt is less than this model's)
+        return nothing
+    end
+    Interfacer.step!(sim.integrator, Δt, true)
+end
+
 function Interfacer.step!(sim::ClimaAtmosSimulation, t::ITime)
-    while sim.integrator.t < t
-        Interfacer.step!(sim.integrator)
+    # Don't step if we haven't reached a step boundary
+    # (This can happen if the coupler dt is less than this model's)
+    Δt = t - sim.integrator.t
+    if isapprox(Δt, sim.integrator.dt) || Δt > sim.integrator.dt
+        while sim.integrator.t < t
+            Interfacer.step!(sim.integrator)
+        end
     end
     return nothing
 end

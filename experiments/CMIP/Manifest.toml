@@ -556,9 +556,9 @@ version = "1.6.4"
 
 [[deps.ClimaOcean]]
 deps = ["Adapt", "CFTime", "CUDA", "ClimaSeaIce", "CopernicusClimateDataStore", "CubicSplines", "DataDeps", "Dates", "DocStringExtensions", "Downloads", "Glob", "ImageMorphology", "JLD2", "KernelAbstractions", "MPI", "MeshArrays", "NCDatasets", "Oceananigans", "OffsetArrays", "PrecompileTools", "Printf", "Scratch", "SeawaterPolynomials", "StaticArrays", "Statistics", "Thermodynamics", "ZipFile"]
-git-tree-sha1 = "07459029d8aa9db794067a7d1b242391d5fead00"
+git-tree-sha1 = "19a8dcf51454982ee4c9f4fb08b1d754939670ad"
 uuid = "0376089a-ecfe-4b0e-a64f-9c555d74d754"
-version = "0.9.3"
+version = "0.9.4"
 
     [deps.ClimaOcean.extensions]
     ClimaOceanCopernicusClimateDataStoreExt = "CopernicusClimateDataStore"
@@ -2378,9 +2378,9 @@ version = "0.5.5"
 
 [[deps.Oceananigans]]
 deps = ["Adapt", "Crayons", "CubedSphere", "Dates", "Distances", "DocStringExtensions", "FFTW", "GPUArraysCore", "Glob", "InteractiveUtils", "JLD2", "KernelAbstractions", "Krylov", "LinearAlgebra", "Logging", "MPI", "MuladdMacro", "OffsetArrays", "OrderedCollections", "Pkg", "Printf", "ReactantCore", "Rotations", "SeawaterPolynomials", "SparseArrays", "StaticArrays", "Statistics", "StructArrays"]
-git-tree-sha1 = "058a92c4d82199422115905086b4876b138af645"
+git-tree-sha1 = "c82aea1f321d728bafdd04b0434bbfca7ebf16bd"
 uuid = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
-version = "0.106.2"
+version = "0.106.3"
 
     [deps.Oceananigans.extensions]
     OceananigansAMDGPUExt = ["AMDGPU", "AbstractFFTs"]

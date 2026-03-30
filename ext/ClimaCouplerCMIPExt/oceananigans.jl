@@ -2,6 +2,7 @@ import ClimaComms
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
+import ClimaUtilities.TimeManager: ITime
 import Dates
 
 """
@@ -157,7 +158,14 @@ function OceananigansSimulation(
         closure = (horizontal_viscosity, vertical_mixing)
     end
 
-    model_clock = OC.TimeSteppers.Clock(time = start_date)
+    if tspan[1] isa ITime
+        # create a model clock that uses DateTime, for compatibility with ITime.
+        model_clock = OC.TimeSteppers.Clock(time = start_date)
+    elseif tspan[1] isa Float64
+        model_clock = OC.TimeSteppers.Clock{Float64}(time=tspan[1])
+    else
+        error("Unsupported time type: $(typeof(tspan[1]))")
+    end
     model_Δt = dt
     ocean = CO.ocean_simulation(
         grid;
@@ -340,9 +348,17 @@ end
 ###############################################################################
 
 # Timestep the simulation forward to time `t`. This may not actually do anything.
-function Interfacer.step!(sim::OceananigansSimulation, t)
+function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
     Δt = t - sim.ocean.model.clock.time
     if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
+        OC.time_step!(sim.ocean, Δt)
+    end
+end
+
+function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
+    Δt = Dates.DateTime(t) - sim.ocean.model.clock.time
+    model_Δt = Dates.DateTime(sim.model_Δt) - Dates.DateTime(0)
+    if Δt >= model_Δt
         OC.time_step!(sim.ocean, Δt)
     end
 end

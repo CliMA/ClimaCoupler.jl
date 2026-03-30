@@ -79,7 +79,11 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
 
     advection = ocean.ocean.model.advection.T
-    ice = sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection)
+    ice = sea_ice_simulation(
+        grid, ocean.ocean;
+        clock = deepcopy(ocean.ocean.model.clock),
+        Δt = float(dt),
+        advection)
 
     ocean_ice_flux_formulation =
         CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)
@@ -179,6 +183,7 @@ end
 function sea_ice_simulation(
     grid,
     ocean = nothing;
+    clock = OC.TimeSteppers.Clock{eltype(grid)}(time = 0),
     Δt = 5 * 60.0, # 5 minutes
     ice_salinity = 4, # psu
     advection = nothing, # for the moment
@@ -213,6 +218,7 @@ function sea_ice_simulation(
     # Build the sea ice model
     sea_ice_model = CSI.SeaIceModel(
         grid;
+        clock,
         ice_salinity,
         advection,
         tracers,
@@ -231,9 +237,17 @@ end
 ###############################################################################
 
 # Timestep the simulation forward to time `t`
-function Interfacer.step!(sim::ClimaSeaIceSimulation, t)
+function Interfacer.step!(sim::ClimaSeaIceSimulation, t::Float64)
     Δt = t - sim.ice.model.clock.time
     if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
+        OC.time_step!(sim.ice, Δt)
+    end
+end
+
+function Interfacer.step!(sim::ClimaSeaIceSimulation, t::ITime)
+    Δt = Dates.DateTime(t) - sim.ice.model.clock.time
+    model_Δt = Dates.DateTime(sim.model_Δt) - Dates.DateTime(0)
+    if Δt >= model_Δt
         OC.time_step!(sim.ice, Δt)
     end
 end

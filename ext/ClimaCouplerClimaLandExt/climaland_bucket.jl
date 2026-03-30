@@ -315,16 +315,27 @@ function Interfacer.update_field!(
     Interfacer.remap!(sim.integrator.p.bucket.turbulent_fluxes.vapor_flux, field ./ ρ_liq) # TODO: account for sublimation
 end
 
-function Interfacer.step!(sim::BucketSimulation, t)
-    # Don't step if we haven't reached a step boundary
-    # (This can happen if the coupler dt is less than this model's)
+# Don't step if we haven't reached a step boundary
+# (This can happen if the coupler dt is less than this model's)
+function Interfacer.step!(sim::BucketSimulation, t::ITime)
     Δt = t - sim.integrator.t
-    if isapprox(Δt, sim.integrator.dt) || Δt > sim.integrator.dt
+    if Δt >= sim.integrator.dt
         while sim.integrator.t < t
             Interfacer.step!(sim.integrator)
         end
     end
 end
+function Interfacer.step!(sim::BucketSimulation, t::Float64)
+    model_t = Float64(sim.integrator.t)
+    Δt = t - model_t
+    model_dt = Float64(sim.integrator.dt)
+    if isapprox(Δt, model_dt) || Δt > model_dt
+        while Float64(sim.integrator.t) < t
+            Interfacer.step!(sim.integrator)
+        end
+    end
+end
+
 Interfacer.close_output_writers(sim::BucketSimulation) =
     isnothing(sim.output_writer) || close(sim.output_writer)
 

@@ -101,7 +101,7 @@ function OceananigansSimulation(
         arch;
         size = resolution_points,
         longitude = (-180, 180),
-        latitude = (-80, 80),   # NOTE: Don't go too high up when using LatLongGrid, or the cells will be too small
+        latitude = (-85, 85),   # NOTE: Don't go too high up when using LatLongGrid, or the cells will be too small
         z,
         halo = (7, 7, 7),
     )
@@ -199,7 +199,7 @@ function OceananigansSimulation(
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
     # polar-exclusion mask
-    # Precompute polar-exclusion flux masks once (zeros ocean surface fluxes where |lat| ≥ 78° to avoid instability).
+    # Precompute polar-exclusion flux masks once (zeros ocean surface fluxes where |lat| ≥ 83° to avoid instability).
     # _centers = cell-centered (T, S); _u = Face/Center (u); _v = Center/Face (v).
     polar_exclusion_flux_mask_centers =
         ocean_flux_highlat_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
@@ -296,7 +296,7 @@ end
 Ensure the ocean and ice area fractions are consistent with each other.
 This matters in the case of a LatitudeLongitudeGrid, which only extends to
 ±80° latitude. We set ice and ocean area fractions to 0 and land to 1 where
-|lat| ≥ 78° (same band used to zero ocean surface fluxes).
+|lat| ≥ 83° (same band used to zero ocean surface fluxes).
 
 This function also updates the ice concentration field in the ocean simulation
 so that it can be used for weighting flux updates.
@@ -310,12 +310,12 @@ function FieldExchanger.resolve_area_fractions!(
         ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
         ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
 
-        # Polar mask: 1 where |lat| ≥ 78° (same band used to zero ocean fluxes)
+        # Polar mask: 1 where |lat| ≥ 83° (same band used to zero ocean fluxes)
         boundary_space = axes(ocean_fraction)
         FT = CC.Spaces.undertype(boundary_space)
         lat = CC.Fields.coordinate_field(boundary_space).lat
         polar_mask = CC.Fields.zeros(boundary_space)
-        polar_mask .= abs.(lat) .>= FT(78)
+        polar_mask .= abs.(lat) .>= FT(83)
 
         # Set land fraction to 1 and ice/ocean fraction to 0 where polar_mask is 1
         @. land_fraction = ifelse.(polar_mask == FT(1), FT(1), land_fraction)
@@ -365,12 +365,12 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
 
 Build the ocean flux high latitude mask once at setup.
 Currently we define ocean between 80degS to 80degN with 2 degree overlap in the coupler mask.
-Returns a 2D mask (1.0 where |lat| < 78°, 0.0 elsewhere). This mask is on the ocean grid (
+Returns a 2D mask (1.0 where |lat| < 83°, 0.0 elsewhere). This mask is on the ocean grid (
 unlike the polar mask which is defined on the boundary_space)
 """
 # polar-exclusion mask
 function ocean_flux_highlat_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
-    polar_flux_lat_deg = 78.0  # zero fluxes where |lat| ≥ this (same band as polar_mask)
+    polar_flux_lat_deg = 83.0  # zero fluxes where |lat| ≥ this (same band as polar_mask)
     φ = OC.φnodes(grid, location[1], location[2], location[3])
     φ_2D = Array(φ[:, :, 1])
     lat_deg = abs.(rad2deg.(φ_2D))

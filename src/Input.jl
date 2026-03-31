@@ -796,10 +796,32 @@ end
 
 
 """
+    resolve_era5_dir(era5_initial_condition_dir)
+
+Return `era5_initial_condition_dir` if it is not `nothing`, otherwise attempt to
+use the `wxquest_initial_conditions` ClimaArtifact as a fallback.  Errors if
+neither source is available.
+"""
+function resolve_era5_dir(era5_initial_condition_dir)
+    isnothing(era5_initial_condition_dir) || return era5_initial_condition_dir
+    try
+        return @clima_artifact("wxquest_initial_conditions")
+    catch
+        error(
+            "subseasonal mode requires --era5_initial_condition_dir or the " *
+            "wxquest_initial_conditions ClimaArtifact",
+        )
+    end
+end
+
+"""
     get_era5_filepaths(::Type{<:Interfacer.SubseasonalMode}, era5_initial_condition_dir, start_date, bucket_initial_condition)
 
 Build ERA5-based file paths for subseasonal mode simulations.
 Filenames are inferred from the start_date.
+
+If `era5_initial_condition_dir` is `nothing`, the `wxquest_initial_conditions`
+ClimaArtifact is used as a fallback.
 
 # Arguments
 - `sim_mode`: The simulation mode type (must be SubseasonalMode)
@@ -821,9 +843,16 @@ function get_era5_filepaths(
     start_date,
     bucket_initial_condition,
 )
-    isnothing(era5_initial_condition_dir) &&
-        error("subseasonal mode requires --era5_initial_condition_dir")
+    era5_initial_condition_dir = resolve_era5_dir(era5_initial_condition_dir)
     datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
+
+    # Verify that the required files exist for this date
+    sst_path = joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc")
+    isfile(sst_path) || error(
+        "ERA5 initial condition files for date $datestr not found in " *
+        "$era5_initial_condition_dir. Check that start_date matches an " *
+        "available date in the initial condition directory.",
+    )
 
     # Use ERA5-derived bucket IC if user didn't specify one
     isempty(bucket_initial_condition) && (
@@ -834,7 +863,7 @@ function get_era5_filepaths(
     )
 
     return (
-        sst_path = joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc"),
+        sst_path,
         sic_path = joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc"),
         land_ic_path = joinpath(
             era5_initial_condition_dir,

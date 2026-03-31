@@ -161,8 +161,10 @@ function OceananigansSimulation(
     if tspan[1] isa ITime
         # create a model clock that uses DateTime, for compatibility with ITime.
         model_clock = OC.TimeSteppers.Clock(time = start_date)
+        stop_time = Dates.DateTime(tspan[2])
     elseif tspan[1] isa Float64
         model_clock = OC.TimeSteppers.Clock{Float64}(time=tspan[1])
+        stop_time = tspan[2]
     else
         error("Unsupported time type: $(typeof(tspan[1]))")
     end
@@ -170,7 +172,8 @@ function OceananigansSimulation(
     ocean = CO.ocean_simulation(
         grid;
         clock = model_clock,
-        Δt = model_Δt,
+        stop_time,
+        Δt = float(model_Δt),
         timestepper = :SplitRungeKutta3,
         momentum_advection,
         tracer_advection,
@@ -350,16 +353,23 @@ end
 # Timestep the simulation forward to time `t`. This may not actually do anything.
 function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
     Δt = t - sim.ocean.model.clock.time
+    @info "Ocean: Δt = $Δt, typeof(sim.ocean.model.clock.time) = $(typeof(sim.ocean.model.clock.time))"
     if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
+        @info "Ocean: stepping"
         OC.time_step!(sim.ocean, Δt)
+        @info "Ocean: reached time t = $(sim.ocean.model.clock.time)"
     end
 end
 
 function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
-    Δt = Dates.DateTime(t) - sim.ocean.model.clock.time
-    model_Δt = Dates.DateTime(sim.model_Δt) - Dates.DateTime(0)
-    if Δt >= model_Δt
-        OC.time_step!(sim.ocean, Δt)
+    Δt_msec = Dates.DateTime(t) - sim.ocean.model.clock.time
+    model_Δt_msec = Dates.DateTime(sim.model_Δt) - sim.model_Δt.epoch
+    @info "Ocean: Δt_msec = $Δt_msec, typeof(sim.ocean.model.clock.time) = $(typeof(sim.ocean.model.clock.time))"
+    @info "Ocean: model_Δt_msec = $model_Δt_msec, typeof(model_Δt_msec) = $(typeof(model_Δt_msec))"
+    if Δt_msec >= model_Δt_msec
+        @info "Ocean: stepping"
+        OC.time_step!(sim.ocean, float(sim.model_Δt))
+        @info "Ocean: reached time t = $(sim.ocean.model.clock.time)"
     end
 end
 

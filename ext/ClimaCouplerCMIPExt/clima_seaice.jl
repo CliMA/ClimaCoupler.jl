@@ -184,6 +184,7 @@ function sea_ice_simulation(
     grid,
     ocean = nothing;
     clock = OC.TimeSteppers.Clock{eltype(grid)}(time = 0),
+    stop_time = clock.time isa Number ? inf : Dates.DateTime(9999, 12, 31, 23, 59, 59),
     Δt = 5 * 60.0, # 5 minutes
     ice_salinity = 4, # psu
     advection = nothing, # for the moment
@@ -229,7 +230,7 @@ function sea_ice_simulation(
     )
 
     # Build the simulation
-    return OC.Simulation(sea_ice_model; Δt)
+    return OC.Simulation(sea_ice_model; Δt, stop_time)
 end
 
 ###############################################################################
@@ -239,16 +240,25 @@ end
 # Timestep the simulation forward to time `t`
 function Interfacer.step!(sim::ClimaSeaIceSimulation, t::Float64)
     Δt = t - sim.ice.model.clock.time
+    @info "Sea Ice: Δt = $Δt, typeof(sim.ice.model.clock.time) = $(typeof(sim.ice.model.clock.time))"
     if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
+        @info "Sea Ice: stepping forward by Δt = $Δt"
         OC.time_step!(sim.ice, Δt)
+        @info "Sea Ice: reached time t = " * string(float(sim.ice.model.clock.time))
+        @info "Top surface temp: $(sim.ice.model.ice_thermodynamics.top_surface_temperature)"
     end
 end
 
 function Interfacer.step!(sim::ClimaSeaIceSimulation, t::ITime)
-    Δt = Dates.DateTime(t) - sim.ice.model.clock.time
-    model_Δt = Dates.DateTime(sim.model_Δt) - Dates.DateTime(0)
-    if Δt >= model_Δt
-        OC.time_step!(sim.ice, Δt)
+    Δt_msec = Dates.DateTime(t) - sim.ice.model.clock.time
+    model_Δt_msec = Dates.DateTime(sim.model_Δt) - sim.model_Δt.epoch
+    @info "Sea Ice: Δt_msec = $Δt_msec, typeof(sim.ice.model.clock.time) = $(typeof(sim.ice.model.clock.time))"
+    @info "Sea Ice: model_Δt_msec = $model_Δt_msec, typeof(model_Δt_msec) = $(typeof(model_Δt_msec))"
+    if Δt_msec >= model_Δt_msec
+        @info "Sea Ice: stepping forward by Δt_msec = $Δt_msec"
+        OC.time_step!(sim.ice, float(sim.model_Δt))
+        @info "Sea Ice: reached time t = $(sim.ice.model.clock.time)"
+        @info "Top surface temp: $(sim.ice.model.ice_thermodynamics.top_surface_temperature)"
     end
 end
 

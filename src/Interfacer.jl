@@ -441,7 +441,7 @@ abstract type SubseasonalMode <: AbstractSimulationMode end
     CMIPMode
 
 An abstract type representing the CMIP simulation mode. CMIP is currently the most complex
-configuration of the ClimaEarth model. It runs a ClimaAtmos.jl atmosphere model,
+configuration of the CoupledSimulation object. It runs a ClimaAtmos.jl atmosphere model,
 ClimaLand.jl bucket land model, a ClimaOcean ocean model, and a simple thermal sea ice model.
 """
 abstract type CMIPMode <: AbstractSimulationMode end

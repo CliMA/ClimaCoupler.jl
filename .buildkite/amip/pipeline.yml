@@ -20,7 +20,6 @@ steps:
 
       - echo "--- Instantiate AMIP env"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 

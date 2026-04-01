@@ -26,20 +26,17 @@ steps:
 
       - echo "--- Instantiate AMIP experiments env"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate CMIP experiments env"
       - "julia -O0 --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia -O0 --project=experiments/CMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia -O0 --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate test env"
       - "julia -O0 --project=test/ -e 'using Pkg; Pkg.develop(path=\".\")'"
       - "julia -O0 --project=test/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia -O0 --project=test/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia -O0 --project=test/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --project=test/ -e 'using Pkg; Pkg.status()'"
 

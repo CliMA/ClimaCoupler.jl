@@ -2,7 +2,7 @@
 
 julia_version = "1.11.9"
 manifest_format = "2.0"
-project_hash = "078577f531fa62484a425106eeda73fc55e93ed1"
+project_hash = "51459ae569bf2b6c32f16b0f375bd82490e29721"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
@@ -304,6 +304,12 @@ git-tree-sha1 = "b2c9f2d3b8014323c0a8f2b401b68fa6bb08ed06"
 uuid = "179af706-886a-5703-950a-314cd64e0468"
 version = "0.2.8"
 
+[[deps.CPUSummary]]
+deps = ["CpuId", "IfElse", "PrecompileTools", "Preferences", "Static"]
+git-tree-sha1 = "f3a21d7fc84ba618a779d1ed2fcca2e682865bab"
+uuid = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"
+version = "0.2.7"
+
 [[deps.CRC32c]]
 uuid = "8bf52ea8-c179-5cab-976a-9e18b702a9bc"
 version = "1.11.0"
@@ -485,18 +491,20 @@ uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.2"
 
     [deps.ClimaCoupler.extensions]
-    ClimaCouplerCMIPExt = ["ClimaOcean", "ClimaSeaIce", "KernelAbstractions", "Oceananigans"]
+    ClimaCouplerCMIPExt = ["ClimaOcean", "ClimaSeaIce", "KernelAbstractions", "Oceananigans", "ConservativeRegridding", "Adapt"]
     ClimaCouplerCMIPMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
     ClimaCouplerClimaAtmosExt = ["ClimaAtmos"]
     ClimaCouplerClimaLandExt = ["ClimaLand"]
     ClimaCouplerMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Poppler_jll", "Printf"]
 
     [deps.ClimaCoupler.weakdeps]
+    Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
     CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
     ClimaCoreMakie = "908f55d8-4145-4867-9c14-5dad1a479e4d"
     ClimaLand = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
     ClimaOcean = "0376089a-ecfe-4b0e-a64f-9c555d74d754"
     ClimaSeaIce = "6ba0ff68-24e6-4315-936c-2e99227c95a4"
+    ConservativeRegridding = "8e50ac2c-eb48-49bc-a402-07c87b949343"
     GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
     KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
     Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"

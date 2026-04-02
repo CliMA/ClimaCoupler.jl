@@ -3,7 +3,7 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "186days"
-coupler_toml: ["toml/amip_progedmf.toml"]
+coupler_toml: ["toml/amip_progedmf_precip.toml"]
 dt: "120secs"
 dt_cpl: "120secs"
 #dz_bottom: 100.0

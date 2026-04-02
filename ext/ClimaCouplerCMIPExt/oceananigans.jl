@@ -224,9 +224,10 @@ end
 Given an Oceananigans grid and a ClimaCore boundary space, construct the
 remappers needed to remap between the two grids in both directions.
 
-Returns a remapper from the Oceananigans grid to the ClimaCore boundary space.
-To regrid from Oceananigans to ClimaCore, use `CR.regrid!(dest_vector, remapper_oc_to_cc, src_vector)`.
-To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest_vector, transpose(remapper_oc_to_cc), src_vector)`.
+Returns a remapper from the Oceananigans grid to the ClimaCore boundary space (CPU-only sparse operator).
+Coupler `remap!` paths copy through `remapper_oc_to_cc.src_temp` and `dst_temp` so GPU models do not call
+CUDA sparse matmul (which scalar-indexes). For low-level use: `CR.regrid!(dst, remapper_oc_to_cc, src)` and
+transpose for the reverse map.
 """
 function construct_remapper(grid_oc, boundary_space)
     # Move grids to CPU since ConservativeRegridding doesn't support GPU grids yet
@@ -240,6 +241,9 @@ function construct_remapper(grid_oc, boundary_space)
     R = CC.Spaces.topology(boundary_space_cpu).mesh.domain.radius
     manifold = CR.Spherical(; radius = FT_cc(R))
 
+    # Keep the Regridder on CPU: ConservativeRegridding uses sparse matmul that performs
+    # scalar indexing on CuSparseMatrixCSC. GPU ↔ CPU copies around matvec are handled in
+    # `climaocean_helpers.jl`.
     remapper_oc_to_cc = CR.Regridder(
         manifold,
         boundary_space_cpu,
@@ -247,9 +251,6 @@ function construct_remapper(grid_oc, boundary_space)
         normalize = false,
         threaded = false,
     )
-
-    # Move remapper to GPU if needed
-    remapper_oc_to_cc = OC.on_architecture(OC.architecture(grid_oc), remapper_oc_to_cc)
 
     # Create a field of ones on the boundary space so we can compute element areas
     field_ones_cc = CC.Fields.ones(boundary_space)

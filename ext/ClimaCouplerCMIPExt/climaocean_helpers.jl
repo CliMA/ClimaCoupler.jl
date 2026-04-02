@@ -118,6 +118,7 @@ end
 ### Extensions of Interfacer.jl remapping functions for Oceananigans fields/grids
 # Non-allocating ClimaCore -> Oceananigans remap
 function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
+    R = remapping.remapper_oc_to_cc
     get_ConservativeRegriddingCCExt().get_value_per_element!(
         remapping.value_per_element_cc,
         source_field,
@@ -126,11 +127,11 @@ function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field
 
     # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
     z = size(target_field, 3)
-    dst = vec(OC.interior(target_field, :, :, z))
-    src = remapping.value_per_element_cc
-
-    # Regrid the source field to the target field
-    CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
+    dst_gpu = vec(OC.interior(target_field, :, :, z))
+    # R stays on CPU; funnel through shared CPU temps to avoid GPU sparse matmul.
+    copyto!(R.dst_temp, remapping.value_per_element_cc)
+    CR.regrid!(R.src_temp, transpose(R), R.dst_temp)
+    copyto!(dst_gpu, R.src_temp)
     return nothing
 end
 # Allocating ClimaCore -> Oceananigans remap
@@ -152,16 +153,17 @@ end
 function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field, remapping)
     # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
     z = size(source_field, 3)
-    src = vec(OC.interior(source_field, :, :, z))
-
-    # Store the remapped FV values in a vector of length equal to the number of elements in the target space
-    dst = remapping.value_per_element_cc
-
-    # Regrid the source field to the target field
-    CR.regrid!(dst, remapping.remapper_oc_to_cc, src)
+    src_gpu = vec(OC.interior(source_field, :, :, z))
+    R = remapping.remapper_oc_to_cc
+    copyto!(R.src_temp, src_gpu)
+    CR.regrid!(R.dst_temp, R, R.src_temp)
+    copyto!(remapping.value_per_element_cc, R.dst_temp)
 
     # Convert the vector of remapped values to a ClimaCore Field with one value per element
-    get_ConservativeRegriddingCCExt().set_value_per_element!(target_field, dst)
+    get_ConservativeRegriddingCCExt().set_value_per_element!(
+        target_field,
+        remapping.value_per_element_cc,
+    )
     return nothing
 end
 # Allocating Oceananigans Field -> ClimaCore remap

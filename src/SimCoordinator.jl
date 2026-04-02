@@ -431,7 +431,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     ## Build the CoupledSimulation struct
     prev_checkpoint_t = Ref(-1)
     cs = Interfacer.CoupledSimulation{FT}(
-        Ref(start_date),
+        start_date,
         coupler_fields,
         conservation_checks,
         [tspan[1], tspan[2]],

@@ -2,7 +2,7 @@
 
 julia_version = "1.11.8"
 manifest_format = "2.0"
-project_hash = "554441c0b2867dec13f0161c5b1806b87395b409"
+project_hash = "f44c9974c52fd28e50b3daebe29b960cf6fa6fe5"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
@@ -508,10 +508,10 @@ deps = ["ArgParse", "ClimaAnalysis", "ClimaAtmos", "ClimaComms", "ClimaCore", "C
 path = "../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.1.2"
-weakdeps = ["Adapt", "CairoMakie", "ClimaCoreMakie", "ClimaLand", "ClimaOcean", "ClimaSeaIce", "ConservativeRegridding", "GeoMakie", "KernelAbstractions", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
+weakdeps = ["Adapt", "CairoMakie", "ClimaCoreMakie", "ClimaLand", "ClimaOcean", "ClimaSeaIce", "ConservativeRegridding", "GeoMakie", "GeometryOpsCore", "KernelAbstractions", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
 
     [deps.ClimaCoupler.extensions]
-    ClimaCouplerCMIPExt = ["ClimaOcean", "ClimaSeaIce", "KernelAbstractions", "Oceananigans", "ConservativeRegridding", "Adapt"]
+    ClimaCouplerCMIPExt = ["ClimaOcean", "ClimaSeaIce", "KernelAbstractions", "Oceananigans", "ConservativeRegridding", "GeometryOpsCore", "Adapt"]
     ClimaCouplerCMIPMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
     ClimaCouplerClimaAtmosExt = ["ClimaAtmos"]
     ClimaCouplerClimaLandExt = ["ClimaLand"]

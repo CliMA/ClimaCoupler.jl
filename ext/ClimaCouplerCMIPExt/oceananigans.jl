@@ -233,8 +233,15 @@ function construct_remapper(grid_oc, boundary_space)
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), grid_oc.underlying_grid)
     boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
 
-    # Create the remapper from the Oceananigans grid to the ClimaCore boundary space
+    # Oceananigans lat-lon grids use Float64 radius in ConservativeRegridding's default
+    # source manifold, while ClimaCore's cubed sphere uses atmos FT (often Float32).
+    # An explicit CR.Spherical matches both treeify paths and avoids manifold mismatch.
+    FT_cc = CC.Spaces.undertype(boundary_space_cpu)
+    R = CC.Spaces.topology(boundary_space_cpu).mesh.domain.radius
+    manifold = CR.Spherical(; radius = FT_cc(R))
+
     remapper_oc_to_cc = CR.Regridder(
+        manifold,
         boundary_space_cpu,
         grid_oc_underlying_cpu;
         normalize = false,

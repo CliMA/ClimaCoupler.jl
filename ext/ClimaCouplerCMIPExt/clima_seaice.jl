@@ -188,6 +188,10 @@ Compute surface fluxes for `ClimaSeaIceSimulation`. When `sim.use_update_T_sfc_c
 is true, iteratively diagnoses T_sfc via the `update_T_sfc` callback and writes it back to
 `top_surface_temperature`. When false, SurfaceFluxes sees no skin update callback and the
 coupler does not overwrite `top_surface_temperature` after the flux call.
+
+Either way, each call fills `csf.sea_ice_skin_J_a` with ``J^a`` from `ice_skin_J_a` using
+`T_sfc_new`, `F_sh`, and `F_lh` from that flux evaluation (zeros where `area_fraction` is zero),
+so you can compare `sea_ice_update_T_sfc: true` vs `false` using the same diagnostic.
 """
 function FluxCalculator.compute_surface_fluxes!(
     csf,
@@ -314,6 +318,19 @@ function FluxCalculator.compute_surface_fluxes!(
     @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
     @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
     @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
+
+    # Diagnostic Jᵃ (net upward surface flux) consistent with `update_T_sfc` / `ice_skin_J_a`,
+    # even when `use_update_T_sfc_callback` is false (for A/B vs skin-updated T_sfc_new).
+    Interfacer.get_field!(csf.scalar_skin_3, sim, Val(:emissivity))
+    Interfacer.get_field!(csf.scalar_skin_4, sim, Val(:surface_direct_albedo))
+    σ_J = FT(sim.ice_properties.σ)
+    ϵ_J = csf.scalar_skin_3
+    α_J = csf.scalar_skin_4
+    @. csf.sea_ice_skin_J_a = ifelse(
+        area_fraction ≈ 0,
+        zero(FT),
+        ice_skin_J_a(T_sfc_new, csf.SW_d, csf.LW_d, α_J, F_sh, F_lh, σ_J, ϵ_J),
+    )
 
     # Update fluxes in the sea ice simulation
     fields = (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)

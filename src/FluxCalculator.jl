@@ -61,6 +61,7 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
         :L_MO,
         :ustar,
         :buoyancy_flux,
+        :sea_ice_skin_J_a,
     )
         fill!(getproperty(csf, p), 0)
     end

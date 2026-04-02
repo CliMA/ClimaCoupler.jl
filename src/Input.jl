@@ -256,7 +256,7 @@ function argparse_settings()
         arg_type = String
         default = "prescribed"
         "--sea_ice_update_T_sfc"
-        help = "ClimaSeaIce CMIP: use flux-balance `update_T_sfc` in SurfaceFluxes and write diagnosed skin T back to the ice model each flux call [`true` (default), `false`]"
+        help = "ClimaSeaIce CMIP: use flux-balance `update_T_sfc` in SurfaceFluxes and write diagnosed skin T back to the ice model each flux call [`true` (default), `false`]. `cs.fields.sea_ice_skin_J_a` is filled every flux step for diagnostics either way."
         arg_type = Bool
         default = true
         "--land_fraction_source"

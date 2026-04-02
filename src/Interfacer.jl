@@ -140,6 +140,7 @@ default_coupler_fields() = [
     :scalar_temp2,
     :scalar_temp3,
     :scalar_temp4,
+    :sea_ice_skin_J_a,
     :scalar_skin_1,
     :scalar_skin_2,
     :scalar_skin_3,

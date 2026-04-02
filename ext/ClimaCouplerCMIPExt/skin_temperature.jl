@@ -14,6 +14,22 @@ import SurfaceFluxes as SF
 import Thermodynamics as TD
 
 """
+    ice_skin_J_a(T_sfc, SW_d, LW_d, α_albedo, F_sh, F_lh, σ, ϵ)
+
+Net upward atmospheric flux at the ice surface, ``J^a`` [W m⁻²] (**positive upward**), using the
+same definition as `update_T_sfc`:
+
+``J^a = \\sigma\\epsilon T_\\mathrm{sfc}^4 - (1-\\alpha)\\mathrm{SW}_\\downarrow - \\epsilon\\,\\mathrm{LW}_\\downarrow + F_{sh} + F_{lh}``.
+
+Use with `T_sfc`, `F_sh`, and `F_lh` from the **same** `get_surface_fluxes` / SurfaceFluxes evaluation
+you want to compare (e.g. `T_sfc_new` after the flux call). For diagnostics on the coupler boundary
+space, see `csf.sea_ice_skin_J_a` filled in `compute_surface_fluxes!` for `ClimaSeaIceSimulation`.
+"""
+@inline function ice_skin_J_a(T_sfc, SW_d, LW_d, α_albedo, F_sh, F_lh, σ, ϵ)
+    return σ * ϵ * T_sfc^4 - (1 - α_albedo) * SW_d - ϵ * LW_d + F_sh + F_lh
+end
+
+"""
     update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
 
 Create a callback for `SurfaceFluxes.jl` that updates surface temperature using
@@ -84,8 +100,7 @@ function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
             scheme,
         )
 
-        # Net upward flux: Jᵃ = σϵT⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh
-        J_a = σ * ϵ * T_sfc_n^4 - (1 - α_albedo) * SW_d - ϵ * LW_d + F_sh + F_lh
+        J_a = ice_skin_J_a(T_sfc_n, SW_d, LW_d, α_albedo, F_sh, F_lh, σ, ϵ)
 
         # Semi-implicit solve: linearize σϵT⁴ ≈ -3σϵTₙ⁴ + 4σϵTₙ³T
         numerator = T_i - (δ / κ) * (J_a - 4 * σ * ϵ * T_sfc_n^4)

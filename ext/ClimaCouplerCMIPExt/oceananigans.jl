@@ -400,12 +400,23 @@ function ocean_flux_highlat_mask(
     underlying_grid::OC.LatitudeLongitudeGrid;
     location = (OC.Center(), OC.Center(), OC.Center()),
 )
-    φ = OC.φnodes(underlying_grid, location[1], location[2], location[3])
-    φ_2D = Array(φ[:, :, 1])
-    lat_deg = abs.(rad2deg.(φ_2D)) # latitude in degrees
+    # On LatitudeLongitudeGrid, φnodes(..., ℓx, ℓy, ℓz) reduces to a 1D vector along
+    # latitude; the old `φ[:, :, 1]` path produced an Nφ×1 array and did not match the
+    # ocean's (Nλ, Nφ) interior used in flux updates.
+    λ, φ, _ = OC.nodes(
+        underlying_grid,
+        location[1],
+        location[2],
+        location[3];
+        reshape = true,
+        with_halos = false,
+    )
+    φ_slab = φ[:, :, 1]
+    lat_deg = abs.(rad2deg.(φ_slab))
     polar_flux_lat_deg = 78.0
 
-    mask = ifelse.(lat_deg .< polar_flux_lat_deg, 1.0, 0.0)
+    mask_line = ifelse.(lat_deg .< polar_flux_lat_deg, 1.0, 0.0)
+    mask = repeat(mask_line, outer = (size(λ, 1), 1))
 
     architecture = OC.Architectures.architecture(underlying_grid)
     return OC.Architectures.on_architecture(architecture, mask)
@@ -552,12 +563,13 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     # polar-exclusion mask
     polar_excl_centers = sim.remapping.polar_exclusion_flux_mask_centers
 
-    # Remap shortwave and longwave radiation
-    Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.SW_d, sim.remapping) # shortwave radiation
-    remapped_SW_d = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
+    # Remap shortwave and longwave onto separate scratch fields; copy SW so `rad_T_flux`
+    # can reuse scratch_field_oc1 without overlapping the `remapped_SW_d` view.
+    Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.SW_d, sim.remapping)
+    remapped_SW_d = copy(OC.interior(sim.remapping.scratch_field_oc1, :, :, 1))
 
-    Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.LW_d, sim.remapping) # longwave radiation
-    remapped_LW_d = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
+    Interfacer.remap!(sim.remapping.scratch_field_oc2, csf.LW_d, sim.remapping)
+    remapped_LW_d = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
 
     # Update only the part due to radiative fluxes. For the full update, the component due
     # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.

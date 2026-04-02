@@ -3,8 +3,9 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
 checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_progedmf.toml"]
-dt: "120secs"
-dt_cpl: "120secs"
+dt: "180secs"
+dt_cpl: "180secs"
+h_elem: 12
 energy_check: false
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]
@@ -19,6 +20,6 @@ output_default_diagnostics: true
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "1098days"
+t_end: "732days"
 topo_smoothing: true
 topography: "Earth"

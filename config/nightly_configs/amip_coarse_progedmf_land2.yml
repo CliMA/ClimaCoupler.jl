@@ -1,8 +1,9 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
+#bucket_albedo_type: "map_temporal"
 checkpoint_dt: "1months"
-coupler_toml: ["toml/amip_progedmf.toml"]
+coupler_toml: ["toml/amip_progedmf2.toml"]
 dt: "180secs"
 dt_cpl: "180secs"
 #dz_bottom: 100.0
@@ -37,7 +38,10 @@ extra_atmos_diagnostics:
   #   compute_every: 1steps
 h_elem: 12
 land_model: "integrated"
+#bucket_albedo_type: "map_temporal"
+netcdf_interpolation_num_points: [144, 72, 31]
 netcdf_output_at_levels: true
+ode_algo: "ARS222"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 surface_setup: "PrescribedSurface"

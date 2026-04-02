@@ -1,10 +1,12 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
+#bucket_albedo_type: "map_temporal"
 checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_progedmf.toml"]
 dt: "180secs"
 dt_cpl: "180secs"
+z_elem: 127
 #dz_bottom: 100.0
 strict_params: false
 energy_check: false
@@ -18,7 +20,7 @@ energy_check: false
 start_date: "20100101"
 # restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-coarse-nightly-amip/1077/climacoupler-coarse-nightly-amip/output/amip_coarse_progedmf_land/checkpoints/"
 # restart_t: 31536000
-t_end: "366days"
+t_end: "186days"
 
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]
@@ -37,7 +39,10 @@ extra_atmos_diagnostics:
   #   compute_every: 1steps
 h_elem: 12
 land_model: "integrated"
+#bucket_albedo_type: "map_temporal"
+netcdf_interpolation_num_points: [144, 72, 31]
 netcdf_output_at_levels: true
+ode_algo: "ARS222"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 surface_setup: "PrescribedSurface"

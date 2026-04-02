@@ -143,10 +143,11 @@ function postprocess(
             pressure_in_output = "pfull" in CAN.available_vars(simdir)
             t_end = float(cs.t[])
             # Make sure we have enough data to compute the leaderboard.
-            if t_end > 84600 * 31 * 3 # 3 months for spin up
+            spinup_months = 0
+            if t_end > 84600 * 31 * spinup_months # 3 months for spin up
                 leaderboard_base_path = artifacts_dir
-                compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
-                rmse_check && SimOutput.test_rmse_thresholds(atmos_output_dir, 3)
+                compute_leaderboard(leaderboard_base_path, atmos_output_dir, spinup_months)
+                rmse_check && SimOutput.test_rmse_thresholds(atmos_output_dir, spinup_months)
                 pressure_in_output &&
                     compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
             end

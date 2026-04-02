@@ -50,7 +50,7 @@ value = 1
 value = 40.0
 
 [mixing_length_eddy_viscosity_coefficient]
-value = 0.56
+value = 0.14
 
 [tracer_vertical_diffusion_factor]
 value = 0

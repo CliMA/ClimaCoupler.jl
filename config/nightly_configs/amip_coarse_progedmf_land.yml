@@ -1,29 +1,51 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
-checkpoint_dt: "366days"
+#bucket_albedo_type: "map_temporal"
+checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_progedmf.toml"]
 dt: "180secs"
 dt_cpl: "180secs"
-dz_bottom: 100.0
+#dz_bottom: 100.0
+strict_params: false
 energy_check: false
+
+# weather model setup
+# initial_condition: "WeatherModel"
+# mode_name: "subseasonal"
+# era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+# land_spun_up_ic: false
+# land_temperature_anomaly: "nothing"
+# land_fraction_source: "era5"
+start_date: "20100101"
+# restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-coarse-nightly-amip/1077/climacoupler-coarse-nightly-amip/output/amip_coarse_progedmf_land/checkpoints/"
+# restart_t: 31536000
+t_end: "366days"
+
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]
     period: 1months
     reduction_time: average
     pressure_coordinates: true
     compute_every: 6hours
-h_elem: 8
+  # - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, clwvi]
+  #   period: monthly
+  #   reduction_time: average
+  # - short_name: [ts, ta, pfull, hus, rhoa, ua, va, wa, hfss, hfls, pr]
+  #   period: 150secs
+  #   compute_every: 1steps
+  # - short_name: [arup, waup, taup, husup, rhoaup, tke, bgrad]
+  #   period: 150secs
+  #   compute_every: 1steps
+h_elem: 12
 land_model: "integrated"
-mode_name: "amip"
-netcdf_interpolation_num_points: [90, 45, 31]
+#bucket_albedo_type: "map_temporal"
+netcdf_interpolation_num_points: [144, 72, 31]
 netcdf_output_at_levels: true
 ode_algo: "ARS222"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
-start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "465days"
 topo_smoothing: true
 topography: "Earth"
-z_elem: 39
+#z_elem: 39

@@ -81,3 +81,6 @@ type = "float"
 [max_area_limiter_power]
 value = 1
 type = "float"
+
+[tracer_hyperdiffusion_factor]
+value = 1

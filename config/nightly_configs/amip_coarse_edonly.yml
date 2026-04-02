@@ -1,0 +1,42 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
+#bucket_albedo_type: "map_temporal"
+checkpoint_dt: "186days"
+coupler_toml: ["toml/amip_progedmf.toml"]
+dt: "120secs"
+dt_cpl: "120secs"
+#dz_bottom: 100.0
+strict_params: false
+#edmfx_entr_model: "Generalized"
+#edmfx_sgs_mass_flux: false
+#implicit_sgs_mass_flux: false
+energy_check: false
+initial_condition: "WeatherModel"
+era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: monthly
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
+  - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, clwvi]
+    period: monthly
+    reduction_time: average
+h_elem: 12
+land_fraction_source: "era5"
+land_model: "integrated"
+land_spun_up_ic: false
+land_temperature_anomaly: "nothing"
+mode_name: "subseasonal"
+netcdf_interpolation_num_points: [144, 90, 31]
+netcdf_output_at_levels: true
+ode_algo: "ARS222"
+output_default_diagnostics: true
+radiation_reset_rng_seed: true
+start_date: "20100924"
+surface_setup: "PrescribedSurface"
+t_end: "39days"
+topo_smoothing: true
+topography: "Earth"
+#z_elem: 39

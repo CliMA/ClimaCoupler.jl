@@ -610,8 +610,15 @@ Generic constructor for land model simulations. Dispatches to specific implement
 based on `model_type` (`:bucket`, `:integrated`, or `:nothing`).
 
 If `model_type` is `:nothing`, returns `nothing`.
+
+String `model_type` values (e.g. `"bucket"`) are supported and converted to Symbols
+so that configuration files (YAML/TOML) can use plain strings.
 """
 LandSimulation(::Type{FT}, ::Val{:nothing}; kwargs...) where {FT} = nothing
+function LandSimulation(::Type{FT}, ::Val{model_type}; kwargs...) where {FT, model_type<:AbstractString}
+    # Forward to the Symbol-based dispatch, e.g. "bucket" -> Val(:bucket)
+    return LandSimulation(FT, Val(Symbol(model_type)); kwargs...)
+end
 function LandSimulation(::Type{FT}, ::Val{model_type}; kwargs...) where {FT, model_type}
     error(
         "Unknown land model type: $model_type. Valid options are: :bucket, :integrated, or :nothing",
@@ -626,8 +633,15 @@ based on `model_type` (`:oceananigans`, `:slab`, `:prescribed`, or `:nothing`).
 
 If `model_type` is `:nothing`, returns `nothing`.
 Some ocean models (like `:oceananigans`) don't require FT as the first argument.
+
+String `model_type` values (e.g. `"oceananigans"`) are supported and converted to Symbols
+so that configuration files (YAML/TOML) can use plain strings.
 """
 OceanSimulation(::Type{FT}, ::Val{:nothing}; kwargs...) where {FT} = nothing
+function OceanSimulation(::Type{FT}, ::Val{model_type}; kwargs...) where {FT, model_type<:AbstractString}
+    # Forward to the Symbol-based dispatch, e.g. "oceananigans" -> Val(:oceananigans)
+    return OceanSimulation(FT, Val(Symbol(model_type)); kwargs...)
+end
 function OceanSimulation(::Type{FT}, ::Val{model_type}; kwargs...) where {FT, model_type}
     error(
         "Unknown ocean model type: $model_type. Valid options are: :oceananigans, :slab, :prescribed, or :nothing",
@@ -642,8 +656,15 @@ based on `model_type` (`:clima_seaice`, `:prescribed`, or `:nothing`).
 
 If `model_type` is `:nothing`, returns `nothing`.
 FT is passed to all sea ice models, though some may ignore it.
+
+String `model_type` values (e.g. `"clima_seaice"`) are supported and converted to Symbols
+so that configuration files (YAML/TOML) can use plain strings.
 """
 SeaIceSimulation(::Type{FT}, ::Val{:nothing}; kwargs...) where {FT} = nothing
+function SeaIceSimulation(::Type{FT}, ::Val{model_type}; kwargs...) where {FT, model_type<:AbstractString}
+    # Forward to the Symbol-based dispatch, e.g. "clima_seaice" -> Val(:clima_seaice)
+    return SeaIceSimulation(FT, Val(Symbol(model_type)); kwargs...)
+end
 function SeaIceSimulation(::Type{FT}, ::Val{model_type}; kwargs...) where {FT, model_type}
     error(
         "Unknown sea ice model type: $model_type. Valid options are: :clima_seaice, :prescribed, or :nothing",
@@ -657,7 +678,14 @@ Generic constructor for atmosphere model simulations. Dispatches to specific imp
 based on `model_type` (`:climaatmos`).
 
 Note that the atmosphere model cannot be nothing.
+
+String `model_type` values (e.g. `"climaatmos"`) are supported and converted to Symbols
+so that configuration files (YAML/TOML) can use plain strings.
 """
+function AtmosSimulation(::Val{model_type}; kwargs...) where {model_type<:AbstractString}
+    # Forward to the Symbol-based dispatch, e.g. "climaatmos" -> Val(:climaatmos)
+    return AtmosSimulation(Val(Symbol(model_type)); kwargs...)
+end
 AtmosSimulation(::Val{model_type}; kwargs...) where {model_type} =
     error("Unknown atmosphere model type: $model_type. Valid options are: :climaatmos")
 

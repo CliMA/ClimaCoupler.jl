@@ -71,6 +71,9 @@ It contains the following objects:
                              the interfacial temperature and salinity, and the flux formulation used to compute the fluxes.
 - `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
     and the Celsius to Kelvin conversion constant.
+- `use_update_T_sfc_callback::Bool`: If true (default), pass `update_T_sfc` into SurfaceFluxes and write the
+    diagnosed skin temperature back to the ice model after each flux call. If false, use `nothing` for the
+    callback and leave `top_surface_temperature` unchanged by the coupler (for sensitivity tests).
 """
 struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.AbstractSeaIceSimulation
     ice::SIM
@@ -78,6 +81,7 @@ struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.AbstractSeaIce
     remapping::REMAP
     ocean_ice_interface::NT
     ice_properties::IP
+    use_update_T_sfc_callback::Bool
 end
 
 # Include helper functions first (used by both oceananigans.jl and clima_seaice.jl)

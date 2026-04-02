@@ -140,6 +140,10 @@ default_coupler_fields() = [
     :scalar_temp2,
     :scalar_temp3,
     :scalar_temp4,
+    :scalar_skin_1,
+    :scalar_skin_2,
+    :scalar_skin_3,
+    :scalar_skin_4,
 ]
 
 """

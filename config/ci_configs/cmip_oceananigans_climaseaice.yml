@@ -24,6 +24,7 @@ start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "1days"
 topo_smoothing: true
+sea_ice_update_T_sfc: true
 topography: "Earth"
 viscous_sponge: true
 z_elem: 39

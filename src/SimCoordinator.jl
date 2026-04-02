@@ -241,6 +241,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         simple_ocean,
         sst_adjustment,
         ice_model,
+        sea_ice_update_T_sfc,
         land_fraction_source,
         binary_area_fraction,
     ) = Input.get_coupler_args(config_dict)
@@ -369,6 +370,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         land_fraction,
         sic_path,
         binary_area_fraction,
+        use_update_T_sfc_callback = sea_ice_update_T_sfc,
     )
 
     #=

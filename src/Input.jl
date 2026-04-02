@@ -255,6 +255,10 @@ function argparse_settings()
         help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`, `nothing`]"
         arg_type = String
         default = "prescribed"
+        "--sea_ice_update_T_sfc"
+        help = "ClimaSeaIce CMIP: use flux-balance `update_T_sfc` in SurfaceFluxes and write diagnosed skin T back to the ice model each flux call [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
         "--land_fraction_source"
         help = "Source for land fraction data. [`etopo` (default) uses ETOPO-derived landsea_mask artifact, `era5` uses ERA5 land fraction artifact]"
         arg_type = String
@@ -501,6 +505,7 @@ function get_coupler_args(config_dict::Dict)
 
     # Ice model-specific information
     ice_model = Val(Symbol(config_dict["ice_model"]))
+    sea_ice_update_T_sfc = get(config_dict, "sea_ice_update_T_sfc", true)
 
     # Validate and correct model types based on simulation mode
     ocean_model, ice_model, land_model =
@@ -551,6 +556,7 @@ function get_coupler_args(config_dict::Dict)
         simple_ocean,
         sst_adjustment,
         ice_model,
+        sea_ice_update_T_sfc,
         land_fraction_source,
         binary_area_fraction,
     )

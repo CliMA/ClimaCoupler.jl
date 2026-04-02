@@ -28,9 +28,10 @@ a surface area fraction field.
 If a start date is provided, we initialize the sea ice concentration and thickness
 using the ECCO4Monthly dataset. If no start date is provided, we initialize with zero sea ice.
 
-The top heat boundary condition is `PrescribedTemperature`: the coupler iteratively
+The top heat boundary condition is `PrescribedTemperature`: by default the coupler iteratively
 diagnoses T_sfc via the `update_T_sfc` callback and writes it back to the ice model
-after each flux computation (see `compute_surface_fluxes!`).
+after each flux computation (see `compute_surface_fluxes!`). Set keyword `use_update_T_sfc_callback = false`
+(or config `sea_ice_update_T_sfc: false`) to disable that iteration and surface overwrite for diagnostics.
 
 # Arguments
 - `ocean`: [OceananigansSimulation] the ocean simulation to couple with.
@@ -46,6 +47,7 @@ function ClimaSeaIceSimulation(
     start_date = nothing,
     coupled_param_dict = CP.create_toml_dict(FT),
     dt = 5 * 60.0, # 5 minutes
+    use_update_T_sfc_callback::Bool = true,
     extra_kwargs...,
 ) where {FT}
     # Initialize the sea ice with the same grid as the ocean
@@ -137,6 +139,7 @@ function ClimaSeaIceSimulation(
         remapping,
         ocean_ice_interface,
         ice_properties,
+        use_update_T_sfc_callback,
     )
 
     # Ensure ocean temperature is above freezing where there is sea ice
@@ -181,11 +184,10 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
 """
     FluxCalculator.compute_surface_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim, thermo_params)
 
-Compute surface fluxes for `ClimaSeaIceSimulation`, iteratively diagnosing T_sfc
-via the `update_T_sfc` callback to satisfy the skin-temperature flux balance.
-
-The diagnosed T_sfc is written back to ClimaSeaIce's `top_surface_temperature`
-(used by `PrescribedTemperature`) so the ice thermodynamics stays consistent.
+Compute surface fluxes for `ClimaSeaIceSimulation`. When `sim.use_update_T_sfc_callback`
+is true, iteratively diagnoses T_sfc via the `update_T_sfc` callback and writes it back to
+`top_surface_temperature`. When false, SurfaceFluxes sees no skin update callback and the
+coupler does not overwrite `top_surface_temperature` after the flux call.
 """
 function FluxCalculator.compute_surface_fluxes!(
     csf,
@@ -199,32 +201,8 @@ function FluxCalculator.compute_surface_fluxes!(
 
     uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
 
-    # Sea ice parameters for the update_T_sfc callback (load into boundary-space scratch
-    # Fields first to avoid GPU scalar indexing when building the callback)
-    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:ice_thickness))
-    Interfacer.get_field!(csf.scalar_temp2, sim, Val(:internal_temperature))
-    Interfacer.get_field!(csf.scalar_temp3, sim, Val(:emissivity))
-    Interfacer.get_field!(csf.scalar_temp4, sim, Val(:surface_direct_albedo))
-    δ = csf.scalar_temp1
-    T_i = csf.scalar_temp2
-    ϵ = csf.scalar_temp3
-    α_albedo = csf.scalar_temp4
-    internal_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
-    κ = if hasfield(typeof(internal_heat_flux), :conductivity)
-        FT.(internal_heat_flux.conductivity)
-    else
-        convert(FT, 2) # default conductivity [W m⁻¹ K⁻¹]
-    end
-    σ = FT(sim.ice_properties.σ)
-    SW_d = csf.SW_d
-    LW_d = csf.LW_d
-    T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
-
-    # Build element-wise update_T_sfc callbacks (each closes over local ice parameters)
-    update_T_sfc_callback =
-        ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
-
-    # Surface temperature guess from last timestep
+    # Surface temperature guess from last timestep (scalar_temp1 — do not store in csf.T_sfc here,
+    # which holds the area-combined value from exchange! until the next import_combined_surface_fields!)
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
     T_sfc = csf.scalar_temp1
 
@@ -258,6 +236,40 @@ function FluxCalculator.compute_surface_fluxes!(
         error("Unknown roughness_model: $roughness_model. Must be :coare3 or :constant")
     end
     config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
+
+    # Skin callback inputs: fill only after q_sfc / z₀ use scalar_temp2–4; use scalar_skin_* so
+    # δ, T_i, ϵ, α are not overwritten before SurfaceFluxes evaluates the callback (scalar_temp1
+    # must keep T_sfc through get_surface_fluxes).
+    update_T_sfc_callback =
+        if sim.use_update_T_sfc_callback
+            internal_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
+            κ = if hasfield(typeof(internal_heat_flux), :conductivity)
+                FT.(internal_heat_flux.conductivity)
+            else
+                convert(FT, 2) # default conductivity [W m⁻¹ K⁻¹]
+            end
+            σ = FT(sim.ice_properties.σ)
+            SW_d = csf.SW_d
+            LW_d = csf.LW_d
+            T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
+            Interfacer.get_field!(csf.scalar_skin_1, sim, Val(:ice_thickness))
+            Interfacer.get_field!(csf.scalar_skin_2, sim, Val(:internal_temperature))
+            Interfacer.get_field!(csf.scalar_skin_3, sim, Val(:emissivity))
+            Interfacer.get_field!(csf.scalar_skin_4, sim, Val(:surface_direct_albedo))
+            ClimaCouplerCMIPExt.update_T_sfc.(
+                κ,
+                csf.scalar_skin_1,
+                csf.scalar_skin_2,
+                σ,
+                csf.scalar_skin_3,
+                SW_d,
+                LW_d,
+                csf.scalar_skin_4,
+                T_melt,
+            )
+        else
+            nothing
+        end
 
     fluxes =
         FluxCalculator.get_surface_fluxes.(
@@ -317,20 +329,22 @@ function FluxCalculator.compute_surface_fluxes!(
     @. csf.ustar += ustar * area_fraction
     @. csf.buoyancy_flux += buoyancy_flux * area_fraction
 
-    # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
-    csf.scalar_temp2 .=
-        ifelse.(area_fraction .≈ 0, zero(FT), T_sfc_new .- FT(sim.ice_properties.C_to_K))
-    Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.scalar_temp2, sim.remapping) # surface temperature
-    remapped_T_sfc = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
+    if sim.use_update_T_sfc_callback
+        # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
+        csf.scalar_temp2 .=
+            ifelse.(area_fraction .≈ 0, zero(FT), T_sfc_new .- FT(sim.ice_properties.C_to_K))
+        Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.scalar_temp2, sim.remapping)
+        remapped_T_sfc = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
 
-    ice_concentration = sim.ice.model.ice_concentration
-    top_sfc_T = sim.ice.model.ice_thermodynamics.top_surface_temperature
-    OC.interior(top_sfc_T, :, :, 1) .=
-        ifelse.(
-            OC.interior(ice_concentration, :, :, 1) .> 0,
-            remapped_T_sfc,
-            OC.interior(top_sfc_T, :, :, 1),
-        )
+        ice_concentration = sim.ice.model.ice_concentration
+        top_sfc_T = sim.ice.model.ice_thermodynamics.top_surface_temperature
+        OC.interior(top_sfc_T, :, :, 1) .=
+            ifelse.(
+                OC.interior(ice_concentration, :, :, 1) .> 0,
+                remapped_T_sfc,
+                OC.interior(top_sfc_T, :, :, 1),
+            )
+    end
 
     return nothing
 end

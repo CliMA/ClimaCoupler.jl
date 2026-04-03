@@ -633,6 +633,9 @@ function get_atmos_config_dict(
         atmos_config["toml"] = toml
     end
 
+    # If running in SCM mode, set the atmosphere space type and lat/lon
+    coupler_config["domain_type"] == "column" && (atmos_config["config"] = "column")
+
     # Override atmos parameters with coupled parameters
     FT = atmos_config["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
     override_file = CP.merge_toml_files(atmos_config["toml"], override = true)
@@ -692,11 +695,9 @@ one here.
 """
 function dss_state!(sim::ClimaAtmosSimulation)
     Y = sim.integrator.u
-    for key in propertynames(Y)
-        field = getproperty(Y, key)
-        buffer = CC.Spaces.create_dss_buffer(field)
-        CC.Spaces.weighted_dss!(field, buffer)
-    end
+    buffer = Utilities.init_dss_buffer(Y)
+    Utilities.apply_dss!(Y, buffer)
+    return nothing
 end
 
 """

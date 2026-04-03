@@ -4,7 +4,7 @@
 using Test
 import ArgParse
 import Dates
-import ClimaCoupler: Input, Utilities
+import ClimaCoupler: Input, Utilities, Interfacer
 import ClimaCoupler
 import YAML
 
@@ -97,6 +97,9 @@ end
         "sst_adjustment" => 2.0,
         "land_fraction_source" => "etopo",
         "binary_area_fraction" => true,
+        "domain_type" => "global",
+        "column_latlon" => [0.0, 0.0],
+        "scm_surface_type" => nothing,
         "component_dt_dict" => Dict(
             "dt_atmos" => 400.0,
             "dt_land" => 400.0,
@@ -125,6 +128,9 @@ end
     @test args.ice_model == Val(:prescribed)
     @test args.land_fraction_source == "etopo"
     @test args.sst_adjustment == 2.0
+    @test args.domain_type == "global"
+    @test args.column_latlon == (0.0, 0.0)
+    @test args.scm_surface_type === nothing
 
     # Test that component_dt_dict is preserved
     @test args.component_dt_dict isa Dict
@@ -267,4 +273,145 @@ end
         config_dict,
     )
     @test !haskey(config_dict, "dt")
+end
+
+@testset "validate_model_types_for_mode" begin
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.AMIPMode, # sim_mode
+        Val(:slab), # ocean_model
+        Val(:nothing), # ice_model
+        Val(:bucket), # land_model
+    )
+    @test ocean == Val(:prescribed)
+    @test ice == Val(:prescribed)
+    @test land == Val(:bucket)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.SlabplanetAquaMode,
+        Val(:slab),
+        Val(:nothing),
+        Val(:bucket),
+    )
+    @test ocean == Val(:slab)
+    @test ice == Val(:nothing)
+    @test land == Val(:nothing)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.SlabplanetTerraMode,
+        Val(:slab),
+        Val(:prescribed),
+        Val(:integrated),
+    )
+    @test ocean == Val(:nothing)
+    @test ice == Val(:nothing)
+    @test land == Val(:integrated)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.CMIPMode,
+        Val(:prescribed),
+        Val(:prescribed),
+        Val(:bucket),
+    )
+    @test ocean == Val(:oceananigans)
+    @test ice == Val(:clima_seaice)
+    @test land == Val(:bucket)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.SlabplanetTerraMode,
+        Val(:nothing),
+        Val(:nothing),
+        Val(:integrated);
+        domain_type = "column",
+        scm_surface_type = "land",
+    )
+    @test ocean == Val(:nothing)
+    @test ice == Val(:nothing)
+    @test land == Val(:integrated)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.SlabplanetAquaMode,
+        Val(:slab),
+        Val(:nothing),
+        Val(:nothing);
+        domain_type = "column",
+        scm_surface_type = "ocean",
+    )
+    @test ocean == Val(:slab)
+    @test ice == Val(:nothing)
+    @test land == Val(:nothing)
+
+    # Test default scm_surface_type is "ocean"
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.AMIPMode,
+        Val(:prescribed),
+        Val(:prescribed),
+        Val(:bucket);
+        domain_type = "column",
+    )
+    @test ocean == Val(:prescribed)
+    @test ice == Val(:nothing)
+    @test land == Val(:nothing)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.AMIPMode,
+        Val(:prescribed),
+        Val(:prescribed),
+        Val(:bucket);
+        domain_type = "column",
+        scm_surface_type = "land",
+    )
+    @test ocean == Val(:nothing)
+    @test ice == Val(:nothing)
+    @test land == Val(:bucket)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.AMIPMode,
+        Val(:prescribed),
+        Val(:prescribed),
+        Val(:bucket);
+        domain_type = "column",
+        scm_surface_type = "ocean",
+    )
+    @test ocean == Val(:prescribed)
+    @test ice == Val(:nothing)
+    @test land == Val(:nothing)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.AMIPMode,
+        Val(:prescribed),
+        Val(:prescribed),
+        Val(:bucket);
+        domain_type = "column",
+        scm_surface_type = "sea_ice",
+    )
+    @test ocean == Val(:nothing)
+    @test ice == Val(:prescribed)
+    @test land == Val(:nothing)
+
+    @test_throws "Oceananigans ocean model is not supported" Input.validate_model_types_for_mode(
+        Interfacer.CMIPMode,
+        Val(:oceananigans),
+        Val(:prescribed),
+        Val(:bucket);
+        domain_type = "column",
+        scm_surface_type = "ocean",
+    )
+
+    @test_throws "ClimaSeaIce model is not supported" Input.validate_model_types_for_mode(
+        Interfacer.CMIPMode,
+        Val(:prescribed),
+        Val(:clima_seaice),
+        Val(:bucket);
+        domain_type = "column",
+        scm_surface_type = "sea_ice",
+    )
+
+    @test_throws "Unknown scm_surface_type" Input.validate_model_types_for_mode(
+        Interfacer.SlabplanetAquaMode,
+        Val(:slab),
+        Val(:nothing),
+        Val(:nothing);
+        domain_type = "column",
+        scm_surface_type = "invalid_surface",
+    )
 end

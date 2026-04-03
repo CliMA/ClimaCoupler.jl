@@ -127,7 +127,44 @@ steps:
           slurm_gpus: 1
           slurm_mem: 32GB
 
-  - group: "Integration Tests"
+  - group: "Integration Tests (single column)"
+    steps:
+      - label: "SCM: slabplanet aqua (atmos + slab ocean column)"
+        key: "scm_slabplanet_aqua"
+        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_slabplanet_aqua.yml --job_id scm_slabplanet_aqua"
+        artifact_paths: "output/scm_slabplanet_aqua/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "SCM: slabplanet terra bucket (atmos + bucket land column)"
+        key: "scm_slabplanet_terra_bucket"
+        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_slabplanet_terra_bucket.yml --job_id scm_slabplanet_terra_bucket"
+        artifact_paths: "output/scm_slabplanet_terra_bucket/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "SCM: slabplanet terra land (atmos + integrated land column)"
+        key: "scm_slabplanet_terra_land"
+        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_slabplanet_terra_land.yml --job_id scm_slabplanet_terra_land"
+        artifact_paths: "output/scm_slabplanet_terra_land/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "SCM: AMIP ocean (atmos + prescribed ocean column)"
+        key: "scm_amip_ocean"
+        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_amip_ocean.yml --job_id scm_amip_ocean"
+        artifact_paths: "output/scm_amip_ocean/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "SCM: AMIP sea ice (atmos + prescribed sea ice column)"
+        key: "scm_amip_ice"
+        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_amip_ice.yml --job_id scm_amip_ice"
+        artifact_paths: "output/scm_amip_ice/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+  - group: "Integration Tests (global)"
     steps:
       # SLABPLANET EXPERIMENTS
 

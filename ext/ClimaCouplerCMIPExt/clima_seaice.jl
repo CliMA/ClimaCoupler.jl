@@ -1,5 +1,6 @@
 using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions:
     IceWaterThermalEquilibrium, PrescribedTemperature, get_tracer
+using ClimaSeaIce.SeaIceThermodynamics: melting_temperature
 import ClimaComms
 import ClimaOcean.EN4: download_dataset
 import SurfaceFluxes as SF
@@ -11,7 +12,7 @@ using StaticArrays
 haskey(ENV, "ECCO_PASSWORD") && (ENV["ECCO_WEBDAV_PASSWORD"] = ENV["ECCO_PASSWORD"])
 
 """
-    ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP}
+    ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, O, TB}
 
 The ClimaCoupler simulation object used to run with ClimaSeaIce.
 This type is used by the coupler to indicate that this simulation
@@ -25,13 +26,18 @@ It contains the following objects:
                              the interfacial temperature and salinity, and the flux formulation used to compute the fluxes.
 - `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
     and the Celsius to Kelvin conversion constant.
+- `ocean::O`: The coupled `OceananigansSimulation` (same grid as sea ice); used for the slab lower-boundary temperature.
+- `slab_lower_boundary_temperature_k::TB`: Workspace field holding the ice–ocean equilibrium temperature (K) at ocean surface
+    salinity, matching `IceWaterThermalEquilibrium` / conductive closure in ClimaSeaIce.
 """
-struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.AbstractSeaIceSimulation
+struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, O, TB} <: Interfacer.AbstractSeaIceSimulation
     ice::SIM
     area_fraction::A
     remapping::REMAP
     ocean_ice_interface::NT
     ice_properties::IP
+    ocean::O
+    slab_lower_boundary_temperature_k::TB
 end
 
 """
@@ -155,16 +161,22 @@ function ClimaSeaIceSimulation(
     boundary_space = axes(ocean.area_fraction)
     area_fraction = Interfacer.remap(boundary_space, ice.model.ice_concentration)
 
+    slab_lower_boundary_temperature_k = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+
     sim = ClimaSeaIceSimulation(
         ice,
         area_fraction,
         remapping,
         ocean_ice_interface,
         ice_properties,
+        ocean,
+        slab_lower_boundary_temperature_k,
     )
 
     # Ensure ocean temperature is above freezing where there is sea ice
     CO.OceanSeaIceModels.above_freezing_ocean_temperature!(ocean.ocean, grid, ice)
+
+    update_slab_lower_boundary_temperature_k!(sim)
     return sim
 end
 
@@ -181,9 +193,25 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_concentration}) =
     sim.ice.model.ice_concentration
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_thickness}) =
     sim.ice.model.ice_thickness
-# Internal temperature in Kelvin (same convention as :surface_temperature)
+
+"""
+Lower ice-slab boundary temperature (K) consistent with `IceWaterThermalEquilibrium`:
+`T_m(S)` at the ocean surface salinity. Refreshed in `compute_surface_fluxes!` before use.
+"""
+function update_slab_lower_boundary_temperature_k!(sim::ClimaSeaIceSimulation)
+    liquidus = sim.ice.model.ice_thermodynamics.phase_transitions.liquidus
+    C_to_K = sim.ice_properties.C_to_K
+    Ssurf = CO.OceanSeaIceModels.ocean_surface_salinity(sim.ocean.ocean)
+    Tb_K = sim.slab_lower_boundary_temperature_k
+    OC.interior(Tb_K, :, :, 1) .=
+        melting_temperature.(Ref(liquidus), OC.interior(Ssurf, :, :, 1)) .+ C_to_K
+    return nothing
+end
+
+# Internal (lower-boundary) temperature in Kelvin — matches slab conductive lower BC, not the
+# three-equation interface diagnostic in `ocean_ice_interface.temperature`.
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:internal_temperature}) =
-    sim.ocean_ice_interface.temperature + sim.ice_properties.C_to_K
+    sim.slab_lower_boundary_temperature_k
 
 # TODO better values for roughness
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:roughness_model}) = :constant
@@ -208,6 +236,10 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
 Compute surface fluxes for `ClimaSeaIceSimulation`, iteratively diagnosing T_sfc
 via the `update_T_sfc` callback to satisfy the skin-temperature flux balance.
 
+The lower-slab temperature passed into that balance is `T_m(S)` at the **current**
+ocean surface salinity, matching `IceWaterThermalEquilibrium` in ClimaSeaIce (not
+the three-equation interface diagnostic in `ocean_ice_interface.temperature`).
+
 The diagnosed T_sfc is written back to ClimaSeaIce's `top_surface_temperature`
 (used by `PrescribedTemperature`) so the ice thermodynamics stays consistent.
 """
@@ -225,6 +257,7 @@ function FluxCalculator.compute_surface_fluxes!(
 
     # Sea ice parameters for the update_T_sfc callback (load into boundary-space scratch
     # Fields first to avoid GPU scalar indexing when building the callback)
+    update_slab_lower_boundary_temperature_k!(sim)
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:ice_thickness))
     Interfacer.get_field!(csf.scalar_temp2, sim, Val(:internal_temperature))
     Interfacer.get_field!(csf.scalar_temp3, sim, Val(:emissivity))

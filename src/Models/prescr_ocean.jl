@@ -117,8 +117,8 @@ function PrescribedOceanSimulation(
     SST_timevaryinginput = TimeVaryingInput(
         sst_data,
         "SST",
-        boundary_space,
-        reference_date = start_date,
+        boundary_space;
+        start_date,
         file_reader_kwargs = (;
             preprocess_func = (data) -> data + C_to_K + sst_adjustment,
         ), ## convert Celsius to Kelvin and apply adjustment

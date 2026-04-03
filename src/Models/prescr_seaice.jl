@@ -135,8 +135,7 @@ function slab_ice_space_init(
 
     if has_ISTL1
         # Use ERA5 ISTL1 (0-7cm, near-surface layer) as a proxy for surface temperature
-        ISTL1_input =
-            TimeVaryingInput(sic_data, "ISTL1", space; reference_date = start_date)
+        ISTL1_input = TimeVaryingInput(sic_data, "ISTL1", space; start_date)
         T_sfc_data = CC.Fields.zeros(space)
         evaluate!(T_sfc_data, ISTL1_input, t_start)
 
@@ -249,8 +248,8 @@ function PrescribedIceSimulation(
     SIC_timevaryinginput = TimeVaryingInput(
         sic_data,
         "SEAICE",
-        boundary_space,
-        reference_date = start_date,
+        boundary_space;
+        start_date,
         file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
     )
 

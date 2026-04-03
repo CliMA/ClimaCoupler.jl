@@ -201,10 +201,11 @@ Lower ice-slab boundary temperature (K) consistent with `IceWaterThermalEquilibr
 function update_slab_lower_boundary_temperature_k!(sim::ClimaSeaIceSimulation)
     liquidus = sim.ice.model.ice_thermodynamics.phase_transitions.liquidus
     C_to_K = sim.ice_properties.C_to_K
+    # `ocean_surface_salinity` returns a SubArray of the tracer, not a Field — do not use `interior` on it.
     Ssurf = CO.OceanSeaIceModels.ocean_surface_salinity(sim.ocean.ocean)
+    S₂ = @view Ssurf[:, :, 1]
     Tb_K = sim.slab_lower_boundary_temperature_k
-    OC.interior(Tb_K, :, :, 1) .=
-        melting_temperature.(Ref(liquidus), OC.interior(Ssurf, :, :, 1)) .+ C_to_K
+    OC.interior(Tb_K, :, :, 1) .= melting_temperature.(Ref(liquidus), S₂) .+ C_to_K
     return nothing
 end
 

@@ -324,6 +324,19 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
+      - label: "AMIP calibration pipeline with emulated diagnostics"
+        key: "amip_test_calibration"
+        command:
+          - "julia -O0 --color=yes --project=experiments/ClimaEarth experiments/calibration/amip/generate_observations.jl"
+          - "julia -O0 --color=yes --project=experiments/ClimaEarth experiments/calibration/amip/run_calibration.jl"
+        artifact_paths: "amip_calibration/*"
+        env:
+          TEST_CALIBRATION: ""
+        agents:
+          slurm_mem: 64GB
+          slurm_ntasks: 3
+          slurm_cpus_per_task: 4
+
   - wait
 
   # plot job performance history

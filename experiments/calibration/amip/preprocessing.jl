@@ -128,7 +128,6 @@ end
     apply_normalization!(normalization_stats, var::ClimaAnalysis.OutputVar)
 
 Apply normalization using the statistics saved in `normalization_stats`.
-
 """
 function apply_normalization!(normalization_stats, var::ClimaAnalysis.OutputVar)
     if ClimaAnalysis.has_pressure(var)

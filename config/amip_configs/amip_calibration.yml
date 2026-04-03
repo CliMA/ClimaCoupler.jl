@@ -10,7 +10,7 @@ dt_rad: "1hours"
 dt_seaice: "150secs"
 dt: "150secs"
 energy_check: false
-era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
 extra_atmos_diagnostics:
   - short_name: [tas, pr, mslp, rsut, rsutcs, rlut, rlutcs, rsdt]
     period: monthly

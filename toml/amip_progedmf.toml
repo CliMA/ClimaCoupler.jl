@@ -54,3 +54,6 @@ value = 0.01
 
 [precipitation_timescale]
 value = 1200
+
+[mixing_length_eddy_viscosity_coefficient]
+value = 0.56

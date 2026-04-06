@@ -1,6 +1,6 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
-atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
+atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 #bucket_albedo_type: "map_temporal"
 checkpoint_dt: "186days"
 coupler_toml: ["toml/amip_progedmf.toml"]
@@ -8,9 +8,9 @@ dt: "120secs"
 dt_cpl: "120secs"
 #dz_bottom: 100.0
 strict_params: false
-edmfx_entr_model: "Generalized"
-edmfx_sgs_mass_flux: false
-implicit_sgs_mass_flux: false
+#edmfx_entr_model: "Generalized"
+#edmfx_sgs_mass_flux: false
+#implicit_sgs_mass_flux: false
 energy_check: false
 initial_condition: "WeatherModel"
 era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"

@@ -79,7 +79,7 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
 
     advection = ocean.ocean.model.advection.T
-    ice = sea_ice_simulation(
+    ice = CO.SeaIces.sea_ice_simulation(
         grid, ocean.ocean;
         clock = deepcopy(ocean.ocean.model.clock),
         Δt = float(dt),
@@ -178,59 +178,6 @@ function ClimaSeaIceSimulation(
     # Ensure ocean temperature is above freezing where there is sea ice
     CO.OceanSeaIceModels.above_freezing_ocean_temperature!(ocean.ocean, grid, ice)
     return sim
-end
-
-function sea_ice_simulation(
-    grid,
-    ocean = nothing;
-    clock = OC.TimeSteppers.Clock{eltype(grid)}(time = 0),
-    stop_time = clock.time isa Number ? inf : Dates.DateTime(9999, 12, 31, 23, 59, 59),
-    Δt = 5 * 60.0, # 5 minutes
-    ice_salinity = 4, # psu
-    advection = nothing, # for the moment
-    tracers = (),
-    ice_heat_capacity = 2100, # J kg⁻¹ K⁻¹
-    ice_consolidation_thickness = 0.05, # m
-    ice_density = 900, # kg m⁻³
-    dynamics = CO.SeaIces.sea_ice_dynamics(grid, ocean),
-    phase_transitions = CSI.PhaseTransitions(; ice_heat_capacity, ice_density),
-    conductivity = 2, # kg m s⁻³ K⁻¹
-    internal_heat_flux = CSI.ConductiveFlux(; conductivity),
-)
-    FT = eltype(grid)
-
-    top_sfc_temp = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    OC.set!(top_sfc_temp, FT(0))
-    top_heat_boundary_condition = PrescribedTemperature(top_sfc_temp)
-    kᴺ = size(grid, 3)
-    surface_ocean_salinity = OC.interior(ocean.model.tracers.S, :, :, (kᴺ:kᴺ))
-    bottom_heat_boundary_condition = IceWaterThermalEquilibrium(surface_ocean_salinity)
-
-    ice_thermodynamics = CSI.SlabSeaIceThermodynamics(
-        grid;
-        internal_heat_flux,
-        phase_transitions,
-        top_heat_boundary_condition,
-        bottom_heat_boundary_condition,
-    )
-
-    bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-
-    # Build the sea ice model
-    sea_ice_model = CSI.SeaIceModel(
-        grid;
-        clock,
-        ice_salinity,
-        advection,
-        tracers,
-        ice_consolidation_thickness,
-        ice_thermodynamics,
-        dynamics,
-        bottom_heat_flux,
-    )
-
-    # Build the simulation
-    return OC.Simulation(sea_ice_model; Δt, stop_time)
 end
 
 ###############################################################################
@@ -472,39 +419,42 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     grid = sim.ice.model.grid
     ice_concentration = sim.ice.model.ice_concentration
 
-    # Convert the momentum fluxes from contravariant to Cartesian basis
-    contravariant_to_cartesian!(sim.remapping.temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz)
-    F_turb_ρτxz_uv = sim.remapping.temp_uv_vec.components.data.:1
-    F_turb_ρτyz_uv = sim.remapping.temp_uv_vec.components.data.:2
+    # We only need to provide momentum fluxes if the sea ice model has dynamics
+    if !isnothing(sim.ice.model.dynamics)
+        # Convert the momentum fluxes from contravariant to Cartesian basis
+        contravariant_to_cartesian!(sim.remapping.temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz)
+        F_turb_ρτxz_uv = sim.remapping.temp_uv_vec.components.data.:1
+        F_turb_ρτyz_uv = sim.remapping.temp_uv_vec.components.data.:2
 
-    # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        F_turb_ρτxz_uv,
-    )
-    OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr2,
-        sim.remapping.remapper_cc,
-        F_turb_ρτyz_uv,
-    )
-    OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
+        # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
+        CC.Remapping.interpolate!(
+            sim.remapping.scratch_arr1,
+            sim.remapping.remapper_cc,
+            F_turb_ρτxz_uv,
+        )
+        OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
+        CC.Remapping.interpolate!(
+            sim.remapping.scratch_arr2,
+            sim.remapping.remapper_cc,
+            F_turb_ρτyz_uv,
+        )
+        OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
 
-    # Rename for clarity; these are now Center, Center Oceananigans fields
-    F_turb_ρτxz_cell = sim.remapping.scratch_cc1
-    F_turb_ρτyz_cell = sim.remapping.scratch_cc2
+        # Rename for clarity; these are now Center, Center Oceananigans fields
+        F_turb_ρτxz_cell = sim.remapping.scratch_cc1
+        F_turb_ρτyz_cell = sim.remapping.scratch_cc2
 
-    # Set the momentum flux BCs at the correct locations using the remapped scratch fields
-    # Note that this requires the sea ice model to always be run with dynamics turned on
-    si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
-    si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
-    set_from_extrinsic_vector!(
-        (; u = si_flux_u, v = si_flux_v),
-        grid,
-        F_turb_ρτxz_cell,
-        F_turb_ρτyz_cell,
-    )
+        # Set the momentum flux BCs at the correct locations using the remapped scratch fields
+        # Note that this requires the sea ice model to always be run with dynamics turned on
+        si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
+        si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
+        set_from_extrinsic_vector!(
+            (; u = si_flux_u, v = si_flux_v),
+            grid,
+            F_turb_ρτxz_cell,
+            F_turb_ρτyz_cell,
+        )
+    end
 
     # Remap the latent and sensible heat fluxes using scratch arrays
     CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_lh) # latent heat flux
@@ -665,18 +615,17 @@ function FluxCalculator.ocean_seaice_fluxes!(
     flux_u .= ifelse.(polar_excl_u .≈ 0, zero(flux_u), flux_u)
     flux_v .= ifelse.(polar_excl_v .≈ 0, zero(flux_v), flux_v)
 
+    # The heat and salt fluxes already include the SIC masking, so we don't need to
+    # multiply by SIC here.
     oc_flux_T = surface_flux(ocean_sim.ocean.model.tracers.T)
-    qi_masked = OC.interior(ocean_sim.remapping.scratch_cc1, :, :, 1)
-    qi_masked .=
-        OC.interior(ice_concentration, :, :, 1) .* OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
-    qi_masked .= ifelse.(polar_excl_centers .≈ 0, zero(qi_masked), qi_masked)
-    OC.interior(oc_flux_T, :, :, 1) .+= qi_masked
+    heat_flux = OC.interior(ocean_sim.remapping.scratch_cc1, :, :, 1)
+    heat_flux .= OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
+    heat_flux .= ifelse.(polar_excl_centers .≈ 0, zero(heat_flux), heat_flux)
+    OC.interior(oc_flux_T, :, :, 1) .+= heat_flux
 
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
     salt_contrib = OC.interior(ocean_sim.remapping.scratch_cc2, :, :, 1)
-    salt_contrib .=
-        OC.interior(ice_concentration, :, :, 1) .*
-        OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
+    salt_contrib .= OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
     salt_contrib .= ifelse.(polar_excl_centers .≈ 0, zero(salt_contrib), salt_contrib)
     OC.interior(oc_flux_S, :, :, 1) .+= salt_contrib
 
@@ -729,12 +678,19 @@ function Checkpointer.get_model_prog_state(sim::ClimaSeaIceSimulation)
     @warn "get_model_prog_state not implemented for ClimaSeaIceSimulation"
 end
 
+# Additional ClimaSeaIceSimulation getter methods for plotting debug fields
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:u}) = sim.ice.model.velocities.u
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:v}) = sim.ice.model.velocities.v
+
 """
     Plotting.debug_plot_fields(sim::ClimaSeaIceSimulation)
 
 Return the fields to include in debug plots for a ClimaSeaIce simulation.
-This includes the area fraction, surface temperature, ice concentration, and ice thickness.
+This includes the area fraction, surface temperature, ice concentration, ice thickness, and
+zonal and meridional velocity fields. Note that if the sea ice model does not have dynamics,
+the velocity fields will be zero.
+
 These plots are not polished, and are intended for debugging.
 """
 Plotting.debug_plot_fields(sim::ClimaSeaIceSimulation) =
-    (:area_fraction, :surface_temperature, :ice_concentration, :ice_thickness)
+    (:area_fraction, :surface_temperature, :ice_concentration, :ice_thickness, :u, :v)

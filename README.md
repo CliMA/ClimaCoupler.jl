@@ -75,7 +75,8 @@ Note: If you want to set the configuration file to something other than the defa
 while running the driver interactively, you'll need to
 manually set the value for `config_file`.
 
-For example, to use the configuration file found at `config/ci_configs/amip_default.yml`, you would set `config_file` as follows in the `run_amip` driver:
+For example, to use the configuration file found at `config/ci_configs/amip_default.yml`, you would set `config_file`
+as follows in the `run_simulation.jl` driver:
 ```
 config_file = "config/ci_configs/amip_default.yml"
 ```
@@ -96,29 +97,6 @@ from within the Julia environment before running the experiment.
 Sometimes this happens when you are running in an interactive SLURM session.
 
 ## Running on GPU or with MPI
-
-### CUDA.jl and MPI.jl packages
-CUDA.jl and MPI.jl are required to run ClimaCoupler's AMIP experiment on GPU and in parallel (with MPI), respectively.
-Not every machine is capable of running on GPU or with MPI, and the AMIP experiment can be run on CPU
-without these packages, so they aren't included in the ClimaCoupler AMIP experiment environment.
-This means that if you want to run our driver using these capabilities (locally or remotely), you should install
-CUDA and MPI in your machine's base Julia environment. This will make the packages available to the
-AMIP experiment environment, as it is a sub-environment of the base environment.
-If you wish to run the AMIP experiment with GPU or MPI locally as well as remotely,
-this process must be done on each machine you want to run on.
-
-This can be done using the following command in the terminal from any directory:
-```julia
-julia -E "using Pkg; Pkg.add(\"MPI\")"
-```
-
-Now, if you enter your base environment by running `julia` and then check the packages with `] st`, you should see something like:
-```
-(@v1.10) pkg> st
-Status `~/.julia/environments/v1.10/Project.toml`
-  [<hash>] CUDA vX.Y.Z
-  [<hash>] MPI vX.Y.Z
-```
 
 ### Environment variables
 Additionally, there are some environment variables we must set in these cases.

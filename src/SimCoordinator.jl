@@ -243,6 +243,9 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         ice_model,
         land_fraction_source,
         binary_area_fraction,
+        domain_type,
+        column_latlon,
+        scm_surface_type,
     ) = Input.get_coupler_args(config_dict)
 
     override_file = CP.merge_toml_files(parameter_files; override = true)
@@ -276,17 +279,22 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
 
     #=
     ### Boundary Space
-    We use a 2D boundary space at the surface for coupling.
-    If `share_surface_space` is true, the atmosphere's horizontal space is used directly;
-    otherwise a separate cubed-sphere space is created at the specified resolution.
+    We use a boundary space at the surface for coupling operations (computing fluxes, regridding, etc).
+    For column mode, this is a 1D PointSpace with lat/long coordinates.
+    For global mode, this is a 2D CubedSphereSpace or the atmosphere's horizontal space
+    (if `share_surface_space` is true).
     =#
-    if share_surface_space
-        boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
-    else
-        n_quad_points = nh_poly + 1
-        radius = coupled_param_dict["planet_radius"]
-        boundary_space = CC.CommonSpaces.CubedSphereSpace(FT; radius, n_quad_points, h_elem)
-    end
+    boundary_space = Utilities.create_boundary_space(
+        FT,
+        domain_type,
+        atmos_sim,
+        share_surface_space,
+        comms_ctx;
+        column_latlon,
+        nh_poly,
+        h_elem,
+        coupled_param_dict,
+    )
 
     surface_elevation = Interfacer.get_field(boundary_space, atmos_sim, Val(:height_sfc))
     atmos_h = Interfacer.get_atmos_height_delta(
@@ -300,6 +308,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         land_fraction_source,
         binary_area_fraction,
         sim_mode,
+        domain_type,
+        scm_surface_type,
     )
 
     #=
@@ -312,7 +322,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     (; sst_path, sic_path, land_ic_path, albedo_path, bucket_initial_condition) =
         era5_filepaths
 
-    shared_surface_space = share_surface_space ? boundary_space : nothing
+    shared_surface_space =
+        (share_surface_space || domain_type == "column") ? boundary_space : nothing
     land_sim = Interfacer.LandSimulation(
         FT,
         land_model;
@@ -369,6 +380,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         land_fraction,
         sic_path,
         binary_area_fraction,
+        domain_type,
     )
 
     #=
@@ -386,9 +398,9 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
 
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 
-    ## Conservation checks (only applicable to slabplanet mode)
+    ## Conservation checks (only applicable to global slabplanet mode)
     conservation_checks = nothing
-    if energy_check
+    if energy_check && domain_type == "global"
         @assert(
             sim_mode <: Interfacer.AbstractSlabplanetSimulationMode &&
             comms_ctx isa ClimaComms.SingletonCommsContext,
@@ -398,6 +410,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
             energy = ConservationChecker.EnergyConservationCheck(model_sims),
             water = ConservationChecker.WaterConservationCheck(model_sims),
         )
+    elseif energy_check && domain_type == "column"
+        @warn "Conservation checks are disabled for single-column mode."
     end
 
     ## Callbacks
@@ -431,7 +445,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     ## Build the CoupledSimulation struct
     prev_checkpoint_t = Ref(-1)
     cs = Interfacer.CoupledSimulation{FT}(
-        Ref(start_date),
+        start_date,
         coupler_fields,
         conservation_checks,
         [tspan[1], tspan[2]],

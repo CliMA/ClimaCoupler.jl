@@ -505,8 +505,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     # polar-exclusion mask
     @. remapped_F_lh = ifelse(polar_excl_centers .≈ 0, zero(remapped_F_lh), remapped_F_lh)
     @. remapped_F_sh = ifelse(polar_excl_centers .≈ 0, zero(remapped_F_sh), remapped_F_sh)
-    OC.interior(oc_flux_T, :, :, 1) .=
-        OC.interior(oc_flux_T, :, :, 1) .+
+    OC.interior(oc_flux_T, :, :, 1) .+=
         (1.0 .- ice_concentration) .* (remapped_F_lh .+ remapped_F_sh) ./
         (reference_density * heat_capacity)
 
@@ -526,8 +525,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
         zero(moisture_fresh_water_flux),
         moisture_fresh_water_flux,
     )
-    OC.interior(oc_flux_S, :, :, 1) .=
-        OC.interior(oc_flux_S, :, :, 1) .-
+    OC.interior(oc_flux_S, :, :, 1) .-=
         (1.0 .- ice_concentration) .* surface_salinity .* moisture_fresh_water_flux
     return nothing
 end
@@ -561,7 +559,13 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     grid = sim.ocean.model.grid
     Nz = grid.Nz
     ice_concentration = OC.interior(sim.ice_concentration, :, :, 1)
+
+    # Reset fluxes to 0 at the start of the step
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
+    OC.interior(oc_flux_T, :, :, 1) .= 0
+    oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
+    OC.interior(oc_flux_S, :, :, 1) .= 0
+
     # polar-exclusion mask
     polar_excl_centers = sim.remapping.polar_exclusion_flux_mask_centers
 
@@ -597,7 +601,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
             )
         ) ./ (reference_density * heat_capacity)
     @. rad_T_flux = ifelse(polar_excl_centers .≈ 0, zero(rad_T_flux), rad_T_flux)
-    OC.interior(oc_flux_T, :, :, 1) .= rad_T_flux
+    OC.interior(oc_flux_T, :, :, 1) .+= rad_T_flux
 
     # Remap precipitation fields onto scratch arrays; rename for clarity
     CC.Remapping.interpolate!(
@@ -623,11 +627,8 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
             sim.remapping.scratch_arr2,
         )
 
-    # Virtual salt flux
-    oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
-    # polar-exclusion mask
-    OC.interior(oc_flux_S, :, :, 1) .=
-        OC.interior(oc_flux_S, :, :, 1) .-
+    # Update salinity flux with precipitation contribution, including polar masking
+    OC.interior(oc_flux_S, :, :, 1) .-=
         OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
         (remapped_P_liq .+ remapped_P_snow) ./ reference_density
     return nothing

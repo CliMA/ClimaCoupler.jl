@@ -4,7 +4,7 @@ bucket_albedo_type: "map_temporal"
 checkpoint_dt: "1months"
 dt_atmos: "120secs" # 2 minutes
 dt_cloud_fraction: "1hours"
-dt_cpl: "120secs" # 2 minutes
+dt_cpl: "1800secs" # 30 minutes
 dt_land: "120secs" # 2 minutes
 dt_ocean: "1800secs" # 30 minutes
 dt_rad: "1hours"
@@ -23,6 +23,6 @@ ocean_model: "oceananigans"
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "186days"
+t_end: "366days"
 topo_smoothing: true
 topography: "Earth"

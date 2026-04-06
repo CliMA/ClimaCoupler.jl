@@ -22,13 +22,11 @@ steps:
 
       # - echo "--- Instantiate AMIP env"
       # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
       # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 
       # - echo "--- Instantiate CMIP env"
       # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
       # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
 
@@ -45,13 +43,11 @@ steps:
 
       - echo "--- Instantiate AMIP env"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate CMIP env"
       - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
 
@@ -139,11 +135,11 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 32GB
 
-      - label: "GPU AMIP + prog. EDMF + bucket"
-        key: "amip_progedmf"
+      - label: "GPU AMIP + prog. EDMF + integrated land"
+        key: "amip_progedmf_land"
         command:
-          - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_progedmf.yml --job_id amip_progedmf"
-        artifact_paths: "output/amip_progedmf/artifacts/*"
+          - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_progedmf_land.yml --job_id amip_progedmf_land"
+        artifact_paths: "output/amip_progedmf_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -156,7 +152,7 @@ steps:
       - label: "GPU AMIP + prog. EDMF + 1M + integrated land"
         key: "amip_progedmf_1m_land"
         command:
-          - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_amip.jl --config_file $CONFIG_PATH/amip_progedmf_1m_land.yml --job_id amip_progedmf_1m_land"
+          - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_progedmf_1m_land.yml --job_id amip_progedmf_1m_land"
         artifact_paths: "output/amip_progedmf_1m_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -174,7 +170,7 @@ steps:
       - label: "GPU CMIP: ED only + bucket"
         key: "cmip_edonly_bucket"
         command:
-            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_amip.jl --config_file $CONFIG_PATH/cmip_edonly_bucket.yml --job_id cmip_edonly_bucket"
+            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_edonly_bucket.yml --job_id cmip_edonly_bucket"
         artifact_paths: "output/cmip_edonly_bucket/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -198,7 +194,7 @@ steps:
       - label: "GPU CMIP: diag. EDMF + integrated land"
         key: "cmip_diagedmf_land"
         command:
-            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_amip.jl --config_file $CONFIG_PATH/cmip_diagedmf_land.yml --job_id cmip_diagedmf_land"
+            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_diagedmf_land.yml --job_id cmip_diagedmf_land"
         artifact_paths: "output/cmip_diagedmf_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -210,7 +206,7 @@ steps:
       - label: "GPU CMIP: prog. EDMF + integrated land"
         key: "cmip_progedmf_land"
         command:
-            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_amip.jl --config_file $CONFIG_PATH/cmip_progedmf_land.yml --job_id cmip_progedmf_land"
+            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_progedmf_land.yml --job_id cmip_progedmf_land"
         artifact_paths: "output/cmip_progedmf_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"

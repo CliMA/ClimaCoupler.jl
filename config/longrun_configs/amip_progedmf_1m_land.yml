@@ -1,7 +1,6 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
-bucket_albedo_type: "map_temporal"
 checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_progedmf_1m.toml"]
 dt: "120secs"
@@ -13,6 +12,7 @@ extra_atmos_diagnostics:
     reduction_time: average
     pressure_coordinates: true
     compute_every: 6hours
+implicit_microphysics: false
 land_model: "integrated"
 microphysics_model: "1M"
 mode_name: "amip"

@@ -9,12 +9,8 @@ It contains the following objects:
 - `area_fraction::A`: A ClimaCore Field on the boundary space representing the surface area fraction of this component model.
 - `output_writer::OW`: The diagnostic output writer.
 """
-struct ClimaLandSimulation{
-    M <: CL.LandModel,
-    I <: SciMLBase.AbstractODEIntegrator,
-    A <: CC.Fields.Field,
-    OW,
-} <: Interfacer.AbstractImplicitFluxSimulation
+struct ClimaLandSimulation{M <: CL.LandModel, I, A <: CC.Fields.Field, OW} <:
+       Interfacer.AbstractImplicitFluxSimulation
     model::M
     integrator::I
     area_fraction::A
@@ -182,7 +178,9 @@ function ClimaLandSimulation(
     # Snow model setup
     # Set β = 0 in order to regain model without density dependence
     α_snow = CL.Snow.ZenithAngleAlbedoModel(toml_dict)
-    horz_degree_res = FT(sum(CL.Domains.average_horizontal_resolution_degrees(domain)) / 2) # mean of resolution in latitude and longitude, in degrees
+    horz_degree_res =
+        domain isa CL.Domains.Column ? FT(1) :
+        FT(sum(CL.Domains.average_horizontal_resolution_degrees(domain)) / 2)
     scf = CL.Snow.WuWuSnowCoverFractionModel(toml_dict, horz_degree_res)
     snow = CL.Snow.SnowModel(
         FT,

@@ -38,3 +38,5 @@ viscous_sponge: true
 z_elem: 63
 z_max: 60000.0
 microphysics_model: "1M"
+non_orographic_gravity_wave: true
+orographic_gravity_wave: "raw_topo"

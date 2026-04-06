@@ -12,6 +12,7 @@ import Dates
 import Thermodynamics as TD
 import SciMLBase: step!
 import ClimaUtilities.TimeManager: ITime, date
+import Statistics
 
 export CoupledSimulation,
     LandSimulation,
@@ -37,7 +38,8 @@ export CoupledSimulation,
     CMIPMode,
     SlabplanetMode,
     SlabplanetAquaMode,
-    SlabplanetTerraMode
+    SlabplanetTerraMode,
+    is_column_mode
 
 """
     AbstractSimulation
@@ -102,7 +104,18 @@ Return the model date at the current timestep.
 - `cs`: [CoupledSimulation] containing info about the simulation
 """
 current_date(cs::CoupledSimulation) =
-    cs.t[] isa ITime ? date(cs.t[]) : cs.start_date[] + Dates.Second(cs.t[])
+    cs.t[] isa ITime ? date(cs.t[]) : cs.start_date + Dates.Second(cs.t[])
+
+"""
+    is_column_mode(cs::Interfacer.CoupledSimulation)
+
+Return `true` when the coupler boundary fields live on a `PointSpace`, which
+indicates a single-column model (SCM) run.
+"""
+function is_column_mode(cs::Interfacer.CoupledSimulation)
+    names = propertynames(cs.fields)
+    return axes(getproperty(cs.fields, first(names))) isa CC.Spaces.PointSpace
+end
 
 """
     default_coupler_fields()
@@ -441,7 +454,7 @@ abstract type SubseasonalMode <: AbstractSimulationMode end
     CMIPMode
 
 An abstract type representing the CMIP simulation mode. CMIP is currently the most complex
-configuration of the ClimaEarth model. It runs a ClimaAtmos.jl atmosphere model,
+configuration of the CoupledSimulation object. It runs a ClimaAtmos.jl atmosphere model,
 ClimaLand.jl bucket land model, a ClimaOcean ocean model, and a simple thermal sea ice model.
 """
 abstract type CMIPMode <: AbstractSimulationMode end
@@ -553,9 +566,30 @@ function remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field)
         return nothing
     end
 
+    # SCM mode: The boundary space is a PointSpace while the atmos surface space
+    # is a small SpectralElementSpace2D (from BoxGrid with 4 quadrature points),
+    # so we allow the mismatch and use the mean of the source values.
+    if target_space isa CC.Spaces.PointSpace
+        target_field .= Statistics.mean(source_field)
+        return nothing
+    end
+    # SCM mode: When remapping from the coupler's boundary space to the atmosphere's box column,
+    # the spaces won't match, so we copy the source values to the target field.
+    # Note this works for the PointSpace to PointSpace case as well.
+    if source_space isa CC.Spaces.PointSpace
+        parent(target_field) .= parent(source_field)
+        return nothing
+    end
+
     # Get vector of LatLongPoints for the target space to get the hcoords
     # Copy target coordinates to CPU if they are on GPU
     coords = CC.to_cpu(CC.Fields.coordinate_field(target_space))
+    if !(hasproperty(coords, :lat) && hasproperty(coords, :long))
+        error(
+            "Cannot remap between incompatible spaces: target space " *
+            "$(typeof(target_space)) does not have lat/long coordinates.",
+        )
+    end
     lats = CC.Fields.field2array(coords.lat)
     lons = CC.Fields.field2array(coords.long)
     hcoords = CC.Geometry.LatLongPoint.(lats, lons)

@@ -100,6 +100,42 @@ function make_land_domain(
 end
 
 """
+     make_land_domain(
+         shared_surface_space::CC.Spaces.PointSpace,
+         depth::FT;
+         nelements_vert::Int = 15,
+         dz_tuple::Tuple{FT, FT} = FT.((10.0, 0.05)),
+         ) where {FT}
+
+Creates the land model domain from a PointSpace (single-column mode).
+Extracts lat/long from the PointSpace coordinate field and constructs
+a `CL.Domains.Column` with those coordinates.
+
+If `coords` does not have `long` and `lat` fields, the column will be
+constructed without any lat/long information. This is only acceptable
+for bucket model with albedo from function. For integrated land or bucket
+when reading in prescribed albedo, we need to provide lat/long information.
+"""
+function make_land_domain(
+    shared_surface_space::CC.Spaces.PointSpace,
+    depth::FT;
+    nelements_vert::Int = 15,
+    dz_tuple::Tuple{FT, FT} = FT.((10.0, 0.05)),
+) where {FT}
+    coords = CC.Fields.coordinate_field(shared_surface_space)
+    longlat =
+        hasproperty(coords, :long) ?
+        (FT(parent(coords.long)[1]), FT(parent(coords.lat)[1])) : nothing
+    domain = CL.Domains.Column(;
+        zlim = (-depth, FT(0)),
+        nelements = nelements_vert,
+        dz_tuple,
+        longlat,
+    )
+    return domain
+end
+
+"""
     _coupler_set_ic!(Y, p, t, model, atmos_T, set_ic!)
 
 Helper function to set initial conditions using the provided set_ic! function.

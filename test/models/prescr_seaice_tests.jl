@@ -53,7 +53,7 @@ for FT in (Float32, Float64)
                 sic_data,
                 "SEAICE",
                 space,
-                reference_date = Dates.DateTime("20100101", Dates.dateformat"yyyymmdd"),
+                start_date = Dates.DateTime("20100101", Dates.dateformat"yyyymmdd"),
                 file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
             )
             # Get initial SIC values and use them to calculate ice fraction

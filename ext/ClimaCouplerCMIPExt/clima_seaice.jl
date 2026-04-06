@@ -26,9 +26,9 @@ It contains the following objects:
                              the interfacial temperature and salinity, and the flux formulation used to compute the fluxes.
 - `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
     and the Celsius to Kelvin conversion constant.
-- `ocean::O`: The coupled `OceananigansSimulation` (same grid as sea ice); used for the slab lower-boundary temperature.
-- `slab_lower_boundary_temperature_k::TB`: Workspace field holding the ice–ocean equilibrium temperature (K) at ocean surface
-    salinity, matching `IceWaterThermalEquilibrium` / conductive closure in ClimaSeaIce.
+- `ocean::O`: The coupled `OceananigansSimulation` (same grid as sea ice).
+- `slab_lower_boundary_temperature_k::TB`: Workspace holding `T_m(S_ice)` in Kelvin for the coupler skin
+    (ClimaOcean `ConductiveFlux` / ice salinity); not the ice–ocean `IceWaterThermalEquilibrium` temperature.
 """
 struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, O, TB} <: Interfacer.AbstractSeaIceSimulation
     ice::SIM
@@ -195,25 +195,28 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_thickness}) =
     sim.ice.model.ice_thickness
 
 """
-Lower ice-slab boundary temperature (K) consistent with `IceWaterThermalEquilibrium`:
-`T_m(S)` at the ocean surface salinity. Refreshed in `compute_surface_fluxes!` before use.
+Lower reference temperature (K) for the coupler skin balance, matching ClimaOcean’s
+`SkinTemperature` / `ConductiveFlux` branch in `InterfaceComputations/interface_states.jl`:
+`T_m(S)` using **bulk ice salinity** `sim.ice.model.tracers.S` (same role as `Ψᵢ.S` there).
+
+Note: ClimaSeaIce’s **ice–ocean** lower BC remains `IceWaterThermalEquilibrium` with **ocean**
+surface salinity; only the **atmosphere–ice skin** closure uses ice salinity here.
 """
 function update_slab_lower_boundary_temperature_k!(sim::ClimaSeaIceSimulation)
     liquidus = sim.ice.model.ice_thermodynamics.phase_transitions.liquidus
     C_to_K = sim.ice_properties.C_to_K
-    # `ocean_surface_salinity` returns a SubArray of the tracer, not a Field — do not use `interior` on it.
-    Ssurf = CO.OceanSeaIceModels.ocean_surface_salinity(sim.ocean.ocean)
-    S₂ = @view Ssurf[:, :, 1]
+    Sᵢ = sim.ice.model.tracers.S
     Tb_K = sim.slab_lower_boundary_temperature_k
-    OC.interior(Tb_K, :, :, 1) .= melting_temperature.(Ref(liquidus), S₂) .+ C_to_K
+    OC.interior(Tb_K, :, :, 1) .=
+        melting_temperature.(Ref(liquidus), OC.interior(Sᵢ, :, :, 1)) .+ C_to_K
     # Halos must be valid before `Interfacer.remap!` / `map_interpolate!`; otherwise periodic
     # longitudes sample garbage and produce mirrored spikes at both zonal boundaries.
     OC.fill_halo_regions!(Tb_K)
     return nothing
 end
 
-# Internal (lower-boundary) temperature in Kelvin — matches slab conductive lower BC, not the
-# three-equation interface diagnostic in `ocean_ice_interface.temperature`.
+# Kelvin: T_m(ice salinity) for the coupler skin (ClimaOcean ConductiveFlux-style); not the
+# three-equation `ocean_ice_interface.temperature` diagnostic.
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:internal_temperature}) =
     sim.slab_lower_boundary_temperature_k
 
@@ -240,9 +243,10 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
 Compute surface fluxes for `ClimaSeaIceSimulation`, iteratively diagnosing T_sfc
 via the `update_T_sfc` callback to satisfy the skin-temperature flux balance.
 
-The lower-slab temperature passed into that balance is `T_m(S)` at the **current**
-ocean surface salinity, matching `IceWaterThermalEquilibrium` in ClimaSeaIce (not
-the three-equation interface diagnostic in `ocean_ice_interface.temperature`).
+The lower reference in that balance is `T_m(S_ice)` with **bulk ice salinity**
+(`tracers.S`), as in ClimaOcean’s `ConductiveFlux` skin formulation (not ocean
+surface salinity and not the three-equation interface diagnostic in
+`ocean_ice_interface.temperature`).
 
 The diagnosed T_sfc is written back to ClimaSeaIce's `top_surface_temperature`
 (used by `PrescribedTemperature`) so the ice thermodynamics stays consistent.

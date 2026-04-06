@@ -206,6 +206,9 @@ function update_slab_lower_boundary_temperature_k!(sim::ClimaSeaIceSimulation)
     S₂ = @view Ssurf[:, :, 1]
     Tb_K = sim.slab_lower_boundary_temperature_k
     OC.interior(Tb_K, :, :, 1) .= melting_temperature.(Ref(liquidus), S₂) .+ C_to_K
+    # Halos must be valid before `Interfacer.remap!` / `map_interpolate!`; otherwise periodic
+    # longitudes sample garbage and produce mirrored spikes at both zonal boundaries.
+    OC.fill_halo_regions!(Tb_K)
     return nothing
 end
 
@@ -391,6 +394,7 @@ function FluxCalculator.compute_surface_fluxes!(
             sim.remapping.scratch_arr1,
             OC.interior(top_sfc_T, :, :, 1),
         )
+    OC.fill_halo_regions!(top_sfc_T)
 
     return nothing
 end

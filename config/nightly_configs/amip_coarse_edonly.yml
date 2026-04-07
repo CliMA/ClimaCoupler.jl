@@ -20,7 +20,7 @@ extra_atmos_diagnostics:
     reduction_time: average
     pressure_coordinates: true
     compute_every: 6hours
-  - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls]
+  - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, clwvi]
     period: monthly
     reduction_time: average
 h_elem: 12

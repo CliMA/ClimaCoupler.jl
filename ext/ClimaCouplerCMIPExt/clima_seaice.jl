@@ -62,6 +62,10 @@ after each flux computation (see `compute_surface_fluxes!`).
 - `start_date`: [Date] the start date to initialize the sea ice concentration and thickness.
 - `coupled_param_dict`: [Dict{String, Any}] the coupled parameters.
 - `dt`: [Float64] the time step.
+- `sea_ice_skin_flux`: `:conductive` (Fourier flux in ice; default) or `:diffusive` (ClimaOcean `DiffusiveFlux`
+  closure with boundary-layer ``\\kappa`` [``\\mathrm{m^2\\,s^{-1}}``] and ``\\delta`` [m]).
+- `skin_diffusive_κ`, `skin_diffusive_δ`: diffusive flux parameters; defaults match the `DiffusiveFlux(1, 1e-2)` scale in CliMA tests.
+- `skin_diffusive_ρ`, `skin_diffusive_c`: reference density and heat capacity for the diffusive flux scaling ``\\lambda = 1/(\\rho c)``.
 """
 function ClimaSeaIceSimulation(
     ::Type{FT};
@@ -70,8 +74,20 @@ function ClimaSeaIceSimulation(
     start_date = nothing,
     coupled_param_dict = CP.create_toml_dict(FT),
     dt = 5 * 60.0, # 5 minutes
+    sea_ice_skin_flux::Symbol = :conductive,
+    skin_diffusive_κ = nothing,
+    skin_diffusive_δ = nothing,
+    skin_diffusive_ρ = nothing,
+    skin_diffusive_c = nothing,
     extra_kwargs...,
 ) where {FT}
+    sea_ice_skin_flux ∉ (:conductive, :diffusive) &&
+        throw(ArgumentError("sea_ice_skin_flux must be :conductive or :diffusive, got $(repr(sea_ice_skin_flux))"))
+
+    _κ_diff = something(skin_diffusive_κ, FT(1))
+    _δ_diff = something(skin_diffusive_δ, FT(0.01))
+    _ρ_diff = something(skin_diffusive_ρ, FT(1025))
+    _c_diff = something(skin_diffusive_c, FT(3991))
     # Initialize the sea ice with the same grid as the ocean
     grid = ocean.ocean.model.grid
     arch = OC.Architectures.architecture(grid)
@@ -113,6 +129,11 @@ function ClimaSeaIceSimulation(
     ice_properties = (;
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         C_to_K = coupled_param_dict["temperature_water_freeze"],
+        sea_ice_skin_flux,
+        skin_diffusive_κ = _κ_diff,
+        skin_diffusive_δ = _δ_diff,
+        skin_diffusive_ρ = _ρ_diff,
+        skin_diffusive_c = _c_diff,
     )
 
     # Since ocean and sea ice share the same grid, we can also share the remapping objects
@@ -214,7 +235,8 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
     FluxCalculator.compute_surface_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim, thermo_params)
 
 Compute surface fluxes for `ClimaSeaIceSimulation`, iteratively diagnosing T_sfc
-via the `update_T_sfc` callback to satisfy the skin-temperature flux balance.
+via `update_T_sfc` (Fourier conduction in ice) or `update_T_sfc_diffusive` (ClimaOcean
+`DiffusiveFlux` closure), depending on `sim.ice_properties.sea_ice_skin_flux`.
 
 The diagnosed T_sfc is written back to ClimaSeaIce's `top_surface_temperature`
 (used by `PrescribedTemperature`) so the ice thermodynamics stays consistent.
@@ -241,20 +263,49 @@ function FluxCalculator.compute_surface_fluxes!(
     T_i = csf.scalar_temp2
     ϵ = csf.scalar_temp3
     α_albedo = csf.scalar_temp4
-    internal_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
-    κ = if hasfield(typeof(internal_heat_flux), :conductivity)
-        FT.(internal_heat_flux.conductivity)
-    else
-        convert(FT, 2) # default conductivity [W m⁻¹ K⁻¹]
-    end
     σ = FT(sim.ice_properties.σ)
     SW_d = csf.SW_d
     LW_d = csf.LW_d
     T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
 
+    skin_style = hasproperty(sim.ice_properties, :sea_ice_skin_flux) ? sim.ice_properties.sea_ice_skin_flux : :conductive
+
     # Build element-wise update_T_sfc callbacks (each closes over local ice parameters)
-    update_T_sfc_callback =
+    update_T_sfc_callback = if skin_style === :diffusive
+        κ_d = FT(
+            hasproperty(sim.ice_properties, :skin_diffusive_κ) ? sim.ice_properties.skin_diffusive_κ : one(FT),
+        )
+        δ_d = FT(
+            hasproperty(sim.ice_properties, :skin_diffusive_δ) ? sim.ice_properties.skin_diffusive_δ : FT(0.01),
+        )
+        ρ_d = FT(
+            hasproperty(sim.ice_properties, :skin_diffusive_ρ) ? sim.ice_properties.skin_diffusive_ρ : FT(1025),
+        )
+        c_d = FT(
+            hasproperty(sim.ice_properties, :skin_diffusive_c) ? sim.ice_properties.skin_diffusive_c : FT(3991),
+        )
+        ClimaCouplerCMIPExt.update_T_sfc_diffusive.(
+            κ_d,
+            δ_d,
+            ρ_d,
+            c_d,
+            T_i,
+            σ,
+            ϵ,
+            SW_d,
+            LW_d,
+            α_albedo,
+            T_melt,
+        )
+    else
+        internal_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
+        κ = if hasfield(typeof(internal_heat_flux), :conductivity)
+            FT.(internal_heat_flux.conductivity)
+        else
+            convert(FT, 2) # default conductivity [W m⁻¹ K⁻¹]
+        end
         ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
+    end
 
     # Surface temperature guess from last timestep
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))

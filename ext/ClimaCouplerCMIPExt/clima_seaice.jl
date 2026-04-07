@@ -81,10 +81,12 @@ function ClimaSeaIceSimulation(
 
     advection = ocean.ocean.model.advection.T
     ice = CO.SeaIces.sea_ice_simulation(
-        grid, ocean.ocean;
+        grid,
+        ocean.ocean;
         clock = deepcopy(ocean.ocean.model.clock),
         Δt = float(dt),
-        advection)
+        advection,
+    )
 
     ocean_ice_flux_formulation =
         CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)

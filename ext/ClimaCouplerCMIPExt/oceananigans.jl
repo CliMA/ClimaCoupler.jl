@@ -163,7 +163,7 @@ function OceananigansSimulation(
         model_clock = OC.TimeSteppers.Clock(time = start_date)
         stop_time = Dates.DateTime(tspan[2])
     elseif tspan[1] isa Float64
-        model_clock = OC.TimeSteppers.Clock{Float64}(time=tspan[1])
+        model_clock = OC.TimeSteppers.Clock{Float64}(time = tspan[1])
         stop_time = tspan[2]
     else
         error("Unsupported time type: $(typeof(tspan[1]))")

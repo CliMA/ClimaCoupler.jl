@@ -228,7 +228,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         diagnostics_dt,
         evolving_ocean,
         land_model,
-        land_temperature_anomaly,
         land_spun_up_ic,
         lai_source,
         bucket_albedo_type,
@@ -302,21 +301,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         surface_elevation,
     )
     initial_T = CC.Fields.zeros(boundary_space)
-    if land_temperature_anomaly == "orog_adjusted"
-        anomaly_function(latitude) = 40 * cosd(latitude)^4
-        # Set temperature IC including anomaly, based on atmospheric setup
-        lapse_rate = FT(6.5e-3)
-        T_base = FT(271)
-        coords = CC.Field.coordinate_field(boundary_space)
-        T_sfc_0 = T_base .+ anomaly_function.(coords.lat)
-        # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
-        initial_T .=
-            CC.Fields.field_values(T_sfc_0) .-
-            lapse_rate .* CC.Fields.field_values(surface_elevation)
-    else
-        initial_T .= Interfacer.get_field(boundary_space, atmos_sim, Val(:air_temperature))
-    end
-
+    initial_T .= Interfacer.get_field(boundary_space, atmos_sim, Val(:air_temperature))
 
     land_fraction = Input.get_land_fraction(
         boundary_space,

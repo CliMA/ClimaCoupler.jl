@@ -98,14 +98,12 @@ function ClimaSeaIceSimulation(
     if !isnothing(start_date)
         sic_metadata = CO.DataWrangling.Metadatum(
             :sea_ice_concentration,
-            # dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
-            dataset = CO.DataWrangling.ECCO.ECCO2Monthly(),
+            dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
             date = start_date,
         )
         h_metadata = CO.DataWrangling.Metadatum(
             :sea_ice_thickness,
-            # dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
-            dataset = CO.DataWrangling.ECCO.ECCO2Monthly(),
+            dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
             date = start_date,
         )
 
@@ -188,25 +186,16 @@ end
 # Timestep the simulation forward to time `t`
 function Interfacer.step!(sim::ClimaSeaIceSimulation, t::Float64)
     Δt = t - sim.ice.model.clock.time
-    @info "Sea Ice: Δt = $Δt, typeof(sim.ice.model.clock.time) = $(typeof(sim.ice.model.clock.time))"
     if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
-        @info "Sea Ice: stepping forward by Δt = $Δt"
         OC.time_step!(sim.ice, Δt)
-        @info "Sea Ice: reached time t = " * string(float(sim.ice.model.clock.time))
-        @info "Top surface temp: $(sim.ice.model.ice_thermodynamics.top_surface_temperature)"
     end
 end
 
 function Interfacer.step!(sim::ClimaSeaIceSimulation, t::ITime)
     Δt_msec = Dates.DateTime(t) - sim.ice.model.clock.time
     model_Δt_msec = Dates.DateTime(sim.model_Δt) - sim.model_Δt.epoch
-    @info "Sea Ice: Δt_msec = $Δt_msec, typeof(sim.ice.model.clock.time) = $(typeof(sim.ice.model.clock.time))"
-    @info "Sea Ice: model_Δt_msec = $model_Δt_msec, typeof(model_Δt_msec) = $(typeof(model_Δt_msec))"
     if Δt_msec >= model_Δt_msec
-        @info "Sea Ice: stepping forward by Δt_msec = $Δt_msec"
         OC.time_step!(sim.ice, float(sim.model_Δt))
-        @info "Sea Ice: reached time t = $(sim.ice.model.clock.time)"
-        @info "Top surface temp: $(sim.ice.model.ice_thermodynamics.top_surface_temperature)"
     end
 end
 

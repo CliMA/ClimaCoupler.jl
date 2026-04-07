@@ -516,14 +516,11 @@ end
 function Interfacer.step!(sim::ClimaAtmosSimulation, t::Float64)
     model_t = Float64(sim.integrator.t)
     Δt = t - model_t
-    @info "Atmos: Δt = $Δt"
     model_dt = Float64(sim.integrator.dt)
     if isapprox(Δt, model_dt) || Δt > model_dt
         while Float64(sim.integrator.t) < t
-            @info "Atmos: stepping by model's dt"
             Interfacer.step!(sim.integrator, Δt, true)
         end
-        @info "Atmos: reached time t = $(float(sim.integrator.t))"
     end
 end
 
@@ -531,15 +528,10 @@ function Interfacer.step!(sim::ClimaAtmosSimulation, t::ITime)
     # Don't step until we've reached a step boundary
     # (This can happen if the coupler dt is less than this model's)
     Δt = t - sim.integrator.t
-    @info "Atmos: Δt = $Δt"
     if Δt >= sim.integrator.dt
         while sim.integrator.t < t
-            @info "Atmos: stepping by model's dt"
             Interfacer.step!(sim.integrator)
-            air_temps = extrema(CC.Fields.level(sim.integrator.p.precomputed.ᶜT))
-            @info "Atmos: min/max air temperature = $(air_temps[1]) / $(air_temps[2])"
         end
-        @info "Atmos: reached time t = $(float(sim.integrator.t))"
     end
 end
 

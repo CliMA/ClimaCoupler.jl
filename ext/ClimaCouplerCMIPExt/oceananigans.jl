@@ -353,23 +353,16 @@ end
 # Timestep the simulation forward to time `t`. This may not actually do anything.
 function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
     Δt = t - sim.ocean.model.clock.time
-    @info "Ocean: Δt = $Δt, typeof(sim.ocean.model.clock.time) = $(typeof(sim.ocean.model.clock.time))"
     if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
-        @info "Ocean: stepping"
         OC.time_step!(sim.ocean, Δt)
-        @info "Ocean: reached time t = $(sim.ocean.model.clock.time)"
     end
 end
 
 function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
     Δt_msec = Dates.DateTime(t) - sim.ocean.model.clock.time
     model_Δt_msec = Dates.DateTime(sim.model_Δt) - sim.model_Δt.epoch
-    @info "Ocean: Δt_msec = $Δt_msec, typeof(sim.ocean.model.clock.time) = $(typeof(sim.ocean.model.clock.time))"
-    @info "Ocean: model_Δt_msec = $model_Δt_msec, typeof(model_Δt_msec) = $(typeof(model_Δt_msec))"
     if Δt_msec >= model_Δt_msec
-        @info "Ocean: stepping"
         OC.time_step!(sim.ocean, float(sim.model_Δt))
-        @info "Ocean: reached time t = $(sim.ocean.model.clock.time)"
     end
 end
 

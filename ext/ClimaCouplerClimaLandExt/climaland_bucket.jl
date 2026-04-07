@@ -316,26 +316,20 @@ end
 function Interfacer.step!(sim::BucketSimulation, t::Float64)
     model_t = Float64(sim.integrator.t)
     Δt = t - model_t
-    @info "BucketSimulation: Δt = $Δt"
     model_dt = Float64(sim.integrator.dt)
     if isapprox(Δt, model_dt) || Δt > model_dt
         while Float64(sim.integrator.t) < t
-            @info "BucketSimulation: stepping by model's dt"
             Interfacer.step!(sim.integrator)
         end
-        @info "BucketSimulation: reached time t = $(float(sim.integrator.t))"
     end
 end
 
 function Interfacer.step!(sim::BucketSimulation, t::ITime)
     Δt = t - sim.integrator.t
-    @info "BucketSimulation: Δt = $Δt"
     if Δt >= sim.integrator.dt
         while sim.integrator.t < t
-            @info "BucketSimulation: stepping by model's dt"
             Interfacer.step!(sim.integrator)
         end
-        @info "BucketSimulation: reached time t = $(float(sim.integrator.t))"
     end
 end
 

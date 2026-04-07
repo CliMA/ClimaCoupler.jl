@@ -27,7 +27,6 @@ lai_source: "modis_monthly_climatology"
 land_fraction_source: "era5"
 land_model: "integrated"
 land_spun_up_ic: false
-land_temperature_anomaly: "nothing"
 mode_name: "subseasonal"
 netcdf_output_at_levels: true
 non_orographic_gravity_wave: true

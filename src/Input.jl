@@ -485,7 +485,6 @@ function get_coupler_args(config_dict::Dict)
 
     # ClimaLand-specific information
     land_model = Val(Symbol(config_dict["land_model"]))
-    land_temperature_anomaly = lowercase(config_dict["land_temperature_anomaly"])
     use_land_diagnostics = config_dict["use_land_diagnostics"]
     land_spun_up_ic = config_dict["land_spun_up_ic"]
     lai_source = config_dict["lai_source"]
@@ -575,7 +574,6 @@ function get_coupler_args(config_dict::Dict)
         rmse_check,
         output_dir_root,
         land_model,
-        land_temperature_anomaly,
         land_spun_up_ic,
         lai_source,
         use_land_diagnostics,

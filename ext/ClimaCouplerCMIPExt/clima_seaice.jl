@@ -191,6 +191,7 @@ function Interfacer.step!(sim::ClimaSeaIceSimulation, t::Float64)
     if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
         OC.time_step!(sim.ice, Δt)
     end
+    return nothing
 end
 
 function Interfacer.step!(sim::ClimaSeaIceSimulation, t::ITime)
@@ -199,6 +200,7 @@ function Interfacer.step!(sim::ClimaSeaIceSimulation, t::ITime)
     if Δt_msec >= model_Δt_msec
         OC.time_step!(sim.ice, float(sim.model_Δt))
     end
+    return nothing
 end
 
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}) = sim.area_fraction

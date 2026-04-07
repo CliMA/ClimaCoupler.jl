@@ -322,6 +322,7 @@ function Interfacer.step!(sim::BucketSimulation, t::Float64)
             Interfacer.step!(sim.integrator)
         end
     end
+    return nothing
 end
 
 function Interfacer.step!(sim::BucketSimulation, t::ITime)
@@ -331,6 +332,7 @@ function Interfacer.step!(sim::BucketSimulation, t::ITime)
             Interfacer.step!(sim.integrator)
         end
     end
+    return nothing
 end
 
 Interfacer.close_output_writers(sim::BucketSimulation) =

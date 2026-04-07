@@ -356,6 +356,7 @@ function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
     if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
         OC.time_step!(sim.ocean, Δt)
     end
+    return nothing
 end
 
 function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
@@ -364,6 +365,7 @@ function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
     if Δt_msec >= model_Δt_msec
         OC.time_step!(sim.ocean, float(sim.model_Δt))
     end
+    return nothing
 end
 
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction

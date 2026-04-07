@@ -387,6 +387,7 @@ function Interfacer.step!(sim::ClimaLandSimulation, t::ITime)
             Interfacer.step!(sim.integrator)
         end
     end
+    return nothing
 end
 function Interfacer.step!(sim::ClimaLandSimulation, t::Float64)
     model_t = Float64(sim.integrator.t)
@@ -397,6 +398,7 @@ function Interfacer.step!(sim::ClimaLandSimulation, t::Float64)
             Interfacer.step!(sim.integrator)
         end
     end
+    return nothing
 end
 
 Interfacer.close_output_writers(sim::ClimaLandSimulation) =

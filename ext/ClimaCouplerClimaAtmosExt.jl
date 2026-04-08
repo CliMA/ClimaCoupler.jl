@@ -522,6 +522,7 @@ function Interfacer.step!(sim::ClimaAtmosSimulation, t::Float64)
             Interfacer.step!(sim.integrator, Δt, true)
         end
     end
+    return nothing
 end
 
 function Interfacer.step!(sim::ClimaAtmosSimulation, t::ITime)
@@ -533,6 +534,7 @@ function Interfacer.step!(sim::ClimaAtmosSimulation, t::ITime)
             Interfacer.step!(sim.integrator)
         end
     end
+    return nothing
 end
 
 """

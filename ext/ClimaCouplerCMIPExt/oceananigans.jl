@@ -372,10 +372,12 @@ unlike the polar mask which is defined on the boundary_space)
 function ocean_flux_highlat_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
     polar_flux_lat_deg = 78.0  # zero fluxes where |lat| ≥ this (same band as polar_mask)
     φ = OC.φnodes(grid, location[1], location[2], location[3])
-    φ_2D = Array(φ[:, :, 1])
-    lat_deg = abs.(rad2deg.(φ_2D))
-    mask = ifelse.(lat_deg .< polar_flux_lat_deg, 1.0, 0.0)
-    mask = reshape(mask[1, :], 1, :)
+    lat_deg = abs.(Array(φ[:, :, 1]))
+    FT = eltype(lat_deg)
+    mask = ifelse.(lat_deg .< polar_flux_lat_deg, one(FT), zero(FT))
+    size(mask) == (1, 1) && error(
+        "ocean_flux_highlat_mask produced a 1×1 mask; check φnodes layout/units for grid=$(typeof(grid)).",
+    )
     arch = OC.Architectures.architecture(grid)
     return OC.Architectures.on_architecture(arch, mask)
 end

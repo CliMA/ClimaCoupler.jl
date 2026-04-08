@@ -10,7 +10,7 @@ env:
   CONFIG_PATH: "config/nightly_configs"
   BENCHMARK_CONFIG_PATH: "config/benchmark_configs"
 
-timeout_in_minutes: 840
+timeout_in_minutes: 2880
 
 
 steps:
@@ -53,7 +53,7 @@ steps:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_progedmf.yml --job_id amip_coarse_progedmf"
         artifact_paths: "output/amip_coarse_progedmf/artifacts/*"
-        timeout_in_minutes: 840
+        timeout_in_minutes: 2880
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -62,18 +62,18 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 30GB
       
-      - label: "Coarse current AMIP: edonly + 0M + integrated land"
-        key: "amip_edonly"
-        command:
-          - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_edonly.yml --job_id amip_coarse_edonly"
-        artifact_paths: "output/amip_coarse_edonly/artifacts/*"
-        timeout_in_minutes: 840
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 30GB
+      # - label: "Coarse current AMIP: edonly + 0M + integrated land"
+      #   key: "amip_edonly"
+      #   command:
+      #     - echo "--- Run simulation"
+      #     - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_edonly.yml --job_id amip_coarse_edonly"
+      #   artifact_paths: "output/amip_coarse_edonly/artifacts/*"
+      #   timeout_in_minutes: 840
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #   agents:
+      #     slurm_gpus_per_task: 1
+      #     slurm_cpus_per_task: 4
+      #     slurm_ntasks: 1
+      #     slurm_mem: 30GB
       

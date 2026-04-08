@@ -371,13 +371,14 @@ unlike the polar mask which is defined on the boundary_space)
 # polar-exclusion mask
 function ocean_flux_highlat_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
     polar_flux_lat_deg = 78.0  # zero fluxes where |lat| ≥ this (same band as polar_mask)
-    φ = OC.φnodes(grid, location[1], location[2], location[3])
-    lat_deg = abs.(Array(φ[:, :, 1]))
-    FT = eltype(lat_deg)
-    mask = ifelse.(lat_deg .< polar_flux_lat_deg, one(FT), zero(FT))
-    size(mask) == (1, 1) && error(
-        "ocean_flux_highlat_mask produced a 1×1 mask; check φnodes layout/units for grid=$(typeof(grid)).",
-    )
+    # `φnodes(grid, ℓx, ℓy, ℓz)` is only the latitude vector (length ``N_\\phi``), not ``N_x \\times N_y``.
+    # Build a full horizontal mask with `nodes(...; reshape=true)` and repeat along ``\\lambda``.
+    λc, φc, _ = OC.nodes(grid, location[1], location[2], location[3]; reshape=true, with_halos=false)
+    isnothing(φc) && error("ocean_flux_highlat_mask needs latitude nodes; got φc=nothing for $(summary(grid)).")
+    Nλ = isnothing(λc) ? 1 : size(λc, 1)
+    lat_deg = abs.(vec(view(φc, 1, :, 1)))
+    col = ifelse.(lat_deg .< polar_flux_lat_deg, 1.0, 0.0)
+    mask = repeat(reshape(col, 1, length(col)), Nλ, 1)
     arch = OC.Architectures.architecture(grid)
     return OC.Architectures.on_architecture(arch, mask)
 end

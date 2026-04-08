@@ -361,7 +361,7 @@ end
 
 function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
     Δt_msec = Dates.DateTime(t) - sim.ocean.model.clock.time
-    model_Δt_msec = Dates.DateTime(sim.model_Δt) - sim.model_Δt.epoch
+    model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
     if Δt_msec >= model_Δt_msec
         OC.time_step!(sim.ocean, float(sim.model_Δt))
     end

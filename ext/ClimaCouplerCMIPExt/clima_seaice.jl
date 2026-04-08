@@ -196,7 +196,7 @@ end
 
 function Interfacer.step!(sim::ClimaSeaIceSimulation, t::ITime)
     Δt_msec = Dates.DateTime(t) - sim.ice.model.clock.time
-    model_Δt_msec = Dates.DateTime(sim.model_Δt) - sim.model_Δt.epoch
+    model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
     if Δt_msec >= model_Δt_msec
         OC.time_step!(sim.ice, float(sim.model_Δt))
     end

@@ -364,16 +364,23 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
     ocean_flux_highlat_mask(grid; location)
 
 Build the ocean flux high latitude mask once at setup.
-Currently we define ocean between 80degS to 80degN with 2 degree overlap in the coupler mask.
-Returns a 2D mask (1.0 where |lat| < 78°, 0.0 elsewhere). This mask is on the ocean grid (
-unlike the polar mask which is defined on the boundary_space)
+Currently we define ocean between 80°S to 80°N with 2 degree overlap in the coupler mask.
+Returns a 2D mask (1.0 where |lat| < 78°, 0.0 elsewhere). This mask is on the ocean grid 
+(unlike the polar mask which is defined on the boundary_space)
 """
 # polar-exclusion mask
 function ocean_flux_highlat_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
-    polar_flux_lat_deg = 78.0  # zero fluxes where |lat| ≥ this (same band as polar_mask)
-    φ = OC.φnodes(grid, location[1], location[2], location[3])  # in degrees
-    mask = ifelse.(abs.(φ) .< polar_flux_lat_deg, 1.0, 0.0)
-    mask = repeat(mask', grid.Nx, 1) # Nx × Ny
+    polar_flux_lat_deg = 78.0  # zero fluxes where |lat| ≥ this (same band as polar_mask for atmosphere)
+
+    # latitude nodes: a StepRangeLen of size grid.Ny *in degrees*
+    φ = OC.φnodes(grid, location[1], location[2], location[3])
+
+    # compute mask (1.0 where |lat| < 78°, 0.0 elsewhere)
+    mask = ifelse.(abs.(φ) .< polar_flux_lat_deg, 1.0, 0.0)  # Vector of size grid.Ny
+    mask = reshape(mask, 1, :)  # make mask a row vector (1 × grid.Ny)
+    mask = repeat(mask, grid.Nx, 1)  # repeat across longitude to get a grid.Nx × grid.Ny Matrix
+
+    # move to architecture
     arch = OC.Architectures.architecture(grid)
     return OC.Architectures.on_architecture(arch, mask)
 end

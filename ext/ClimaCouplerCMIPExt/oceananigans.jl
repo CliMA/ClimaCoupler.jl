@@ -2,7 +2,7 @@ import ClimaComms
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
-import ClimaUtilities.TimeManager: ITime
+import ClimaUtilities.TimeManager: ITime, date, counter, period
 import Dates
 
 """
@@ -360,7 +360,7 @@ function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
 end
 
 function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
-    Δt_msec = Dates.DateTime(t) - sim.ocean.model.clock.time
+    Δt_msec = date(t) - sim.ocean.model.clock.time
     model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
     if Δt_msec >= model_Δt_msec
         OC.time_step!(sim.ocean, float(sim.model_Δt))

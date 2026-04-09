@@ -6,6 +6,7 @@ import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
 import Dates
+import ClimaUtilities.TimeManager: ITime, date, counter, period
 using StaticArrays
 
 # Rename ECCO password env variable to match ClimaOcean.jl
@@ -195,7 +196,7 @@ function Interfacer.step!(sim::ClimaSeaIceSimulation, t::Float64)
 end
 
 function Interfacer.step!(sim::ClimaSeaIceSimulation, t::ITime)
-    Δt_msec = Dates.DateTime(t) - sim.ice.model.clock.time
+    Δt_msec = date(t) - sim.ice.model.clock.time
     model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
     if Δt_msec >= model_Δt_msec
         OC.time_step!(sim.ice, float(sim.model_Δt))

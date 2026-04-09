@@ -1,7 +1,7 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
-checkpoint_dt: "1months"
+checkpoint_dt: "12hours"
 coupler_toml: ["toml/amip_progedmf_1m.toml"]
 dt: "120secs"
 dt_cpl: "120secs"
@@ -43,3 +43,6 @@ extra_atmos_diagnostics:
    period: 4hours
  - short_name: [hussn_pos_frac, hussn_pos_mean, hussn_pos_sum, hussn_max]
    period: 4hours
+ - short_name: [arup, waup, taup, thetaaup, haup, husup, hurup, clwup, cliup, waen, taen, thetaaen, haen, husen, huren, clwen, clien, tke]
+   period: 4hours
+

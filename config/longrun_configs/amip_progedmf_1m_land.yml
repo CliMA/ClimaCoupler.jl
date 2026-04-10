@@ -21,7 +21,7 @@ topo_smoothing: true
 topography: "Earth"
 use_sgs_quadrature: false
 restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-longruns/1081/climacoupler-longruns/output/amip_progedmf_1m_land/checkpoints/"
-restart_t: "302400"
+restart_t: 302400
 extra_atmos_diagnostics:
  - short_name: [ta, rhoa, ua, va, wa, hur, hus, cl, clw, cli, husra, hussn, pfull]
    period: 1800secs

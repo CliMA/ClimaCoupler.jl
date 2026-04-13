@@ -21,7 +21,7 @@ using Test
 # Uncomment the following for cleaner output (but more difficult debugging)
 # Logging.disable_logging(Logging.Warn)
 
-include("compare.jl")
+include("compare_amip.jl")
 include("../AMIP/code_loading.jl")
 
 comms_ctx = ClimaComms.context()

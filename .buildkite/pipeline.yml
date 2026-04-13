@@ -112,7 +112,7 @@ steps:
         soft_fail: true # remove this after library issues are fixed
 
       - label: "GPU AMIP restarts (state and cache)"
-        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/test/restart.jl"
+        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/test/restart_amip.jl"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -128,7 +128,7 @@ steps:
           slurm_mem: 32GB
 
       - label: "GPU CMIP restarts (state and cache)"
-        command: "julia -O0 --color=yes --project=experiments/ClimaEarth/ experiments/ClimaEarth/test/restart_cmip.jl"
+        command: "julia -O0 --color=yes --project=experiments/CMIP experiments/test/restart_cmip.jl"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

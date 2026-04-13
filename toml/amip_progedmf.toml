@@ -60,3 +60,9 @@ value = 0.14
 
 [mixing_length_diss_coeff]
 value = 0.22
+
+[min_area_limiter_power]
+value = 1
+
+[max_area_limiter_power]
+value = 1

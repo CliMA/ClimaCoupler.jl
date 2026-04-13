@@ -96,9 +96,24 @@ steps:
       #        agents:
       #          slurm_mem: 16GB
 
-      - label: "MPI restarts"
+      - label: "MPI restarts (AMIP)"
         key: "mpi_restarts"
-        command: "srun julia --color=yes --project=experiments/AMIP/ experiments/test/restart.jl"
+        command: "srun julia --color=yes --project=experiments/AMIP/ experiments/test/restart_amip.jl"
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+        timeout_in_minutes: 50
+        soft_fail:
+          - exit_status: -1
+          - exit_status: 255
+        agents:
+          slurm_ntasks: 2
+          slurm_mem: 32GB
+          modules: mpiwrapper/2024_05_27 climacommon/2025_05_15
+        soft_fail: true # remove this after library issues are fixed
+      
+      - label: "MPI restarts (CMIP)"
+        key: "mpi_restarts"
+        command: "srun julia --color=yes --project=experiments/CMIP/ experiments/test/restart_cmip.jl"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
         timeout_in_minutes: 50
@@ -131,6 +146,7 @@ steps:
         command: "julia -O0 --color=yes --project=experiments/CMIP experiments/test/restart_cmip.jl"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
+        timeout_in_minutes: 50
         agents:
           slurm_ntasks: 1
           slurm_gres: "gpu:1"

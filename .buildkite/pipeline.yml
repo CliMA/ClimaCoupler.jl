@@ -97,7 +97,7 @@ steps:
       #          slurm_mem: 16GB
 
       - label: "MPI restarts (AMIP)"
-        key: "mpi_restarts"
+        key: "mpi_restarts amip"
         command: "srun julia --color=yes --project=experiments/AMIP/ experiments/test/restart_amip.jl"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
@@ -112,7 +112,7 @@ steps:
         soft_fail: true # remove this after library issues are fixed
       
       - label: "MPI restarts (CMIP)"
-        key: "mpi_restarts"
+        key: "mpi_restarts cmip"
         command: "srun julia --color=yes --project=experiments/CMIP/ experiments/test/restart_cmip.jl"
         env:
           CLIMACOMMS_CONTEXT: "MPI"

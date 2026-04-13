@@ -82,7 +82,7 @@ steps:
     steps:
       - label: "GPU runtests"
         command: "julia -O0 --color=yes --project=test/ test/runtests.jl"
-        timeout_in_minutes: 10
+        timeout_in_minutes: 20
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

@@ -12,24 +12,24 @@ edmfx_entr_model: "Generalized"
 energy_check: false
 
 # weather model setup
-initial_condition: "WeatherModel"
-mode_name: "subseasonal"
-era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
-land_spun_up_ic: false
-land_temperature_anomaly: "nothing"
-land_fraction_source: "era5"
-start_date: "20100924"
-t_end: "39days"
+# initial_condition: "WeatherModel"
+# mode_name: "subseasonal"
+# era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+# land_spun_up_ic: false
+# land_temperature_anomaly: "nothing"
+# land_fraction_source: "era5"
+start_date: "20100101"
+t_end: "186days"
 
-extra_atmos_diagnostics:
-  - short_name: [hur, hus, ta]
-    period: monthly
-    reduction_time: average
-    pressure_coordinates: true
-    compute_every: 6hours
-  - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, clwvi]
-    period: monthly
-    reduction_time: average
+# extra_atmos_diagnostics:
+#   - short_name: [hur, hus, ta]
+#     period: monthly
+#     reduction_time: average
+#     pressure_coordinates: true
+#     compute_every: 6hours
+#   - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, clwvi]
+#     period: monthly
+#     reduction_time: average
 h_elem: 12
 land_model: "integrated"
 netcdf_interpolation_num_points: [144, 72, 31]

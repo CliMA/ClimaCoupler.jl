@@ -510,13 +510,14 @@ function FluxCalculator.ocean_seaice_fluxes!(
     # Compute fluxes for u, v, T, and S from momentum, heat, and freshwater fluxes
     oc_flux_u = surface_flux(ocean_sim.ocean.model.velocities.u)
     oc_flux_v = surface_flux(ocean_sim.ocean.model.velocities.v)
-    # polar-exclusion mask
-    polar_excl_centers = ocean_sim.remapping.polar_exclusion_flux_mask_centers
-    polar_excl_u = ocean_sim.remapping.polar_exclusion_flux_mask_u
-    polar_excl_v = ocean_sim.remapping.polar_exclusion_flux_mask_v
 
     ρτxio = ice_sim.ocean_ice_interface.fluxes.x_momentum # sea_ice - ocean zonal momentum flux
     ρτyio = ice_sim.ocean_ice_interface.fluxes.y_momentum # sea_ice - ocean meridional momentum flux
+
+    # mask out the poles
+    polar_mask = ocean_sim.remapping.polar_mask
+    @. ρτxio = polar_mask * ρτxio
+    @. ρτyio = polar_mask * ρτyio
 
     # Update the momentum flux contributions from ocean/sea ice fluxes
     arch = OC.Architectures.architecture(grid)
@@ -533,24 +534,21 @@ function FluxCalculator.ocean_seaice_fluxes!(
         ρₒ⁻¹,
         ice_concentration,
     )
-    # polar-exclusion mask
-    flux_u = OC.interior(oc_flux_u, :, :, 1)
-    flux_v = OC.interior(oc_flux_v, :, :, 1)
-    flux_u .= ifelse.(polar_excl_u .≈ 0, zero(flux_u), flux_u)
-    flux_v .= ifelse.(polar_excl_v .≈ 0, zero(flux_v), flux_v)
 
     # The heat and salt fluxes already include the SIC masking, so we don't need to
     # multiply by SIC here.
     oc_flux_T = surface_flux(ocean_sim.ocean.model.tracers.T)
     heat_flux = OC.interior(ocean_sim.remapping.scratch_cc1, :, :, 1)
     heat_flux .= OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
-    heat_flux .= ifelse.(polar_excl_centers .≈ 0, zero(heat_flux), heat_flux)
+    # mask out the poles
+    @. heat_flux = polar_mask * heat_flux
     OC.interior(oc_flux_T, :, :, 1) .+= heat_flux
 
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
     salt_contrib = OC.interior(ocean_sim.remapping.scratch_cc2, :, :, 1)
     salt_contrib .= OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
-    salt_contrib .= ifelse.(polar_excl_centers .≈ 0, zero(salt_contrib), salt_contrib)
+    # mask out the poles
+    @. salt_contrib = polar_mask * salt_contrib
     OC.interior(oc_flux_S, :, :, 1) .+= salt_contrib
 
     return nothing

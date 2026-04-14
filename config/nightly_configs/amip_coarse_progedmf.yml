@@ -4,8 +4,8 @@ atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
 #bucket_albedo_type: "map_temporal"
 checkpoint_dt: "186days"
 coupler_toml: ["toml/amip_progedmf.toml"]
-dt: "120secs"
-dt_cpl: "120secs"
+dt: "150secs"
+dt_cpl: "150secs"
 #dz_bottom: 100.0
 strict_params: false
 edmfx_entr_model: "Generalized"
@@ -19,14 +19,14 @@ energy_check: false
 # land_temperature_anomaly: "nothing"
 # land_fraction_source: "era5"
 start_date: "20100101"
-t_end: "186days"
+t_end: "732days"
 
-# extra_atmos_diagnostics:
-#   - short_name: [hur, hus, ta]
-#     period: monthly
-#     reduction_time: average
-#     pressure_coordinates: true
-#     compute_every: 6hours
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: 1months
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
 #   - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, clwvi]
 #     period: monthly
 #     reduction_time: average

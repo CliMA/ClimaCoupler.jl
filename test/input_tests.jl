@@ -256,7 +256,7 @@ end
         "dt_ocean" => "200secs",
         "dt_seaice" => "200secs",
     )
-    @test_throws "Coupler dt must be divisible by all component dt's" Input.parse_component_dts!(
+    @test_throws "Coupler's and each model's time steps must be integer multiples of each other" Input.parse_component_dts!(
         config_dict,
     )
 

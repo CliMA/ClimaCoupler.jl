@@ -684,7 +684,7 @@ function parse_component_dts!(config_dict)
             assertion =
                 isapprox(Δt_cpl % component_dt, 0.0) ||
                 isapprox(component_dt % Δt_cpl, 0.0)
-            @assert assertion "Coupler time step and atmosphere time step must be integer multiples of each other\n dt_cpl = $Δt_cpl\n $key = $component_dt"
+            @assert assertion "Coupler's and each model's time steps must be integer multiples of each other\n dt_cpl = $Δt_cpl\n $key = $component_dt"
             component_dt_dict[key] = component_dt
         end
     else

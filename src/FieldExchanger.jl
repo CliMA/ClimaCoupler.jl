@@ -78,6 +78,10 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
         ocean_fraction = cs.fields.scalar_temp3
     end
 
+    # update the ice and ocean area fraction coupler fields (land is static)
+    cs.fields.ice_area_fraction .= ice_fraction
+    cs.fields.ocean_area_fraction .= ocean_fraction
+
     # check that the sum of area fractions is 1
     @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
     @assert maximum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)

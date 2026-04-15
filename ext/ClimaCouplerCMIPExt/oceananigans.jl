@@ -345,7 +345,7 @@ end
 # Timestep the simulation forward to time `t`. This may not actually do anything.
 function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
     Δt = t - sim.ocean.model.clock.time
-    if isapprox(Δt, sim.model_Δt) || Δt > sim.model_Δt
+    if isapprox(Δt, sim.model_Δt, atol=0.125) || Δt > sim.model_Δt
         OC.time_step!(sim.ocean, Δt)
     end
     return nothing

@@ -393,7 +393,7 @@ function Interfacer.step!(sim::ClimaLandSimulation, t::Float64)
     model_t = Float64(sim.integrator.t)
     Δt = t - model_t
     model_dt = Float64(sim.integrator.dt)
-    if isapprox(Δt, model_dt) || Δt > model_dt
+    if isapprox(Δt, model_dt, atol=0.125) || Δt > model_dt
         while Float64(sim.integrator.t) < t
             Interfacer.step!(sim.integrator)
         end

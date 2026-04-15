@@ -189,7 +189,7 @@ end
 # Timestep the simulation forward to time `t`
 function Interfacer.step!(sim::ClimaSeaIceSimulation, t::Float64)
     Δt = t - sim.ice.model.clock.time
-    if isapprox(Δt, sim.model_Δt, atol=0.125) || Δt > sim.model_Δt
+    if isapprox(Δt, sim.model_Δt, atol = 0.125) || Δt > sim.model_Δt
         OC.time_step!(sim.ice, Δt)
     end
     return nothing

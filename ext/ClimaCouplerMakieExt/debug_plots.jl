@@ -115,9 +115,9 @@ function Plotting.debug(
 end
 
 """
-    debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
+    debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
 
-Plot useful coupler fields (in `field_names`) and save plots to a directory.
+Plot useful coupler fields (in `cs_fields`) and save plots to a directory.
 
 If `cs_fields_ref` is provided (e.g., using a copy of cs.fields from the initialization),
 plot the anomalies of the fields with respect to `cs_fields_ref`.
@@ -128,7 +128,7 @@ basis before plotting so they can be interpreted physically.
 For single-column (PointSpace) fields, each subplot shows only the title with extrema;
 no heatmap or table is drawn.
 """
-function Plotting.debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
+function Plotting.debug(cs_fields::NamedTuple, dir, cs_fields_ref = nothing)
     field_names = propertynames(cs_fields)
 
     fig = Makie.Figure(size = (1500, 800))

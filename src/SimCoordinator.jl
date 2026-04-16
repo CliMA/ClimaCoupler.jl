@@ -402,9 +402,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     coupler_fields.land_area_fraction .= land_fraction
     coupler_fields.ice_area_fraction .= 0  # initialized as 0 since we start with no sea ice, but will evolve in time
     coupler_fields.ocean_area_fraction .= 1 .- land_fraction  # no sea ice
-    @warn extrema(coupler_fields.land_area_fraction)
-    @warn extrema(coupler_fields.ice_area_fraction)
-    @warn extrema(coupler_fields.ocean_area_fraction)
 
     ## Conservation checks (only applicable to global slabplanet mode)
     conservation_checks = nothing

@@ -4,6 +4,24 @@ import Dates
 
 export diagnostics_setup
 
+#### Custom Schedule for diagnostics that only get output once at the beginning of the simulation
+
+struct OnceSchedule <: CD.Schedules.AbstractSchedule end
+
+function (::OnceSchedule)(integrator)
+    return integrator.step == 1
+end
+
+function CD.Schedules.short_name(::OnceSchedule)
+    return "once"
+end
+
+function CD.Schedules.long_name(::OnceSchedule)
+    return "once at the first step of the simulation"
+end
+
+#### Diagnostics orchestration and setup functions
+
 """
     CD.orchestrate_diagnostics(cs::CoupledSimulation)
 
@@ -42,7 +60,7 @@ function diagnostics_setup(
     netcdf_writer = CD.Writers.NetCDFWriter(boundary_space, output_dir)
 
     # Create schedules for computing and outputting diagnostics
-    schedule_once = integrator -> integrator.step == 1
+    schedule_once = OnceSchedule()
     schedule_everystep = CD.Schedules.EveryStepSchedule()
     schedule_calendar_dt = CD.Schedules.EveryCalendarDtSchedule(diagnostics_dt; start_date)
 

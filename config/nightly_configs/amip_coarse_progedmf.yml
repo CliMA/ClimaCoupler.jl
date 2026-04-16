@@ -19,7 +19,7 @@ energy_check: false
 # land_temperature_anomaly: "nothing"
 # land_fraction_source: "era5"
 start_date: "20100101"
-t_end: "732days"
+t_end: "366days"
 
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]

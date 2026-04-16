@@ -56,7 +56,7 @@ value = 0.01
 value = 1200
 
 [mixing_length_eddy_viscosity_coefficient]
-value = 0.14
+value = 0.56
 
 [mixing_length_diss_coeff]
 value = 0.22

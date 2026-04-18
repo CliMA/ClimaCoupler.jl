@@ -32,7 +32,7 @@ value = 0.6022681998170195
 value = 0.0001
 
 [entr_coeff]
-value = 0.1
+value = 0.05
 
 [detr_inv_tau]
 value = 0.0001

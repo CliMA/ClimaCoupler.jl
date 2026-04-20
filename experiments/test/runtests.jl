@@ -20,3 +20,6 @@ end
 @safetestset "AMIP test" begin
     include("amip_test.jl")
 end
+@safetestset "time incrementing test" begin
+    include("time_increment_test.jl")
+end

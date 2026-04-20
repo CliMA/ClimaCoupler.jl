@@ -10,7 +10,10 @@ import Dates
 
 import ClimaAnalysis
 import ClimaAnalysis: NCCatalog
+import ClimaCoupler
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
+import ClimaDiagnostics
+import ClimaUtilities.TimeManager: ITime
 
 # TODO: Remove this once the name is added to ClimaAnalysis
 push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
@@ -880,6 +883,68 @@ Add the parameter toml file at `parameter_filepath` to `config_dict`.
 function add_parameter_filepath!(config_dict, parameter_filepath)
     parameter_filepaths = get!(config_dict, "coupler_toml", String[])
     push!(parameter_filepaths, parameter_filepath)
+    return nothing
+end
+
+"""
+    setup_and_emulate_diagnostics(config_dict::AbstractDict; dt = "86400secs")
+
+Set up and emulate producing the diagnostics of the coupled model simulation
+specified by the `config_dict`. Returns the `CoupledSimulation` after simulating
+the diagnostics.
+
+This is analogous to [`SimCoordinator.setup_and_run`](@ref) and is meant a
+drop-in replacement for starting a simulation that will produce only
+diagnostics. Note this function is primarily intended for testing, not running
+or viewing meaningful simulations.
+
+By default, the size of the time step will be set to one day.
+
+!!! note "Atmos diagnostics"
+    This only supports simulating the creation of atmos diagnostics.
+
+!!! note "Emulation"
+    Since no actual time steps are taken, the values in the `CoupledSimulation`
+    might be nonsensical.
+"""
+function setup_and_emulate_diagnostics(config_dict::AbstractDict; dt = "86400secs")
+    config_dict["dt"] = dt
+    cs = ClimaCoupler.Interfacer.CoupledSimulation(config_dict)
+    emulate_diagnostics!(cs)
+    return cs
+end
+
+"""
+    emulate_diagnostics!(cs::ClimaCoupler.Interfacer.CoupledSimulation)
+
+Emulate producing diagnostics for `cs`.
+
+This only produces diagnostics for the atmos model because the calibration of
+the coupled model currently uses only atmos variables.
+"""
+function emulate_diagnostics!(cs::ClimaCoupler.Interfacer.CoupledSimulation)
+    t_end = cs.tspan[end]
+    emulate_diagnostics!(cs.model_sims.atmos_sim, t_end)
+end
+
+"""
+    emulate_diagnostics!(sim, t_end)
+
+Emulate producing diagnostics for the component model `sim`.
+
+There is only support for emulating diagnostics of the `ClimaAtmosSimulation`.
+"""
+function emulate_diagnostics!(sim, t_end)
+    (; integrator, output_writers) = sim
+    diagnostics_handler =
+        integrator.callback.discrete_callbacks[end].affect!.diagnostics_handler
+    while sim.integrator.t < t_end
+        sim.integrator.t += integrator.dt
+        ClimaDiagnostics.orchestrate_diagnostics(integrator, diagnostics_handler)
+    end
+    # Since the simulation never actually ran, we need to manually close the
+    # writers ourselves
+    foreach(close, output_writers)
     return nothing
 end
 

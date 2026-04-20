@@ -269,18 +269,7 @@ function FluxCalculator.compute_surface_fluxes!(
 
     # Roughness and gustiness configuration
     gustiness = ones(boundary_space)
-    roughness_model = Interfacer.get_field(sim, Val(:roughness_model))
-    roughness_params = if roughness_model == :coare3
-        Interfacer.get_field(sim, Val(:coare3_roughness_params))
-    elseif roughness_model == :constant
-        Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_momentum))
-        z0m = csf.scalar_temp3
-        Interfacer.get_field!(csf.scalar_temp4, sim, Val(:roughness_buoyancy))
-        z0b = csf.scalar_temp4
-        SF.ConstantRoughnessParams.(z0m, z0b)
-    else
-        error("Unknown roughness_model: $roughness_model. Must be :coare3 or :constant")
-    end
+    roughness_params = FluxCalculator.get_roughness_params(csf, sim)
     config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
 
     fluxes =
@@ -302,48 +291,16 @@ function FluxCalculator.compute_surface_fluxes!(
             update_T_sfc_callback,
         )
 
-    (;
-        F_turb_ρτxz,
-        F_turb_ρτyz,
-        F_sh,
-        F_lh,
-        F_turb_moisture,
-        L_MO,
-        ustar,
-        buoyancy_flux,
-        T_sfc_new,
-    ) = fluxes
-
-    # Zero out fluxes where area fraction is zero
-    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
-    area_fraction = csf.scalar_temp1
-
-    @. F_turb_ρτxz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτxz), F_turb_ρτxz)
-    @. F_turb_ρτyz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτyz), F_turb_ρτyz)
-    @. F_sh = ifelse(area_fraction ≈ 0, zero(F_sh), F_sh)
-    @. F_lh = ifelse(area_fraction ≈ 0, zero(F_lh), F_lh)
-    @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(F_turb_moisture), F_turb_moisture)
-    @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
-    @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
-    @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
-
-    # Update fluxes in the sea ice simulation
-    fields = (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
-    FluxCalculator.update_turbulent_fluxes!(sim, fields)
-
-    # Accumulate area-weighted fluxes in coupler fields
-    @. csf.F_turb_ρτxz += F_turb_ρτxz * area_fraction
-    @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction
-    @. csf.F_lh += F_lh * area_fraction
-    @. csf.F_sh += F_sh * area_fraction
-    @. csf.F_turb_moisture += F_turb_moisture * area_fraction
-    @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
-    @. csf.ustar += ustar * area_fraction
-    @. csf.buoyancy_flux += buoyancy_flux * area_fraction
+    FluxCalculator.update_flux_fields!(csf, sim, fluxes)
+    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
     csf.scalar_temp2 .=
-        ifelse.(area_fraction .≈ 0, zero(FT), T_sfc_new .- FT(sim.ice_properties.C_to_K))
+        ifelse.(
+            area_fraction .≈ 0,
+            zero(FT),
+            fluxes.T_sfc_new .- FT(sim.ice_properties.C_to_K),
+        )
     CC.Remapping.interpolate!(
         sim.remapping.scratch_arr1,
         sim.remapping.remapper_cc,
@@ -553,13 +510,14 @@ function FluxCalculator.ocean_seaice_fluxes!(
     # Compute fluxes for u, v, T, and S from momentum, heat, and freshwater fluxes
     oc_flux_u = surface_flux(ocean_sim.ocean.model.velocities.u)
     oc_flux_v = surface_flux(ocean_sim.ocean.model.velocities.v)
-    # polar-exclusion mask
-    polar_excl_centers = ocean_sim.remapping.polar_exclusion_flux_mask_centers
-    polar_excl_u = ocean_sim.remapping.polar_exclusion_flux_mask_u
-    polar_excl_v = ocean_sim.remapping.polar_exclusion_flux_mask_v
 
     ρτxio = ice_sim.ocean_ice_interface.fluxes.x_momentum # sea_ice - ocean zonal momentum flux
     ρτyio = ice_sim.ocean_ice_interface.fluxes.y_momentum # sea_ice - ocean meridional momentum flux
+
+    # mask out the poles
+    polar_mask = ocean_sim.remapping.polar_mask
+    @. ρτxio = polar_mask * ρτxio
+    @. ρτyio = polar_mask * ρτyio
 
     # Update the momentum flux contributions from ocean/sea ice fluxes
     arch = OC.Architectures.architecture(grid)
@@ -576,24 +534,21 @@ function FluxCalculator.ocean_seaice_fluxes!(
         ρₒ⁻¹,
         ice_concentration,
     )
-    # polar-exclusion mask
-    flux_u = OC.interior(oc_flux_u, :, :, 1)
-    flux_v = OC.interior(oc_flux_v, :, :, 1)
-    flux_u .= ifelse.(polar_excl_u .≈ 0, zero(flux_u), flux_u)
-    flux_v .= ifelse.(polar_excl_v .≈ 0, zero(flux_v), flux_v)
 
     # The heat and salt fluxes already include the SIC masking, so we don't need to
     # multiply by SIC here.
     oc_flux_T = surface_flux(ocean_sim.ocean.model.tracers.T)
     heat_flux = OC.interior(ocean_sim.remapping.scratch_cc1, :, :, 1)
     heat_flux .= OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
-    heat_flux .= ifelse.(polar_excl_centers .≈ 0, zero(heat_flux), heat_flux)
+    # mask out the poles
+    @. heat_flux = polar_mask * heat_flux
     OC.interior(oc_flux_T, :, :, 1) .+= heat_flux
 
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
     salt_contrib = OC.interior(ocean_sim.remapping.scratch_cc2, :, :, 1)
     salt_contrib .= OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
-    salt_contrib .= ifelse.(polar_excl_centers .≈ 0, zero(salt_contrib), salt_contrib)
+    # mask out the poles
+    @. salt_contrib = polar_mask * salt_contrib
     OC.interior(oc_flux_S, :, :, 1) .+= salt_contrib
 
     return nothing

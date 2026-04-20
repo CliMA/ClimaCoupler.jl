@@ -80,7 +80,7 @@ end
                        update_T_sfc_cb, update_q_vap_sfc;
                        roughness_inputs, scheme, solver_opts, flux_specs)
 
-Uses SurfaceFluxes.jl to calculate turbulent surface fluxes. 
+Uses SurfaceFluxes.jl to calculate turbulent surface fluxes.
 Fluxes are computed over the entire surface, even where the relevant surface model is not present.
 
 `update_T_sfc_cb` and `update_q_vap_sfc` are positional so they participate in
@@ -277,26 +277,13 @@ function compute_surface_fluxes!(
     # Set some scalars that we hardcode for now
     gustiness = ones(boundary_space)
 
-    # Get roughness model from the simulation (ocean simulations return :coare3, others return :constant)
-    roughness_model = Interfacer.get_field(sim, Val(:roughness_model))
-
     # Set SurfaceFluxConfig containing models for roughness and gustiness
-    # Reuse cached roughness params when available to avoid allocations
-    roughness_params = if roughness_model == :coare3
-        # All COARE3-using simulations cache coare3_roughness_params, so no allocation needed
-        Interfacer.get_field(sim, Val(:coare3_roughness_params))
-    elseif roughness_model == :constant
-        Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_momentum))
-        z0m = csf.scalar_temp3
-        Interfacer.get_field!(csf.scalar_temp4, sim, Val(:roughness_buoyancy))
-        z0b = csf.scalar_temp4
-        SF.ConstantRoughnessParams.(z0m, z0b)
-    else
-        error("Unknown roughness_model: $roughness_model. Must be :coare3 or :constant")
-    end
-
+    roughness_params = get_roughness_params(csf, sim)
     config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
 
+    # Set surface velocity to zero for now
+    csf.scalar_temp3 .= 0
+    uv_sfc = csf.scalar_temp3
     fluxes =
         FluxCalculator.get_surface_fluxes.(
             surface_fluxes_params,
@@ -306,21 +293,38 @@ function compute_surface_fluxes!(
             csf.q_liq_atmos,
             csf.q_ice_atmos,
             csf.ρ_atmos,
-            csf.height_int,
-            uv_int .* FT(0),
+            csf.height_int, # h_int
+            uv_int .* FT(0), # uv_sfc
             T_sfc,
             q_sfc,
-            csf.height_sfc,
-            FT(0),
+            csf.height_sfc, # h_sfc
+            FT(0), # d
             config,
         )
+
+    # Update the coupler fields and surface simulation with the fluxes
+    update_flux_fields!(csf, sim, fluxes)
+    return nothing
+end
+
+"""
+    update_flux_fields!(csf, sim::Interfacer.AbstractSurfaceSimulation, fluxes)
+
+Update the surface simulation `sim` with the values stored in `fluxes,
+without any area-weighting. Then, update the coupler fields `csf` with
+the area-weighted fluxes.
+
+# Arguments
+- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields:
+    `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
+- `sim`: [Interfacer.AbstractComponentSimulation] the surface simulation to update.
+- `fluxes`: [NamedTuple] containing the fluxes to update the surface simulation with.
+"""
+function update_flux_fields!(csf, sim::Interfacer.AbstractSurfaceSimulation, fluxes)
     (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) =
         fluxes
+    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
-    # get area fraction (min = 0, max = 1)
-    # We can reuse scalar_temp1 after flux calculation
-    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
-    area_fraction = csf.scalar_temp1
     # Zero out fluxes where the area fraction is zero
     # Multiplying by `area_fraction` is not sufficient because the fluxes may
     # be NaN where the area fraction is zero.
@@ -333,7 +337,7 @@ function compute_surface_fluxes!(
     @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
     @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
 
-    # update the fluxes, which are now area-weighted, of this surface model
+    # update the fluxes, which are now area fraction-masked, of this surface model
     fields = (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
     FluxCalculator.update_turbulent_fluxes!(sim, fields)
 
@@ -356,6 +360,47 @@ function compute_surface_fluxes!(
     @. csf.buoyancy_flux += buoyancy_flux * area_fraction
     return nothing
 end
+
+"""
+    get_roughness_params(csf, sim)
+
+Return the roughness parameters for the simulation, based on the roughness model.
+"""
+function get_roughness_params(csf, sim)
+    roughness_model = Interfacer.get_field(sim, Val(:roughness_model))
+    return get_roughness_params(csf, sim, Val(roughness_model))
+end
+
+"""
+    get_roughness_params(csf, sim, ::Val{:coare3})
+
+Return COARE3 roughness parameters from the simulation.
+"""
+get_roughness_params(csf, sim, ::Val{:coare3}) =
+    Interfacer.get_field(sim, Val(:coare3_roughness_params))
+
+"""
+    get_roughness_params(csf, sim, ::Val{:constant})
+
+Load momentum and buoyancy roughness from the simulation into csf scratch fields
+and return element-wise `ConstantRoughnessParams`.
+"""
+function get_roughness_params(csf, sim, ::Val{:constant})
+    Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_momentum))
+    z0m = csf.scalar_temp3
+    Interfacer.get_field!(csf.scalar_temp4, sim, Val(:roughness_buoyancy))
+    z0b = csf.scalar_temp4
+    return SF.ConstantRoughnessParams.(z0m, z0b)
+end
+
+"""
+    get_roughness_params(csf, sim, roughness_model)
+
+Fallback for unknown roughness model; errors.
+"""
+get_roughness_params(csf, sim, roughness_model) =
+    error("Unknown roughness_model: $roughness_model. Must be :coare3 or :constant")
+
 
 """
     ocean_seaice_fluxes!(cs::CoupledSimulation)

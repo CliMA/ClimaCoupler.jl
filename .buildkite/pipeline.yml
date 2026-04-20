@@ -82,7 +82,7 @@ steps:
     steps:
       - label: "GPU runtests"
         command: "julia -O0 --color=yes --project=test/ test/runtests.jl"
-        timeout_in_minutes: 10
+        timeout_in_minutes: 20
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -323,6 +323,21 @@ steps:
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
+
+      - label: "AMIP calibration pipeline with emulated diagnostics"
+        key: "amip_test_calibration"
+        command:
+          - "julia -O0 --color=yes --project=experiments/AMIP/ experiments/calibration/amip/generate_observations.jl"
+          - "julia -O0 --color=yes --project=experiments/AMIP/ experiments/calibration/amip/run_calibration.jl"
+        artifact_paths: "amip_calibration/*"
+        env:
+          CLIMACOMMS_DEVICE: "CPU"
+          CLIMACOMMS_CONTEXT: "SINGLETON"
+          TEST_CALIBRATION: ""
+        agents:
+          slurm_mem: 64GB
+          slurm_ntasks: 3
+          slurm_cpus_per_task: 4
 
   - wait
 

@@ -110,7 +110,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
             verbose = true,
             hpc_kwargs = Dict(
                 # Options include "premium", "regular", "economy", "preempt"
-                :job_priority => "regular", # {}
+                :job_priority => "premium", # {}
                 # 720 minutes is 12 hours
                 :time => 720,
                 :ntasks => 1,

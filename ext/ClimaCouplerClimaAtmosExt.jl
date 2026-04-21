@@ -517,9 +517,12 @@ function Interfacer.step!(sim::ClimaAtmosSimulation, t::Float64)
     model_t = Float64(sim.integrator.t)
     Δt = t - model_t
     model_dt = Float64(sim.integrator.dt)
+    # Check to see that we're within 1/8 sec of a time step to avoid floating point issues,
+    # and if so take an integer number of steps to get there
     if isapprox(Δt, model_dt, atol = 0.125) || Δt > model_dt
-        while Float64(sim.integrator.t) < t
-            Interfacer.step!(sim.integrator, Δt, true)
+        n_steps = round(Int, Δt / model_dt)
+        for _ in 1:n_steps
+            Interfacer.step!(sim.integrator, model_dt, true)
         end
     end
     return nothing

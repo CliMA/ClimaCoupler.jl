@@ -5,6 +5,8 @@ import ClimaOcean.EN4: download_dataset
 import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
+import Dates
+import ClimaUtilities.TimeManager: ITime, date, counter, period
 using StaticArrays
 
 # Rename ECCO password env variable to match ClimaOcean.jl
@@ -26,12 +28,14 @@ It contains the following objects:
 - `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
     and the Celsius to Kelvin conversion constant.
 """
-struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.AbstractSeaIceSimulation
+struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, MDT} <:
+       Interfacer.AbstractSeaIceSimulation
     ice::SIM
     area_fraction::A
     remapping::REMAP
     ocean_ice_interface::NT
     ice_properties::IP
+    model_Δt::MDT
 end
 
 """
@@ -77,12 +81,21 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
 
     advection = ocean.ocean.model.advection.T
-    ice = CO.SeaIces.sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection)
+    ice = CO.SeaIces.sea_ice_simulation(
+        grid,
+        ocean.ocean;
+        clock = deepcopy(ocean.ocean.model.clock),
+        Δt = float(dt),
+        advection,
+    )
 
     ocean_ice_flux_formulation =
         CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)
     interface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     interface_salinity = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+
+    # Initialize model_Δt so that time stepping works properly
+    model_Δt = dt
 
     # Initialize nonzero sea ice if start date provided
     if !isnothing(start_date)
@@ -161,6 +174,7 @@ function ClimaSeaIceSimulation(
         remapping,
         ocean_ice_interface,
         ice_properties,
+        model_Δt,
     )
 
     # Ensure ocean temperature is above freezing where there is sea ice
@@ -173,8 +187,22 @@ end
 ###############################################################################
 
 # Timestep the simulation forward to time `t`
-Interfacer.step!(sim::ClimaSeaIceSimulation, t) =
-    OC.time_step!(sim.ice, float(t) - sim.ice.model.clock.time)
+function Interfacer.step!(sim::ClimaSeaIceSimulation, t::Float64)
+    Δt = t - sim.ice.model.clock.time
+    if isapprox(Δt, sim.model_Δt, atol = 0.125) || Δt > sim.model_Δt
+        OC.time_step!(sim.ice, Δt)
+    end
+    return nothing
+end
+
+function Interfacer.step!(sim::ClimaSeaIceSimulation, t::ITime)
+    Δt_msec = date(t) - sim.ice.model.clock.time
+    model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
+    if Δt_msec >= model_Δt_msec
+        OC.time_step!(sim.ice, float(sim.model_Δt))
+    end
+    return nothing
+end
 
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}) = sim.area_fraction
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_concentration}) =

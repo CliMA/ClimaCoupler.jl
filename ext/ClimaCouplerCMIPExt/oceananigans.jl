@@ -2,6 +2,7 @@ import ClimaComms
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
+import ClimaUtilities.TimeManager: ITime, date, counter, period
 import Dates
 
 """
@@ -18,13 +19,14 @@ It contains the following objects:
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ice_concentration::SIC`: An Oceananigans Field representing the sea ice concentration on the ocean/sea ice grid.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <:
+struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, MDT} <:
        Interfacer.AbstractOceanSimulation
     ocean::SIM
     area_fraction::A
     ocean_properties::OPROP
     remapping::REMAP
     ice_concentration::SIC
+    model_Δt::MDT
 end
 
 """
@@ -67,7 +69,7 @@ function OceananigansSimulation(
     tspan,
     output_dir,
     simple_ocean = false,
-    dt = nothing,
+    dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
     extra_kwargs...,
@@ -156,10 +158,22 @@ function OceananigansSimulation(
         closure = (horizontal_viscosity, vertical_mixing)
     end
 
-    Δt = isnothing(dt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : float(dt)
+    if tspan[1] isa ITime
+        # create a model clock that uses DateTime, for compatibility with ITime.
+        model_clock = OC.TimeSteppers.Clock(time = start_date)
+        stop_time = Dates.DateTime(tspan[2])
+    elseif tspan[1] isa Float64
+        model_clock = OC.TimeSteppers.Clock{Float64}(time = tspan[1])
+        stop_time = tspan[2]
+    else
+        error("Unsupported time type: $(typeof(tspan[1]))")
+    end
+    model_Δt = dt
     ocean = CO.ocean_simulation(
         grid;
-        Δt,
+        clock = model_clock,
+        stop_time,
+        Δt = float(model_Δt),
         timestepper = :SplitRungeKutta3,
         momentum_advection,
         tracer_advection,
@@ -279,6 +293,7 @@ function OceananigansSimulation(
         ocean_properties,
         remapping,
         ice_concentration,
+        model_Δt,
     )
 end
 
@@ -327,9 +342,23 @@ end
 ### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###############################################################################
 
-# Timestep the simulation forward to time `t`
-Interfacer.step!(sim::OceananigansSimulation, t) =
-    OC.time_step!(sim.ocean, float(t) - sim.ocean.model.clock.time)
+# Timestep the simulation forward to time `t`. This may not actually do anything.
+function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
+    Δt = t - sim.ocean.model.clock.time
+    if isapprox(Δt, sim.model_Δt, atol = 0.125) || Δt > sim.model_Δt
+        OC.time_step!(sim.ocean, Δt)
+    end
+    return nothing
+end
+
+function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
+    Δt_msec = date(t) - sim.ocean.model.clock.time
+    model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
+    if Δt_msec >= model_Δt_msec
+        OC.time_step!(sim.ocean, float(sim.model_Δt))
+    end
+    return nothing
+end
 
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
 

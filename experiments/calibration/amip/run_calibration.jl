@@ -38,7 +38,7 @@ model_interface = joinpath(
 const TEST_CALIBRATION = haskey(ENV, "TEST_CALIBRATION")
 
 config_file =
-    joinpath(pkgdir(ClimaCoupler), "config", "amip_configs", "amip_calibration.yml")
+    joinpath(pkgdir(ClimaCoupler), "config", "nightly_configs", "amip_coarse_diagedmf_calibration.yml")
 
 # Calibrate only on Jan 1 2010
 sample_date_ranges =
@@ -46,7 +46,8 @@ sample_date_ranges =
 
 # On Derecho, it is preferable to save the calibration output to the scratch
 # directory (e.g. "/glade/derecho/scratch")
-output_dir = joinpath(pkgdir(ClimaCoupler), "amip_calibration")
+#output_dir = joinpath(pkgdir(ClimaCoupler), "amip_calibration")
+output_dir = "/glade/derecho/scratch/zhaoyi/calibration/amip/exp1"
 isdir(output_dir) || mkdir(output_dir)
 
 n_iterations = 6
@@ -69,7 +70,7 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     config_file,
     # Note: Pressure-level variables require model output with
     # pressure_coordinates: true in config
-    short_names = ["ta", "hur"],
+    short_names = ["rsut", "rlut"],
     minibatch_size = 1,
     n_iterations,
     sample_date_ranges,
@@ -89,11 +90,12 @@ const NORMALIZATION_STATS_FP =
     joinpath(CALIBRATE_CONFIG.output_dir, "normalization_stats.jld2")
 
 const CALIBRATION_PRIORS = [
+    PD.constrained_gaussian("entr_inv_tau", 0.0015, 0.0005, 0.0005, 0.003),
     PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
     PD.constrained_gaussian("Tq_correlation_coefficient", 0.4, 0.4, -1.0, 1.0),
     PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.2, 0.1, 0, 1.0),
     PD.constrained_gaussian("mixing_length_diss_coeff", 0.22, 0.15, 0.0, 10.0),
-    PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 8.0, 4.0, 0, 100.0),
+    #PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 8.0, 4.0, 0, 100.0),
 ]
 
 if TEST_CALIBRATION
@@ -172,7 +174,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
             verbose = true,
             hpc_kwargs = Dict(
                 # Options include "premium", "regular", "economy", "preempt"
-                :job_priority => "regular", # {}
+                :job_priority => "premium", # {}
                 # 720 minutes is 12 hours
                 :time => 720,
                 :ntasks => 1,

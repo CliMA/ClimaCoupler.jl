@@ -515,12 +515,13 @@ end
 # extensions required by FieldExchanger
 function Interfacer.step!(sim::ClimaAtmosSimulation, t::Float64)
     model_t = Float64(sim.integrator.t)
-    Δt = t - model_t
+    time_since_last_model_step = t - model_t
     model_dt = Float64(sim.integrator.dt)
     # Check to see that we're within 1/8 sec of a time step to avoid floating point issues,
     # and if so take an integer number of steps to get there
-    if isapprox(Δt, model_dt, atol = 0.125) || Δt > model_dt
-        n_steps = round(Int, Δt / model_dt)
+    if isapprox(time_since_last_model_step, model_dt, atol = 0.125) ||
+       time_since_last_model_step > model_dt
+        n_steps = round(Int, time_since_last_model_step / model_dt)
         for _ in 1:n_steps
             Interfacer.step!(sim.integrator, model_dt, true)
         end
@@ -531,8 +532,8 @@ end
 function Interfacer.step!(sim::ClimaAtmosSimulation, t::ITime)
     # Don't step until we've reached a step boundary
     # (This can happen if the coupler dt is less than this model's)
-    Δt = t - sim.integrator.t
-    if Δt >= sim.integrator.dt
+    time_since_last_model_step = t - sim.integrator.t
+    if time_since_last_model_step >= sim.integrator.dt
         while sim.integrator.t < t
             Interfacer.step!(sim.integrator)
         end

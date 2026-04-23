@@ -1,4 +1,4 @@
-FLOAT_TYPE: "Float64"
+FLOAT_TYPE: "Float32"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "1months"
@@ -10,12 +10,14 @@ dt_ocean: "1800secs" # 30 minutes
 dt_rad: "1hours"
 dt_seaice: "1800secs" # 30 minutes
 energy_check: false
-h_elem: 32
+h_elem: 30
 ice_model: "clima_seaice"
 insolation: "timevarying"
 mode_name: "cmip"
 nh_poly: 2
 ocean_model: "oceananigans"
+orographic_gravity_wave: ~
+non_orographic_gravity_wave: false
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"

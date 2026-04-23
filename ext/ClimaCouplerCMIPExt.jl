@@ -34,11 +34,7 @@ get_ConservativeRegriddingCCExt() =
     Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
 
 """
-    OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}
-
-The ClimaCoupler simulation object used to run with Oceananigans.
-This type is used by the coupler to indicate that this simulation
-is a surface/ocean simulation for dispatch.
+    OceananigansSimulation
 
 It contains the following objects:
 - `ocean::SIM`: The Oceananigans simulation object.
@@ -47,13 +43,14 @@ It contains the following objects:
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ice_concentration::SIC`: An Oceananigans Field representing the sea ice concentration on the ocean/sea ice grid.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <:
+struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, MDT} <:
        Interfacer.AbstractOceanSimulation
     ocean::SIM
     area_fraction::A
     ocean_properties::OPROP
     remapping::REMAP
     ice_concentration::SIC
+    model_Δt::MDT
 end
 
 """
@@ -72,12 +69,14 @@ It contains the following objects:
 - `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
     and the Celsius to Kelvin conversion constant.
 """
-struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP} <: Interfacer.AbstractSeaIceSimulation
+struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, MDT} <:
+       Interfacer.AbstractSeaIceSimulation
     ice::SIM
     area_fraction::A
     remapping::REMAP
     ocean_ice_interface::NT
     ice_properties::IP
+    model_Δt::MDT
 end
 
 # Include helper functions first (used by both oceananigans.jl and clima_seaice.jl)

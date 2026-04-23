@@ -82,30 +82,33 @@ to update the coupler fields from the component model that computes the field.
 The default coupler exchange fields are the following, defined in
 `default_coupler_fields()` in the Interfacer module:
 
-| Coupler name      | Description                                                 | Units      |
-|-------------------|-------------------------------------------------------------|------------|
-| `T_atmos`         | atmosphere temperature at the bottom layer                  | K          |
-| `q_tot_atmos`     | atmosphere total humidity at the bottom layer               | kg kg⁻¹    |
-| `q_liq_atmos`     | atmosphere liquid humidity at the bottom layer              | kg kg⁻¹    |
-| `q_ice_atmos`     | atmosphere ice humidity at the bottom layer                 | kg kg⁻¹    |
-| `ρ_atmos`         | atmosphere air density at the bottom layer                  | kg m⁻³     |
-| `height_int`      | height at the bottom cell center of the atmosphere space    | m          |
-| `height_sfc`      | height at the bottom face of the atmosphere space           | m          |
-| `F_lh`            | latent heat flux                                            | W m⁻²      |
-| `F_sh`            | sensible heat flux                                          | W m⁻²      |
-| `F_turb_moisture` | turbulent moisture flux                                     | kg m⁻² s⁻¹ |
-| `F_turb_ρτxz`     | turbulent momentum flux in the zonal direction              | kg m⁻¹ s⁻² |
-| `F_turb_ρτyz`     | turbulent momentum flux in the meridional direction         | kg m⁻¹ s⁻² |
-| `SW_d`            | downward SW flux at the surface                             | W m⁻²      |
-| `LW_d`            | downward LW flux at the surface                             | W m⁻²      |
-| `emissivity`      | surface emissivity                                          | -          |
-| `T_sfc`           | surface temperature, averaged across components             | K          |
-| `P_liq`           | liquid precipitation                                        | kg m⁻² s⁻¹ |
-| `P_snow`          | snow precipitation                                          | kg m⁻² s⁻¹ |
-| `scalar_temp1`    | a surface scalar field used for intermediate calculations   | -          |
-| `scalar_temp2`    | a surface scalar field used for intermediate calculations   | -          |
-| `scalar_temp3`    | a surface scalar field used for intermediate calculations   | -          |
-| `scalar_temp4`    | a surface scalar field used for intermediate calculations   | -          |
+| Coupler name          | Description                                                 | Units      |
+|-----------------------|-------------------------------------------------------------|------------|
+| `land_area_fraction`  | area fraction of the land model                             | -          |
+| `ocean_area_fraction` | area fraction of the ocean model                            | -          |
+| `ice_area_fraction`   | area fraction of the sea-ice model                          | -          |
+| `T_atmos`             | atmosphere temperature at the bottom layer                  | K          |
+| `q_tot_atmos`         | atmosphere total humidity at the bottom layer               | kg kg⁻¹    |
+| `q_liq_atmos`         | atmosphere liquid humidity at the bottom layer              | kg kg⁻¹    |
+| `q_ice_atmos`         | atmosphere ice humidity at the bottom layer                 | kg kg⁻¹    |
+| `ρ_atmos`             | atmosphere air density at the bottom layer                  | kg m⁻³     |
+| `height_int`          | height at the bottom cell center of the atmosphere space    | m          |
+| `height_sfc`          | height at the bottom face of the atmosphere space           | m          |
+| `F_lh`                | latent heat flux                                            | W m⁻²      |
+| `F_sh`                | sensible heat flux                                          | W m⁻²      |
+| `F_turb_moisture`     | turbulent moisture flux                                     | kg m⁻² s⁻¹ |
+| `F_turb_ρτxz`         | turbulent momentum flux in the zonal direction              | kg m⁻¹ s⁻² |
+| `F_turb_ρτyz`         | turbulent momentum flux in the meridional direction         | kg m⁻¹ s⁻² |
+| `SW_d`                | downward SW flux at the surface                             | W m⁻²      |
+| `LW_d`                | downward LW flux at the surface                             | W m⁻²      |
+| `emissivity`          | surface emissivity                                          | -          |
+| `T_sfc`               | surface temperature, averaged across components             | K          |
+| `P_liq`               | liquid precipitation                                        | kg m⁻² s⁻¹ |
+| `P_snow`              | snow precipitation                                          | kg m⁻² s⁻¹ |
+| `scalar_temp1`        | a surface scalar field used for intermediate calculations   | -          |
+| `scalar_temp2`        | a surface scalar field used for intermediate calculations   | -          |
+| `scalar_temp3`        | a surface scalar field used for intermediate calculations   | -          |
+| `scalar_temp4`        | a surface scalar field used for intermediate calculations   | -          |
 
 !!! note "What should be stored in the coupler exchange fields?"
     In general, the coupler fields should contain exchange fields for fluxes, including

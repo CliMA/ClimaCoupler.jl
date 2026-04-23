@@ -123,6 +123,10 @@ end
 Return a list of default coupler fields needed to run a simulation.
 """
 default_coupler_fields() = [
+    # fields used to define area fractions for flux calculations
+    :land_area_fraction,
+    :ocean_area_fraction,
+    :ice_area_fraction,
     # fields used to compute turbulent fluxes
     :T_atmos,
     :q_tot_atmos,

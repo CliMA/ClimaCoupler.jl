@@ -8,7 +8,7 @@ ClimaSeaIce, KernelAbstractions). For CMIP, see `experiments/CMIP/`.
 ## Running
 
 ```bash
-julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl
+julia --project=experiments/AMIP/run_simulation.jl
 ```
 
 To run with a specific configuration file:

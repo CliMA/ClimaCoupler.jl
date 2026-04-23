@@ -5,10 +5,38 @@ import ClimaOcean.EN4: download_dataset
 import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
+import Dates
+import ClimaUtilities.TimeManager: ITime, date, counter, period
 using StaticArrays
 
 # Rename ECCO password env variable to match ClimaOcean.jl
 haskey(ENV, "ECCO_PASSWORD") && (ENV["ECCO_WEBDAV_PASSWORD"] = ENV["ECCO_PASSWORD"])
+
+"""
+    ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP}
+
+The ClimaCoupler simulation object used to run with ClimaSeaIce.
+This type is used by the coupler to indicate that this simulation
+is a surface/sea ice simulation for dispatch.
+
+It contains the following objects:
+- `ice::SIM`: The ClimaSeaIce simulation object.
+- `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
+- `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
+- `ocean_ice_interface::NT`: A NamedTuple containing fluxes between the ocean and sea ice, computed at each coupling step,
+                             the interfacial temperature and salinity, and the flux formulation used to compute the fluxes.
+- `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
+    and the Celsius to Kelvin conversion constant.
+"""
+struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, MDT} <:
+       Interfacer.AbstractSeaIceSimulation
+    ice::SIM
+    area_fraction::A
+    remapping::REMAP
+    ocean_ice_interface::NT
+    ice_properties::IP
+    model_Δt::MDT
+end
 
 """
     Interfacer.SeaIceSimulation(::Type{FT}, ::Val{:clima_seaice}; kwargs...)
@@ -53,12 +81,21 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
 
     advection = ocean.ocean.model.advection.T
-    ice = CO.SeaIces.sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection)
+    ice = CO.SeaIces.sea_ice_simulation(
+        grid,
+        ocean.ocean;
+        clock = deepcopy(ocean.ocean.model.clock),
+        Δt = float(dt),
+        advection,
+    )
 
     ocean_ice_flux_formulation =
         CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)
     interface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     interface_salinity = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+
+    # Initialize model_Δt so that time stepping works properly
+    model_Δt = dt
 
     # Initialize nonzero sea ice if start date provided
     if !isnothing(start_date)
@@ -137,6 +174,7 @@ function ClimaSeaIceSimulation(
         remapping,
         ocean_ice_interface,
         ice_properties,
+        model_Δt,
     )
 
     # Ensure ocean temperature is above freezing where there is sea ice
@@ -149,8 +187,31 @@ end
 ###############################################################################
 
 # Timestep the simulation forward to time `t`
-Interfacer.step!(sim::ClimaSeaIceSimulation, t) =
-    OC.time_step!(sim.ice, float(t) - sim.ice.model.clock.time)
+function Interfacer.step!(sim::ClimaSeaIceSimulation, t::Float64)
+    time_since_last_model_step = t - sim.ice.model.clock.time
+    # Check to see that we're within 1/8 sec of a time step to avoid floating point issues,
+    # and if so take an integer number of steps to get there
+    if isapprox(time_since_last_model_step, sim.model_Δt, atol = 0.125) ||
+       time_since_last_model_step > sim.model_Δt
+        n_steps = round(Int, time_since_last_model_step / sim.model_Δt)
+        for _ in 1:n_steps
+            OC.time_step!(sim.ice, sim.model_Δt)
+        end
+    end
+    return nothing
+end
+
+function Interfacer.step!(sim::ClimaSeaIceSimulation, t::ITime)
+    Δt_msec = date(t) - sim.ice.model.clock.time
+    model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
+    if Δt_msec >= model_Δt_msec
+        n_steps = round(Int, Δt_msec / model_Δt_msec)
+        for _ in 1:n_steps
+            OC.time_step!(sim.ice, float(sim.model_Δt))
+        end
+    end
+    return nothing
+end
 
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}) = sim.area_fraction
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_concentration}) =
@@ -245,18 +306,7 @@ function FluxCalculator.compute_surface_fluxes!(
 
     # Roughness and gustiness configuration
     gustiness = ones(boundary_space)
-    roughness_model = Interfacer.get_field(sim, Val(:roughness_model))
-    roughness_params = if roughness_model == :coare3
-        Interfacer.get_field(sim, Val(:coare3_roughness_params))
-    elseif roughness_model == :constant
-        Interfacer.get_field!(csf.scalar_temp3, sim, Val(:roughness_momentum))
-        z0m = csf.scalar_temp3
-        Interfacer.get_field!(csf.scalar_temp4, sim, Val(:roughness_buoyancy))
-        z0b = csf.scalar_temp4
-        SF.ConstantRoughnessParams.(z0m, z0b)
-    else
-        error("Unknown roughness_model: $roughness_model. Must be :coare3 or :constant")
-    end
+    roughness_params = FluxCalculator.get_roughness_params(csf, sim)
     config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
 
     fluxes =
@@ -278,44 +328,8 @@ function FluxCalculator.compute_surface_fluxes!(
             update_T_sfc_callback,
         )
 
-    (;
-        F_turb_ρτxz,
-        F_turb_ρτyz,
-        F_sh,
-        F_lh,
-        F_turb_moisture,
-        L_MO,
-        ustar,
-        buoyancy_flux,
-        T_sfc_new,
-    ) = fluxes
-
-    # Zero out fluxes where area fraction is zero
-    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
-    area_fraction = csf.scalar_temp1
-
-    @. F_turb_ρτxz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτxz), F_turb_ρτxz)
-    @. F_turb_ρτyz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτyz), F_turb_ρτyz)
-    @. F_sh = ifelse(area_fraction ≈ 0, zero(F_sh), F_sh)
-    @. F_lh = ifelse(area_fraction ≈ 0, zero(F_lh), F_lh)
-    @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(F_turb_moisture), F_turb_moisture)
-    @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
-    @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
-    @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
-
-    # Update fluxes in the sea ice simulation
-    fields = (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
-    FluxCalculator.update_turbulent_fluxes!(sim, fields)
-
-    # Accumulate area-weighted fluxes in coupler fields
-    @. csf.F_turb_ρτxz += F_turb_ρτxz * area_fraction
-    @. csf.F_turb_ρτyz += F_turb_ρτyz * area_fraction
-    @. csf.F_lh += F_lh * area_fraction
-    @. csf.F_sh += F_sh * area_fraction
-    @. csf.F_turb_moisture += F_turb_moisture * area_fraction
-    @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
-    @. csf.ustar += ustar * area_fraction
-    @. csf.buoyancy_flux += buoyancy_flux * area_fraction
+    FluxCalculator.update_flux_fields!(csf, sim, fluxes)
+    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
     csf.scalar_temp2 .=
@@ -509,13 +523,14 @@ function FluxCalculator.ocean_seaice_fluxes!(
     # Compute fluxes for u, v, T, and S from momentum, heat, and freshwater fluxes
     oc_flux_u = surface_flux(ocean_sim.ocean.model.velocities.u)
     oc_flux_v = surface_flux(ocean_sim.ocean.model.velocities.v)
-    # polar-exclusion mask
-    polar_excl_centers = ocean_sim.remapping.polar_exclusion_flux_mask_centers
-    polar_excl_u = ocean_sim.remapping.polar_exclusion_flux_mask_u
-    polar_excl_v = ocean_sim.remapping.polar_exclusion_flux_mask_v
 
     ρτxio = ice_sim.ocean_ice_interface.fluxes.x_momentum # sea_ice - ocean zonal momentum flux
     ρτyio = ice_sim.ocean_ice_interface.fluxes.y_momentum # sea_ice - ocean meridional momentum flux
+
+    # mask out the poles
+    polar_mask = ocean_sim.remapping.polar_mask
+    @. ρτxio = polar_mask * ρτxio
+    @. ρτyio = polar_mask * ρτyio
 
     # Update the momentum flux contributions from ocean/sea ice fluxes
     arch = OC.Architectures.architecture(grid)
@@ -532,24 +547,21 @@ function FluxCalculator.ocean_seaice_fluxes!(
         ρₒ⁻¹,
         ice_concentration,
     )
-    # polar-exclusion mask
-    flux_u = OC.interior(oc_flux_u, :, :, 1)
-    flux_v = OC.interior(oc_flux_v, :, :, 1)
-    flux_u .= ifelse.(polar_excl_u .≈ 0, zero(flux_u), flux_u)
-    flux_v .= ifelse.(polar_excl_v .≈ 0, zero(flux_v), flux_v)
 
     # The heat and salt fluxes already include the SIC masking, so we don't need to
     # multiply by SIC here.
     oc_flux_T = surface_flux(ocean_sim.ocean.model.tracers.T)
     heat_flux = OC.interior(ocean_sim.remapping.scratch_field_oc1, :, :, 1)
     heat_flux .= OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
-    heat_flux .= ifelse.(polar_excl_centers .≈ 0, zero(heat_flux), heat_flux)
+    # mask out the poles
+    @. heat_flux = polar_mask * heat_flux
     OC.interior(oc_flux_T, :, :, 1) .+= heat_flux
 
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
     salt_contrib = OC.interior(ocean_sim.remapping.scratch_field_oc2, :, :, 1)
     salt_contrib .= OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
-    salt_contrib .= ifelse.(polar_excl_centers .≈ 0, zero(salt_contrib), salt_contrib)
+    # mask out the poles
+    @. salt_contrib = polar_mask * salt_contrib
     OC.interior(oc_flux_S, :, :, 1) .+= salt_contrib
 
     return nothing

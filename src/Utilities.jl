@@ -12,7 +12,12 @@ import Logging
 import ClimaUtilities.OutputPathGenerator: generate_output_path
 
 export get_device,
-    get_comms_context, show_memory_usage, setup_output_dirs, time_to_seconds, integral
+    get_comms_context,
+    show_memory_usage,
+    setup_output_dirs,
+    time_to_seconds,
+    integral,
+    create_boundary_space
 
 """
     get_device(config_dict)
@@ -237,6 +242,145 @@ end
 
 function integral(field::AbstractArray)
     return sum(field)
+end
+
+"""
+    _column_boundary_space(::Type{FT}, latlon, comms_ctx) where {FT}
+
+Create a `PointSpace` with lat/long coordinates for use as a single-column
+boundary space. Constructs a minimal extruded domain with `LatPoint`/`LongPoint`
+intervals centered at the given coordinates, then extracts the top face level
+as a `PointSpace`.
+
+The resulting `PointSpace` has `LatLongZPoint` coordinates (with `.lat`, `.long`,
+and `.z`), so `SpaceVaryingInput`, `TimeVaryingInput`, insolation calculations,
+and coordinate-dependent physics all work correctly.
+
+# Arguments
+- `FT`: floating-point type
+- `latlon`: tuple of `(latitude, longitude)` in degrees
+- `comms_ctx`: ClimaComms context
+"""
+function _column_boundary_space(::Type{FT}, latlon, comms_ctx) where {FT}
+    lat, long = FT.(latlon)
+    device = ClimaComms.device(comms_ctx)
+
+    # Build a small non-degenerate horizontal domain centered at (lat, long).
+    # GL{1} gives 1 quadrature point per element, located at the interval center.
+    offset = FT(0.2)
+    domain_x = CC.Domains.IntervalDomain(
+        CC.Geometry.LatPoint(lat - offset),
+        CC.Geometry.LatPoint(lat + offset);
+        boundary_names = (:north, :south),
+    )
+    domain_y = CC.Domains.IntervalDomain(
+        CC.Geometry.LongPoint(long - offset),
+        CC.Geometry.LongPoint(long + offset);
+        boundary_names = (:west, :east),
+    )
+    plane = CC.Domains.RectangleDomain(domain_x, domain_y)
+    mesh = CC.Meshes.RectilinearMesh(plane, 1, 1)
+    topology = CC.Topologies.Topology2D(comms_ctx, mesh)
+    quad = CC.Spaces.Quadratures.GL{1}()
+    hspace = CC.Spaces.SpectralElementSpace2D(topology, quad)
+
+    # Minimal vertical domain
+    z_sfc = FT(0)
+    vertdomain = CC.Domains.IntervalDomain(
+        CC.Geometry.ZPoint(z_sfc - FT(1)),
+        CC.Geometry.ZPoint(z_sfc);
+        boundary_names = (:bottom, :top),
+    )
+    vertmesh = CC.Meshes.IntervalMesh(vertdomain; nelems = 2)
+    vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(device, vertmesh)
+    center_extruded = CC.Spaces.ExtrudedFiniteDifferenceSpace(hspace, vert_center_space)
+
+    # Extract the top face level as a PointSpace.
+    # level(FaceFiniteDifferenceSpace, PlusHalf) → PointSpace
+    face_extruded = CC.Spaces.face_space(center_extruded)
+    face_column = CC.Spaces.column(face_extruded, 1, 1, 1)
+    point_space = CC.Spaces.level(face_column, CC.Utilities.half)
+
+    return point_space
+end
+
+"""
+    create_boundary_space(::Type{FT}, domain_type, atmos_sim, share_surface_space, comms_ctx; kwargs...)
+
+Construct the 2D boundary space used for coupler field exchange.
+
+For `domain_type == "column"`, returns a `PointSpace` with lat/long coordinates.
+For global simulations, returns either the atmosphere's horizontal surface space
+(when `share_surface_space` is true) or an independent `CubedSphereSpace`.
+
+# Arguments
+- `FT`: floating-point type
+- `domain_type`: `"global"` or `"column"`
+- `atmos_sim`: atmosphere simulation (used when sharing surface space)
+- `share_surface_space`: whether to reuse the atmosphere's horizontal space
+- `comms_ctx`: ClimaComms context
+- `column_latlon`: `(lat, lon)` tuple, required when `domain_type == "column"`
+- `nh_poly`: polynomial order, required when not sharing surface space
+- `h_elem`: number of horizontal elements, required when not sharing surface space
+- `coupled_param_dict`: parameter dictionary, required when not sharing surface space
+"""
+function create_boundary_space(
+    ::Type{FT},
+    domain_type,
+    atmos_sim,
+    share_surface_space,
+    comms_ctx;
+    column_latlon = nothing,
+    nh_poly = nothing,
+    h_elem = nothing,
+    coupled_param_dict = nothing,
+) where {FT}
+    if domain_type == "column"
+        return _column_boundary_space(FT, column_latlon, comms_ctx)
+    elseif share_surface_space
+        return CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
+    else
+        n_quad_points = nh_poly + 1
+        radius = coupled_param_dict["planet_radius"]
+        return CC.CommonSpaces.CubedSphereSpace(FT; radius, n_quad_points, h_elem)
+    end
+end
+
+"""
+    init_dss_buffer(field::CC.Fields.Field)
+    init_dss_buffer(field_object::Union{CC.Fields.FieldVector, NamedTuple})
+
+Initialize a DSS buffer for the given Field or FieldVector object.
+If the object is defined on a `PointSpace`, return `nothing`.
+"""
+function init_dss_buffer(field::CC.Fields.Field)
+    if axes(field) isa CC.Spaces.PointSpace
+        return nothing
+    else
+        return CC.Spaces.create_dss_buffer(field)
+    end
+end
+function init_dss_buffer(field_object::Union{CC.Fields.FieldVector, NamedTuple})
+    buffers = map(
+        key -> init_dss_buffer(getproperty(field_object, key)),
+        propertynames(field_object),
+    )
+    all(isnothing, buffers) && return nothing
+    return NamedTuple{propertynames(field_object)}(buffers)
+end
+
+"""
+    apply_dss!(field::Union{CC.Fields.Field, CC.Fields.FieldVector}, buffer)
+
+Apply DSS to the given Field or FieldVector object.
+If the object is defined on a `PointSpace`, return `nothing`.
+"""
+function apply_dss!(field::Union{CC.Fields.Field, CC.Fields.FieldVector}, buffer)
+    if isnothing(buffer)
+        return nothing
+    else
+        return CC.Spaces.weighted_dss!(field, buffer)
+    end
 end
 
 end # module

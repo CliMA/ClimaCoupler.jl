@@ -1,6 +1,8 @@
 import ClimaComms
 import SurfaceFluxes as SF
 import Thermodynamics as TD
+import ClimaOcean.EN4: download_dataset
+import ClimaUtilities.TimeManager: ITime, date, counter, period
 import Dates
 
 # TODO move to Oceananigans
@@ -16,29 +18,24 @@ const TGRF = Union{<:OC.ImmersedBoundaryGrid{<:Any, <:Any, <:Any, <:Any, <:TG}, 
 @inline resize_to_facefolded(a::AbstractArray{T, 2}) where {T} = a[:, 1:(end - 1)]
 @inline resize_to_facefolded(a::AbstractArray{T, 3}) where {T} = a[:, 1:(end - 1), :]
 
-function OC.Fields.set_to_array!(
-    u::OC.Field{LX, <:OC.Grids.Center, LZ, O, <:TGRF},
-    a,
-) where {LX, LZ, O}
-    a = OC.Architectures.on_architecture(OC.Architectures.CPU(), a)
-    a = resize_to_facefolded(a)
-    a = OC.Architectures.on_architecture(OC.Architectures.architecture(u), a)
+"""
+    OceananigansSimulation
 
-    try
-        copyto!(OC.interior(u), a)
-    catch err
-        if err isa DimensionMismatch
-            Nx, Ny, Nz = size(u)
-            u .= reshape(a, Nx, Ny, Nz)
-
-            msg = string("Reshaped ", summary(a), " to set! its data to ", '\n', summary(u))
-            @warn msg
-        else
-            throw(err)
-        end
-    end
-
-    return u
+It contains the following objects:
+- `ocean::SIM`: The Oceananigans simulation object.
+- `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
+- `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters (including COARE3 roughness params).
+- `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
+- `ice_concentration::SIC`: An Oceananigans Field representing the sea ice concentration on the ocean/sea ice grid.
+"""
+struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, MDT} <:
+       Interfacer.AbstractOceanSimulation
+    ocean::SIM
+    area_fraction::A
+    ocean_properties::OPROP
+    remapping::REMAP
+    ice_concentration::SIC
+    model_Δt::MDT
 end
 
 """
@@ -81,7 +78,7 @@ function OceananigansSimulation(
     tspan,
     output_dir,
     simple_ocean = false,
-    dt = nothing,
+    dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
     extra_kwargs...,
@@ -166,10 +163,22 @@ function OceananigansSimulation(
         closure = (horizontal_viscosity, vertical_mixing)
     end
 
-    Δt = isnothing(dt) ? CO.OceanSimulations.estimate_maximum_Δt(grid) : float(dt)
+    if tspan[1] isa ITime
+        # create a model clock that uses DateTime, for compatibility with ITime.
+        model_clock = OC.TimeSteppers.Clock(time = start_date)
+        stop_time = Dates.DateTime(tspan[2])
+    elseif tspan[1] isa Float64
+        model_clock = OC.TimeSteppers.Clock{Float64}(time = tspan[1])
+        stop_time = tspan[2]
+    else
+        error("Unsupported time type: $(typeof(tspan[1]))")
+    end
+    model_Δt = dt
     ocean = CO.ocean_simulation(
         grid;
-        Δt,
+        clock = model_clock,
+        stop_time,
+        Δt = float(model_Δt),
         timestepper = :SplitRungeKutta3,
         momentum_advection,
         tracer_advection,
@@ -248,6 +257,7 @@ function OceananigansSimulation(
         ocean_properties,
         remapping,
         ice_concentration,
+        model_Δt,
     )
 end
 
@@ -369,9 +379,32 @@ end
 ### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###############################################################################
 
-# Timestep the simulation forward to time `t`
-Interfacer.step!(sim::OceananigansSimulation, t) =
-    OC.time_step!(sim.ocean, float(t) - sim.ocean.model.clock.time)
+# Timestep the simulation forward to time `t`. This may not actually do anything.
+function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
+    time_since_last_model_step = t - sim.ocean.model.clock.time
+    # Check to see that we're within 1/8 sec of a time step to avoid floating point issues,
+    # and if so take an integer number of steps to get there
+    if isapprox(time_since_last_model_step, sim.model_Δt, atol = 0.125) ||
+       time_since_last_model_step > sim.model_Δt
+        n_steps = round(Int, time_since_last_model_step / sim.model_Δt)
+        for _ in 1:n_steps
+            OC.time_step!(sim.ocean, sim.model_Δt)
+        end
+    end
+    return nothing
+end
+
+function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
+    Δt_msec = date(t) - sim.ocean.model.clock.time
+    model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
+    if Δt_msec >= model_Δt_msec
+        n_steps = round(Int, Δt_msec / model_Δt_msec)
+        for _ in 1:n_steps
+            OC.time_step!(sim.ocean, float(sim.model_Δt))
+        end
+    end
+    return nothing
+end
 
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
 
@@ -396,75 +429,27 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
 
 # TODO does this match main?
 """
-    construct_polar_mask(grid)
+    ocean_polar_mask(grid; location)
 
-Construct the polar exclusion flux masks on the ocean grid.
-We define three masks to be used for different fluxes:
-- `polar_exclusion_flux_mask_centers`: cell-centered (heat and salinity fluxes)
-- `polar_exclusion_flux_mask_u`: Face/Center (zonal momentum flux)
-- `polar_exclusion_flux_mask_v`: Center/Face (meridional momentum flux)
+Build the ocean polar mask once at setup.
+Currently we define ocean between 80°S to 80°N with 2 degree overlap in the coupler mask.
+Returns a 2D mask (1.0 where |lat| < 78°, 0.0 elsewhere). This mask is on the ocean grid 
+(unlike the polar mask which is defined on the boundary_space)
 """
-function construct_polar_mask(grid)
-    # Precompute polar-exclusion flux masks once (zeros ocean surface fluxes where |lat| ≥ 78° to avoid instability).
-    # _centers = cell-centered (T, S); _u = Face/Center (u); _v = Center/Face (v).
-    polar_exclusion_flux_mask_centers = ocean_flux_highlat_mask(
-        grid.underlying_grid;
-        location = (OC.Center(), OC.Center(), OC.Center()),
-    )
-    polar_exclusion_flux_mask_u = ocean_flux_highlat_mask(
-        grid.underlying_grid;
-        location = (OC.Face(), OC.Center(), OC.Center()),
-    )
-    polar_exclusion_flux_mask_v = ocean_flux_highlat_mask(
-        grid.underlying_grid;
-        location = (OC.Center(), OC.Face(), OC.Center()),
-    )
+function ocean_polar_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
+    polar_flux_lat_deg = 78.0  # zero fluxes where |lat| ≥ this (same band as polar_mask for atmosphere)
 
-    return (;
-        polar_exclusion_flux_mask_centers,
-        polar_exclusion_flux_mask_u,
-        polar_exclusion_flux_mask_v,
-    )
-end
+    # latitude nodes: a StepRangeLen of size grid.Ny *in degrees*
+    φ = OC.φnodes(grid, location[1], location[2], location[3])
 
-"""
-    ocean_flux_highlat_mask(underlying_grid; location)
+    # compute mask (1.0 where |lat| < 78°, 0.0 elsewhere)
+    mask = ifelse.(abs.(φ) .< polar_flux_lat_deg, 1.0, 0.0)  # Vector of size grid.Ny
+    mask = reshape(mask, 1, :)  # make mask a row vector (1 × grid.Ny)
+    mask = repeat(mask, grid.Nx, 1)  # repeat across longitude to get a grid.Nx × grid.Ny Matrix
 
-Build the ocean flux high latitude mask once at setup.
-Currently we define ocean between 80degS to 80degN with 2 degree overlap in the coupler mask.
-Returns a 2D mask (1.0 where |lat| < 78°, 0.0 elsewhere). This mask is on the ocean grid (
-unlike the polar mask which is defined on the boundary_space)
-"""
-function ocean_flux_highlat_mask(
-    underlying_grid::OC.LatitudeLongitudeGrid;
-    location = (OC.Center(), OC.Center(), OC.Center()),
-)
-    φ = OC.φnodes(underlying_grid, location[1], location[2], location[3])
-    φ_2D = Array(φ[:, :, 1])
-    lat_deg = abs.(rad2deg.(φ_2D)) # latitude in degrees
-    polar_flux_lat_deg = 78.0
-
-    # Define the mask to be 1.0 where |lat| < polar_flux_lat_deg, 0.0 elsewhere
-    mask = ifelse.(lat_deg .< polar_flux_lat_deg, 1.0, 0.0)
-
-    architecture = OC.Architectures.architecture(underlying_grid)
-    return OC.Architectures.on_architecture(architecture, mask)
-end
-
-function ocean_flux_highlat_mask(
-    underlying_grid::OC.TripolarGrid;
-    location = (OC.Center(), OC.Center(), OC.Center()),
-)
-    φ = OC.φnodes(underlying_grid, location[1], location[2], location[3])
-    φ_2D = Array(φ[:, :, 1])
-    lat_deg = φ_2D # latitude in degrees
-    polar_flux_lat_deg = -78.0
-
-    # Define the mask to be 1.0 where |lat| < polar_flux_lat_deg, 0.0 elsewhere
-    mask = ifelse.(lat_deg .> polar_flux_lat_deg, 1.0, 0.0) # mask is 1.0 where |lat| > -78°, 0.0 elsewhere
-
-    architecture = OC.Architectures.architecture(underlying_grid)
-    return OC.Architectures.on_architecture(architecture, mask)
+    # move to architecture
+    arch = OC.Architectures.architecture(grid)
+    return OC.Architectures.on_architecture(arch, mask)
 end
 
 """
@@ -491,8 +476,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     (; reference_density, heat_capacity) = sim.ocean_properties
     grid = sim.ocean.model.grid
     ice_concentration_field = sim.ice_concentration
-    # polar-exclusion mask
-    polar_excl_centers = sim.remapping.polar_exclusion_flux_mask_centers
+    # for masking out the poles
+    polar_mask = sim.remapping.polar_mask
 
     # Convert the momentum fluxes from contravariant to Cartesian basis
     contravariant_to_cartesian!(sim.remapping.temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz)
@@ -506,7 +491,11 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     F_turb_ρτxz_oc = sim.remapping.scratch_field_oc1
     F_turb_ρτyz_oc = sim.remapping.scratch_field_oc2
 
-    # Weight by (1 - sea ice concentration); polar-exclusion mask applied via ifelse below
+    # mask out the poles
+    @. F_turb_ρτxz_cell = polar_mask * F_turb_ρτxz_cell
+    @. F_turb_ρτyz_cell = polar_mask * F_turb_ρτyz_cell
+
+    # Weight by (1 - sea ice concentration)
     ice_concentration = OC.interior(ice_concentration_field, :, :, 1)
     OC.interior(F_turb_ρτxz_oc, :, :, 1) .=
         OC.interior(F_turb_ρτxz_oc, :, :, 1) .* (1.0 .- ice_concentration) ./
@@ -524,13 +513,6 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
         F_turb_ρτxz_oc,
         F_turb_ρτyz_oc,
     )
-    # polar-exclusion mask
-    polar_excl_u = sim.remapping.polar_exclusion_flux_mask_u
-    polar_excl_v = sim.remapping.polar_exclusion_flux_mask_v
-    flux_u = OC.interior(oc_flux_u, :, :, 1)
-    flux_v = OC.interior(oc_flux_v, :, :, 1)
-    flux_u .= ifelse.(polar_excl_u .≈ 0, zero(flux_u), flux_u)
-    flux_v .= ifelse.(polar_excl_v .≈ 0, zero(flux_v), flux_v)
 
     # Remap the latent and sensible heat fluxes using scratch arrays
     Interfacer.remap!(sim.remapping.scratch_field_oc1, F_lh, sim.remapping) # latent heat flux
@@ -544,9 +526,9 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     # everything on the surface, but later we will need to account for this.
     # One way we can do this is using directly ClimaOcean
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
-    # polar-exclusion mask
-    @. remapped_F_lh = ifelse(polar_excl_centers .≈ 0, zero(remapped_F_lh), remapped_F_lh)
-    @. remapped_F_sh = ifelse(polar_excl_centers .≈ 0, zero(remapped_F_sh), remapped_F_sh)
+    # mask out the poles
+    @. remapped_F_lh = polar_mask * remapped_F_lh
+    @. remapped_F_sh = polar_mask * remapped_F_sh
     OC.interior(oc_flux_T, :, :, 1) .+=
         (1.0 .- ice_concentration) .* (remapped_F_lh .+ remapped_F_sh) ./
         (reference_density * heat_capacity)
@@ -559,12 +541,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
 
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
-    # polar-exclusion mask
-    @. moisture_fresh_water_flux = ifelse(
-        polar_excl_centers .≈ 0,
-        zero(moisture_fresh_water_flux),
-        moisture_fresh_water_flux,
-    )
+    # mask out the poles
+    @. moisture_fresh_water_flux = polar_mask * moisture_fresh_water_flux
     OC.interior(oc_flux_S, :, :, 1) .-=
         (1.0 .- ice_concentration) .* surface_salinity .* moisture_fresh_water_flux
     return nothing
@@ -606,8 +584,8 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     OC.interior(oc_flux_S, :, :, 1) .= 0
 
-    # polar-exclusion mask
-    polar_excl_centers = sim.remapping.polar_exclusion_flux_mask_centers
+    # for masking out the poles
+    polar_mask = sim.remapping.polar_mask
 
     # Remap shortwave and longwave radiation
     Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.SW_d, sim.remapping) # shortwave radiation
@@ -632,7 +610,8 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
                 σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T, :, :, Nz)) .^ 4
             )
         ) ./ (reference_density * heat_capacity)
-    @. rad_T_flux = ifelse(polar_excl_centers .≈ 0, zero(rad_T_flux), rad_T_flux)
+    # mask out the poles
+    @. rad_T_flux = polar_mask * rad_T_flux
     OC.interior(oc_flux_T, :, :, 1) .+= rad_T_flux
 
     # Remap precipitation fields onto scratch arrays; rename for clarity

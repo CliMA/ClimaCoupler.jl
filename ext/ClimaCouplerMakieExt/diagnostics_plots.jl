@@ -30,6 +30,10 @@ This function will plot all variables that have been saved in `output_path`.
 
 When plotting diagnostics, diagnostics that are daily averages in z coordinates
 (if available) are prioritized first.
+
+For column / box-grid output (no lat/lon dimensions), degenerate horizontal
+dimensions are sliced out and 3-D variables are plotted as vertical profiles
+(value vs z) instead of being zonally averaged.
 """
 function Plotting.make_diagnostics_plots(
     output_path::AbstractString,
@@ -55,29 +59,69 @@ function Plotting.make_diagnostics_plots(
         vars[i] = get(simdir; short_name, reduction, period, coord_type)
     end
 
-    # Filter vars into 2D and 3D variable diagnostics vectors
-    # 3D fields are zonally averaged platted on the lat-z plane
-    # 2D fields are plotted on the lon-lat plane
     is_3d = var -> CAN.has_altitude(var) || CAN.has_pressure(var)
-    vars_3D = map(var_3D -> CAN.average_lon(var_3D), filter(is_3d, vars))
-    vars_2D = filter(var -> !is_3d(var), vars)
+    has_latlon = any(v -> CAN.has_longitude(v) || CAN.has_latitude(v), vars)
 
-    # Generate plots and save in `plot_path`
-    !isempty(vars_3D) && make_plots_generic(
-        output_path,
-        plot_path,
-        vars_3D,
-        time = LAST_SNAP,
-        output_name = output_prefix * "summary_3D",
-        more_kwargs = YLINEARSCALE,
-    )
-    !isempty(vars_2D) && make_plots_generic(
-        output_path,
-        plot_path,
-        vars_2D,
-        time = LAST_SNAP,
-        output_name = output_prefix * "summary_2D",
-    )
+    if has_latlon
+        # Global mode: zonally-averaged 3-D fields on lat-z, 2-D fields on lon-lat
+        vars_3D = map(var_3D -> CAN.average_lon(var_3D), filter(is_3d, vars))
+        vars_2D = filter(var -> !is_3d(var), vars)
+
+        !isempty(vars_3D) && make_plots_generic(
+            output_path,
+            plot_path,
+            vars_3D,
+            time = LAST_SNAP,
+            output_name = output_prefix * "summary_3D",
+            more_kwargs = YLINEARSCALE,
+        )
+        !isempty(vars_2D) && make_plots_generic(
+            output_path,
+            plot_path,
+            vars_2D,
+            time = LAST_SNAP,
+            output_name = output_prefix * "summary_2D",
+        )
+    else
+        # Column / box-grid mode: slice out degenerate horizontal dims
+        vars_profile = _slice_to_column.(filter(is_3d, vars))
+        vars_surface = _slice_to_column.(filter(var -> !is_3d(var), vars))
+
+        !isempty(vars_profile) && make_plots_generic(
+            output_path,
+            plot_path,
+            vars_profile,
+            time = LAST_SNAP,
+            output_name = output_prefix * "summary_profiles",
+            more_kwargs = YLINEARSCALE,
+        )
+        !isempty(vars_surface) && make_plots_generic(
+            output_path,
+            plot_path,
+            vars_surface,
+            time = LAST_SNAP,
+            output_name = output_prefix * "summary_surface",
+        )
+    end
+end
+
+
+
+"""
+    _slice_to_column(var)
+
+Remove horizontal dimensions from a `CAN.OutputVar` by slicing at the first
+value. Used for column / box-grid diagnostics saved by the atmosphere in
+column mode to get 1D vertical profiles.
+"""
+function _slice_to_column(var)
+    CAN.has_longitude(var) && (var = CAN.slice(var, by = CAN.Index(), longitude = 1))
+    CAN.has_latitude(var) && (var = CAN.slice(var, by = CAN.Index(), latitude = 1))
+
+    dim_names = collect(keys(var.dims))
+    "x" in dim_names && (var = CAN.slice(var, by = CAN.Index(), x = 1))
+    "y" in dim_names && (var = CAN.slice(var, by = CAN.Index(), y = 1))
+    return var
 end
 
 """

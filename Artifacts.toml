@@ -71,3 +71,6 @@ git-tree-sha1 = "dae77bc4ff79194ee6e794c1181bec1bebd67ea9"
 
 [calipso_cloudsat_lowres]
 git-tree-sha1 = "c1c0a16127bd547124cdf7288140002d74846efe"
+
+[wxquest_initial_conditions]
+git-tree-sha1 = "85b1e3654fb88f19a715ea6c235e1d66f254d2e6"

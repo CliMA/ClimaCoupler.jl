@@ -8,6 +8,8 @@ import EnsembleKalmanProcesses as EKP
 import EnsembleKalmanProcesses.ParameterDistributions as PD
 import JLD2
 
+using Distributed
+
 include(
     joinpath(
         pkgdir(ClimaCoupler),
@@ -26,51 +28,29 @@ model_interface = joinpath(
     "model_interface.jl",
 )
 
-# CALIBRATION CONFIGURATION
+# Choose which calibration config to use
+config_path = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "amip", "config")
+calibration_config_path = joinpath(config_path, "pressure_levels.jl")
 
-config_file =
-    joinpath(pkgdir(ClimaCoupler), "config", "amip_configs", "amip_calibration.yml")
+test_calibration_config_path = joinpath(config_path, "pipeline_test.jl")
+const TEST_CALIBRATION = haskey(ENV, "TEST_CALIBRATION")
 
-# Calibrate only on Jan 1 2010
-sample_date_ranges =
-    [(Dates.DateTime(2010, 10, 1), Dates.DateTime(2010, 10, 1)) for _ in 1:6]
-# On Derecho, it is preferable to save the calibration output to the scratch
-# directory (e.g. "/glade/derecho/scratch")
-output_dir = joinpath(pkgdir(ClimaCoupler), "amip_calibration")
+config_path = TEST_CALIBRATION ? test_calibration_config_path : calibration_config_path
+
+@info "Using calibration configuration in: $config_path"
+include(config_path)
+
+(; output_dir) = CALIBRATE_CONFIG
 isdir(output_dir) || mkdir(output_dir)
 
-const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
-    config_file,
-    # Note: Pressure-level variables require model output with
-    # pressure_coordinates: true in config
-    short_names = ["ta", "hur"],
-    minibatch_size = 1,
-    n_iterations = 6,
-    sample_date_ranges,
-    extend = Dates.Month(1),
-    spinup = Dates.Day(7),
-    output_dir,
-    rng_seed = 42,
-)
+# Commit type piracy to overwrite module_load_string because an old version of
+# climacommon is being used
+function ClimaCalibrate.module_load_string(::ClimaCalibrate.CaltechHPCBackend)
+    return """export MODULEPATH="/resnick/groups/esm/modules:\$MODULEPATH"
+    module purge
+    module load climacommon/2025_05_15"""
+end
 
-# Used in generate_observations.jl and observation_map.jl
-# Units: Pa (not hPa)
-const PRESSURE_LEVELS = 100.0 .* [200.0, 500.0, 850.0]
-
-# To disable normalization, update generate_observations.jl to not apply the
-# normalization. You may want to do the same in the observation map as well.
-const NORMALIZATION_STATS_FP =
-    joinpath(CALIBRATE_CONFIG.output_dir, "normalization_stats.jld2")
-
-const CALIBRATION_PRIORS = [
-    PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
-    PD.constrained_gaussian("Tq_correlation_coefficient", 0.4, 0.4, -1.0, 1.0),
-    PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.2, 0.1, 0, 1.0),
-    PD.constrained_gaussian("mixing_length_diss_coeff", 0.22, 0.15, 0.0, 10.0),
-    PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 8.0, 4.0, 0, 100.0),
-]
-
-const PRIORS = EKP.combine_distributions(CALIBRATION_PRIORS)
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
@@ -112,7 +92,19 @@ if abspath(PROGRAM_FILE) == @__FILE__
         scheduler = EKP.DataMisfitController(terminate_at = 1000000),
     )
 
-    if ClimaCalibrate.get_backend() == ClimaCalibrate.DerechoBackend
+    if TEST_CALIBRATION
+        addprocs(ClimaCalibrate.SlurmManager())
+        @everywhere include($model_interface)
+        (; n_iterations, output_dir) = CALIBRATE_CONFIG
+        ClimaCalibrate.calibrate(
+            ClimaCalibrate.WorkerBackend(),
+            ekp,
+            n_iterations,
+            PRIORS,
+            output_dir,
+        )
+        return nothing
+    elseif ClimaCalibrate.get_backend() == ClimaCalibrate.DerechoBackend
         backend = ClimaCalibrate.DerechoBackend(;
             model_interface,
             verbose = true,

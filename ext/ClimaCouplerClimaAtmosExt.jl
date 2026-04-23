@@ -513,11 +513,30 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
 end
 
 # extensions required by FieldExchanger
-Interfacer.step!(sim::ClimaAtmosSimulation, t::Real) =
-    Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
+function Interfacer.step!(sim::ClimaAtmosSimulation, t::Float64)
+    model_t = Float64(sim.integrator.t)
+    time_since_last_model_step = t - model_t
+    model_dt = Float64(sim.integrator.dt)
+    # Check to see that we're within 1/8 sec of a time step to avoid floating point issues,
+    # and if so take an integer number of steps to get there
+    if isapprox(time_since_last_model_step, model_dt, atol = 0.125) ||
+       time_since_last_model_step > model_dt
+        n_steps = round(Int, time_since_last_model_step / model_dt)
+        for _ in 1:n_steps
+            Interfacer.step!(sim.integrator, model_dt, true)
+        end
+    end
+    return nothing
+end
+
 function Interfacer.step!(sim::ClimaAtmosSimulation, t::ITime)
-    while sim.integrator.t < t
-        Interfacer.step!(sim.integrator)
+    # Don't step until we've reached a step boundary
+    # (This can happen if the coupler dt is less than this model's)
+    time_since_last_model_step = t - sim.integrator.t
+    if time_since_last_model_step >= sim.integrator.dt
+        while sim.integrator.t < t
+            Interfacer.step!(sim.integrator)
+        end
     end
     return nothing
 end
@@ -633,6 +652,9 @@ function get_atmos_config_dict(
         atmos_config["toml"] = toml
     end
 
+    # If running in SCM mode, set the atmosphere space type and lat/lon
+    coupler_config["domain_type"] == "column" && (atmos_config["config"] = "column")
+
     # Override atmos parameters with coupled parameters
     FT = atmos_config["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
     override_file = CP.merge_toml_files(atmos_config["toml"], override = true)
@@ -692,11 +714,9 @@ one here.
 """
 function dss_state!(sim::ClimaAtmosSimulation)
     Y = sim.integrator.u
-    for key in propertynames(Y)
-        field = getproperty(Y, key)
-        buffer = CC.Spaces.create_dss_buffer(field)
-        CC.Spaces.weighted_dss!(field, buffer)
-    end
+    buffer = Utilities.init_dss_buffer(Y)
+    Utilities.apply_dss!(Y, buffer)
+    return nothing
 end
 
 """

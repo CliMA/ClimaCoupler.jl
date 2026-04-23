@@ -61,8 +61,8 @@ end
     SST_timevaryinginput = TimeVaryingInput(
         sst_data,
         "SST",
-        space,
-        reference_date = start_date,
+        space;
+        start_date,
         file_reader_kwargs = (; preprocess_func = (data) -> data + C_to_K,), ## convert Celsius to Kelvin
     )
     SST_expected = zeros(space)

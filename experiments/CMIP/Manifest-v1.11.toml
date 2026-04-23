@@ -556,9 +556,7 @@ version = "1.7.0"
 
 [[deps.ClimaOcean]]
 deps = ["Adapt", "CFTime", "CUDA", "ClimaSeaIce", "CopernicusClimateDataStore", "CubicSplines", "DataDeps", "Dates", "DocStringExtensions", "Downloads", "Glob", "ImageMorphology", "JLD2", "KernelAbstractions", "MPI", "MeshArrays", "NCDatasets", "Oceananigans", "OffsetArrays", "PrecompileTools", "Printf", "Scratch", "SeawaterPolynomials", "StaticArrays", "Statistics", "Thermodynamics", "ZipFile"]
-git-tree-sha1 = "01343d9b436b0c2a3a510ef0535ec25d007db4e4"
-repo-rev = "as/debug"
-repo-url = "https://github.com/CliMA/ClimaOcean.jl.git"
+git-tree-sha1 = "c091fd828f6d0e7626f2889d3d73bcfaa1b47de7"
 uuid = "0376089a-ecfe-4b0e-a64f-9c555d74d754"
 version = "0.9.5"
 

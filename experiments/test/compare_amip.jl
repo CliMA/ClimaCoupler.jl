@@ -50,18 +50,8 @@ function compare(
     name = "",
     ignore = Set([:rc]),
 ) where {
-    T1 <: Union{
-        CC.Fields.FieldVector,
-        CC.Spaces.AbstractSpace,
-        NamedTuple,
-        CA.AtmosCache,
-    },
-    T2 <: Union{
-        CC.Fields.FieldVector,
-        CC.Spaces.AbstractSpace,
-        NamedTuple,
-        CA.AtmosCache,
-    },
+    T1 <: Union{CC.Fields.FieldVector, CC.Spaces.AbstractSpace, NamedTuple, CA.AtmosCache},
+    T2 <: Union{CC.Fields.FieldVector, CC.Spaces.AbstractSpace, NamedTuple, CA.AtmosCache},
 }
     pass = true
     return _compare(pass, v1, v2; name, ignore)

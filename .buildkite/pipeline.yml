@@ -63,8 +63,6 @@ steps:
         agents:
           slurm_ntasks: 2
           slurm_mem: 16GB
-          modules: mpiwrapper/2024_05_27 climacommon/2025_05_15
-        soft_fail: true # remove this after library issues are fixed
 
       - label: "MPI Interfacer unit tests"
         key: "interfacer_mpi_tests"
@@ -75,8 +73,6 @@ steps:
         agents:
           slurm_ntasks: 2
           slurm_mem: 16GB
-          modules: mpiwrapper/2024_05_27 climacommon/2025_05_15
-        soft_fail: true # remove this after library issues are fixed
 
   - group: "GPU: unit tests"
     steps:
@@ -108,8 +104,6 @@ steps:
         agents:
           slurm_ntasks: 2
           slurm_mem: 32GB
-          modules: mpiwrapper/2024_05_27 climacommon/2025_05_15
-        soft_fail: true # remove this after library issues are fixed
 
       - label: "GPU restarts (state and cache)"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/test/restart.jl"
@@ -254,8 +248,6 @@ steps:
         agents:
           slurm_ntasks: 4
           slurm_mem_per_cpu: 12GB
-          modules: mpiwrapper/2024_05_27 climacommon/2025_05_15
-        soft_fail: true # remove this after library issues are fixed
 
       # short high-res performance test
       - label: "Unthreaded AMIP FINE" # also reported by longruns with a flame graph

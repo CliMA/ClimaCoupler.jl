@@ -19,7 +19,6 @@ binary_area_fraction: false
 land_model: "integrated"
 lai_source: "modis_monthly_climatology"
 land_spun_up_ic: false
-land_temperature_anomaly: "nothing"
 radiation_reset_rng_seed: true
 start_date: "20180901"
 surface_setup: "PrescribedSurface"

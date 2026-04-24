@@ -39,9 +39,8 @@ end
         dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
         shared_surface_space = nothing,
         land_spun_up_ic::Bool = true,
-        surface_elevation = nothing,
         atmos_h,
-        land_temperature_anomaly::String = "amip",
+        initial_T,
         use_land_diagnostics::Bool = true,
         parameter_files = [],
         land_ic_path::Union{Nothing,String} = nothing,
@@ -73,9 +72,8 @@ function ClimaLandSimulation(
     dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
     shared_surface_space = nothing,
     land_spun_up_ic::Bool = true,
-    surface_elevation = nothing,
     atmos_h,
-    land_temperature_anomaly::String = "amip",
+    initial_T,
     use_land_diagnostics::Bool = true,
     coupled_param_dict = CP.create_toml_dict(FT),
     land_ic_path::Union{Nothing, String} = nothing,
@@ -103,15 +101,12 @@ function ClimaLandSimulation(
     surface_space = domain.space.surface
     subsurface_space = domain.space.subsurface
 
-    # If provided, interpolate surface elevation field to surface space; otherwise use zero elevation
-    if isnothing(surface_elevation)
-        surface_elevation = CC.Fields.zeros(surface_space)
-    else
-        surface_elevation = Interfacer.remap(surface_space, surface_elevation)
-    end
     # Interpolate atmosphere height field to surface space of land model,
     #  since that's where we compute fluxes for this land model
+    # Likewise initialize the initial temperature field to the surface space
+    # of the land model.
     atmos_h = Interfacer.remap(surface_space, atmos_h)
+    initial_T = Interfacer.remap(surface_space, initial_T)
 
     # Set up atmosphere and radiation forcing
     forcing = (;
@@ -219,29 +214,6 @@ function ClimaLandSimulation(
         diagnostics = nothing
     end
 
-    # Apply temperature anomaly function to initial temperature only if specified
-    T_base = FT(276.85)
-    if land_temperature_anomaly != "nothing"
-        T_functions =
-            Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
-        haskey(T_functions, land_temperature_anomaly) ||
-            error("land temp anomaly function $land_temperature_anomaly not supported")
-        temp_anomaly = T_functions[land_temperature_anomaly]
-        coords = CL.Domains.coordinates(model)
-        T_sfc0 = T_base .+ temp_anomaly.(coords.subsurface)
-    else
-        # constant field on subsurface space
-        T_sfc0 = T_base .* CC.Fields.ones(subsurface_space)
-    end
-    lapse_rate = FT(6.5e-3)
-    # Adjust initial temperature to account for orography of the surface
-    # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
-    orog_adjusted_T_data =
-        CC.Fields.field_values(T_sfc0) .-
-        lapse_rate .* CC.Fields.field_values(surface_elevation)
-    orog_adjusted_T_surface =
-        CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
-
     # Define functions to set initial conditions
     if !land_spun_up_ic && !isnothing(land_ic_path)
         @info "ClimaLand: using land IC file" land_ic_path
@@ -260,8 +232,7 @@ function ClimaLandSimulation(
             enforce_constraints = true,
         )
         set_ic! =
-            (Y, p, t, model) ->
-                _coupler_set_ic!(Y, p, t, model, orog_adjusted_T_surface, spun_up_set_ic!)
+            (Y, p, t, model) -> _coupler_set_ic!(Y, p, t, model, initial_T, spun_up_set_ic!)
 
     else
         set_ic_from_atmos_and_parameters! =
@@ -272,7 +243,7 @@ function ClimaLandSimulation(
                 p,
                 t,
                 model,
-                orog_adjusted_T_surface,
+                initial_T,
                 set_ic_from_atmos_and_parameters!,
             )
     end

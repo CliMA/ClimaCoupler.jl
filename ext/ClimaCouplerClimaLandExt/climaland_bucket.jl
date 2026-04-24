@@ -45,9 +45,8 @@ function BucketSimulation(
     depth::FT = FT(3.5),
     dz_tuple::Tuple{FT, FT} = FT.((1, 0.05)),
     shared_surface_space = nothing,
-    surface_elevation = nothing,
     atmos_h,
-    land_temperature_anomaly::String = "amip",
+    initial_T,
     use_land_diagnostics::Bool = true,
     albedo_type::String = "map_static",
     bucket_initial_condition::String = "",
@@ -74,13 +73,6 @@ function BucketSimulation(
         )
     end
     surface_space = domain.space.surface
-
-    # If provided, interpolate surface elevation field to surface space; otherwise use zero elevation
-    if isnothing(surface_elevation)
-        surface_elevation = CC.Fields.zeros(surface_space)
-    else
-        surface_elevation = Interfacer.remap(surface_space, surface_elevation)
-    end
 
     if albedo_type == "map_static" # Read in albedo from static data file (default type)
         # By default, this uses a file containing bareground albedo without a time component. Snow albedo is specified separately.
@@ -125,7 +117,10 @@ function BucketSimulation(
 
     # Interpolate atmosphere height field to surface space of land model,
     #  since that's where we compute fluxes for this land model
+    # Likewise initialize the initial temperature field to the surface space
+    # of the land model.
     atmos_h = Interfacer.remap(surface_space, atmos_h)
+    initial_T = Interfacer.remap(surface_space, initial_T)
 
     args = (
         params,
@@ -134,27 +129,6 @@ function BucketSimulation(
         domain,
     )
     model = CL.Bucket.BucketModel{FT, typeof.(args)...}(args...)
-
-    if land_temperature_anomaly != "nothing"
-        T_functions =
-            Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
-        haskey(T_functions, land_temperature_anomaly) ||
-            error("land temp anomaly function $land_temperature_anomaly not supported")
-        temp_anomaly = T_functions[land_temperature_anomaly]
-
-        # Set temperature IC including anomaly, based on atmospheric setup
-        # Bucket surface temperature is in `p.bucket.T_sfc` (ClimaLand.jl)
-        lapse_rate = FT(6.5e-3)
-        T_base = FT(271)
-        coords = CL.Domains.coordinates(model)
-        T_sfc_0 = T_base .+ temp_anomaly.(coords.subsurface)
-        # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
-        orog_adjusted_T_data =
-            CC.Fields.field_values(T_sfc_0) .-
-            lapse_rate .* CC.Fields.field_values(surface_elevation)
-        orog_adjusted_T_surface =
-            CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
-    end
 
     # Overwrite initial conditions with interpolated values from a netcdf file if provided.
     # We expect the file to contain the following variables:
@@ -173,7 +147,7 @@ function BucketSimulation(
                 p,
                 t,
                 model,
-                orog_adjusted_T_surface,
+                initial_T,
                 CL.Simulations.make_set_initial_state_from_atmos_and_parameters(model),
             )
     end

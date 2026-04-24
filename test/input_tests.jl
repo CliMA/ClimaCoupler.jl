@@ -84,7 +84,6 @@ end
         "rmse_check" => false,
         "coupler_output_dir" => "test_output",
         "land_model" => "bucket",
-        "land_temperature_anomaly" => "aquaplanet",
         "land_spun_up_ic" => true,
         "lai_source" => "modis_monthly",
         "bucket_albedo_type" => "map_static",

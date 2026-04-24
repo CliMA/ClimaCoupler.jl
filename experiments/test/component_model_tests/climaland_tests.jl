@@ -36,7 +36,8 @@ FT = Float32
     )
     area_fraction = CC.Fields.ones(boundary_space)
     atmos_h = CC.Fields.zeros(boundary_space) .+ 2
-    initial_T = CC.Fields.zeros(boundary_space) .+ 289
+    coord = ClimaCore.Fields.coordinate_field(boundary_space)
+    initial_T = CC.Fields.zeros(boundary_space) .+ 276.85 .+ 40 .* cosd.(coord.lat)^4
     # Construct simulation object
     land_sim = Interfacer.LandSimulation(
         FT,

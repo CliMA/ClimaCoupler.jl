@@ -81,6 +81,12 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     # check that the sum of area fractions is 1
     @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
     @assert maximum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
+
+    Interfacer.update_field!(
+        cs.model_sims.atmos_sim, 
+        Val(:ocean_fraction), 
+        ocean_fraction
+    )
 end
 
 """

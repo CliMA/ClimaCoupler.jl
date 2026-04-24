@@ -353,6 +353,13 @@ function Interfacer.update_field!(
 )
     Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.T_sfc, field)
 end
+function Interfacer.update_field!(
+    sim::ClimaAtmosSimulation,
+    ::Val{:ocean_fraction},
+    field,
+)
+    Interfacer.remap!(sim.integrator.p.ocean_fraction, field)
+end
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_humidity}, csf)
     # NOTE: This update_field! takes as argument the entire coupler fields struct, instead
     # of a single field. This is unlike most of other functions, so we may want to revisit it.

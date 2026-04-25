@@ -83,4 +83,7 @@ value = 1
 type = "float"
 
 [tracer_hyperdiffusion_factor]
-value = 1
+value = 10
+
+[D_horizontal_diffusion]
+value = 1e6

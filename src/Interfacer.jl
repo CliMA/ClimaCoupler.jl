@@ -411,7 +411,7 @@ function step!(sim::AbstractComponentSimulation, t::Float64)
     # `round(Int, ...)` tolerates floating point drift less than `model_dt / 2`
     n_steps = round(Int, (t - Float64(sim.integrator.t)) / model_dt)
     for _ in 1:n_steps
-        step!(sim.integrator, model_dt, true)
+        step!(sim.integrator)
     end
 end
 

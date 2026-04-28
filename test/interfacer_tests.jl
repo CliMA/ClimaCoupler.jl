@@ -346,8 +346,8 @@ end
     struct FakeSimF64 <: Interfacer.AbstractComponentSimulation
         integrator::FakeIntegratorF64
     end
-    function Interfacer.step!(integrator::FakeIntegratorF64, Δt, _)
-        getfield(integrator, :t)[] += Δt
+    function Interfacer.step!(integrator::FakeIntegratorF64)
+        getfield(integrator, :t)[] += integrator.dt
         getfield(integrator, :n_steps)[] += 1
         return
     end

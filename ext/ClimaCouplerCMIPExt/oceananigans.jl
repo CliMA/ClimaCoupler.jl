@@ -209,7 +209,7 @@ function OceananigansSimulation(
     end
 
     # Attaching a progress function to the ocean
-    add_callback!(ocean, progress, IterationInterval(1))
+    OC.add_callback!(ocean, progress, IterationInterval(1))
 
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])

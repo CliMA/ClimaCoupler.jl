@@ -196,15 +196,13 @@ function OceananigansSimulation(
         ηmax = maximum(ocean.free_surface.displacement)
         ηmin = minimum(ocean.free_surface.displacement)
         step_time = 1e-9 * (time_ns() - wall_time[])
-
-        msg1 = @sprintf("time: %s, iteration: %d, Δt: %s, ", prettytime(sim), iteration(sim), prettytime(sim.Δt))
-        msg2 = @sprintf("extrema(η): (%.2e, %.2e) ", ηmin, ηmax)
-        msg3 = @sprintf("extrema(T, S): (%.2f, %.2f) ᵒC, (%.2f, %.2f) psu ", Tmin, Tmax, Smin, Smax)
-        msg4 = @sprintf("maximum(u): (%.2e, %.2e, %.2e) m/s, ", umax, vmax, wmax)
-        msg5 = @sprintf("wall time: %s", prettytime(step_time))
-
-        @info msg1 * msg2 * msg3 * msg4 * msg5
-
+        @info "time: $(prettytime(sim)), iteration: $(iteration(sim)), Δt: $(prettytime(sim.Δt)), " *
+              "extrema(η): ($(round(ηmin, sigdigits=2)), $(round(ηmax, sigdigits=2))) " *
+              "extrema(T, S): ($(round(Tmin, digits=2)), $(round(Tmax, digits=2))) ᵒC, " *
+              "($(round(Smin, digits=2)), $(round(Smax, digits=2))) psu " *
+              "maximum(u): ($(round(umax, sigdigits=2)), $(round(vmax, sigdigits=2)), $(round(wmax, sigdigits=2))) m/s, " *
+              "wall time: $(prettytime(step_time))"
+        
         wall_time[] = time_ns()
 
         return nothing

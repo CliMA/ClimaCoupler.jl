@@ -181,6 +181,8 @@ function OceananigansSimulation(
         closure,
     )
 
+    wall_time = Ref(time_ns())
+    
     function progress(sim)
         ocean = sim.model
 

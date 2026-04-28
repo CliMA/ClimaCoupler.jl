@@ -186,7 +186,11 @@ end
 Update the cached surface temperature field using the prescribed data
 at each timestep.
 """
-function Interfacer.step!(sim::PrescribedOceanSimulation, t)
+function Interfacer.step!(sim::PrescribedOceanSimulation, t::Float64)
+    evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
+    sim.cache.t[] = t
+end
+function Interfacer.step!(sim::PrescribedOceanSimulation, t::ITime)
     evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
     sim.cache.t[] = t
 end

@@ -298,8 +298,8 @@ end
 end
 
 @testset "SurfaceStub step!" begin
-    FT = Float32
-    @test isnothing(Interfacer.step!(Interfacer.SurfaceStub(FT(0)), 1))
+    FT = Float64
+    @test isnothing(Interfacer.step!(Interfacer.SurfaceStub(FT(0)), FT(1)))
 end
 
 @testset "remap" begin

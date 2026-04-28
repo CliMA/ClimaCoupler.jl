@@ -5,11 +5,11 @@ checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_diagedmf.toml"]
 dt_atmos: "120secs" # 2 minutes
 dt_cloud_fraction: "1hours"
-dt_cpl: "1800secs" # 30 minutes
+dt_cpl: "360secs" # 6 minutes
 dt_land: "120secs" # 2 minutes
-dt_ocean: "1800secs" # 30 minutes
+dt_ocean: "360secs" # 6 minutes
 dt_rad: "1hours"
-dt_seaice: "1800secs" # 30 minutes
+dt_seaice: "360secs" # 6 minutes
 energy_check: false
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]

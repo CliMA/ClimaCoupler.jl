@@ -181,6 +181,36 @@ function OceananigansSimulation(
         closure,
     )
 
+    function progress(sim)
+        ocean = sim.model
+
+        Tmax = maximum(ocean.tracers.T)
+        Tmin = minimum(ocean.tracers.T)
+        Smax = maximum(ocean.tracers.S)
+        Smin = minimum(ocean.tracers.S)
+        umax = maximum(ocean.velocities.u)
+        vmax = maximum(ocean.velocities.v)
+        wmax = maximum(ocean.velocities.w)
+        ηmax = maximum(ocean.free_surface.displacement)
+        ηmin = minimum(ocean.free_surface.displacement)
+        step_time = 1e-9 * (time_ns() - wall_time[])
+
+        msg1 = @sprintf("time: %s, iteration: %d, Δt: %s, ", prettytime(sim), iteration(sim), prettytime(sim.Δt))
+        msg2 = @sprintf("extrema(η): (%.2e, %.2e) ", ηmin, ηmax)
+        msg3 = @sprintf("extrema(T, S): (%.2f, %.2f) ᵒC, (%.2f, %.2f) psu ", Tmin, Tmax, Smin, Smax)
+        msg4 = @sprintf("maximum(u): (%.2e, %.2e, %.2e) m/s, ", umax, vmax, wmax)
+        msg5 = @sprintf("wall time: %s", prettytime(step_time))
+
+        @info msg1 * msg2 * msg3 * msg4 * msg5
+
+        wall_time[] = time_ns()
+
+        return nothing
+    end
+
+    # Attaching a progress function to the ocean
+    add_callback!(ocean, progress, IterationInterval(1))
+
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
 

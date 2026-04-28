@@ -512,25 +512,6 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
     return nothing
 end
 
-# extensions required by FieldExchanger
-function Interfacer.step!(sim::ClimaAtmosSimulation, t::Float64)
-    model_dt = Float64(sim.integrator.dt)
-    # `round(Int, ...)` tolerates floating point drift less than `model_dt / 2`
-    n_steps = round(Int, (t - Float64(sim.integrator.t)) / model_dt)
-    for _ in 1:n_steps
-        Interfacer.step!(sim.integrator, model_dt, true)
-    end
-    return nothing
-end
-
-function Interfacer.step!(sim::ClimaAtmosSimulation, t::ITime)
-    n_steps = div(t - sim.integrator.t, sim.integrator.dt) # integer division; exact for ITime
-    for _ in 1:n_steps
-        Interfacer.step!(sim.integrator)
-    end
-    return nothing
-end
-
 """
 Extend Interfacer.add_coupler_fields! to add the fields required for ClimaAtmosSimulation.
 

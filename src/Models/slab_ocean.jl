@@ -250,21 +250,6 @@ function Interfacer.update_field!(
     Interfacer.remap!(sim.integrator.p.α_diffuse, field)
 end
 
-# extensions required by FieldExchanger
-function Interfacer.step!(sim::SlabOceanSimulation, t::Float64)
-    model_dt = Float64(sim.integrator.dt)
-    # `round(Int, ...)` tolerates floating point drift less than `model_dt / 2`
-    n_steps = round(Int, (t - Float64(sim.integrator.t)) / model_dt)
-    for _ in 1:n_steps
-        Interfacer.step!(sim.integrator, model_dt, true)
-    end
-end
-function Interfacer.step!(sim::SlabOceanSimulation, t::ITime)
-    n_steps = div(t - sim.integrator.t, sim.integrator.dt) # integer division; exact for ITime
-    for _ in 1:n_steps
-        Interfacer.step!(sim.integrator, sim.integrator.dt, true)
-    end
-end
 
 function FluxCalculator.update_turbulent_fluxes!(
     sim::SlabOceanSimulation,

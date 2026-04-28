@@ -378,24 +378,6 @@ function Interfacer.update_field!(
         StaticArrays.SVector.(sim.integrator.p.scratch1, sim.integrator.p.scratch2)
 end
 
-# Don't step if we haven't reached a step boundary
-# (This can happen if the coupler dt is less than this model's)
-function Interfacer.step!(sim::ClimaLandSimulation, t::Float64)
-    model_dt = Float64(sim.integrator.dt)
-    # `round(Int, ...)` tolerates floating point drift less than `model_dt / 2`
-    n_steps = round(Int, (t - Float64(sim.integrator.t)) / model_dt)
-    for _ in 1:n_steps
-        Interfacer.step!(sim.integrator)
-    end
-    return nothing
-end
-function Interfacer.step!(sim::ClimaLandSimulation, t::ITime)
-    n_steps = div(t - sim.integrator.t, sim.integrator.dt) # integer division; exact for ITime
-    for _ in 1:n_steps
-        Interfacer.step!(sim.integrator)
-    end
-    return nothing
-end
 
 Interfacer.close_output_writers(sim::ClimaLandSimulation) =
     isnothing(sim.output_writer) || close(sim.output_writer)

@@ -145,9 +145,9 @@ function OceananigansSimulation(
         # Simpler setup
         @info "Using simpler ocean setup; to be used for software testing only."
         free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
-        momentum_advection = OC.VectorInvariant()
+        momentum_advection = OC.WENOVectorInvariant(order = 5)
+        horizontal_viscosity = OC.HorizontalScalarDiffusivity(ν = 1e4)
         tracer_advection = OC.WENO(order = 5)
-        horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
         vertical_mixing = OC.ConvectiveAdjustmentVerticalDiffusivity(
             background_κz = 1e-5,
             convective_κz = 0.1,
@@ -212,7 +212,7 @@ function OceananigansSimulation(
     # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
-    # Precompute mask (zero where |lat| ≥ 78°) for removing ocean surface fluxes at the poles 
+    # Precompute mask (zero where |lat| ≥ 78°) for removing ocean surface fluxes at the poles
     # This mask lives on cell centers
     # (Will be removed when we switch to other grids)
     polar_mask = ocean_polar_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
@@ -395,7 +395,7 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
 
 Build the ocean polar mask once at setup.
 Currently we define ocean between 80°S to 80°N with 2 degree overlap in the coupler mask.
-Returns a 2D mask (1.0 where |lat| < 78°, 0.0 elsewhere). This mask is on the ocean grid 
+Returns a 2D mask (1.0 where |lat| < 78°, 0.0 elsewhere). This mask is on the ocean grid
 (unlike the polar mask which is defined on the boundary_space)
 """
 function ocean_polar_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))

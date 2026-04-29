@@ -54,6 +54,4 @@ within the atmospheric model.
     FluxCalculator.compute_surface_fluxes!
     FluxCalculator.get_surface_fluxes
     FluxCalculator.update_turbulent_fluxes!
-    FluxCalculator.update_flux_fields!
-    FluxCalculator.get_roughness_params
 ```

@@ -519,9 +519,9 @@ weakdeps = ["CUDA"]
 
 [[deps.ClimaLand]]
 deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "NCDatasets", "RootSolvers", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "e2c559b3c763215cd844eb95876a791690c9ff42"
+git-tree-sha1 = "26452741f38d83551d15800dd5c278767b1323ed"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
-version = "1.7.0"
+version = "1.6.5"
 
     [deps.ClimaLand.extensions]
     ConstrainedNeuralModelExt = ["Adapt", "Flux", "JLD2", "InteractiveUtils"]

@@ -133,7 +133,7 @@ end
 # Override observation_map to use correct job_id path
 function ClimaCalibrate.observation_map(iteration)
     output_dir = CALIBRATE_CONFIG.output_dir
-    ekp = JLD2.load_object(ClimaCalibrate.ekp_path(output_dir, iteration))
+    ekp = JLD2.load_object(ClimaCalibrate.Calibration.ekp_path(output_dir, iteration))
 
     g_ens_builder = EnsembleBuilder.GEnsembleBuilder(ekp)
     job_id = get_job_id()

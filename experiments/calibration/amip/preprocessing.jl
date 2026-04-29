@@ -79,12 +79,12 @@ function set_unitless_units!(var)
 end
 
 """
-    compute_mean_and_and_stddev(normalization_stas, var::ClimaAnalysis.OutputVar)
+    compute_mean_and_stddev(normalization_stas, var::ClimaAnalysis.OutputVar)
 
 Generate normalization statistics by computing a single mean and standard
 deviation for `var`.
 """
-function compute_mean_and_and_stddev(var::ClimaAnalysis.OutputVar)
+function compute_mean_and_stddev(var::ClimaAnalysis.OutputVar)
     mean_of_var = Statistics.mean(var.data)
     std_of_var = Statistics.std(var.data)
     std_of_var ≈ 0.0 && error("Standard deviation is zero; check your data")
@@ -105,19 +105,19 @@ combination.
 function compute_normalization!(normalization_stats::Dict, var)
     if ClimaAnalysis.has_pressure(var)
         for pressure_level in ClimaAnalysis.pressures(var)
-            var_view_of_pressure_level = view_select(
+            var_view_of_pressure_level = ClimaAnalysis.view_select(
                 var,
                 by = ClimaAnalysis.MatchValue(),
                 pressure_level = pressure_level,
             )
-            var_mean, var_stddev = compute_mean_and_and_stddev(var_view_of_pressure_level)
+            var_mean, var_stddev = compute_mean_and_stddev(var_view_of_pressure_level)
             normalization_stats[(
                 ClimaAnalysis.short_name(var_view_of_pressure_level),
                 pressure_level,
             )] = (var_mean, var_stddev)
         end
     else
-        var_mean, var_stddev = compute_mean_and_and_stddev(var)
+        var_mean, var_stddev = compute_mean_and_stddev(var)
         normalization_stats[(ClimaAnalysis.short_name(var), nothing)] =
             (var_mean, var_stddev)
     end
@@ -132,7 +132,7 @@ Apply normalization using the statistics saved in `normalization_stats`.
 function apply_normalization!(normalization_stats, var::ClimaAnalysis.OutputVar)
     if ClimaAnalysis.has_pressure(var)
         for pressure_level in ClimaAnalysis.pressures(var)
-            var_view_of_pressure_level = view_select(
+            var_view_of_pressure_level = ClimaAnalysis.view_select(
                 var,
                 by = ClimaAnalysis.MatchValue(),
                 pressure_level = pressure_level,

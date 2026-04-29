@@ -1,26 +1,41 @@
 import ClimaCoupler
+import ClimaCoupler: CalibrationTools
 import ClimaCalibrate
-using Pkg
 
-# Include run_calibration.jl only if CALIBRATE_CONFIG is not already defined
-# This allows other pipelines to include their own run_calibration.jl first
-if !@isdefined(CALIBRATE_CONFIG)
-    include(joinpath(@__DIR__, "run_calibration.jl"))
+include(joinpath(pkgdir(ClimaCoupler), "experiments", "AMIP", "code_loading.jl"))
+
+import Pkg
+import Statistics
+
+"""
+    CouplerModelInterface <: ClimaCalibrate.AbstractModelInterface
+
+A model interface struct for running the AMIP calibration pipeline.
+
+See the ClimaCalibrate.jl documentation for the methods that
+`CouplerModelInterface` should implement.
+"""
+struct CouplerModelInterface <: ClimaCalibrate.AbstractModelInterface
+    config::CalibrationTools.CalibrateConfig
 end
 
-if !TEST_CALIBRATION
-    ENV["CLIMACOMMS_DEVICE"] = "CUDA"
-    ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
-end
+"""
+    ClimaCalibrate.forward_model(interface::CouplerModelInterface, iter, member)
 
-function ClimaCalibrate.forward_model(iter, member)
+Run a coupled model simulation.
+
+This function may be called in parallel depending on the ClimaCalibrate backend
+used.
+"""
+function ClimaCalibrate.forward_model(interface::CouplerModelInterface, iter, member)
     Pkg.status()
-    config_dict = ClimaCoupler.Input.get_coupler_config_dict(CALIBRATE_CONFIG.config_file)
-    output_dir_root = CALIBRATE_CONFIG.output_dir
+    (; config) = interface
+    config_dict = ClimaCoupler.Input.get_coupler_config_dict(config.config_file)
+    output_dir_root = config.output_dir
 
-    start_date =
-        first(CALIBRATE_CONFIG.sample_date_ranges[iter + 1]) - CALIBRATE_CONFIG.spinup
-    end_date = last(CALIBRATE_CONFIG.sample_date_ranges[iter + 1]) + CALIBRATE_CONFIG.extend
+    (; sample_date_ranges, spinup, extend) = config
+    start_date = first(sample_date_ranges[iter + 1]) - spinup
+    end_date = last(sample_date_ranges[iter + 1]) + extend
     CalibrationTools.update_timespan!(config_dict, start_date, end_date)
 
     # Set member parameter file
@@ -34,6 +49,7 @@ function ClimaCalibrate.forward_model(iter, member)
 
     @info "Simulation dates" start_date end_date
 
+    TEST_CALIBRATION = haskey(ENV, "TEST_CALIBRATION")
     if !TEST_CALIBRATION
         ClimaCoupler.SimCoordinator.setup_and_run(config_dict)
     else
@@ -43,3 +59,35 @@ function ClimaCalibrate.forward_model(iter, member)
     @info "Completed member $member"
     return nothing
 end
+
+"""
+    ClimaCalibrate.model_interface_filepath(::CouplerModelInterface)
+
+Return a filepath to the definition of the `CouplerModelInterface` struct and
+all its associated methods.
+
+This is required to use the `ClimaCalibrate.HPCBackend`s.
+"""
+function ClimaCalibrate.model_interface_filepath(::CouplerModelInterface)
+    return @__FILE__
+end
+
+include(
+    joinpath(
+        pkgdir(ClimaCoupler),
+        "experiments",
+        "calibration",
+        "amip",
+        "observation_map.jl",
+    ),
+)
+
+include(
+    joinpath(
+        pkgdir(ClimaCoupler),
+        "experiments",
+        "calibration",
+        "amip",
+        "post_analyze_iteration.jl",
+    ),
+)

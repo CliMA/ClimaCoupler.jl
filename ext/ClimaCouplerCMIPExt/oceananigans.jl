@@ -309,10 +309,8 @@ function construct_remapper(grid_oc, boundary_space)
     # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
-    # Precompute mask for removing ocean surface fluxes at the poles for LatLonGrid
-    # and near south pole for TripolarGrid
-    # This mask lives on cell centers
-    # (Will be removed when we switch to other grids)
+    # Precompute 2D ocean-grid mask for polar flux suppression on LatitudeLongitudeGrid only.
+    # On TripolarGrid, `ocean_polar_mask` returns all ones (no suppression); same shape/device as lat–lon.
     polar_mask = ocean_polar_mask(grid_oc.underlying_grid; location = (OC.Center(), OC.Center(), OC.Center()))
 
     return (;
@@ -336,10 +334,6 @@ The ocean's LatitudeLongitudeGrid is only defined between -80 and 80
 degrees latitude. In this case, we set ice and ocean area fractions
 to 0 and land to 1 where |lat| ≥ 78° (same band used to zero ocean
 surface fluxes).
-
-Similarly, the ocean's TripolarGrid is defined between -80 and 90 degrees latitude.
-In this case we set the ice and ocean area fractions to 0 and the land fraction to 1
-on [-78°S, -90°S], and leave the northern latitudes unmodified.
 """
 function FieldExchanger.resolve_area_fractions!(
     ocean_sim::OceananigansSimulation,
@@ -357,10 +351,6 @@ function FieldExchanger.resolve_area_fractions!(
     if ocean_sim.ocean.model.grid.underlying_grid isa OC.LatitudeLongitudeGrid
         # Polar mask: 1 where |lat| < 78° (valid ocean), 0 where polar
         polar_mask .= abs.(lat) .< FT(78)
-    elseif ocean_sim.ocean.model.grid.underlying_grid isa OC.TripolarGrid
-        # TODO we should be able to remove this polar mask for Tripolar - double check by plotting land/sea mask
-        # Create a mask that's 1 where valid (lat >= -78°) and 0 at the south pole
-        polar_mask .= lat .>= FT(-78)
     end
 
     # Set land fraction to 1 and ice/ocean fraction to 0 where polar_mask is 0
@@ -448,24 +438,18 @@ end
 """
     ocean_polar_mask(underlying_grid::TripolarGrid; location)
 
-Same convention as the LatLon method: `1.0` where surface fluxes are applied, `0.0` in the
-south polar cap (latitudes below about -78°). See `resolve_area_fractions!` for the matching
-coupler boundary mask.
+Tripolar grids do not use polar flux suppression here: returns a dense 2D array of `1.0`
+with the same horizontal shape and architecture as a lat–lon mask would, so downstream
+`polar_mask * flux` broadcasts stay valid without branching.
 """
 function ocean_polar_mask(
     underlying_grid::OC.TripolarGrid;
     location = (OC.Center(), OC.Center(), OC.Center()),
 )
-    # zero fluxes where lat ≥ this (same band as polar_mask for atmosphere)
-    polar_flux_lat_deg = -78.0
-
-    # TODO check if this is correct, esp radians vs degrees and dimensions of arrays (different from LatLonGrid)
-    # compute mask (1.0 where lat >= -78°, 0.0 elsewhere)
     φ = OC.φnodes(underlying_grid, location[1], location[2], location[3])
     φ_2D = Array(φ[:, :, 1])
-    mask = ifelse.(φ_2D .> polar_flux_lat_deg, 1.0, 0.0)  # Vector of size grid.Ny
+    mask = ones(Float64, size(φ_2D))
 
-    # move to architecture
     architecture = OC.Architectures.architecture(underlying_grid)
     return OC.Architectures.on_architecture(architecture, mask)
 end

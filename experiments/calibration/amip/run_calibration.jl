@@ -43,17 +43,7 @@ include(config_path)
 (; output_dir) = CALIBRATE_CONFIG
 isdir(output_dir) || mkdir(output_dir)
 
-# Commit type piracy to overwrite module_load_string because an old version of
-# climacommon is being used
-function ClimaCalibrate.module_load_string(::ClimaCalibrate.CaltechHPCBackend)
-    return """export MODULEPATH="/resnick/groups/esm/modules:\$MODULEPATH"
-    module purge
-    module load climacommon/2025_05_15"""
-end
-
-
 if abspath(PROGRAM_FILE) == @__FILE__
-
     observation_vector_filepath = joinpath(
         pkgdir(ClimaCoupler),
         "experiments",
@@ -106,34 +96,42 @@ if abspath(PROGRAM_FILE) == @__FILE__
         return nothing
     elseif ClimaCalibrate.get_backend() == ClimaCalibrate.DerechoBackend
         backend = ClimaCalibrate.DerechoBackend(;
-            model_interface,
-            verbose = true,
-            hpc_kwargs = Dict(
+            directives = [
                 # Options include "premium", "regular", "economy", "preempt"
-                :job_priority => "regular", # {}
+                :job_priority => "regular",
                 # 720 minutes is 12 hours
                 :time => 720,
                 :ntasks => 1,
                 :cpus_per_task => 12,
                 :gpus_per_task => 1,
-            ),
+            ],
+            modules = ["climacommon"],
+            env_vars = ["CLIMACOMMS_CONTEXT" => "SINGLETON", "CLIMACOMMS_DEVICE" => "CUDA"],
         )
     elseif ClimaCalibrate.get_backend() == ClimaCalibrate.GCPBackend
         backend = ClimaCalibrate.GCPBackend(;
-            model_interface,
-            verbose = true,
-            hpc_kwargs = Dict(
+            directives = [
                 :ntasks => 1,
                 :gpus_per_task => 1,
                 :cpus_per_task => 12,
                 :time => 720,
                 :partition => "a3mega",
-            ),
+            ],
+            modules = ["climacommon"],
+            env_vars = ["CLIMACOMMS_CONTEXT" => "SINGLETON", "CLIMACOMMS_DEVICE" => "CUDA"],
         )
     else
         error("Unsupported backend: $(ClimaCalibrate.get_backend())")
     end
 
     (; n_iterations, output_dir) = CALIBRATE_CONFIG
-    eki = ClimaCalibrate.calibrate(backend, ekp, n_iterations, PRIORS, output_dir;)
+    eki = ClimaCalibrate.calibrate(
+        backend,
+        ekp,
+        n_iterations,
+        PRIORS,
+        output_dir,
+        model_interface;
+        experiment_dir = ClimaCalibrate.project_dir(),
+    )
 end

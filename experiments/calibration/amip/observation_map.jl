@@ -105,7 +105,7 @@ end
 
 function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, iteration)
     short_names = EnsembleBuilder.missing_short_names(g_ens_builder, col_idx)
-    sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges[iteration + 1]
+    sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges[iteration]
     @info "Short names: $short_names"
 
     simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)

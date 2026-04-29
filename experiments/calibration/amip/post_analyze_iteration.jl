@@ -26,14 +26,14 @@ object and denormalized to physical units when normalization is enabled.
 """
 function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation_path)
     (; short_names, sample_date_ranges) = CALIBRATE_CONFIG
-    sample_date_range = sample_date_ranges[iteration + 1]
+    sample_date_range = sample_date_ranges[iteration]
     calib_start, _ = sample_date_range
 
     # Reconstruct ERA5 OutputVars from the EKP observation object
     obs_series = EKP.get_observation_series(ekp)
-    minibatch_obs = ClimaCalibrate.ObservationRecipe.get_observations_for_nth_iteration(
+    minibatch_obs = ClimaCalibrate.get_observations_for_nth_iteration(
         obs_series,
-        iteration + 1,
+        iteration,
     )
 
     era5_vars =

@@ -53,7 +53,7 @@ G ensemble matrix.
 """
 function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, iteration)
     short_names = EnsembleBuilder.missing_short_names(g_ens_builder, col_idx)
-    sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges[iteration + 1]
+    sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges[iteration]
     @info "Short names: $short_names"
 
     simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
@@ -183,11 +183,11 @@ them against simulation variables for each date in the sample date ranges.
 """
 function plot_bias(ekp, simdir, iteration; output_dir = simdir.simulation_path)
     # Get observations for this iteration
-    sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges[iteration + 1]
+    sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges[iteration]
     obs_series = EKP.get_observation_series(ekp)
     minibatch_obs = ClimaCalibrate.ObservationRecipe.get_observations_for_nth_iteration(
         obs_series,
-        iteration + 1,
+        iteration,
     )
 
     # Reconstruct OutputVars from observations (ERA5 data)
@@ -223,7 +223,7 @@ function plot_bias(ekp, simdir, iteration; output_dir = simdir.simulation_path)
     end
 
     # Get sample dates for this iteration
-    sample_dates = unique(CALIBRATE_CONFIG.sample_date_ranges[iteration + 1])
+    sample_dates = unique(CALIBRATE_CONFIG.sample_date_ranges[iteration])
 
     # Create figure
     fig = GeoMakie.Figure(size = (1500, 500 * length(var_pairs)))

@@ -212,7 +212,7 @@ function OceananigansSimulation(
     # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
-    # Precompute mask (zero where |lat| ≥ 78°) for removing ocean surface fluxes at the poles 
+    # Precompute mask (zero where |lat| ≥ 78°) for removing ocean surface fluxes at the poles
     # This mask lives on cell centers
     # (Will be removed when we switch to other grids)
     polar_mask = ocean_polar_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
@@ -344,15 +344,10 @@ end
 
 # Timestep the simulation forward to time `t`. This may not actually do anything.
 function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
-    time_since_last_model_step = t - sim.ocean.model.clock.time
-    # Check to see that we're within 1/8 sec of a time step to avoid floating point issues,
-    # and if so take an integer number of steps to get there
-    if isapprox(time_since_last_model_step, sim.model_Δt, atol = 0.125) ||
-       time_since_last_model_step > sim.model_Δt
-        n_steps = round(Int, time_since_last_model_step / sim.model_Δt)
-        for _ in 1:n_steps
-            OC.time_step!(sim.ocean, sim.model_Δt)
-        end
+    # `round(Int, ...)` tolerates floating point drift less than `model_dt / 2`
+    n_steps = round(Int, (t - sim.ocean.model.clock.time) / sim.model_Δt)
+    for _ in 1:n_steps
+        OC.time_step!(sim.ocean, sim.model_Δt)
     end
     return nothing
 end
@@ -360,11 +355,9 @@ end
 function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
     Δt_msec = date(t) - sim.ocean.model.clock.time
     model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
-    if Δt_msec >= model_Δt_msec
-        n_steps = round(Int, Δt_msec / model_Δt_msec)
-        for _ in 1:n_steps
-            OC.time_step!(sim.ocean, float(sim.model_Δt))
-        end
+    n_steps = div(Δt_msec, model_Δt_msec) # integer division; exact for Millisecond periods
+    for _ in 1:n_steps
+        OC.time_step!(sim.ocean, float(sim.model_Δt))
     end
     return nothing
 end
@@ -395,7 +388,7 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
 
 Build the ocean polar mask once at setup.
 Currently we define ocean between 80°S to 80°N with 2 degree overlap in the coupler mask.
-Returns a 2D mask (1.0 where |lat| < 78°, 0.0 elsewhere). This mask is on the ocean grid 
+Returns a 2D mask (1.0 where |lat| < 78°, 0.0 elsewhere). This mask is on the ocean grid
 (unlike the polar mask which is defined on the boundary_space)
 """
 function ocean_polar_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))

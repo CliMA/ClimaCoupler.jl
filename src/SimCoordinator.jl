@@ -390,6 +390,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     model_sims =
         NamedTuple{filter(key -> !isnothing(model_sims[key]), keys(model_sims))}(model_sims)
     @info "Component models initialized: $(keys(model_sims))"
+    @info "Component model types: $(nameof.(values(model_sims)))"
 
     coupler_field_names = Interfacer.default_coupler_fields()
     foreach(sim -> Interfacer.add_coupler_fields!(coupler_field_names, sim), model_sims)

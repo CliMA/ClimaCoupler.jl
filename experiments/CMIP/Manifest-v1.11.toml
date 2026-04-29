@@ -2,7 +2,7 @@
 
 julia_version = "1.11.9"
 manifest_format = "2.0"
-project_hash = "8daecc58e44a5dcdda9af99a2f2f88324fd9a0ce"
+project_hash = "d23b6cfc43e23b0eabd7bcee8bad10893afc372c"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
@@ -530,9 +530,9 @@ weakdeps = ["CUDA"]
 
 [[deps.ClimaLand]]
 deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "NCDatasets", "RootSolvers", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "e2c559b3c763215cd844eb95876a791690c9ff42"
+git-tree-sha1 = "26452741f38d83551d15800dd5c278767b1323ed"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
-version = "1.7.0"
+version = "1.6.5"
 
     [deps.ClimaLand.extensions]
     ConstrainedNeuralModelExt = ["Adapt", "Flux", "JLD2", "InteractiveUtils"]

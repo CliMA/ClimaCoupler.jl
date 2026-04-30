@@ -1,4 +1,5 @@
 import ClimaComms
+import NVTX
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
@@ -343,7 +344,7 @@ end
 ###############################################################################
 
 # Timestep the simulation forward to time `t`. This may not actually do anything.
-function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
+NVTX.@annotate function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
     # `round(Int, ...)` tolerates floating point drift less than `model_dt / 2`
     n_steps = round(Int, (t - sim.ocean.model.clock.time) / sim.model_Δt)
     for _ in 1:n_steps
@@ -352,7 +353,7 @@ function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
     return nothing
 end
 
-function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
+NVTX.@annotate function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
     Δt_msec = date(t) - sim.ocean.model.clock.time
     model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
     n_steps = div(Δt_msec, model_Δt_msec) # integer division; exact for Millisecond periods

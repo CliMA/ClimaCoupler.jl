@@ -12,6 +12,7 @@ import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 import ClimaCore as CC
+import NVTX
 import ..Interfacer, ..Utilities
 
 export turbulent_fluxes!,
@@ -240,7 +241,7 @@ function compute_surface_fluxes!(
     return nothing
 end
 
-function compute_surface_fluxes!(
+NVTX.@annotate function compute_surface_fluxes!(
     csf,
     sim::Interfacer.AbstractSurfaceSimulation,
     atmos_sim::Interfacer.AbstractAtmosSimulation,

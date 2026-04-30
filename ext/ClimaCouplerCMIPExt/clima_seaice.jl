@@ -2,6 +2,7 @@ using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions:
     IceWaterThermalEquilibrium, PrescribedTemperature, get_tracer
 import ClimaComms
 import ClimaOcean.EN4: download_dataset
+import NVTX
 import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
@@ -187,7 +188,7 @@ end
 ###############################################################################
 
 # Timestep the simulation forward to time `t`
-function Interfacer.step!(sim::ClimaSeaIceSimulation, t::Float64)
+NVTX.@annotate function Interfacer.step!(sim::ClimaSeaIceSimulation, t::Float64)
     # `round(Int, ...)` tolerates floating point drift less than `model_dt / 2`
     n_steps = round(Int, (t - sim.ice.model.clock.time) / sim.model_Δt)
     for _ in 1:n_steps
@@ -196,7 +197,7 @@ function Interfacer.step!(sim::ClimaSeaIceSimulation, t::Float64)
     return nothing
 end
 
-function Interfacer.step!(sim::ClimaSeaIceSimulation, t::ITime)
+NVTX.@annotate function Interfacer.step!(sim::ClimaSeaIceSimulation, t::ITime)
     Δt_msec = date(t) - sim.ice.model.clock.time
     model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
     n_steps = div(Δt_msec, model_Δt_msec) # integer division; exact for Millisecond periods
@@ -241,7 +242,7 @@ via the `update_T_sfc` callback to satisfy the skin-temperature flux balance.
 The diagnosed T_sfc is written back to ClimaSeaIce's `top_surface_temperature`
 (used by `PrescribedTemperature`) so the ice thermodynamics stays consistent.
 """
-function FluxCalculator.compute_surface_fluxes!(
+NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     csf,
     sim::ClimaSeaIceSimulation,
     atmos_sim::Interfacer.AbstractAtmosSimulation,

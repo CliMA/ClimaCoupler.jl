@@ -10,23 +10,14 @@ import JLD2
 
 using Distributed
 
-include(
-    joinpath(
-        pkgdir(ClimaCoupler),
-        "experiments",
-        "calibration",
-        "amip",
-        "observation_map.jl",
-    ),
-)
-
-model_interface = joinpath(
+model_interface_filepath = joinpath(
     pkgdir(ClimaCoupler),
     "experiments",
     "calibration",
     "amip",
     "model_interface.jl",
 )
+include(model_interface_filepath)
 
 # Choose which calibration config to use
 config_path = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "amip", "config")
@@ -71,7 +62,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ),
     )
 
-    rng_seed = CALIBRATE_CONFIG.rng_seed
+    (; rng_seed) = CALIBRATE_CONFIG
     rng = Random.MersenneTwister(rng_seed)
 
     ekp = EKP.EnsembleKalmanProcess(
@@ -82,13 +73,16 @@ if abspath(PROGRAM_FILE) == @__FILE__
         scheduler = EKP.DataMisfitController(terminate_at = 1000000),
     )
 
-    if TEST_CALIBRATION
+    coupler_model_interface = CouplerModelInterface(CALIBRATE_CONFIG)
+
+    if false
         addprocs(ClimaCalibrate.SlurmManager())
-        @everywhere include($model_interface)
+        @everywhere include($model_interface_filepath)
         (; n_iterations, output_dir) = CALIBRATE_CONFIG
         ClimaCalibrate.calibrate(
             ClimaCalibrate.WorkerBackend(),
             ekp,
+            coupler_model_interface,
             n_iterations,
             PRIORS,
             output_dir,
@@ -120,6 +114,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
             modules = ["climacommon"],
             env_vars = ["CLIMACOMMS_CONTEXT" => "SINGLETON", "CLIMACOMMS_DEVICE" => "CUDA"],
         )
+    elseif ClimaCalibrate.get_backend() == ClimaCalibrate.ClimaGPUBackend
+        backend = ClimaCalibrate.ClimaGPUBackend(;
+            directives = [:ntasks => 1, :cpus_per_task => 6, :time => 60],
+            modules = ["climacommon"],
+            env_vars = ["CLIMACOMMS_CONTEXT" => "SINGLETON", "CLIMACOMMS_DEVICE" => "CPU"],
+        )
     else
         error("Unsupported backend: $(ClimaCalibrate.get_backend())")
     end
@@ -128,10 +128,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
     eki = ClimaCalibrate.calibrate(
         backend,
         ekp,
+        coupler_model_interface,
         n_iterations,
         PRIORS,
         output_dir,
-        model_interface;
+        model_interface_filepath;
         experiment_dir = ClimaCalibrate.project_dir(),
     )
 end

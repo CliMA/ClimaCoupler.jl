@@ -31,10 +31,7 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
 
     # Reconstruct ERA5 OutputVars from the EKP observation object
     obs_series = EKP.get_observation_series(ekp)
-    minibatch_obs = ClimaCalibrate.get_observations_for_nth_iteration(
-        obs_series,
-        iteration,
-    )
+    minibatch_obs = ClimaCalibrate.get_observations_for_nth_iteration(obs_series, iteration)
 
     era5_vars =
         mapreduce(ClimaCalibrate.ObservationRecipe.reconstruct_vars, vcat, minibatch_obs)
@@ -98,11 +95,19 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
     return nothing
 end
 
-function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, iteration)
+function ClimaCalibrate.analyze_iteration(
+    interface::CouplerModelInterface,
+    ekp,
+    g_ensemble,
+    prior,
+    output_dir,
+    iteration,
+)
     plot_output_path = ClimaCalibrate.path_to_iteration(output_dir, iteration)
     plot_constrained_params_and_errors(output_dir, ekp, prior)
 
-    job_id = get_job_id()
+    (; config) = interface
+    job_id = get_job_id(config)
     member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, 1)
     simdir_path = joinpath(member_path, job_id, "output_active")
     try

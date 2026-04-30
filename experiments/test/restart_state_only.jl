@@ -1,4 +1,4 @@
-# This test runs a small AMIP simulation twice times.
+# This test runs a small AMIP simulation twice.
 #
 # - The first time the simulation is run for two steps
 # - The second time the simulation is run for two steps, but restarting from the

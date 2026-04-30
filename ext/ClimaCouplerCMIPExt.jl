@@ -74,7 +74,7 @@ It contains the following objects:
     and the Celsius to Kelvin conversion constant.
 """
 struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, MDT} <:
-        Interfacer.AbstractSeaIceSimulation
+       Interfacer.AbstractSeaIceSimulation
     ice::SIM
     area_fraction::A
     remapping::REMAP

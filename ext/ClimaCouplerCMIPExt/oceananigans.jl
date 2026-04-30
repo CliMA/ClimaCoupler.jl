@@ -273,7 +273,10 @@ function construct_remapper(grid_oc, boundary_space)
 
     # Precompute 2D ocean-grid mask for polar flux suppression on LatitudeLongitudeGrid only.
     # On TripolarGrid, `ocean_polar_mask` returns all ones (no suppression); same shape/device as lat–lon.
-    polar_mask = ocean_polar_mask(grid_oc.underlying_grid; location = (OC.Center(), OC.Center(), OC.Center()))
+    polar_mask = ocean_polar_mask(
+        grid_oc.underlying_grid;
+        location = (OC.Center(), OC.Center(), OC.Center()),
+    )
 
     return (;
         remapper_oc_to_cc,
@@ -381,7 +384,10 @@ Currently we define ocean between 80°S to 80°N with 2 degree overlap in the co
 Returns a 2D mask (1.0 where |lat| < 78°, 0.0 elsewhere). This mask is on the ocean grid
 (unlike the polar mask which is defined on the boundary_space)
 """
-function ocean_polar_mask(underlying_grid::OC.LatitudeLongitudeGrid; location = (OC.Center(), OC.Center(), OC.Center()))
+function ocean_polar_mask(
+    underlying_grid::OC.LatitudeLongitudeGrid;
+    location = (OC.Center(), OC.Center(), OC.Center()),
+)
     polar_flux_lat_deg = 78.0  # zero fluxes where |lat| ≥ this (same band as polar_mask for atmosphere)
 
     # latitude nodes: a StepRangeLen of size grid.Ny *in degrees*

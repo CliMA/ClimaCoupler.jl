@@ -300,7 +300,11 @@ function FluxCalculator.compute_surface_fluxes!(
 
     # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
     csf.scalar_temp2 .=
-        ifelse.(area_fraction .≈ 0, zero(FT), fluxes.T_sfc_new .- FT(sim.ice_properties.C_to_K))
+        ifelse.(
+            area_fraction .≈ 0,
+            zero(FT),
+            fluxes.T_sfc_new .- FT(sim.ice_properties.C_to_K),
+        )
     Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.scalar_temp2, sim.remapping) # surface temperature
     remapped_T_sfc = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
 

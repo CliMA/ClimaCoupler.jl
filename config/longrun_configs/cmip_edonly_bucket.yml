@@ -10,11 +10,11 @@ dt_ocean: "1800secs" # 30 minutes
 dt_rad: "1hours"
 dt_seaice: "1800secs" # 30 minutes
 energy_check: false
-h_elem: 32
+h_elem: 16
 ice_model: "clima_seaice"
 insolation: "timevarying"
 mode_name: "cmip"
-nh_poly: 2
+nh_poly: 3
 ocean_model: "oceananigans"
 rmse_check: true
 start_date: "20100101"

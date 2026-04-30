@@ -34,7 +34,7 @@ get_ConservativeRegriddingCCExt() =
     Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
 
 """
-    OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}
+    OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, MDT}
 
 The ClimaCoupler simulation object used to run with Oceananigans.
 This type is used by the coupler to indicate that this simulation
@@ -47,13 +47,14 @@ It contains the following objects:
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ice_concentration::SIC`: An Oceananigans Field representing the sea ice concentration on the ocean/sea ice grid.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC} <:
+struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, MDT} <:
        Interfacer.AbstractOceanSimulation
     ocean::SIM
     area_fraction::A
     ocean_properties::OPROP
     remapping::REMAP
     ice_concentration::SIC
+    model_Δt::MDT
 end
 
 """

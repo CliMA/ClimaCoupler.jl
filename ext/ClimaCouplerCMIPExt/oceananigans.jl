@@ -186,8 +186,7 @@ function OceananigansSimulation(
     function progress(sim)
         ocean = sim.model
 
-        Tmax = maximum(ocean.tracers.T)
-        Tmin = minimum(ocean.tracers.T)
+        (Tmax, Tmin) = extrema(ocean.tracers.T)
         Smax = maximum(ocean.tracers.S)
         Smin = minimum(ocean.tracers.S)
         umax = maximum(ocean.velocities.u)

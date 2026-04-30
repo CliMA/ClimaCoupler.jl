@@ -26,11 +26,15 @@ steps:
 
       - echo "--- Instantiate AMIP experiments env"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaLand\", rev=\"main\"))'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.resolve()'"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate CMIP experiments env"
       - "julia -O0 --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaLand\", rev=\"main\"))'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.resolve()'"
       - "julia -O0 --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
 

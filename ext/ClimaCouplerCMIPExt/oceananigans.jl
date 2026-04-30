@@ -183,6 +183,13 @@ function OceananigansSimulation(
 
     wall_time = Ref(time_ns())
     
+    """
+        progress(sim)
+
+    Output the extrema of some prognostic variables, which can be useful for debugging.
+    The frequency with which this is output is determined by the interval passed to
+    `OC.add_callback!` below.
+    """
     function progress(sim)
         ocean = sim.model
 

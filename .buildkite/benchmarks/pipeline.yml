@@ -10,6 +10,16 @@ env:
   SLURM_GRES_FLAGS: "allow-task-sharing"
   BENCHMARK_CONFIG_PATH: "config/benchmark_configs"
 
+# This pipeline serves two purposes:
+# 1. To run the standard benchmarks (default)
+# 2. To run Nsight profiling jobs (when `RUN_PROFILING` is set)
+#
+# We check for the existence of `RUN_PROFILING` to determine whether to run
+# the Nsight profiling jobs instead of the standard benchmarks. To run profiling
+# on Buildkite manually, make a new build and pass `RUN_PROFILING=""` as an
+# environment variable. The value of `RUN_PROFILING` does not matter, only its
+# presence.
+
 steps:
   - label: "init :GPU:"
     key: "init_gpu_env"
@@ -33,6 +43,7 @@ steps:
   - wait
 
   - group: "GPU benchmarks for flagship amip"
+    if: build.env("RUN_PROFILING") == null
     steps:
       - label: "GPU AMIP with prognostic EDMF + 1M + integrated land (16 helems)"
         key: "gpu_amip_progedmf_1M_land_he16"
@@ -59,6 +70,7 @@ steps:
           slurm_mem: 16GB
 
   - group: "GPU benchmarks"
+    if: build.env("RUN_PROFILING") == null
     steps:
       - label: "GPU ClimaAtmos without diagnostic EDMF"
         key: "gpu_climaatmos"
@@ -114,6 +126,7 @@ steps:
 
 
   - group: "Generate output table"
+    if: build.env("RUN_PROFILING") == null
     steps:
       - label: "Compare AMIP/Atmos-only with diagnostic EDMF"
         key: "compare_amip_climaatmos_amip_diagedmf"
@@ -142,6 +155,7 @@ steps:
           - slack-upload -c C04S6MBSDC4 -f output/compare_amip_climaatmos_amip_diagedmf/table.txt -n compare_amip_climaatmos_amip_diagedmf_table -x "Coupler CPU/GPU Comparison Table"
 
   - group: "Profile with Nsight"
+    if: build.env("RUN_PROFILING") != null
     steps:
       - label: "nsys AMIP with diagnostic EDMF"
         key: "nsys_amip_diagedmf"

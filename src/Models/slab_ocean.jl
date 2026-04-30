@@ -2,7 +2,7 @@ import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
 import ClimaUtilities
-import ClimaUtilities.TimeManager: date
+import ClimaUtilities.TimeManager: ITime, date
 import SurfaceFluxes as SF
 import ..Checkpointer, ..FluxCalculator, ..Interfacer, ..Utilities, ..FieldExchanger
 
@@ -250,9 +250,6 @@ function Interfacer.update_field!(
     Interfacer.remap!(sim.integrator.p.α_diffuse, field)
 end
 
-# extensions required by FieldExchanger
-Interfacer.step!(sim::SlabOceanSimulation, t) =
-    Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 
 function FluxCalculator.update_turbulent_fluxes!(
     sim::SlabOceanSimulation,

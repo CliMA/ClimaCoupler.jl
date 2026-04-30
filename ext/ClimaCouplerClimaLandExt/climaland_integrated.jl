@@ -378,12 +378,7 @@ function Interfacer.update_field!(
         StaticArrays.SVector.(sim.integrator.p.scratch1, sim.integrator.p.scratch2)
 end
 
-function Interfacer.step!(sim::ClimaLandSimulation, t)
-    while float(sim.integrator.t) < float(t)
-        Interfacer.step!(sim.integrator)
-    end
-    return nothing
-end
+
 Interfacer.close_output_writers(sim::ClimaLandSimulation) =
     isnothing(sim.output_writer) || close(sim.output_writer)
 

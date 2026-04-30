@@ -311,12 +311,7 @@ function Interfacer.update_field!(
     Interfacer.remap!(sim.integrator.p.bucket.turbulent_fluxes.vapor_flux, field ./ ρ_liq) # TODO: account for sublimation
 end
 
-function Interfacer.step!(sim::BucketSimulation, t)
-    while float(sim.integrator.t) < float(t)
-        Interfacer.step!(sim.integrator)
-    end
-    return nothing
-end
+
 Interfacer.close_output_writers(sim::BucketSimulation) =
     isnothing(sim.output_writer) || close(sim.output_writer)
 

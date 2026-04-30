@@ -398,6 +398,11 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
 
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 
+    # set initial area fractions
+    coupler_fields.land_area_fraction .= land_fraction
+    coupler_fields.ice_area_fraction .= 0  # initialized as 0 since we start with no sea ice, but will evolve in time
+    coupler_fields.ocean_area_fraction .= 1 .- land_fraction  # no sea ice
+
     ## Conservation checks (only applicable to global slabplanet mode)
     conservation_checks = nothing
     if energy_check && domain_type == "global"

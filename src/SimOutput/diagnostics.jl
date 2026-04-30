@@ -57,7 +57,7 @@ function diagnostics_setup(
 
     # Create output writer (shared across all diagnostics since they all live on the boundary space)
     boundary_space = axes(fields.F_lh)
-    netcdf_writer = CD.Writers.NetCDFWriter(boundary_space, output_dir)
+    netcdf_writer = CD.Writers.NetCDFWriter(boundary_space, output_dir; start_date)
 
     #### Turbulent energy fluxes diagnostic
 

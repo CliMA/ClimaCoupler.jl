@@ -77,6 +77,6 @@ two_steps_reading["save_cache"] = false
 Input.update_t_start_for_restarts!(two_steps_reading)
 
 cs_two_steps_reading = setup_and_run(two_steps_reading)
-@testset "Restarts from command line arguments" begin
+@testset "AMIP restarts (state only)" begin
     @test cs_two_steps_reading.tspan[1] == cs_two_steps.tspan[2]
 end

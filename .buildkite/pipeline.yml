@@ -98,7 +98,7 @@ steps:
 
       - label: "MPI restarts"
         key: "mpi_restarts"
-        command: "srun julia --color=yes --project=experiments/AMIP/ experiments/test/restart.jl"
+        command: "srun julia --color=yes --project=experiments/AMIP/ experiments/test/restart_amip.jl"
         env:
           CLIMACOMMS_CONTEXT: "MPI"
         timeout_in_minutes: 50

@@ -10,6 +10,7 @@ import ClimaComms
 import ClimaCore as CC
 import Dates
 import Thermodynamics as TD
+import NVTX
 import SciMLBase: step!
 import ClimaUtilities.TimeManager: ITime, date
 import Statistics
@@ -406,7 +407,7 @@ between the simulation time (stored in the integrator) and the coupler time
 `t`, divided by the simulation timestep. This generically handles the cases where
 the simulation's timestep is shorter than, longer than, or equal to that of the coupler.
 """
-function step!(sim::AbstractComponentSimulation, t::Float64)
+NVTX.@annotate function step!(sim::AbstractComponentSimulation, t::Float64)
     model_dt = Float64(sim.integrator.dt)
     # `round(Int, ...)` tolerates floating point drift less than `model_dt / 2`
     n_steps = round(Int, (t - Float64(sim.integrator.t)) / model_dt)
@@ -427,7 +428,7 @@ between the simulation time (stored in the integrator) and the coupler time
 `t`, divided by the simulation timestep. This generically handles the cases where
 the simulation's timestep is shorter than, longer than, or equal to that of the coupler.
 """
-function step!(sim::AbstractComponentSimulation, t::ITime)
+NVTX.@annotate function step!(sim::AbstractComponentSimulation, t::ITime)
     n_steps = div(t - sim.integrator.t, sim.integrator.dt) # integer division; exact for ITime
     for _ in 1:n_steps
         step!(sim.integrator)
@@ -545,7 +546,10 @@ Non-ClimaCore fields should provide a method to this function.
 """
 function remap end
 
-function remap(target_space::CC.Spaces.AbstractSpace, source_field::CC.Fields.Field)
+NVTX.@annotate function remap(
+    target_space::CC.Spaces.AbstractSpace,
+    source_field::CC.Fields.Field,
+)
     source_space = axes(source_field)
 
     # Check if the source and target spaces are compatible
@@ -588,7 +592,7 @@ Note that this method has a lot of allocations and is not efficient.
 """
 function remap! end
 
-function remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field)
+NVTX.@annotate function remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field)
     source_space = axes(source_field)
     target_space = axes(target_field)
     comms_ctx = ClimaComms.context(source_space)

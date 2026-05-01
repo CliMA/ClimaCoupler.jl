@@ -209,24 +209,5 @@ Interfacer.remap(target_space::CC.Spaces.AbstractSpace, source_num::Number, rema
 Interfacer.remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field, remapping) =
     Interfacer.remap!(target_field, source_field)
 
-# Extend Interfacer.get_field to allow automatic remapping to the target space
-function Interfacer.get_field!(
-    target_field,
-    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
-    quantity,
-)
-    Interfacer.remap!(target_field, Interfacer.get_field(sim, quantity), sim.remapping)
-    return nothing
-end
-# TODO see if we can remove this allocating version
-function Interfacer.get_field(
-    target_space::CC.Spaces.AbstractSpace,
-    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
-    quantity,
-)
-    return Interfacer.remap(
-        target_space,
-        Interfacer.get_field(sim, quantity),
-        sim.remapping,
-    )
-end
+# Interfacer.get_field! / get_field for OceananigansSimulation and ClimaSeaIceSimulation
+# live in clima_seaice.jl (included after both simulation types are defined).

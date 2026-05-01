@@ -653,3 +653,26 @@ These plots are not polished, and are intended for debugging.
 """
 Plotting.debug_plot_fields(sim::ClimaSeaIceSimulation) =
     (:area_fraction, :surface_temperature, :ice_concentration, :ice_thickness, :u, :v)
+
+# Extend Interfacer.get_field to allow automatic remapping to the target space
+# (defined here so `OceananigansSimulation` and `ClimaSeaIceSimulation` exist.)
+function Interfacer.get_field!(
+    target_field,
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    quantity,
+)
+    Interfacer.remap!(target_field, Interfacer.get_field(sim, quantity), sim.remapping)
+    return nothing
+end
+# TODO see if we can remove this allocating version
+function Interfacer.get_field(
+    target_space::CC.Spaces.AbstractSpace,
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    quantity,
+)
+    return Interfacer.remap(
+        target_space,
+        Interfacer.get_field(sim, quantity),
+        sim.remapping,
+    )
+end

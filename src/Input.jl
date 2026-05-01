@@ -219,7 +219,7 @@ function argparse_settings()
         "--land_spun_up_ic"
         help = "Boolean flag to indicate whether to use integrated land initial conditions from spun up state [`true` (default), `false`]"
         arg_type = Bool
-        default = true
+        default = false
         "--lai_source"
         help = "Source for leaf area index data. [`modis_monthly` (default), `modis_monthly_climatology`]"
         arg_type = String

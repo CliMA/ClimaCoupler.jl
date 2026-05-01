@@ -150,3 +150,50 @@ end
 
 This is equivalent to what `run!` does internally, without the precompilation warmup
 and SYPD timing. See [SimCoordinator](@ref) for the full API.
+
+## Single-column model (SCM) experiments
+
+To run a single-column model (SCM) experiment, set `domain_type: "column"`, **`scm_surface_type`**
+(which surface runs: land, ocean, or sea ice), and **`column_latlon`** (where the column sits).
+Example config file:
+
+```yaml
+domain_type: "column"
+column_latlon: [37.0, -120.0]   # [latitude, longitude] in degrees
+scm_surface_type: "ocean"       # "land", "ocean", or "sea_ice"
+mode_name: "slabplanet_aqua"    # or "amip", "slabplanet_terra", etc.
+dt: "120secs"
+dt_cpl: "120secs"
+t_end: "480secs"
+start_date: "20100101"
+# ... other options (rad, microphysics_model, surface_setup, vert_diff, z_elem, etc.)
+```
+
+Run it the same way as a global run, e.g.:
+
+```bash
+julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl --config_file=config/ci_configs/scm_slabplanet_aqua.yml --job_id=my_scm
+```
+
+Or from the REPL:
+
+```julia
+include("experiments/AMIP/code_loading.jl")
+cs = CoupledSimulation("config/ci_configs/scm_slabplanet_aqua.yml")
+run!(cs)
+```
+
+Ready-to-use SCM configs are in `config/ci_configs/` (e.g. `scm_slabplanet_aqua.yml`,
+`scm_slabplanet_terra_land.yml`, `scm_amip_ocean.yml`).
+
+### SCM surface model selection
+
+`scm_surface_type` is used to select which surface model runs in SCM mode. It must
+be set to `"land"`, `"ocean"`, or `"sea_ice"`. The coupler then keeps exactly one of the land,
+ocean, or sea-ice component models active (the others are disabled). Which *kind* of ocean,
+land, or ice model (e.g. slab vs prescribed) still follows from `mode_name` and the usual
+`ocean_model` / `land_model` / `ice_model` config where applicable. Multiple surface
+model types (e.g. half ocean, half land) are currently not supported in SCM mode.
+
+`column_latlon` sets the geographic location of the column (e.g. for spatially-varying
+land parameters, prescribed ocean albedo calculation, radiation).

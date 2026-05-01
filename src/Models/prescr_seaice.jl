@@ -1,6 +1,7 @@
 import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
+import ClimaUtilities.TimeManager: ITime
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
@@ -135,8 +136,7 @@ function slab_ice_space_init(
 
     if has_ISTL1
         # Use ERA5 ISTL1 (0-7cm, near-surface layer) as a proxy for surface temperature
-        ISTL1_input =
-            TimeVaryingInput(sic_data, "ISTL1", space; reference_date = start_date)
+        ISTL1_input = TimeVaryingInput(sic_data, "ISTL1", space; start_date)
         T_sfc_data = CC.Fields.zeros(space)
         evaluate!(T_sfc_data, ISTL1_input, t_start)
 
@@ -227,6 +227,7 @@ function PrescribedIceSimulation(
     stepper = CTS.RK4(),
     sic_path::Union{Nothing, String} = nothing,
     binary_area_fraction::Bool = true,
+    domain_type::String = "global",
     extra_kwargs...,
 ) where {FT}
     # Set up prescribed sea ice concentration object
@@ -249,23 +250,27 @@ function PrescribedIceSimulation(
     SIC_timevaryinginput = TimeVaryingInput(
         sic_data,
         "SEAICE",
-        boundary_space,
-        reference_date = start_date,
+        boundary_space;
+        start_date,
         file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
     )
 
     # Get initial SIC values and use them to calculate ice fraction
     ice_fraction = CC.Fields.zeros(boundary_space)
-    evaluate!(ice_fraction, SIC_timevaryinginput, tspan[1])
+    if domain_type == "column"
+        ice_fraction .= FT(1)
+    else
+        evaluate!(ice_fraction, SIC_timevaryinginput, tspan[1])
 
-    # Ensure ice fraction is finite and not NaN
-    @. ice_fraction = ifelse(isfinite(ice_fraction), ice_fraction, FT(0))
-    # binary ice fraction (threshold at 0.5)
-    if binary_area_fraction
-        @. ice_fraction = ifelse(ice_fraction > FT(0.5), FT(1), FT(0))
+        # Ensure ice fraction is finite and not NaN
+        @. ice_fraction = ifelse(isfinite(ice_fraction), ice_fraction, FT(0))
+        # binary ice fraction (threshold at 0.5)
+        if binary_area_fraction
+            @. ice_fraction = ifelse(ice_fraction > FT(0.5), FT(1), FT(0))
+        end
+        # max/min needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
+        @. ice_fraction = max(min(ice_fraction, FT(1) - land_fraction), FT(0))
     end
-    # max/min needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-    @. ice_fraction = max(min(ice_fraction, FT(1) - land_fraction), FT(0))
 
     params = IceSlabParameters{FT}(coupled_param_dict)
 
@@ -288,16 +293,17 @@ function PrescribedIceSimulation(
         SIC_timevaryinginput = SIC_timevaryinginput,
         land_fraction = land_fraction,
         binary_area_fraction = binary_area_fraction,
+        domain_type = domain_type,
         dt = dt,
         thermo_params = thermo_params,
         # add dss_buffer to cache to avoid runtime dss allocation
-        dss_buffer = CC.Spaces.create_dss_buffer(Y),
+        dss_buffer = Utilities.init_dss_buffer(Y),
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     ode_function = CTS.ClimaODEFunction(
         T_exp! = ice_rhs!,
-        dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer),
+        dss! = (Y, p, t) -> Utilities.apply_dss!(Y, p.dss_buffer),
     )
     if dt isa Number
         dt = Float64(dt)
@@ -386,9 +392,6 @@ Interfacer.update_field!(
     field,
 ) = nothing
 
-# extensions required by FieldExchanger
-Interfacer.step!(sim::PrescribedIceSimulation, t) =
-    Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 
 function FluxCalculator.update_turbulent_fluxes!(
     sim::PrescribedIceSimulation,
@@ -426,16 +429,20 @@ function ice_rhs!(dY, Y, p, t)
     (; k_ice, h, T_base, ρ, c, ϵ, α, T_freeze, σ) = p.params
 
     # Update the cached area fraction with the current SIC
-    evaluate!(p.area_fraction, p.SIC_timevaryinginput, t)
-    @. p.area_fraction = ifelse(isfinite(p.area_fraction), p.area_fraction, FT(0))
-    # binary ice fraction (threshold at 0.5)
-    if p.binary_area_fraction
-        @. p.area_fraction = ifelse(p.area_fraction > FT(0.5), FT(1), FT(0))
-    end
+    if p.domain_type == "column"
+        @. p.area_fraction = FT(1)
+    else
+        evaluate!(p.area_fraction, p.SIC_timevaryinginput, t)
+        @. p.area_fraction = ifelse(isfinite(p.area_fraction), p.area_fraction, FT(0))
+        # binary ice fraction (threshold at 0.5)
+        if p.binary_area_fraction
+            @. p.area_fraction = ifelse(p.area_fraction > FT(0.5), FT(1), FT(0))
+        end
 
-    # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
-    #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-    @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_fraction), FT(0))
+        # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
+        #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
+        @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_fraction), FT(0))
+    end
 
     # Calculate the conductive flux (positive when upward)
     (; T_sfc_min) = p.params
@@ -465,7 +472,7 @@ Perform DSS on the state of a component simulation, intended to be used
 before the initial step of a run. This method acts on prescribed ice simulations.
 """
 dss_state!(sim::PrescribedIceSimulation) =
-    CC.Spaces.weighted_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)
+    Utilities.apply_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)
 
 function Checkpointer.get_model_cache(sim::PrescribedIceSimulation)
     return sim.integrator.p

@@ -117,8 +117,8 @@ function PrescribedOceanSimulation(
     SST_timevaryinginput = TimeVaryingInput(
         sst_data,
         "SST",
-        boundary_space,
-        reference_date = start_date,
+        boundary_space;
+        start_date,
         file_reader_kwargs = (;
             preprocess_func = (data) -> data + C_to_K + sst_adjustment,
         ), ## convert Celsius to Kelvin and apply adjustment
@@ -186,7 +186,11 @@ end
 Update the cached surface temperature field using the prescribed data
 at each timestep.
 """
-function Interfacer.step!(sim::PrescribedOceanSimulation, t)
+function Interfacer.step!(sim::PrescribedOceanSimulation, t::Float64)
+    evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
+    sim.cache.t[] = t
+end
+function Interfacer.step!(sim::PrescribedOceanSimulation, t::ITime)
     evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
     sim.cache.t[] = t
 end

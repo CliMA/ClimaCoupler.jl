@@ -178,7 +178,9 @@ function ClimaLandSimulation(
     # Snow model setup
     # Set β = 0 in order to regain model without density dependence
     α_snow = CL.Snow.ZenithAngleAlbedoModel(toml_dict)
-    horz_degree_res = FT(sum(CL.Domains.average_horizontal_resolution_degrees(domain)) / 2) # mean of resolution in latitude and longitude, in degrees
+    horz_degree_res =
+        domain isa CL.Domains.Column ? FT(1) :
+        FT(sum(CL.Domains.average_horizontal_resolution_degrees(domain)) / 2)
     scf = CL.Snow.WuWuSnowCoverFractionModel(toml_dict, horz_degree_res)
     snow = CL.Snow.SnowModel(
         FT,
@@ -376,12 +378,7 @@ function Interfacer.update_field!(
         StaticArrays.SVector.(sim.integrator.p.scratch1, sim.integrator.p.scratch2)
 end
 
-function Interfacer.step!(sim::ClimaLandSimulation, t)
-    while float(sim.integrator.t) < float(t)
-        Interfacer.step!(sim.integrator)
-    end
-    return nothing
-end
+
 Interfacer.close_output_writers(sim::ClimaLandSimulation) =
     isnothing(sim.output_writer) || close(sim.output_writer)
 

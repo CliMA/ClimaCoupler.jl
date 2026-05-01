@@ -26,20 +26,17 @@ steps:
 
       - echo "--- Instantiate AMIP experiments env"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate CMIP experiments env"
       - "julia -O0 --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia -O0 --project=experiments/CMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia -O0 --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate test env"
       - "julia -O0 --project=test/ -e 'using Pkg; Pkg.develop(path=\".\")'"
       - "julia -O0 --project=test/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia -O0 --project=test/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia -O0 --project=test/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --project=test/ -e 'using Pkg; Pkg.status()'"
 
@@ -66,8 +63,6 @@ steps:
         agents:
           slurm_ntasks: 2
           slurm_mem: 16GB
-          modules: mpiwrapper/2024_05_27 climacommon/2025_05_15
-        soft_fail: true # remove this after library issues are fixed
 
       - label: "MPI Interfacer unit tests"
         key: "interfacer_mpi_tests"
@@ -78,14 +73,12 @@ steps:
         agents:
           slurm_ntasks: 2
           slurm_mem: 16GB
-          modules: mpiwrapper/2024_05_27 climacommon/2025_05_15
-        soft_fail: true # remove this after library issues are fixed
 
   - group: "GPU: unit tests"
     steps:
       - label: "GPU runtests"
         command: "julia -O0 --color=yes --project=test/ test/runtests.jl"
-        timeout_in_minutes: 10
+        timeout_in_minutes: 20
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -111,8 +104,6 @@ steps:
         agents:
           slurm_ntasks: 2
           slurm_mem: 32GB
-          modules: mpiwrapper/2024_05_27 climacommon/2025_05_15
-        soft_fail: true # remove this after library issues are fixed
 
       - label: "GPU restarts (state and cache)"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/test/restart.jl"
@@ -130,7 +121,44 @@ steps:
           slurm_gpus: 1
           slurm_mem: 32GB
 
-  - group: "Integration Tests"
+  - group: "Integration Tests (single column)"
+    steps:
+      - label: "SCM: slabplanet aqua (atmos + slab ocean column)"
+        key: "scm_slabplanet_aqua"
+        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_slabplanet_aqua.yml --job_id scm_slabplanet_aqua"
+        artifact_paths: "output/scm_slabplanet_aqua/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "SCM: slabplanet terra bucket (atmos + bucket land column)"
+        key: "scm_slabplanet_terra_bucket"
+        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_slabplanet_terra_bucket.yml --job_id scm_slabplanet_terra_bucket"
+        artifact_paths: "output/scm_slabplanet_terra_bucket/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "SCM: slabplanet terra land (atmos + integrated land column)"
+        key: "scm_slabplanet_terra_land"
+        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_slabplanet_terra_land.yml --job_id scm_slabplanet_terra_land"
+        artifact_paths: "output/scm_slabplanet_terra_land/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "SCM: AMIP ocean (atmos + prescribed ocean column)"
+        key: "scm_amip_ocean"
+        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_amip_ocean.yml --job_id scm_amip_ocean"
+        artifact_paths: "output/scm_amip_ocean/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+      - label: "SCM: AMIP sea ice (atmos + prescribed sea ice column)"
+        key: "scm_amip_ice"
+        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_amip_ice.yml --job_id scm_amip_ice"
+        artifact_paths: "output/scm_amip_ice/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
+  - group: "Integration Tests (global)"
     steps:
       # SLABPLANET EXPERIMENTS
 
@@ -220,8 +248,6 @@ steps:
         agents:
           slurm_ntasks: 4
           slurm_mem_per_cpu: 12GB
-          modules: mpiwrapper/2024_05_27 climacommon/2025_05_15
-        soft_fail: true # remove this after library issues are fixed
 
       # short high-res performance test
       - label: "Unthreaded AMIP FINE" # also reported by longruns with a flame graph
@@ -289,6 +315,21 @@ steps:
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
+
+      - label: "AMIP calibration pipeline with emulated diagnostics"
+        key: "amip_test_calibration"
+        command:
+          - "julia -O0 --color=yes --project=experiments/AMIP/ experiments/calibration/amip/generate_observations.jl"
+          - "julia -O0 --color=yes --project=experiments/AMIP/ experiments/calibration/amip/run_calibration.jl"
+        artifact_paths: "amip_calibration/*"
+        env:
+          CLIMACOMMS_DEVICE: "CPU"
+          CLIMACOMMS_CONTEXT: "SINGLETON"
+          TEST_CALIBRATION: ""
+        agents:
+          slurm_mem: 64GB
+          slurm_ntasks: 3
+          slurm_cpus_per_task: 4
 
   - wait
 

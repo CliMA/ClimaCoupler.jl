@@ -12,7 +12,6 @@ extra_atmos_diagnostics:
     reduction_time: average
     pressure_coordinates: true
     compute_every: 6hours
-implicit_microphysics: false
 land_model: "integrated"
 microphysics_model: "1M"
 mode_name: "amip"
@@ -25,4 +24,3 @@ surface_setup: "PrescribedSurface"
 t_end: "186days"
 topo_smoothing: true
 topography: "Earth"
-use_sgs_quadrature: false

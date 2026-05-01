@@ -164,7 +164,7 @@ specific timesteps should be specified, rather than only `dt`.
 | `--land_model` | String | `"bucket"` | `bucket`, `integrated` | Land model to use |
 | `--land_temperature_anomaly` | String | `"aquaplanet"` | `amip`, `aquaplanet`, `nothing` | Type of temperature anomaly for land model |
 | `--use_land_diagnostics` | Bool | `true` | `true`, `false` | Whether to compute and output land model diagnostics |
-| `--land_spun_up_ic` | Bool | `true` | `true`, `false` | Whether to use integrated land initial conditions from spun up state |
+| `--land_spun_up_ic` | Bool | `false` | `true`, `false` | Whether to use integrated land initial conditions from spun up state |
 | `--lai_source` | String | `"modis_monthly"` | `modis_monthly`, `modis_monthly_climatology` | Source for leaf area index data. `modis_monthly` uses full MODIS monthly data, `modis_monthly_climatology` uses MODIS monthly climatology with periodic calendar |
 | `--bucket_albedo_type` | String | `"map_static"` | `map_static`, `function`, `map_temporal`, `era5` | Access bucket surface albedo information from data file. Use `era5` for ERA5-derived processed albedo files (requires `era5_initial_condition_dir`) |
 | `--bucket_initial_condition` | String | `""` | Any valid file path | File path for a NetCDF file (read documentation about requirements). In subseasonal mode, automatically inferred from `era5_initial_condition_dir` if not specified |

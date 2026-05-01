@@ -27,6 +27,9 @@ It contains the following objects:
                              the interfacial temperature and salinity, and the flux formulation used to compute the fluxes.
 - `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
     and the Celsius to Kelvin conversion constant.
+- `use_update_T_sfc_callback::Bool`: If true, pass `update_T_sfc` into SurfaceFluxes and write diagnosed
+    skin temperature back to the ice model after each flux call.
+- `model_Δt::MDT`: Sea ice component time step used in `step!`.
 """
 struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, MDT} <:
        Interfacer.AbstractSeaIceSimulation
@@ -35,6 +38,7 @@ struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, MDT} <:
     remapping::REMAP
     ocean_ice_interface::NT
     ice_properties::IP
+    use_update_T_sfc_callback::Bool
     model_Δt::MDT
 end
 
@@ -176,6 +180,7 @@ function ClimaSeaIceSimulation(
         remapping,
         ocean_ice_interface,
         ice_properties,
+        use_update_T_sfc_callback,
         model_Δt,
     )
 
@@ -282,8 +287,12 @@ function FluxCalculator.compute_surface_fluxes!(
     # Skin callback inputs: fill only after q_sfc / z₀ use scalar_temp2–4; use scalar_skin_* so
     # δ, T_i, ϵ, α are not overwritten before SurfaceFluxes evaluates the callback (scalar_temp1
     # must keep T_sfc through get_surface_fluxes).
+    # `hasfield` covers interactive sessions where the struct was redefined (e.g. Revise) but an
+    # old `ClimaSeaIceSimulation` instance is still in memory; default matches historical behavior.
+    use_update_T_sfc_callback =
+        hasfield(typeof(sim), :use_update_T_sfc_callback) ? sim.use_update_T_sfc_callback : true
     update_T_sfc_callback =
-        if sim.use_update_T_sfc_callback
+        if use_update_T_sfc_callback
             internal_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
             κ = if hasfield(typeof(internal_heat_flux), :conductivity)
                 FT.(internal_heat_flux.conductivity)
@@ -337,7 +346,7 @@ function FluxCalculator.compute_surface_fluxes!(
 
     # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
     csf.scalar_temp2 .=
-        ifelse.(area_fraction .≈ 0, zero(FT), T_sfc_new .- FT(sim.ice_properties.C_to_K))
+        ifelse.(area_fraction .≈ 0, zero(FT), fluxes.T_sfc_new .- FT(sim.ice_properties.C_to_K))
     Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.scalar_temp2, sim.remapping)
     remapped_T_sfc = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
 
@@ -551,10 +560,11 @@ function FluxCalculator.ocean_seaice_fluxes!(
     ρτxio = ice_sim.ocean_ice_interface.fluxes.x_momentum # sea_ice - ocean zonal momentum flux
     ρτyio = ice_sim.ocean_ice_interface.fluxes.y_momentum # sea_ice - ocean meridional momentum flux
 
-    # mask out the poles
-    polar_mask = ocean_sim.remapping.polar_mask
-    @. ρτxio = polar_mask * ρτxio
-    @. ρτyio = polar_mask * ρτyio
+    # mask out the poles (staggered masks match Face/Center vs Center/Face momentum locations)
+    (; polar_exclusion_flux_mask_u, polar_exclusion_flux_mask_v, polar_exclusion_flux_mask_centers) =
+        ocean_sim.remapping
+    @. ρτxio = polar_exclusion_flux_mask_u * ρτxio
+    @. ρτyio = polar_exclusion_flux_mask_v * ρτyio
 
     # Update the momentum flux contributions from ocean/sea ice fluxes
     arch = OC.Architectures.architecture(grid)
@@ -578,14 +588,14 @@ function FluxCalculator.ocean_seaice_fluxes!(
     heat_flux = OC.interior(ocean_sim.remapping.scratch_field_oc1, :, :, 1)
     heat_flux .= OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
     # mask out the poles
-    @. heat_flux = polar_mask * heat_flux
+    @. heat_flux = polar_exclusion_flux_mask_centers * heat_flux
     OC.interior(oc_flux_T, :, :, 1) .+= heat_flux
 
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
     salt_contrib = OC.interior(ocean_sim.remapping.scratch_field_oc2, :, :, 1)
     salt_contrib .= OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
     # mask out the poles
-    @. salt_contrib = polar_mask * salt_contrib
+    @. salt_contrib = polar_exclusion_flux_mask_centers * salt_contrib
     OC.interior(oc_flux_S, :, :, 1) .+= salt_contrib
 
     return nothing

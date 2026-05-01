@@ -62,20 +62,20 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 30GB
       
-      - label: "Coarse current AMIP: diagedmf + 0M + bucket model"
-        key: "amip_diagedmf"
-        command:
-          - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_diagedmf.yml --job_id amip_coarse_diagedmf"
-        artifact_paths: "output/amip_coarse_diagedmf/artifacts/*"
-        timeout_in_minutes: 840
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 30GB
+      # - label: "Coarse current AMIP: diagedmf + 0M + bucket model"
+      #   key: "amip_diagedmf"
+      #   command:
+      #     - echo "--- Run simulation"
+      #     - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_diagedmf.yml --job_id amip_coarse_diagedmf"
+      #   artifact_paths: "output/amip_coarse_diagedmf/artifacts/*"
+      #   timeout_in_minutes: 840
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #   agents:
+      #     slurm_gpus_per_task: 1
+      #     slurm_cpus_per_task: 4
+      #     slurm_ntasks: 1
+      #     slurm_mem: 30GB
 
       # - label: "Coarse current AMIP: diagedmf + 1M + integrated land"
       #   key: "amip_diagedmf_1m_land"

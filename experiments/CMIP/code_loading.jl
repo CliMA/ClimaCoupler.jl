@@ -21,7 +21,8 @@ using ClimaCoupler
 using CairoMakie, ClimaCoreMakie, GeoMakie, Makie, Poppler_jll, Printf
 
 # Trigger ClimaCouplerCMIPExt
-import Oceananigans, ClimaOcean, ClimaSeaIce, KernelAbstractions
+import Oceananigans,
+    ClimaOcean, ClimaSeaIce, KernelAbstractions, ConservativeRegridding, Adapt
 
 # Trigger ClimaCouplerClimaLandExt
 import ClimaLand

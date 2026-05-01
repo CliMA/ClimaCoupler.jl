@@ -10,15 +10,11 @@ dt_ocean: "360secs" # 6 minutes
 dt_rad: "1hours"
 dt_seaice: "360secs" # 6 minutes
 energy_check: false
-extra_atmos_diagnostics:
-  - short_name: [hur, hus, ta]
-    period: 1months
-    reduction_time: average
-    pressure_coordinates: true
-    compute_every: 6hours
+h_elem: 16
 ice_model: "clima_seaice"
 insolation: "timevarying"
 mode_name: "cmip"
+nh_poly: 3
 ocean_model: "oceananigans"
 rmse_check: true
 start_date: "20100101"
@@ -26,3 +22,9 @@ surface_setup: "PrescribedSurface"
 t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: 1months
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours

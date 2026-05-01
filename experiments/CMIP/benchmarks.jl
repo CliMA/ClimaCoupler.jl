@@ -61,8 +61,10 @@ open(joinpath(table_output_dir, "table.txt"), "w") do f
     # Output the table, including lines before and after the header
     PrettyTables.pretty_table(
         f,
-        data,
-        header = headers,
-        hlines = [0, 3, 5, 7, 9, 11, 13, 15],
+        data;
+        column_labels = headers,
+        table_format = PrettyTables.TextTableFormat(
+            horizontal_lines_at_data_rows = [2, 4, 6, 8, 10, 12, 14],
+        ),
     )
 end

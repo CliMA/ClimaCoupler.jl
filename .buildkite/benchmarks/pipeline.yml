@@ -10,6 +10,16 @@ env:
   SLURM_GRES_FLAGS: "allow-task-sharing"
   BENCHMARK_CONFIG_PATH: "config/benchmark_configs"
 
+# This pipeline serves two purposes:
+# 1. To run the standard benchmarks (default)
+# 2. To run Nsight profiling jobs (when `RUN_PROFILING` is set)
+#
+# We check for the existence of `RUN_PROFILING` to determine whether to run
+# the Nsight profiling jobs instead of the standard benchmarks. To run profiling
+# on Buildkite manually, make a new build and pass `RUN_PROFILING=""` as an
+# environment variable. The value of `RUN_PROFILING` does not matter, only its
+# presence.
+
 steps:
   - label: "init :GPU:"
     key: "init_gpu_env"
@@ -18,6 +28,11 @@ steps:
       - julia --project=experiments/AMIP -e 'using Pkg; Pkg.instantiate(;verbose=true)'
       - julia --project=experiments/AMIP -e 'using Pkg; Pkg.precompile()'
       - julia --project=experiments/AMIP -e 'using Pkg; Pkg.status()'
+
+      - echo "--- Instantiate experiments/CMIP"
+      - julia --project=experiments/CMIP -e 'using Pkg; Pkg.instantiate(;verbose=true)'
+      - julia --project=experiments/CMIP -e 'using Pkg; Pkg.precompile()'
+      - julia --project=experiments/CMIP -e 'using Pkg; Pkg.status()'
     agents:
       slurm_gpus: 1
       slurm_cpus_per_task: 8
@@ -28,6 +43,7 @@ steps:
   - wait
 
   - group: "GPU benchmarks for flagship amip"
+    if: build.env("RUN_PROFILING") == null
     steps:
       - label: "GPU AMIP with prognostic EDMF + 1M + integrated land (16 helems)"
         key: "gpu_amip_progedmf_1M_land_he16"
@@ -54,6 +70,7 @@ steps:
           slurm_mem: 16GB
 
   - group: "GPU benchmarks"
+    if: build.env("RUN_PROFILING") == null
     steps:
       - label: "GPU ClimaAtmos without diagnostic EDMF"
         key: "gpu_climaatmos"
@@ -109,6 +126,7 @@ steps:
 
 
   - group: "Generate output table"
+    if: build.env("RUN_PROFILING") == null
     steps:
       - label: "Compare AMIP/Atmos-only with diagnostic EDMF"
         key: "compare_amip_climaatmos_amip_diagedmf"
@@ -135,3 +153,66 @@ steps:
           - "compare_amip_climaatmos_amip_diagedmf"
         command:
           - slack-upload -c C04S6MBSDC4 -f output/compare_amip_climaatmos_amip_diagedmf/table.txt -n compare_amip_climaatmos_amip_diagedmf_table -x "Coupler CPU/GPU Comparison Table"
+
+  - group: "Profile with Nsight"
+    if: build.env("RUN_PROFILING") != null
+    steps:
+      - label: "nsys AMIP with diagnostic EDMF"
+        key: "nsys_amip_diagedmf"
+        command:
+          - mkdir -p output/nsys_amip_diagedmf/artifacts
+          - >
+            nsys profile --start-later=true --capture-range=cudaProfilerApi --trace=nvtx,mpi,cuda,osrt --cuda-memory-usage=true --kill=none
+            --output=output/nsys_amip_diagedmf/artifacts/report_amip_diagedmf_land
+            julia --color=yes --project=experiments/AMIP/ experiments/AMIP/profile_simulation.jl
+            --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf.yml --job_id nsys_amip_diagedmf
+        artifact_paths: "output/nsys_amip_diagedmf/artifacts/report_amip_diagedmf_land*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+          JULIA_NVTX_CALLBACKS: "gc,alloc,free,inference"
+          CLIMA_NAME_CUDA_KERNELS_FROM_STACK_TRACE: "true"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 1
+          slurm_mem: 64GB
+
+      - label: "nsys CMIP with ED only + integrated land"
+        key: "nsys_cmip_edonly_land"
+        command:
+          - mkdir -p output/nsys_cmip_edonly_land/artifacts
+          - >
+            nsys profile --start-later=true --capture-range=cudaProfilerApi --trace=nvtx,mpi,cuda,osrt --cuda-memory-usage=true --kill=none
+            --output=output/nsys_cmip_edonly_land/artifacts/report_cmip_edonly_land
+            julia --color=yes --project=experiments/CMIP/ experiments/CMIP/profile_simulation.jl
+            --config_file config/longrun_configs/cmip_edonly_land.yml --job_id nsys_cmip_edonly_land
+        artifact_paths: "output/nsys_cmip_edonly_land/artifacts/report_cmip_edonly_land*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+          JULIA_NVTX_CALLBACKS: "gc,alloc,free,inference"
+          CLIMA_NAME_CUDA_KERNELS_FROM_STACK_TRACE: "true"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 1
+          slurm_mem: 64GB
+
+      - label: "nsys CMIP with diag EDMF + integrated land"
+        key: "nsys_cmip_diagedmf_land"
+        command:
+          - mkdir -p output/nsys_cmip_diagedmf_land/artifacts
+          - >
+            nsys profile --start-later=true --capture-range=cudaProfilerApi --trace=nvtx,mpi,cuda,osrt --cuda-memory-usage=true --kill=none
+            --output=output/nsys_cmip_diagedmf_land/artifacts/report_cmip_diagedmf_land
+            julia --color=yes --project=experiments/CMIP/ experiments/CMIP/profile_simulation.jl
+            --config_file config/longrun_configs/cmip_diagedmf_land.yml --job_id nsys_cmip_diagedmf_land
+        artifact_paths: "output/nsys_cmip_diagedmf_land/artifacts/report_cmip_diagedmf_land*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+          JULIA_NVTX_CALLBACKS: "gc,alloc,free,inference"
+          CLIMA_NAME_CUDA_KERNELS_FROM_STACK_TRACE: "true"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 1
+          slurm_mem: 64GB

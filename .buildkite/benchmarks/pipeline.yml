@@ -162,14 +162,11 @@ steps:
         command:
           - mkdir -p output/nsys_amip_diagedmf/artifacts
           - >
-            nsys profile --start-later=true --capture-range=cudaProfilerApi
-            --trace=nvtx,mpi,cuda,osrt --cuda-memory-usage=true --kill=none
-            --output=output/nsys_amip_diagedmf/artifacts/report
-            srun julia --threads=3 --color=yes --project=experiments/AMIP/
-            experiments/AMIP/profile_simulation.jl
-            --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf.yml
-            --job_id nsys_amip_diagedmf
-        artifact_paths: "output/nsys_amip_diagedmf/artifacts/report*"
+            nsys profile --start-later=true --capture-range=cudaProfilerApi --trace=nvtx,mpi,cuda,osrt --cuda-memory-usage=true --kill=none
+            --output=output/nsys_amip_diagedmf/artifacts/report_amip_diagedmf_land
+            julia --color=yes --project=experiments/AMIP/ experiments/AMIP/profile_simulation.jl
+            --config_file $BENCHMARK_CONFIG_PATH/amip_diagedmf.yml --job_id nsys_amip_diagedmf
+        artifact_paths: "output/nsys_amip_diagedmf/artifacts/report_amip_diagedmf_land*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
           JULIA_NVTX_CALLBACKS: "gc,alloc,free,inference"
@@ -185,14 +182,11 @@ steps:
         command:
           - mkdir -p output/nsys_cmip_edonly_land/artifacts
           - >
-            nsys profile --start-later=true --capture-range=cudaProfilerApi
-            --trace=nvtx,mpi,cuda,osrt --cuda-memory-usage=true --kill=none
-            --output=output/nsys_cmip_edonly_land/artifacts/report
-            srun julia --threads=3 --color=yes --project=experiments/CMIP/
-            experiments/CMIP/profile_simulation.jl
-            --config_file config/longrun_configs/cmip_edonly_land.yml
-            --job_id nsys_cmip_edonly_land
-        artifact_paths: "output/nsys_cmip_edonly_land/artifacts/report*"
+            nsys profile --start-later=true --capture-range=cudaProfilerApi --trace=nvtx,mpi,cuda,osrt --cuda-memory-usage=true --kill=none
+            --output=output/nsys_cmip_edonly_land/artifacts/report_cmip_edonly_land
+            julia --color=yes --project=experiments/CMIP/ experiments/CMIP/profile_simulation.jl
+            --config_file config/longrun_configs/cmip_edonly_land.yml --job_id nsys_cmip_edonly_land
+        artifact_paths: "output/nsys_cmip_edonly_land/artifacts/report_cmip_edonly_land*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
           JULIA_NVTX_CALLBACKS: "gc,alloc,free,inference"
@@ -208,14 +202,11 @@ steps:
         command:
           - mkdir -p output/nsys_cmip_diagedmf_land/artifacts
           - >
-            nsys profile --start-later=true --capture-range=cudaProfilerApi
-            --trace=nvtx,mpi,cuda,osrt --cuda-memory-usage=true --kill=none
-            --output=output/nsys_cmip_diagedmf_land/artifacts/report
-            srun julia --threads=3 --color=yes --project=experiments/CMIP/
-            experiments/CMIP/profile_simulation.jl
-            --config_file config/longrun_configs/cmip_diagedmf_land.yml
-            --job_id nsys_cmip_diagedmf_land
-        artifact_paths: "output/nsys_cmip_diagedmf_land/artifacts/report*"
+            nsys profile --start-later=true --capture-range=cudaProfilerApi --trace=nvtx,mpi,cuda,osrt --cuda-memory-usage=true --kill=none
+            --output=output/nsys_cmip_diagedmf_land/artifacts/report_cmip_diagedmf_land
+            julia --color=yes --project=experiments/CMIP/ experiments/CMIP/profile_simulation.jl
+            --config_file config/longrun_configs/cmip_diagedmf_land.yml --job_id nsys_cmip_diagedmf_land
+        artifact_paths: "output/nsys_cmip_diagedmf_land/artifacts/report_cmip_diagedmf_land*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
           JULIA_NVTX_CALLBACKS: "gc,alloc,free,inference"

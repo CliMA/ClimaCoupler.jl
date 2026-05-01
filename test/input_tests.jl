@@ -128,6 +128,7 @@ end
     @test args.ice_model == Val(:prescribed)
     @test args.land_fraction_source == "etopo"
     @test args.sst_adjustment == 2.0
+    @test args.simple_ocean_momentum_advection === :weno
     @test args.domain_type == "global"
     @test args.column_latlon == (0.0, 0.0)
     @test args.scm_surface_type === nothing

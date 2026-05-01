@@ -53,6 +53,8 @@ dispatch in coupling.
 - `stop_date`: Stop date for the simulation
 - `output_dir`: Directory for output files
 - `simple_ocean`: Whether to use a simple ocean model setup
+- `simple_ocean_momentum_advection`: With `simple_ocean`, `:weno` (default) or `:vector_invariant`
+  (`VectorInvariant` momentum + biharmonic horizontal viscosity; cheaper numerics).
 
 # Optional keyword arguments
 - `dt`: Time step (default: `nothing`)
@@ -69,6 +71,7 @@ function OceananigansSimulation(
     tspan,
     output_dir,
     simple_ocean = false,
+    simple_ocean_momentum_advection = :weno,
     dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
@@ -145,8 +148,6 @@ function OceananigansSimulation(
         # Simpler setup
         @info "Using simpler ocean setup; to be used for software testing only."
         free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
-        momentum_advection = OC.WENOVectorInvariant(order = 5)
-        horizontal_viscosity = OC.HorizontalScalarDiffusivity(ν = 1e4)
         tracer_advection = OC.WENO(order = 5)
         vertical_mixing = OC.ConvectiveAdjustmentVerticalDiffusivity(
             background_κz = 1e-5,
@@ -154,7 +155,13 @@ function OceananigansSimulation(
             background_νz = 1e-4,
             convective_νz = 0.1,
         )
-
+        if simple_ocean_momentum_advection === :vector_invariant
+            momentum_advection = OC.VectorInvariant()
+            horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(ν = 1e11)
+        else
+            momentum_advection = OC.WENOVectorInvariant(order = 5)
+            horizontal_viscosity = OC.HorizontalScalarDiffusivity(ν = 1e4)
+        end
         closure = (horizontal_viscosity, vertical_mixing)
     end
 

@@ -77,9 +77,9 @@ two_steps["dt_ocean"] = "360secs"
 two_steps["dt_seaice"] = "360secs"
 two_steps["t_end"] = "720secs"
 two_steps["coupler_output_dir"] = tmpdir
-# checkpoint_dt = 360 s divides 1800 s exactly (1800 / 360 = 5), ensuring that
-# no gravity-wave callback fires at a non-checkpoint boundary and that the saved
-# state is reproducible after restart.
+# restart_cmip.yml sets dt_nogw/dt_ogw to 360 s so checkpoint_dt (360 s here, 1440 s in
+# four_steps) is an integer multiple of the GW callback periods (ClimaAtmos checks
+# checkpoint_dt / dt_nogw and checkpoint_dt / dt_ogw).
 two_steps["checkpoint_dt"] = "360secs"
 two_steps["job_id"] = "two_steps"
 
@@ -138,7 +138,7 @@ cs_two_steps2 = setup_and_run(two_steps)
         cs_two_steps2.model_sims.ice_sim.ice.model,
         # :bottom is the ocean-salinity reference used by IceWaterThermalEquilibrium;
         # after Oceananigans set! the reference may point to the t=0 ocean field
-        # rather than the restored field, causing a spurious Float64-level mismatch.
+        # rather than the restored field, causing a spurious mismatch.
         ignore = [:clock, :parent, :ptr, :bottom],
     )
 

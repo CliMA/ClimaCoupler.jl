@@ -246,6 +246,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use a simpler ocean model setup with Oceananigans [`false` (default), `true`]"
         arg_type = Bool
         default = false
+        "--simple_ocean_momentum_advection"
+        help = "With `simple_ocean`, ocean momentum advection: `weno` (default) or `vector_invariant` (cheaper numerics; e.g. CI)"
+        arg_type = String
+        default = "weno"
         "--sst_adjustment"
         help = "Adjustment to add to prescribed SST after conversion to Kelvin (default: 0.0)"
         arg_type = Float64
@@ -510,6 +514,8 @@ function get_coupler_args(config_dict::Dict)
     # Ocean model-specific information
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
     simple_ocean = config_dict["simple_ocean"]
+    simple_ocean_momentum_advection =
+        parse_simple_ocean_momentum_advection(config_dict)
     sst_adjustment = FT(config_dict["sst_adjustment"])
 
     # Ice model-specific information
@@ -588,6 +594,7 @@ function get_coupler_args(config_dict::Dict)
         era5_filepaths,
         ocean_model,
         simple_ocean,
+        simple_ocean_momentum_advection,
         sst_adjustment,
         ice_model,
         land_fraction_source,
@@ -599,6 +606,26 @@ function get_coupler_args(config_dict::Dict)
 end
 
 ### Helper functions used in argument parsing ###
+
+"""
+    parse_simple_ocean_momentum_advection(config_dict) -> Symbol
+
+Return `:weno` or `:vector_invariant` from `simple_ocean_momentum_advection` (default `:weno`).
+"""
+function parse_simple_ocean_momentum_advection(config_dict)
+    raw = get(config_dict, "simple_ocean_momentum_advection", "weno")
+    s = Symbol(lowercase(string(strip(string(raw)))))
+    if s === :weno
+        return :weno
+    elseif s === :vector_invariant
+        return :vector_invariant
+    else
+        error(
+            "Invalid simple_ocean_momentum_advection $(repr(raw)); " *
+            "use \"weno\" or \"vector_invariant\".",
+        )
+    end
+end
 
 """
     get_diag_period(t_start, t_end)

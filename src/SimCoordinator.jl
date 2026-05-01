@@ -476,14 +476,16 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
 
     FieldExchanger.update_surface_fractions!(cs)
 
-    if !should_restart || !restart_cache
-        ## Initialize Component Model Exchange
-        FieldExchanger.import_static_fields!(cs.fields, cs.model_sims)
-        FieldExchanger.exchange!(cs)
-        FieldExchanger.set_caches!(cs)
-        FluxCalculator.turbulent_fluxes!(cs)
-        FluxCalculator.ocean_seaice_fluxes!(cs)
-    end
+    ## Initialize Component Model Exchange
+    ## Note: We always run these initialization functions, even when restarting with
+    ## cache restoration enabled. This is necessary because some component models
+    ## (e.g., ClimaSeaIceSimulation, OceananigansSimulation) do not support cache
+    ## restoration. Running these functions ensures the coupling state is consistent.
+    FieldExchanger.import_static_fields!(cs.fields, cs.model_sims)
+    FieldExchanger.exchange!(cs)
+    FieldExchanger.set_caches!(cs)
+    FluxCalculator.turbulent_fluxes!(cs)
+    FluxCalculator.ocean_seaice_fluxes!(cs)
     Utilities.show_memory_usage()
     return cs
 end

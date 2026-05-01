@@ -243,12 +243,19 @@ function OceananigansSimulation(
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
     if arch isa OC.CPU
+        # NetCDF global attributes must be scalars/vectors NCDatasets can write.
+        # `TimeInterval(Dates.Day(1))` is required for a DateTime clock, but then
+        # `interval` metadata is a Dates.Period and NCDatasets errors. Use iteration
+        # counts instead (same spacing as 86400s and 3600s with this model Δt).
+        Δt_ocean = float(model_Δt)
+        iter_per_day = max(1, round(Int, 86400 / Δt_ocean))
+        iter_per_hour = max(1, round(Int, 3600 / Δt_ocean))
         # Save all tracers and velocities to a NetCDF file at daily frequency
         outputs = merge(ocean.model.tracers, ocean.model.velocities)
         surface_writer = OC.NetCDFWriter(
             ocean.model,
             outputs;
-            schedule = OC.TimeInterval(86400), # Daily output
+            schedule = OC.IterationInterval(iter_per_day),
             filename = joinpath(output_dir, "ocean_diagnostics.nc"),
             indices = (:, :, grid.Nz),
             overwrite_existing = true,
@@ -257,7 +264,7 @@ function OceananigansSimulation(
         free_surface_writer = OC.NetCDFWriter(
             ocean.model,
             (; displacement = ocean.model.free_surface.displacement);
-            schedule = OC.TimeInterval(3600), # hourly snapshots
+            schedule = OC.IterationInterval(iter_per_hour),
             filename = joinpath(output_dir, "ocean_free_surface.nc"),
             overwrite_existing = true,
             array_type = Array{FT},
@@ -269,7 +276,7 @@ function OceananigansSimulation(
         fluxes_writer = OC.NetCDFWriter(
             ocean.model,
             (; Tflux, Sflux, uflux, vflux);
-            schedule = OC.TimeInterval(3600), # hourly snapshots
+            schedule = OC.IterationInterval(iter_per_hour),
             filename = joinpath(output_dir, "ocean_fluxes.nc"),
             overwrite_existing = true,
             array_type = Array{FT},

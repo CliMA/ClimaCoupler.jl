@@ -130,7 +130,7 @@ function ClimaSeaIceSimulation(
         jld_writer = OC.JLD2Writer(
             ice.model,
             outputs;
-            schedule = OC.TimeInterval(86400), # Daily output
+            schedule = OC.TimeInterval(Dates.Day(1)), # Daily output
             filename = joinpath(output_dir, "seaice_diagnostics.jld2"),
             overwrite_existing = true,
             array_type = Array{FT},

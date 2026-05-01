@@ -182,12 +182,9 @@ function get_obs_var_in_pfull_dict()
     for (short_name, era5_short_name) in short_names_pairs
         obs_var_dict[short_name] =
             (start_date) -> begin
-                obs_var = ClimaAnalysis.OutputVar(
-                    artifact_path,
-                    era5_short_name,
-                    new_start_date = start_date,
-                    shift_by = Dates.firstdayofmonth,
-                )
+                obs_var = ClimaAnalysis.OutputVar(artifact_path, era5_short_name)
+                ClimaAnalysis.transform_dates!(obs_var, Dates.firstdayofmonth)
+                ClimaAnalysis.set_reference_date!(obs_var, start_date)
                 (ClimaAnalysis.units(obs_var) == "kg kg**-1") &&
                     (obs_var = ClimaAnalysis.set_units(obs_var, "unitless"))
                 obs_var = ClimaAnalysis.Var.convert_dim_units(
@@ -202,12 +199,9 @@ function get_obs_var_in_pfull_dict()
 
     obs_var_dict["hur"] =
         (start_date) -> begin
-            obs_var = ClimaAnalysis.OutputVar(
-                artifact_path,
-                "r",
-                new_start_date = start_date,
-                shift_by = Dates.firstdayofmonth,
-            )
+            obs_var = ClimaAnalysis.OutputVar(artifact_path, "r")
+            ClimaAnalysis.transform_dates!(obs_var, Dates.firstdayofmonth)
+            ClimaAnalysis.set_reference_date!(obs_var, start_date)
             obs_var = ClimaAnalysis.Var.convert_dim_units(
                 obs_var,
                 "pressure_level",

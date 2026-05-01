@@ -361,7 +361,8 @@ function Base.get(loader::ERA5DataLoader, short_name::String)
     short_name in available_vars || error(
         "$short_name is not available to load. To add this variable, add it to ERA5_TO_CLIMA_NAMES as a pair mapping ERA5 name to CliMA name and create a new ERA5DataLoader",
     )
-    var = get(catalog, short_name; var_kwargs = (shift_by = Dates.firstdayofmonth,))
+    var = get(catalog, short_name)
+    ClimaAnalysis.transform_dates!(obs_var, Dates.firstdayofmonth)
     return preprocess(loader, var, Val(Symbol(short_name)))
 end
 
@@ -467,11 +468,8 @@ end
 
 # Helper functions to support getting swcre and lwcre
 function _get(loader::CERESDataLoader, ::Val{short_name}) where {short_name}
-    var = get(
-        loader.catalog,
-        string(short_name);
-        var_kwargs = (shift_by = Dates.firstdayofmonth,),
-    )
+    var = get(loader.catalog, string(short_name);)
+    ClimaAnalysis.transform_dates!(obs_var, Dates.firstdayofmonth)
     return preprocess(loader, var, Val(short_name))
 end
 
@@ -557,7 +555,8 @@ function Base.get(loader::GPCPDataLoader, short_name::String)
     short_name in available_vars || error(
         "$short_name is not available to load. To add this variable, pass it to gpcp_to_clima_names as a pair mapping GPCP name to CliMA name and create a new GPCPDataLoader",
     )
-    var = get(catalog, short_name; var_kwargs = (shift_by = Dates.firstdayofmonth,))
+    var = get(catalog, short_name)
+    ClimaAnalysis.transform_dates!(var, Dates.firstdayofmonth)
     return preprocess(loader, var, Val(Symbol(short_name)))
 end
 
@@ -623,7 +622,9 @@ function Base.get(loader::ERA5PressureLevelDataLoader, short_name::String)
     short_name in available_vars || error(
         "$short_name is not available to load. To add this variable, pass it to era5_pressure_level_to_clima_names as a pair mapping ERA5 name to CliMA name and create a new ERA5PressureLevelDataLoader",
     )
-    var = get(catalog, short_name; var_kwargs = (shift_by = Dates.firstdayofmonth,))
+    var = get(catalog, short_name)
+    ClimaAnalysis.transform_dates!(obs_var, Dates.firstdayofmonth)
+    ClimaAnalysis.set_reference_date!(obs_var, start_date)
     return preprocess(loader, var, Val(Symbol(short_name)))
 end
 
@@ -690,7 +691,8 @@ function Base.get(loader::ModisDataLoader, short_name::String)
     short_name in available_vars || error(
         "$short_name is not available to load. To add this variable, pass it to modis_to_clima_names as a pair mapping ERA5 name to CliMA name and create a new ModisDataLoader",
     )
-    var = get(catalog, short_name; var_kwargs = (shift_by = Dates.firstdayofmonth,))
+    var = get(catalog, short_name)
+    ClimaAnalysis.transform_dates!(obs_var, Dates.firstdayofmonth)
     return preprocess(loader, var, Val(Symbol(short_name)))
 end
 
@@ -755,7 +757,8 @@ function Base.get(loader::CalipsoDataLoader, short_name::String)
     short_name in available_vars || error(
         "$short_name is not available to load. To add this variable, pass it to calipso_to_clima_names as a pair mapping CALIPSO/CloudSat name to CliMA name and create a new CalipsoDataLoader",
     )
-    var = get(catalog, short_name; var_kwargs = (shift_by = Dates.firstdayofmonth,))
+    var = get(catalog, short_name)
+    ClimaAnalysis.transform_dates!(obs_var, Dates.firstdayofmonth)
     return preprocess(loader, var, Val(Symbol(short_name)))
 end
 

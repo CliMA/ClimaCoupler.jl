@@ -137,9 +137,9 @@ function get_obs_var_dict()
             obs_var = ClimaAnalysis.OutputVar(
                 joinpath(@clima_artifact("precipitation_obs"), "precip.mon.mean.nc"),
                 "precip",
-                new_start_date = start_date,
-                shift_by = Dates.firstdayofmonth,
             )
+            ClimaAnalysis.transform_dates!(obs_var, Dates.firstdayofmonth)
+            ClimaAnalysis.set_reference_date!(obs_var, start_date)
             return obs_var
         end
 
@@ -154,9 +154,9 @@ function get_obs_var_dict()
                         "era5_monthly_averages_surface_single_level_197901-202410.nc",
                     ),
                     obs_name,
-                    new_start_date = start_date,
-                    shift_by = Dates.firstdayofmonth,
                 )
+                ClimaAnalysis.transform_dates!(obs_var, Dates.firstdayofmonth)
+                ClimaAnalysis.set_reference_date!(obs_var, start_date)
                 (ClimaAnalysis.units(obs_var) == "W m**-2") && (
                     obs_var = ClimaAnalysis.convert_units(
                         obs_var,
@@ -177,9 +177,9 @@ function get_obs_var_dict()
                         "CERES_EBAF_Ed4.2_Subset_200003-201910.nc",
                     ),
                     obs_name,
-                    new_start_date = start_date,
-                    shift_by = Dates.firstdayofmonth,
                 )
+                ClimaAnalysis.transform_dates!(obs_var, Dates.firstdayofmonth)
+                ClimaAnalysis.set_reference_date!(obs_var, start_date)
                 # Convert from W m-2 to W m^-2
                 ClimaAnalysis.units(obs_var) == "W m-2" ?
                 obs_var = ClimaAnalysis.set_units(obs_var, "W m^-2") :

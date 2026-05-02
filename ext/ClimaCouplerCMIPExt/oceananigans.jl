@@ -242,7 +242,7 @@ function OceananigansSimulation(
     )
 
     # Before version 0.96.22, the NetCDFWriter was broken on GPU
-    if arch isa OC.CPU
+    if (arch isa OC.CPU) || (pkgversion(OC) > v"0.96.22")
         # Save all tracers and velocities to a NetCDF file at daily frequency
         outputs = merge(ocean.model.tracers, ocean.model.velocities)
         surface_writer = OC.NetCDFWriter(

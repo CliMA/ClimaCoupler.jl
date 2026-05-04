@@ -515,6 +515,7 @@ function get_coupler_args(config_dict::Dict)
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
     simple_ocean = config_dict["simple_ocean"]
     sst_adjustment = FT(config_dict["sst_adjustment"])
+    progress_interval = config_dict["ocean_progress_interval"]
 
     # Ice model-specific information
     ice_model = Val(Symbol(config_dict["ice_model"]))
@@ -593,6 +594,7 @@ function get_coupler_args(config_dict::Dict)
         ocean_model,
         simple_ocean,
         sst_adjustment,
+        progress_interval,
         ice_model,
         land_fraction_source,
         binary_area_fraction,

@@ -287,7 +287,7 @@ function OceananigansSimulation(
     # Create a dummy area fraction that will get overwritten in `update_surface_fractions!`
     area_fraction = ones(boundary_space)
 
-    return OceananigansSimulation(
+    sim = OceananigansSimulation(
         ocean,
         area_fraction,
         ocean_properties,
@@ -295,6 +295,10 @@ function OceananigansSimulation(
         ice_concentration,
         model_Δt,
     )
+
+    add_ocean_diagnostics!(sim; output_dir)
+
+    return sim
 end
 
 """

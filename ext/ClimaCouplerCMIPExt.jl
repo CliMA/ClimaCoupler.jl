@@ -34,4 +34,7 @@ include("ClimaCouplerCMIPExt/skin_temperature.jl")
 include("ClimaCouplerCMIPExt/oceananigans.jl")
 include("ClimaCouplerCMIPExt/clima_seaice.jl")
 
+include("ClimaCouplerCMIPExt/ocean_diagnostics.jl")
+include("ClimaCouplerCMIPExt/seaice_diagnostics.jl")
+
 end # module ClimaCouplerCMIPExt

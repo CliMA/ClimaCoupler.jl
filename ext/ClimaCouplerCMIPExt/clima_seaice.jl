@@ -177,6 +177,8 @@ function ClimaSeaIceSimulation(
         model_Δt,
     )
 
+    add_seaice_diagnostics!(sim; output_dir)
+
     # Ensure ocean temperature is above freezing where there is sea ice
     CO.OceanSeaIceModels.above_freezing_ocean_temperature!(ocean.ocean, grid, ice)
     return sim

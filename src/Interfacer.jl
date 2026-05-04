@@ -771,27 +771,26 @@ end
     get_atmos_height_delta(height_int, height_sfc)
 
 Return a Field of the height delta between the atmosphere bottom cell center
-and bottom face, defined on the boundary space.
+and the surface, defined on the boundary space.
 This is used to compute turbulent fluxes.
 
-Since the atmospheric height is defined on centers, we need to copy the values onto
-the boundary space to be able to subtract the surface elevation.
-This pattern is not reliable and should not be reused.
+Both `height_int` and `height_sfc` must already be defined on the same space
+(the boundary space). Use `get_field!` to remap the atmosphere height onto
+the boundary space before calling this function.
 
 Note this function allocates a new field, and the atmosphere heights won't change
 during a simulation, so it should only be called at initialization.
 
 # Arguments
-- `csf`: [NamedTuple] containing coupler fields.
+- `height_int`: [CC.Fields.Field] defined on the boundary space, containing the
+  atmosphere bottom cell center height.
+- `height_sfc`: [CC.Fields.Field] defined on the boundary space.
 
 # Returns
 - [CC.Fields.Field] defined on the boundary space containing the height delta.
 """
 function get_atmos_height_delta(height_int, height_sfc)
-    return CC.Fields.Field(
-        CC.Fields.field_values(height_int),
-        axes(height_sfc), # boundary space
-    ) .- height_sfc
+    return height_int .- height_sfc
 end
 
 end # module

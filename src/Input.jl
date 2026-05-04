@@ -122,13 +122,21 @@ function argparse_settings()
         default = "90days"
         # Space information
         "--h_elem"
-        help = "Number of horizontal elements to use for the boundary space [16 (default)]"
+        help = "Number of horizontal elements to use for the atmosphere horizontal space [16 (default)]"
         arg_type = Int
         default = 16
+        "--h_elem_coupler"
+        help = "Number of horizontal elements to use for the boundary space when `share_surface_space` is false [16 (default)]"
+        arg_type = Int
+        default = 32
         "--nh_poly"
-        help = "Polynomial order to use for the boundary space [3 (default)]"
+        help = "Polynomial order to use for the atmosphere horizontal space [3 (default)]"
         arg_type = Int
         default = 3
+        "--nh_poly_coupler"
+        help = "Polynomial order to use for the boundary space when `share_surface_space` is false [3 (default)]"
+        arg_type = Int
+        default = 2
         "--share_surface_space"
         help = "Boolean flag indicating whether to share the surface space between the surface models, atmosphere, and boundary [`true` (default), `false`]"
         arg_type = Bool
@@ -458,8 +466,8 @@ function get_coupler_args(config_dict::Dict)
 
     # Space information
     share_surface_space = config_dict["share_surface_space"]
-    nh_poly = config_dict["nh_poly"]
-    h_elem = config_dict["h_elem"]
+    nh_poly_coupler = config_dict["nh_poly_coupler"]
+    h_elem_coupler = config_dict["h_elem_coupler"]
 
     # Checkpointing information
     checkpoint_dt = config_dict["checkpoint_dt"]
@@ -562,8 +570,8 @@ function get_coupler_args(config_dict::Dict)
         Δt_cpl,
         component_dt_dict,
         share_surface_space,
-        nh_poly,
-        h_elem,
+        nh_poly_coupler,
+        h_elem_coupler,
         saveat,
         checkpoint_dt,
         detect_restart_files,

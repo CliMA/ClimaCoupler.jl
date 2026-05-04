@@ -123,21 +123,6 @@ function ClimaSeaIceSimulation(
     # Since ocean and sea ice share the same grid, we can also share the remapping objects
     remapping = ocean.remapping
 
-    # Before version 0.96.22, the NetCDFWriter was broken on GPU
-    if arch isa OC.CPU
-        # Save all tracers and velocities to a NetCDF file at daily frequency
-        outputs = OC.prognostic_fields(ice.model)
-        jld_writer = OC.JLD2Writer(
-            ice.model,
-            outputs;
-            schedule = OC.TimeInterval(86400), # Daily output
-            filename = joinpath(output_dir, "seaice_diagnostics.jld2"),
-            overwrite_existing = true,
-            array_type = Array{FT},
-        )
-        ice.output_writers[:diagnostics] = jld_writer
-    end
-
     # Allocate space for the sea ice-ocean (io) fluxes
     io_bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     io_frazil_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)

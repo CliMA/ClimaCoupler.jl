@@ -202,12 +202,12 @@ function OceananigansSimulation(
         ηmax = maximum(ocean.free_surface.displacement)
         ηmin = minimum(ocean.free_surface.displacement)
         step_time = 1e-9 * (time_ns() - wall_time[])
-        @info "time: $(prettytime(sim)), iteration: $(iteration(sim)), Δt: $(prettytime(sim.Δt)), " *
+        @info "time: $(OC.Utils.prettytime(sim)), iteration: $(iteration(sim)), Δt: $(OC.Utils.prettytime(sim.Δt)), " *
               "extrema(η): ($(round(ηmin, sigdigits=2)), $(round(ηmax, sigdigits=2))) " *
               "extrema(T, S): ($(round(Tmin, digits=2)), $(round(Tmax, digits=2))) ᵒC, " *
               "($(round(Smin, digits=2)), $(round(Smax, digits=2))) psu " *
               "maximum(u): ($(round(umax, sigdigits=2)), $(round(vmax, sigdigits=2)), $(round(wmax, sigdigits=2))) m/s, " *
-              "wall time: $(prettytime(step_time))"
+              "wall time: $(OC.Utils.prettytime(step_time))"
         
         wall_time[] = time_ns()
 

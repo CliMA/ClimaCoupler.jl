@@ -250,6 +250,10 @@ function argparse_settings()
         help = "Adjustment to add to prescribed SST after conversion to Kelvin (default: 0.0)"
         arg_type = Float64
         default = 0.0
+        "--ocean_progress_interval"
+        help = "Iteration interval for printing progress information [`nothing`, `<:Integer`] (default: nothing)"
+        arg_type = Integer
+        default = nothing
         # Ice model specific
         "--ice_model"
         help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`, `nothing`]"

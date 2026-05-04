@@ -58,6 +58,7 @@ dispatch in coupling.
 - `dt`: Time step (default: `nothing`)
 - `comms_ctx`: Communication context (default: `ClimaComms.context()`)
 - `coupled_param_dict`: Coupled parameter dictionary (default: created from `area_fraction`)
+- `progress_interval`: iteration interval for printing progress information (default: `nothing`)
 
 Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
@@ -72,6 +73,7 @@ function OceananigansSimulation(
     dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
+    progress_interval = nothing,
     extra_kwargs...,
 ) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
@@ -194,15 +196,13 @@ function OceananigansSimulation(
         ocean = sim.model
 
         (Tmax, Tmin) = extrema(ocean.tracers.T)
-        Smax = maximum(ocean.tracers.S)
-        Smin = minimum(ocean.tracers.S)
-        umax = maximum(ocean.velocities.u)
-        vmax = maximum(ocean.velocities.v)
-        wmax = maximum(ocean.velocities.w)
-        ηmax = maximum(ocean.free_surface.displacement)
-        ηmin = minimum(ocean.free_surface.displacement)
+        (Smax, Smin) = extrema(ocean.tracers.S)
+        (ηmax, ηmin) = extrema(ocean.free_surface.displacement)
+        umax = maximum(abs, ocean.velocities.u)
+        vmax = maximum(abs, ocean.velocities.v)
+        wmax = maximum(abs, ocean.velocities.w)
         step_time = 1e-9 * (time_ns() - wall_time[])
-        @info "time: $(OC.Utils.prettytime(sim)), iteration: $(iteration(sim)), Δt: $(OC.Utils.prettytime(sim.Δt)), " *
+        @info "time: $(OC.Utils.prettytime(sim)), iteration: $(OC.iteration(sim)), Δt: $(OC.Utils.prettytime(sim.Δt)), " *
               "extrema(η): ($(round(ηmin, sigdigits=2)), $(round(ηmax, sigdigits=2))) " *
               "extrema(T, S): ($(round(Tmin, digits=2)), $(round(Tmax, digits=2))) ᵒC, " *
               "($(round(Smin, digits=2)), $(round(Smax, digits=2))) psu " *
@@ -215,7 +215,9 @@ function OceananigansSimulation(
     end
 
     # Attaching a progress function to the ocean
-    OC.add_callback!(ocean, progress, IterationInterval(1))
+    if !isnothing(progress_interval)
+        OC.add_callback!(ocean, progress, OC.IterationInterval(progress_interval))
+    end
 
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])

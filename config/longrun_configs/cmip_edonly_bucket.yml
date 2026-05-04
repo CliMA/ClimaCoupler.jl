@@ -7,6 +7,7 @@ dt_cloud_fraction: "1hours"
 dt_cpl: "1800secs" # 30 minutes
 dt_land: "120secs" # 2 minutes
 dt_ocean: "1800secs" # 30 minutes
+ocean_progress_interval: 1 
 dt_rad: "1hours"
 dt_seaice: "1800secs" # 30 minutes
 energy_check: false

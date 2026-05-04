@@ -1,14 +1,14 @@
-using Oceananigans.Units: days, prettytime
+import Dates
 import ClimaOcean.Diagnostics: MixedLayerDepthField
 
 """
     add_ocean_diagnostics!(ocean_sim::OceananigansSimulation;
                            output_dir = ".",
-                           surface_averaging_interval = 1days,
-                           field_averaging_interval = 15days,
-                           checkpoint_interval = 90days,
+                           surface_averaging_interval = Dates.Day(1),
+                           field_averaging_interval = Dates.Day(15),
+                           checkpoint_interval = Dates.Day(90),
                            filename_prefix = "ocean",
-                           file_splitting_interval = 15days)
+                           file_splitting_interval = Dates.Day(15))
 
 Attach averaged-output writers to the underlying Oceananigans simulation inside an `OceananigansSimulation`. 
 Three writers are added to `ocean_sim.ocean.output_writers`:
@@ -28,11 +28,11 @@ Three writers are added to `ocean_sim.ocean.output_writers`:
 function add_ocean_diagnostics!(
     ocean_sim::OceananigansSimulation;
     output_dir = ".",
-    surface_averaging_interval = 1days,
-    field_averaging_interval = 15days,
-    checkpoint_interval = 90days,
+    surface_averaging_interval = Dates.Day(1),
+    field_averaging_interval = Dates.Day(15),
+    checkpoint_interval = Dates.Day(90),
     filename_prefix = "ocean",
-    file_splitting_interval = 15days,
+    file_splitting_interval = Dates.Day(15),
 )
     ocean = ocean_sim.ocean
     grid = ocean.model.grid
@@ -114,9 +114,9 @@ function add_ocean_diagnostics!(
     )
 
     @info "Ocean diagnostics attached:" *
-          " surface ($(length(surface_outputs)) fields, every $(prettytime(surface_averaging_interval)))," *
-          " 3-D ($(length(field_outputs)) fields, every $(prettytime(field_averaging_interval)))," *
-          " checkpointer (every $(prettytime(checkpoint_interval)))"
+          " surface ($(length(surface_outputs)) fields, every $surface_averaging_interval)," *
+          " 3-D ($(length(field_outputs)) fields, every $field_averaging_interval)," *
+          " checkpointer (every $checkpoint_interval)"
 
     return nothing
 end

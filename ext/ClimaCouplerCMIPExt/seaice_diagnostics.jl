@@ -1,10 +1,10 @@
 """
     add_seaice_diagnostics!(ice_sim::ClimaSeaIceSimulation;
                             output_dir = ".",
-                            surface_averaging_interval = 1days,
-                            checkpoint_interval = 90days,
+                            surface_averaging_interval = Dates.Day(1),
+                            checkpoint_interval = Dates.Day(90),
                             filename_prefix = "seaice",
-                            file_splitting_interval = 15days)
+                            file_splitting_interval = Dates.Day(15))
 
 Attach averaged-output writers to the underlying ClimaSeaIce simulation inside a `ClimaSeaIceSimulation`. 
 Two writers are added to `ice_sim.ice.output_writers`:
@@ -16,10 +16,10 @@ Two writers are added to `ice_sim.ice.output_writers`:
 function add_seaice_diagnostics!(
     ice_sim::ClimaSeaIceSimulation;
     output_dir = ".",
-    surface_averaging_interval = 1days,
-    checkpoint_interval = 90days,
+    surface_averaging_interval = Dates.Day(1),
+    checkpoint_interval = Dates.Day(90),
     filename_prefix = "seaice",
-    file_splitting_interval = 15days,
+    file_splitting_interval = Dates.Day(15),
 )
     ice = ice_sim.ice
     file_splitting = OC.TimeInterval(file_splitting_interval)
@@ -63,8 +63,8 @@ function add_seaice_diagnostics!(
     )
 
     @info "Sea-ice diagnostics attached:" *
-          " surface ($(length(surface_outputs)) fields, every $(prettytime(surface_averaging_interval)))," *
-          " checkpointer (every $(prettytime(checkpoint_interval)))"
+          " surface ($(length(surface_outputs)) fields, every $surface_averaging_interval)," *
+          " checkpointer (every $checkpoint_interval)"
 
     return nothing
 end

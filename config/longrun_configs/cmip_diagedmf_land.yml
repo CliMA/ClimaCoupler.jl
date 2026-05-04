@@ -5,11 +5,11 @@ checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_diagedmf.toml"]
 dt_atmos: "120secs" # 2 minutes
 dt_cloud_fraction: "1hours"
-dt_cpl: "1800secs" # 30 minutes
+dt_cpl: "120secs" # 2 minutes
 dt_land: "120secs" # 2 minutes
-dt_ocean: "1800secs" # 30 minutes
+dt_ocean: "120secs" # 2 minutes
 dt_rad: "1hours"
-dt_seaice: "1800secs" # 30 minutes
+dt_seaice: "120secs" # 2 minutes
 energy_check: false
 h_elem: 16
 ice_model: "clima_seaice"

@@ -395,6 +395,47 @@ function will be called and an error will be raised.
 step!(sim::AbstractComponentSimulation, t) = error("undefined step! for $(nameof(sim))")
 
 """
+    step!(sim::AbstractComponentSimulation, t::Float64)
+
+Default step method for simulations using `Float64` as the time type.
+This method is suitable for simulations that use a SciMLBase-style integrator,
+but should be extended for other models.
+
+This method computes the number of steps to take based on the difference
+between the simulation time (stored in the integrator) and the coupler time
+`t`, divided by the simulation timestep. This generically handles the cases where
+the simulation's timestep is shorter than, longer than, or equal to that of the coupler.
+"""
+function step!(sim::AbstractComponentSimulation, t::Float64)
+    model_dt = Float64(sim.integrator.dt)
+    # `round(Int, ...)` tolerates floating point drift less than `model_dt / 2`
+    n_steps = round(Int, (t - Float64(sim.integrator.t)) / model_dt)
+    for _ in 1:n_steps
+        step!(sim.integrator)
+    end
+end
+
+"""
+    step!(sim::AbstractComponentSimulation, t::ITime)
+
+Default step method for simulations using `ITime` as the time type.
+This method is suitable for simulations that use a SciMLBase-style integrator,
+but should be extended for other models.
+
+This method computes the number of steps to take based on the difference
+between the simulation time (stored in the integrator) and the coupler time
+`t`, divided by the simulation timestep. This generically handles the cases where
+the simulation's timestep is shorter than, longer than, or equal to that of the coupler.
+"""
+function step!(sim::AbstractComponentSimulation, t::ITime)
+    n_steps = div(t - sim.integrator.t, sim.integrator.dt) # integer division; exact for ITime
+    for _ in 1:n_steps
+        step!(sim.integrator)
+    end
+    return nothing
+end
+
+"""
     close_output_writers(sim::AbstractComponentSimulation)
 
 A function to close all output writers associated with the given

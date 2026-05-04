@@ -100,4 +100,5 @@ update_field!(::AbstractSurfaceStub, ::Val{:turbulent_moisture_flux}, field) = n
 
 The stub surface simulation is not updated by this function. Extends `SciMLBase.step!`.
 """
-step!(::AbstractSurfaceStub, _) = nothing
+step!(::AbstractSurfaceStub, ::Float64) = nothing
+step!(::AbstractSurfaceStub, ::ITime) = nothing

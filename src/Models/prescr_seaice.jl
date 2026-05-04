@@ -1,6 +1,7 @@
 import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
+import ClimaUtilities.TimeManager: ITime
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
@@ -391,9 +392,6 @@ Interfacer.update_field!(
     field,
 ) = nothing
 
-# extensions required by FieldExchanger
-Interfacer.step!(sim::PrescribedIceSimulation, t) =
-    Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 
 function FluxCalculator.update_turbulent_fluxes!(
     sim::PrescribedIceSimulation,

@@ -36,6 +36,39 @@ config_file = Input.parse_commandline(Input.argparse_settings())["config_file"]
 
 # Set up and run the coupled simulation
 cs = CoupledSimulation(config_file)
+
+
+# TODO: Remove this before merging
+
+import Oceananigans as OC
+
+wall_time = Ref(time_ns())
+
+function progress(sim)
+    ocean = sim.model
+
+    (Tmax, Tmin) = extrema(ocean.tracers.T)
+    (Smax, Smin) = extrema(ocean.tracers.S)
+    (ηmax, ηmin) = extrema(ocean.free_surface.displacement)
+    umax = maximum(ocean.velocities.u)
+    vmax = maximum(ocean.velocities.v)
+    wmax = maximum(ocean.velocities.w)
+    step_time = 1e-9 * (time_ns() - wall_time[])
+    @info "time: $(OC.prettytime(sim)), iteration: $(OC.iteration(sim)), Δt: $(OC.prettytime(sim.Δt)), " *
+          "extrema(η): ($(round(ηmin, sigdigits=2)), $(round(ηmax, sigdigits=2))) " *
+          "extrema(T, S): ($(round(Tmin, digits=2)), $(round(Tmax, digits=2))) ᵒC, " *
+          "($(round(Smin, digits=2)), $(round(Smax, digits=2))) psu " *
+          "maximum(u): ($(round(umax, sigdigits=2)), $(round(vmax, sigdigits=2)), $(round(wmax, sigdigits=2))) m/s, " *
+          "wall time: $(OC.prettytime(step_time))"
+
+    wall_time[] = time_ns()
+
+    return nothing
+end
+
+# Attaching a progress function to the ocean
+OC.add_callback!(cs.model_sims.ocean_sim.ocean, progress, OC.IterationInterval(1))
+
 run!(cs)
 
 # Postprocessing

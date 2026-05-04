@@ -331,8 +331,8 @@ function create_boundary_space(
     share_surface_space,
     comms_ctx;
     column_latlon = nothing,
-    nh_poly = nothing,
-    h_elem = nothing,
+    nh_poly_coupler = nothing,
+    h_elem_coupler = nothing,
     coupled_param_dict = nothing,
 ) where {FT}
     if domain_type == "column"
@@ -340,9 +340,14 @@ function create_boundary_space(
     elseif share_surface_space
         return CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
     else
-        n_quad_points = nh_poly + 1
+        n_quad_points = nh_poly_coupler + 1
         radius = coupled_param_dict["planet_radius"]
-        return CC.CommonSpaces.CubedSphereSpace(FT; radius, n_quad_points, h_elem)
+        return CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius,
+            n_quad_points,
+            h_elem = h_elem_coupler,
+        )
     end
 end
 

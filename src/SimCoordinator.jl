@@ -215,8 +215,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         Δt_cpl,
         component_dt_dict,
         share_surface_space,
-        nh_poly,
-        h_elem,
+        nh_poly_coupler,
+        h_elem_coupler,
         saveat,
         checkpoint_dt,
         detect_restart_files,
@@ -291,16 +291,16 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         share_surface_space,
         comms_ctx;
         column_latlon,
-        nh_poly,
-        h_elem,
+        nh_poly_coupler,
+        h_elem_coupler,
         coupled_param_dict,
     )
 
     surface_elevation = Interfacer.get_field(boundary_space, atmos_sim, Val(:height_sfc))
-    atmos_h = Interfacer.get_atmos_height_delta(
-        Interfacer.get_field(atmos_sim, Val(:height_int)),
-        surface_elevation,
-    )
+    atmos_bottom_center_height =
+        Interfacer.get_field(boundary_space, atmos_sim, Val(:height_int))
+    atmos_h =
+        Interfacer.get_atmos_height_delta(atmos_bottom_center_height, surface_elevation)
 
     land_fraction = Input.get_land_fraction(
         boundary_space,

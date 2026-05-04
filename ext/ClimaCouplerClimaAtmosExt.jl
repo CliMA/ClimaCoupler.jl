@@ -108,6 +108,8 @@ function ClimaAtmosSimulation(atmos_config)
         @. ᶠradiation_flux = CC.Geometry.WVector(FT(0))
     end
 
+    _OCEAN_ISOLATION_MASK[] = nothing
+
     sim = ClimaAtmosSimulation(integrator.p.params, spaces, integrator, output_writers)
 
     # DSS state to ensure we have continuous fields
@@ -353,61 +355,113 @@ function Interfacer.update_field!(
 )
     Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.T_sfc, field)
 end
-# Cached flat indices of isolated inland cells on the atmos surface grid.
-# Detected once on the first ocean_fraction update; applied on every subsequent one.
-# `nothing` = not yet detected; empty BitVector = flat space (no lat/lon, nothing to mask).
-const _OCEAN_ISOLATED_CELLS = Ref{Union{Nothing, BitVector}}(nothing)
+# Mask field (same axes as ocean_fraction) with 1 on valid ocean cells and 0 on isolated ones.
+# Built once on the first ocean_fraction update via a BFS flood-fill from true-ocean seeds,
+# then uploaded to the device. Every subsequent timestep applies it with a pure on-device broadcast.
+# `nothing` = not yet built.
+const _OCEAN_ISOLATION_MASK = Ref{Any}(nothing)
 
-function _init_ocean_isolated_cells!(ocean_fraction, threshold, search_radius_deg)
+# BFS flood-fill to identify all ocean-connected cells globally.
+#
+# Three-level threshold design:
+#   seed_thr (0.8) + seed_lat_band (±40°): starting seeds — unambiguously open ocean in the
+#       tropics/subtropics. High threshold + lat restriction keeps the Great Lakes and other
+#       northern freshwater bodies out of the initial set even if they have some ocean_fraction.
+#   strong_thr (0.8): a kept cell can only propagate the frontier if its ocean_fraction >= this.
+#       Coastal/partial cells (e.g. 0.3) are included when reached but do not themselves link
+#       to further neighbours, preventing a chain of marginal cells from leaking into inland areas.
+#   min_thr (0.25): minimum ocean_fraction a cell must have to be included at all.
+#
+# The Mediterranean, Red Sea, Persian Gulf, etc. are reached naturally: the BFS seeds the
+# Atlantic, strong cells carry the frontier through the Strait of Gibraltar and similar narrow
+# passages, and the enclosed basin is flooded from there.
+function _init_ocean_isolation_mask!(
+    ocean_fraction, seed_thr, strong_thr, min_thr, seed_lat_band, search_radius_deg
+)
+    FT     = eltype(ocean_fraction)
     coords = CC.Fields.coordinate_field(axes(ocean_fraction))
-    ET = eltype(coords)
+    ET     = eltype(coords)
+
+    # No lat/lon available (e.g. flat test space) — skip masking entirely.
     if !hasfield(ET, :lat) || !hasfield(ET, :long)
-        _OCEAN_ISOLATED_CELLS[] = BitVector()
+        _OCEAN_ISOLATION_MASK[] = ones(axes(ocean_fraction))
         return
     end
 
-    lats = vec(Array(parent(coords.lat)))
-    lons = vec(Array(parent(coords.long)))
-    vals = vec(Array(parent(ocean_fraction)))
-    n    = length(vals)
+    comms_ctx  = ClimaComms.context(axes(ocean_fraction))
+    local_lats = vec(Array(parent(coords.lat)))
+    local_lons = vec(Array(parent(coords.long)))
+    local_vals = vec(Array(parent(ocean_fraction)))
+    n_local    = length(local_vals)
 
-    isolated    = falses(n)
+    # Gather global coordinate + value arrays to all ranks so each rank can search
+    # across partition boundaries.
+    if comms_ctx isa ClimaComms.SingletonCommsContext
+        lats        = local_lats
+        lons        = local_lons
+        vals        = local_vals
+        local_start = 1
+        local_end   = n_local
+    else
+        lats = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, local_lats))
+        lons = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, local_lons))
+        vals = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, local_vals))
+        all_counts  = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, [n_local]))
+        my_end      = sum(all_counts[1:ClimaComms.mypid(comms_ctx)])
+        local_start = my_end - n_local + 1
+        local_end   = my_end
+    end
+
+    n           = length(vals)
+    keep        = falses(n)
     perm        = sortperm(lats)
     sorted_lats = lats[perm]
     r           = Float64(search_radius_deg)
-    thr         = Float64(threshold)
 
+    # Seed: strong ocean cells within the tropical/subtropical band.
+    queue = Int[]
     for i in 1:n
-        Float64(vals[i]) < thr && continue
+        if Float64(vals[i]) > Float64(seed_thr) && abs(Float64(lats[i])) <= Float64(seed_lat_band)
+            keep[i] = true
+            push!(queue, i)
+        end
+    end
+
+    # Flood outward. Only strong cells (>= strong_thr) carry the frontier forward; weak cells
+    # (min_thr < val < strong_thr) are included when reached but do not expand further.
+    while !isempty(queue)
+        i     = pop!(queue)
         lat_i = Float64(lats[i])
         lon_i = Float64(lons[i])
-        lo = searchsortedfirst(sorted_lats, lat_i - r)
-        hi = searchsortedlast(sorted_lats,  lat_i + r)
-        has_ocean_neighbor = false
+        lo    = searchsortedfirst(sorted_lats, lat_i - r)
+        hi    = searchsortedlast(sorted_lats,  lat_i + r)
         for k in lo:hi
             j = perm[k]
-            j == i && continue
-            Float64(vals[j]) < thr && continue
+            keep[j] && continue
+            Float64(vals[j]) <= Float64(min_thr) && continue
             dlon = abs(Float64(lons[j]) - lon_i)
             dlon > 180.0 && (dlon = 360.0 - dlon)
             dlat = Float64(sorted_lats[k]) - lat_i
             if dlat^2 + (dlon * cosd(lat_i))^2 ≤ r^2
-                has_ocean_neighbor = true
-                break
+                keep[j] = true
+                if Float64(vals[j]) >= Float64(strong_thr)
+                    push!(queue, j)
+                end
             end
         end
-        isolated[i] = !has_ocean_neighbor
     end
-    _OCEAN_ISOLATED_CELLS[] = isolated
+
+    # Upload the local slice of the mask to the device as a ClimaCore Field.
+    local_keep = FT.(keep[local_start:local_end])
+    mask       = ones(axes(ocean_fraction))
+    copyto!(parent(mask), reshape(local_keep, size(parent(mask))))
+    _OCEAN_ISOLATION_MASK[] = mask
 end
 
-function _apply_ocean_isolated_mask!(ocean_fraction)
-    isolated = _OCEAN_ISOLATED_CELLS[]
-    isempty(isolated) && return
-    FT   = eltype(ocean_fraction)
-    vals = vec(Array(parent(ocean_fraction)))
-    vals[isolated] .= FT(0)
-    copyto!(parent(ocean_fraction), reshape(vals, size(parent(ocean_fraction))))
+function _apply_ocean_isolation_mask!(ocean_fraction)
+    mask = _OCEAN_ISOLATION_MASK[]
+    isnothing(mask) && return
+    ocean_fraction .= ocean_fraction .* mask
 end
 
 function Interfacer.update_field!(
@@ -417,10 +471,10 @@ function Interfacer.update_field!(
 )
     atmos_ocean_fraction = sim.integrator.p.ocean_fraction
     Interfacer.remap!(atmos_ocean_fraction, field)
-    if isnothing(_OCEAN_ISOLATED_CELLS[])
-        _init_ocean_isolated_cells!(atmos_ocean_fraction, 0.25, 1.5)
+    if isnothing(_OCEAN_ISOLATION_MASK[])
+        _init_ocean_isolation_mask!(atmos_ocean_fraction, 0.8, 0.8, 0.25, 40.0, 1.5)
     end
-    _apply_ocean_isolated_mask!(atmos_ocean_fraction)
+    _apply_ocean_isolation_mask!(atmos_ocean_fraction)
 end
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_humidity}, csf)
     # NOTE: This update_field! takes as argument the entire coupler fields struct, instead

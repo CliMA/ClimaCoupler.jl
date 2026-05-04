@@ -353,12 +353,74 @@ function Interfacer.update_field!(
 )
     Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.T_sfc, field)
 end
+# Cached flat indices of isolated inland cells on the atmos surface grid.
+# Detected once on the first ocean_fraction update; applied on every subsequent one.
+# `nothing` = not yet detected; empty BitVector = flat space (no lat/lon, nothing to mask).
+const _OCEAN_ISOLATED_CELLS = Ref{Union{Nothing, BitVector}}(nothing)
+
+function _init_ocean_isolated_cells!(ocean_fraction, threshold, search_radius_deg)
+    coords = CC.Fields.coordinate_field(axes(ocean_fraction))
+    ET = eltype(coords)
+    if !hasfield(ET, :lat) || !hasfield(ET, :long)
+        _OCEAN_ISOLATED_CELLS[] = BitVector()
+        return
+    end
+
+    lats = vec(Array(parent(coords.lat)))
+    lons = vec(Array(parent(coords.long)))
+    vals = vec(Array(parent(ocean_fraction)))
+    n    = length(vals)
+
+    isolated    = falses(n)
+    perm        = sortperm(lats)
+    sorted_lats = lats[perm]
+    r           = Float64(search_radius_deg)
+    thr         = Float64(threshold)
+
+    for i in 1:n
+        Float64(vals[i]) < thr && continue
+        lat_i = Float64(lats[i])
+        lon_i = Float64(lons[i])
+        lo = searchsortedfirst(sorted_lats, lat_i - r)
+        hi = searchsortedlast(sorted_lats,  lat_i + r)
+        has_ocean_neighbor = false
+        for k in lo:hi
+            j = perm[k]
+            j == i && continue
+            Float64(vals[j]) < thr && continue
+            dlon = abs(Float64(lons[j]) - lon_i)
+            dlon > 180.0 && (dlon = 360.0 - dlon)
+            dlat = Float64(sorted_lats[k]) - lat_i
+            if dlat^2 + (dlon * cosd(lat_i))^2 ≤ r^2
+                has_ocean_neighbor = true
+                break
+            end
+        end
+        isolated[i] = !has_ocean_neighbor
+    end
+    _OCEAN_ISOLATED_CELLS[] = isolated
+end
+
+function _apply_ocean_isolated_mask!(ocean_fraction)
+    isolated = _OCEAN_ISOLATED_CELLS[]
+    isempty(isolated) && return
+    FT   = eltype(ocean_fraction)
+    vals = vec(Array(parent(ocean_fraction)))
+    vals[isolated] .= FT(0)
+    copyto!(parent(ocean_fraction), reshape(vals, size(parent(ocean_fraction))))
+end
+
 function Interfacer.update_field!(
     sim::ClimaAtmosSimulation,
     ::Val{:ocean_fraction},
     field,
 )
-    Interfacer.remap!(sim.integrator.p.ocean_fraction, field)
+    atmos_ocean_fraction = sim.integrator.p.ocean_fraction
+    Interfacer.remap!(atmos_ocean_fraction, field)
+    if isnothing(_OCEAN_ISOLATED_CELLS[])
+        _init_ocean_isolated_cells!(atmos_ocean_fraction, 0.25, 1.5)
+    end
+    _apply_ocean_isolated_mask!(atmos_ocean_fraction)
 end
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_humidity}, csf)
     # NOTE: This update_field! takes as argument the entire coupler fields struct, instead

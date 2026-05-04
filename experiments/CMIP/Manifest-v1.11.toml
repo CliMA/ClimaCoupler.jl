@@ -2,7 +2,7 @@
 
 julia_version = "1.11.9"
 manifest_format = "2.0"
-project_hash = "4e2361f0e6b48498d7b6d87159c20193b198caaf"
+project_hash = "f4398b972dc7af64a0e702a7ebb970d2a38c04dd"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -556,19 +556,16 @@ version = "1.8.0"
 
 [[deps.ClimaOcean]]
 deps = ["Adapt", "CFTime", "CUDA", "ClimaSeaIce", "CopernicusClimateDataStore", "CubicSplines", "DataDeps", "Dates", "DocStringExtensions", "Downloads", "Glob", "ImageMorphology", "JLD2", "KernelAbstractions", "MPI", "MeshArrays", "NCDatasets", "Oceananigans", "OffsetArrays", "PrecompileTools", "Printf", "Scratch", "SeawaterPolynomials", "StaticArrays", "Statistics", "Thermodynamics", "ZipFile"]
-git-tree-sha1 = "c091fd828f6d0e7626f2889d3d73bcfaa1b47de7"
+git-tree-sha1 = "844bb9768f0382b0559398a65fbbdb981a58a28d"
 uuid = "0376089a-ecfe-4b0e-a64f-9c555d74d754"
-version = "0.9.5"
+version = "0.9.6"
 
     [deps.ClimaOcean.extensions]
     ClimaOceanCopernicusClimateDataStoreExt = "CopernicusClimateDataStore"
     ClimaOceanCopernicusMarineExt = "CopernicusMarine"
-    ClimaOceanReactantExt = "Reactant"
-    ClimaOceanSpeedyWeatherExt = ["SpeedyWeather", "XESMF"]
 
     [deps.ClimaOcean.weakdeps]
     CopernicusMarine = "cd43e856-93a3-40c8-bc9e-6146cdce14fa"
-    Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
     SpeedyWeather = "9e226e20-d153-4fed-8a5b-493def4f21a9"
     XESMF = "2e0b0046-e7a1-486f-88de-807ee8ffabe5"
 
@@ -580,9 +577,9 @@ version = "1.0.17"
 
 [[deps.ClimaSeaIce]]
 deps = ["Adapt", "JLD2", "KernelAbstractions", "Oceananigans", "RootSolvers", "Roots", "SeawaterPolynomials"]
-git-tree-sha1 = "a4cb5ae733db031a1e7de297faf050032e413751"
+git-tree-sha1 = "813f90bc5583311d17767468df8e98209a96aa53"
 uuid = "6ba0ff68-24e6-4315-936c-2e99227c95a4"
-version = "0.4.5"
+version = "0.4.10"
 
 [[deps.ClimaTimeSteppers]]
 deps = ["ClimaComms", "Krylov", "LinearAlgebra", "LinearOperators", "NVTX", "StaticArrays"]
@@ -2029,9 +2026,9 @@ version = "1.0.0"
 
 [[deps.MLDataDevices]]
 deps = ["Adapt", "Functors", "Preferences", "Random", "SciMLPublic"]
-git-tree-sha1 = "2dfe3b4b96c6ecbea7c798dfbe96d493fd7a1848"
+git-tree-sha1 = "29b00f22be6fd821a214760f0224329f21998a05"
 uuid = "7e8f7934-dd98-4c1a-8fe8-92b47a384d40"
-version = "1.17.8"
+version = "1.17.10"
 
     [deps.MLDataDevices.extensions]
     AMDGPUExt = "AMDGPU"
@@ -2401,9 +2398,9 @@ version = "0.5.5"
 
 [[deps.Oceananigans]]
 deps = ["Adapt", "Crayons", "CubedSphere", "Dates", "Distances", "DocStringExtensions", "FFTW", "GPUArraysCore", "Glob", "InteractiveUtils", "JLD2", "KernelAbstractions", "Krylov", "LinearAlgebra", "Logging", "MPI", "MuladdMacro", "OffsetArrays", "OrderedCollections", "Pkg", "Printf", "ReactantCore", "Rotations", "SeawaterPolynomials", "SparseArrays", "StaticArrays", "Statistics", "StructArrays"]
-git-tree-sha1 = "cda79e6d7ed7de61316a314494ea93202345315b"
+git-tree-sha1 = "9e4c315868cc6b0d55a673309c572a34e52ecc2b"
 uuid = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
-version = "0.106.6"
+version = "0.107.4"
 
     [deps.Oceananigans.extensions]
     OceananigansAMDGPUExt = ["AMDGPU", "AbstractFFTs"]

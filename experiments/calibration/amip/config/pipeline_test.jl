@@ -31,7 +31,7 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     minibatch_size = 1,
     n_iterations = 1,
     sample_date_ranges = [
-        (Dates.DateTime(2010, 10, 1), Dates.DateTime(2010, 10, 1)) for _ in 1:6
+        (Dates.DateTime(2010, 1, 1), Dates.DateTime(2011, 1, 1)) for _ in 1:6
     ],
     extend = Dates.Month(1),
     spinup = Dates.Day(0),

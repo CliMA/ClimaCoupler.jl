@@ -50,6 +50,11 @@ function make_scalar_covariance_observation_vector(
         @info "Scalar: $scalar"
         @info "Latitude weighting: $use_latitude_weights"
         @info "Min cosd lat: $min_cosd_lat"
+        windowed_vars =
+            drop_initial_and_time_average.(vars, start_date, end_date)
+        # The windowed vars carry a singleton time slice; the observation
+        # recipe requires `start_date == end_date == that slice's date`.
+        sample_date = first(ClimaAnalysis.dates(first(windowed_vars)))
         covar_estimator = ClimaCalibrate.ObservationRecipe.ScalarCovariance(;
             scalar,
             use_latitude_weights,
@@ -57,9 +62,9 @@ function make_scalar_covariance_observation_vector(
         )
         ClimaCalibrate.ObservationRecipe.observation(
             covar_estimator,
-            vars,
-            start_date,
-            end_date,
+            windowed_vars,
+            sample_date,
+            sample_date,
         )
     end
     return obs_vec

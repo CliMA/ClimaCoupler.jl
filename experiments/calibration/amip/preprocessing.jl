@@ -3,6 +3,7 @@
 
 import ClimaAnalysis
 import ClimaCoupler
+import Dates
 import Statistics
 
 """
@@ -63,6 +64,56 @@ function get_lonlat_regridder(config_file)
     lon_vals = range(-180, 180, nlon)
     lat_vals = range(-90, 90, nlat)
     return var -> ClimaAnalysis.resampled_as(var; longitude = lon_vals, latitude = lat_vals)
+end
+
+"""
+    drop_initial_and_time_average(var, start_date, stop_date; spinup = CALIBRATE_CONFIG.spinup)
+
+Window `var` to `[start_date, stop_date]`, drop the leading `spinup` of time,
+and collapse the remaining time dimension by averaging. The time dimension is
+re-attached as a singleton anchored at the first windowed time so that
+downstream consumers (e.g. `ClimaCalibrate.ObservationRecipe`) can still resolve
+`dates(var)`.
+"""
+function drop_initial_and_time_average(
+    var,
+    start_date,
+    stop_date;
+    spinup = CALIBRATE_CONFIG.spinup,
+)
+    target_date = start_date + spinup
+    var = ClimaAnalysis.window(var, "time"; left = target_date, right = stop_date)
+    avg_var = ClimaAnalysis.average_time(var)
+    return _restore_singleton_time_dim(avg_var, var, target_date)
+end
+
+# `average_time` squeezes the time dimension out. Re-attach it as a singleton
+# anchored at `target_date` so `ClimaAnalysis.dates(var)` resolves the same way
+# for obs and sim regardless of how their underlying time arrays are sampled.
+function _restore_singleton_time_dim(reduced_var, original_var, target_date)
+    time_dim = ClimaAnalysis.Var.time_name(original_var)
+    new_dims = deepcopy(original_var.dims)
+    new_dim_attribs = deepcopy(original_var.dim_attributes)
+
+    start_date_attr = Dates.DateTime(reduced_var.attributes["start_date"])
+    target_seconds =
+        Dates.value(Dates.Millisecond(target_date - start_date_attr)) / 1000
+    T = eltype(original_var.dims[time_dim])
+    new_dims[time_dim] = T[convert(T, target_seconds)]
+
+    time_idx = original_var.dim2index[time_dim]
+    new_shape = ntuple(ndims(reduced_var.data) + 1) do i
+        i == time_idx && return 1
+        i < time_idx ? size(reduced_var.data, i) :
+        size(reduced_var.data, i - 1)
+    end
+    new_data = reshape(reduced_var.data, new_shape)
+    return ClimaAnalysis.remake(
+        reduced_var;
+        dims = new_dims,
+        dim_attributes = new_dim_attribs,
+        data = new_data,
+    )
 end
 
 """

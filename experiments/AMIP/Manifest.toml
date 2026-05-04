@@ -1895,9 +1895,9 @@ version = "1.0.0"
 
 [[deps.MLDataDevices]]
 deps = ["Adapt", "Functors", "Preferences", "Random", "SciMLPublic"]
-git-tree-sha1 = "2dfe3b4b96c6ecbea7c798dfbe96d493fd7a1848"
+git-tree-sha1 = "29b00f22be6fd821a214760f0224329f21998a05"
 uuid = "7e8f7934-dd98-4c1a-8fe8-92b47a384d40"
-version = "1.17.8"
+version = "1.17.10"
 
     [deps.MLDataDevices.extensions]
     AMDGPUExt = "AMDGPU"

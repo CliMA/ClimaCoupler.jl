@@ -41,6 +41,14 @@ use_coupler_diagnostics: false
 use_land_diagnostics: false
 insolation: "timevarying"
 extra_atmos_diagnostics:
-  - short_name: [mmrss, loadss, mmrsslt01, mmrsslt02, mmrsslt03, mmrsslt04, mmrsslt05, emiss, emisslt01, emisslt02, emisslt03, emisslt04, emisslt05, mmrdust, mmrso4, mmrbcpo, mmrbcpi, mmrocpo, mmrocpi]
+  - short_name: [
+      o3,
+      mmrdust, mmrdst01, mmrdst02, mmrdst03, mmrdst04, mmrdst05,
+      mmrss, mmrsslt01, mmrsslt02, mmrsslt03, mmrsslt04, mmrsslt05,
+      mmrso4, mmrbcpo, mmrbcpi, mmrocpo, mmrocpi,
+      loadss,
+      emiss, emisslt01, emisslt02, emisslt03, emisslt04, emisslt05,
+      sslt_u10, ustar, u_mo_lowest, u_actual_lowest, obukhovlen, oceanfrac,
+    ]
     period: 6hours
     reduction_time: average

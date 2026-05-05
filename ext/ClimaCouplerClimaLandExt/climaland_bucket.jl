@@ -192,7 +192,7 @@ function BucketSimulation(
         diagnostics = nothing
     end
 
-    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+    stop_date = start_date + Dates.Second(float(tspan[2]))
     # Convert start_date and stop_date to ITime if using ITime
     if dt isa ITime
         start_date = tspan[1]

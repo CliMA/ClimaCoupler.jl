@@ -78,7 +78,7 @@ function OceananigansSimulation(
     OC.Oceananigans.defaults.FloatType = FT
 
     # Compute stop_date for oceananigans (needed for EN4 data retrieval)
-    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+    stop_date = start_date + Dates.Second(float(tspan[2]))
 
     # Use Float64 for the ocean to avoid precision issues
     FT_ocean = Float64

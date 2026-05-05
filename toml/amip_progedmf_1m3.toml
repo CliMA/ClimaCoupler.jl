@@ -62,7 +62,7 @@ value = 100
 value = 100
 
 [rain_autoconversion_timescale]
-value = 7200
+value = 3600
 
 [fixed_cloud_liquid_terminal_velocity]
 value = 0.01
@@ -73,6 +73,5 @@ value = 0.05
 [Tq_correlation_coefficient]
 value = -1
 
-[rain_cross_section_size_relation_coefficient_chia]
-value = 2.0
-
+[snow_cross_section_size_relation_coefficient_chia]
+value = 4.0

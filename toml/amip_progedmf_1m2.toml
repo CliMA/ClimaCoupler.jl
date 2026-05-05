@@ -61,9 +61,6 @@ value = 100
 [sublimation_deposition_timescale]
 value = 100
 
-[rain_autoconversion_timescale]
-value = 7200
-
 [fixed_cloud_liquid_terminal_velocity]
 value = 0.01
 
@@ -73,6 +70,23 @@ value = 0.05
 [Tq_correlation_coefficient]
 value = -1
 
-[rain_cross_section_size_relation_coefficient_chia]
-value = 2.0
+[rain_autoconversion_timescale]
+value = 13400.0
 
+[Variable_time_scale_autoconversion_coeff_alpha]
+value = 0.52
+
+[rain_terminal_velocity_size_relation_coefficient_chiv]
+value = 0.205
+
+[rain_terminal_velocity_size_relation_coefficient_delv]
+value = 0.228
+
+[rain_cross_section_size_relation_coefficient_chia]
+value = 16.61
+
+[rain_cross_section_size_relation_coefficient_dela]
+value = 3.0
+
+[rain_ventilation_coefficient_b]
+value = 0.98

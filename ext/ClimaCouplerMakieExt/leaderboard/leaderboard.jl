@@ -52,7 +52,9 @@ function Plotting.compute_leaderboard(
         obs_var = obs_var_dict[short_name](sim_var.attributes["start_date"])
 
         # Remove first spin_up_months from simulation
-        spinup_cutoff_date = first(ClimaAnalysis.dates(sim_var)) + spinup * Dates.Month(1)
+        # spinup_cutoff_date = first(ClimaAnalysis.dates(sim_var)) + spinup * Dates.Month(1)
+        # Hardcoded: keep only October (drop the partial-September record)
+        spinup_cutoff_date = Dates.DateTime(2010, 10, 1)
         ClimaAnalysis.dates(sim_var)[end] >= spinup_cutoff_date &&
             (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff_date))
 
@@ -257,7 +259,9 @@ function Plotting.compute_pfull_leaderboard(
             error("Units of pressure should be hPa for $short_name simulation data")
 
         # Remove first spin_up_months from simulation
-        spinup_cutoff_date = first(ClimaAnalysis.dates(sim_var)) + spinup * Dates.Month(1)
+        # spinup_cutoff_date = first(ClimaAnalysis.dates(sim_var)) + spinup * Dates.Month(1)
+        # Hardcoded: keep only October (drop the partial-September record)
+        spinup_cutoff_date = Dates.DateTime(2010, 10, 1)
         ClimaAnalysis.dates(sim_var)[end] >= spinup_cutoff_date &&
             (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff_date))
 

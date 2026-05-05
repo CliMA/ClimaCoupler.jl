@@ -1,0 +1,54 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
+checkpoint_dt: "1months"
+coupler_toml: ["toml/amip_progedmf_1m3.toml"]
+dt: "180secs"
+dt_cpl: "180secs"
+h_elem: 12
+#z_elem: 39
+#dz_bottom: 100.0
+netcdf_interpolation_num_points: [144, 72, 31]
+energy_check: false
+
+# weather model setup
+initial_condition: "WeatherModel"
+mode_name: "subseasonal"
+era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+land_temperature_anomaly: "nothing"
+land_fraction_source: "era5"
+start_date: "20100924"
+t_end: "39days"
+# sgs_distribution: "lognormal"
+
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: monthly
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
+  # - short_name: [ua, va, wa, ta, hus, hur, waup, taup, husup, hurup, tke, lmix, clw, cli, husra, hussn, clwup, cliup, husraup, hussnup, cl]
+  #   period: 1days
+  #   reduction_time: average
+  #   compute_every: 1hours
+  - short_name: [ua, va, wa, ta, hus, hur, waup, taup, husup, hurup, tke, lmix, clw, cli, husra, hussn, clwup, cliup, husraup, hussnup, cl]
+    period: monthly
+    reduction_time: average
+    compute_every: 1hours
+  # - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, rwp, swp, clwvi, clivi, clt]
+  #   period: 1days
+  #   reduction_time: average
+  #   compute_every: 1hours
+  - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, rwp, swp, clwvi, clivi, clt]
+    period: monthly
+    reduction_time: average
+    compute_every: 1hours
+
+land_model: "integrated"
+# mode_name: "amip"
+netcdf_output_at_levels: true
+output_default_diagnostics: true
+radiation_reset_rng_seed: true
+surface_setup: "PrescribedSurface"
+topo_smoothing: true
+topography: "Earth"

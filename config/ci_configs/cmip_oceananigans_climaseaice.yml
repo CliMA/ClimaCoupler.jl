@@ -10,6 +10,7 @@ dt_seaice: "1800secs" # 30 minutes
 dz_bottom: 100.0
 energy_check: false
 h_elem: 16
+orographic_gravity_wave: null # Necessary to run
 ice_model: "clima_seaice"
 land_model: "integrated"
 land_spun_up_ic: false
@@ -20,7 +21,7 @@ ocean_model: "oceananigans"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 rayleigh_sponge: true
-simple_ocean: true
+simple_ocean: false
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "1days"

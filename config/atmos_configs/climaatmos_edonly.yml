@@ -24,4 +24,4 @@ z_elem: 63
 z_max: 60000.0
 microphysics_model: "0M"
 non_orographic_gravity_wave: true
-orographic_gravity_wave: "raw_topo"
+orographic_gravity_wave: 

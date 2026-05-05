@@ -14,7 +14,7 @@ value = 1.0e-5
 value = 0.7
 
 [entr_inv_tau]
-value = 0
+value = 0.0001
 
 [entr_coeff]
 value = 0.1
@@ -25,14 +25,8 @@ value = 0.0001
 [min_area_limiter_power]
 value = 1
 
-[turb_entr_param_vec]
-value = [1e-4, 10]
-
-[entr_detr_limit_inv_tau]
-value = 0
-
 [detr_inv_tau]
-value = 0
+value = 0.0001
 
 [detr_coeff]
 value = 0
@@ -53,7 +47,7 @@ value = 0.001
 value = 1
 
 [pressure_normalmode_drag_coeff]
-value = 10.0
+value = 40.0
 
 [mixing_length_eddy_viscosity_coefficient]
 value = 0.56
@@ -61,14 +55,37 @@ value = 0.56
 [tracer_vertical_diffusion_factor]
 value = 0
 
+[Tq_correlation_coefficient]
+value = -1
+
 [condensation_evaporation_timescale]
 value = 100
 
 [sublimation_deposition_timescale]
 value = 100
 
+[fixed_cloud_liquid_terminal_velocity]
+value = 0.01
+
+[fixed_cloud_ice_terminal_velocity]
+value = 0.01
+
 [rain_autoconversion_timescale]
-value = 1800
+value = 3600
 
 [snow_autoconversion_timescale]
-value = 1800
+value = 3600
+
+[fixed_rain_terminal_velocity]
+value = 5.0
+type = "float"
+
+[fixed_snow_terminal_velocity]
+value = 0.5
+type = "float"
+
+[rain_cross_section_size_relation_coefficient_chia]
+value = 1.0
+
+[snow_cross_section_size_relation_coefficient_chia]
+value = 1.0

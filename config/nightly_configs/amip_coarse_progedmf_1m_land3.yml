@@ -2,7 +2,7 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
 checkpoint_dt: "1months"
-coupler_toml: ["toml/amip_progedmf_1m.toml"]
+coupler_toml: ["toml/amip_progedmf_1m3.toml"]
 dt: "180secs"
 dt_cpl: "180secs"
 h_elem: 12
@@ -22,8 +22,8 @@ binary_area_fraction: false
 lai_source: "modis_monthly_climatology"
 start_date: "20100924"
 t_end: "39days"
-strict_params: false
 # divergence_damping_factor: 20.0
+# snow_autoconversion: WithSupersaturation
 
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta, clw, cli, cl]
@@ -35,16 +35,22 @@ extra_atmos_diagnostics:
     period: monthly
     reduction_time: average
     compute_every: 1hours
-  # - short_name: [ssatl, ssati, clw, cli]
-  #   period: daily
+  # - short_name: [ua, va, wa, ta, hus, hur, arup, waup, taup, husup, hurup, tke, lmix, edt, evu, clw, cli, husra, hussn, clwup, cliup, husraup, hussnup, cl]
+  #   period: monthly
+  #   reduction_time: average
+  #   compute_every: 1hours
   - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, iwp, rwp, swp, clwvi, clivi, clt]
     period: monthly
     reduction_time: average
     compute_every: 1hours
-  # - short_name: [arup, waup, zg, orog, entr, turbentr]
+  # - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, iwp, rwp, swp, clwvi, clivi, clt]
   #   period: monthly
   #   reduction_time: average
   #   compute_every: 1hours
+  - short_name: [arup, waup, zg, orog, entr, turbentr]
+    period: monthly
+    reduction_time: average
+    compute_every: 1hours
 
 land_model: "integrated"
 # mode_name: "amip"
@@ -54,4 +60,3 @@ radiation_reset_rng_seed: true
 surface_setup: "PrescribedSurface"
 topo_smoothing: true
 topography: "Earth"
-walltime_debug: true

@@ -4,10 +4,7 @@ value = 40000.0
 [zd_viscous]
 value = 40000.0
 
-[alpha_rayleigh_tracer]
-value = 0.001
-
-[EDMF_max_surface_area]
+[EDMF_surface_area]
 value = 0.1
 
 [EDMF_min_area]
@@ -47,7 +44,7 @@ value = 1
 value = 0
 
 [detr_massflux_vertdiv_coeff]
-value = 0.3
+value = 1
 
 [max_area_limiter_scale]
 value = 0.001
@@ -64,12 +61,6 @@ value = 0.56
 [tracer_vertical_diffusion_factor]
 value = 0
 
-[fixed_rain_terminal_velocity]
-value = 5.0
-
-[fixed_snow_terminal_velocity]
-value = 1.0
-
 [condensation_evaporation_timescale]
 value = 100
 
@@ -84,4 +75,3 @@ value = 1800
 
 [cloud_liquid_water_specific_humidity_autoconversion_threshold]
 value = 0
-

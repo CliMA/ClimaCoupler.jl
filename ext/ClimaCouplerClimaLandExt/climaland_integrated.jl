@@ -113,11 +113,15 @@ function ClimaLandSimulation(
     #  since that's where we compute fluxes for this land model
     atmos_h = Interfacer.remap(surface_space, atmos_h)
 
+    # `tspan` can contain non-zero values (e.g. (720.0, 900.0)) when restarting
+    sim_start_date = start_date + Dates.Second(float(tspan[1]))
+    sim_stop_date = start_date + Dates.Second(float(tspan[2]))
+
     # Set up atmosphere and radiation forcing
     forcing = (;
         atmos = CL.CoupledAtmosphere{FT, typeof(atmos_h)}(atmos_h, gustiness),
         radiation = CL.CoupledRadiativeFluxes{FT}(
-            start_date;
+            sim_start_date;
             latitude = CC.Fields.coordinate_field(domain.space.surface).lat,
             longitude = CC.Fields.coordinate_field(domain.space.surface).long,
             toml_dict,
@@ -125,13 +129,12 @@ function ClimaLandSimulation(
     )
 
     # Set up leaf area index (LAI)
-    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
     if lai_source == "modis_monthly"
         # Full monthly MODIS LAI data
         LAI = CL.prescribed_lai_modis(
             surface_space,
-            start_date,
-            stop_date;
+            sim_start_date,
+            sim_stop_date;
             time_interpolation_method = LinearInterpolation(),
         )
     elseif lai_source == "modis_monthly_climatology"
@@ -142,8 +145,8 @@ function ClimaLandSimulation(
         )
         LAI = CL.prescribed_lai_modis(
             surface_space,
-            start_date,
-            stop_date;
+            sim_start_date,
+            sim_stop_date;
             modis_lai_ncdata_path = modis_lai_clim_path,
             time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
         )
@@ -272,11 +275,11 @@ function ClimaLandSimulation(
     # Convert start_date and stop_date to ITime if using ITime
     if dt isa ITime
         start_date = tspan[1]
-        stop_date = tspan[2]
+        sim_stop_date = tspan[2]
     end
     simulation = CL.Simulations.LandSimulation(
         start_date,
-        stop_date,
+        sim_stop_date,
         dt,
         model;
         outdir = output_dir,

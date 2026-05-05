@@ -70,6 +70,8 @@ end
         "share_surface_space" => true,
         "nh_poly" => 2,
         "h_elem" => 8,
+        "h_elem_coupler" => 16,
+        "nh_poly_coupler" => 2,
         "checkpoint_dt" => "90days",
         "detect_restart_files" => false,
         "restart_dir" => nothing,

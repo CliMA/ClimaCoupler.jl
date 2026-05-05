@@ -5,21 +5,47 @@ checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_progedmf.toml"]
 dt: "180secs"
 dt_cpl: "180secs"
+<<<<<<< HEAD
+=======
+h_elem: 8
+z_elem: 39
+dz_bottom: 100.0
+>>>>>>> 4bb7237e (1m)
 energy_check: false
+
+# weather model setup
+# initial_condition: "WeatherModel"
+# mode_name: "subseasonal"
+# era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+# land_temperature_anomaly: "nothing"
+# land_fraction_source: "era5"
+start_date: "20100101"
+t_end: "366days"
+
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]
     period: 1months
     reduction_time: average
     pressure_coordinates: true
     compute_every: 6hours
+<<<<<<< HEAD
 h_elem: 12
+=======
+  # - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, rwp, clwvi, clivi]
+  #   period: monthly
+  #   reduction_time: average
+
+>>>>>>> 4bb7237e (1m)
 land_model: "integrated"
-mode_name: "amip"
+# mode_name: "amip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
-start_date: "20100101"
+
 surface_setup: "PrescribedSurface"
+<<<<<<< HEAD
 t_end: "366days"
+=======
+>>>>>>> 4bb7237e (1m)
 topo_smoothing: true
 topography: "Earth"

@@ -166,7 +166,9 @@ function postprocess(
             var_1M = get(simdir; short_name, reduction, period, coord_type)
             start_date = first(CAN.dates(var_1M))
             end_date = last(CAN.dates(var_1M))
-            spinup = 3
+            # spinup = 3
+            # Hardcoded: allow the leaderboard to run on a ~1-month run
+            spinup = 0
             if end_date >= start_date + Dates.Month(spinup)
                 leaderboard_base_path = artifacts_dir
                 compute_leaderboard(leaderboard_base_path, atmos_output_dir, spinup)

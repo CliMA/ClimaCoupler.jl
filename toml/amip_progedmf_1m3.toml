@@ -65,20 +65,20 @@ value = 100
 value = 0.01
 
 [fixed_cloud_ice_terminal_velocity]
-value = 0.01
+value = 0.1
 
 [rain_autoconversion_timescale]
-value = 300
+value = 600
 
 [snow_autoconversion_timescale]
 value = 600
 
 [fixed_rain_terminal_velocity]
-value = 7.5
+value = 5.0
 type = "float"
 
 [fixed_snow_terminal_velocity]
-value = 2.0
+value = 1.0
 type = "float"
 
 [rain_cross_section_size_relation_coefficient_chia]

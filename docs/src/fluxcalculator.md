@@ -34,10 +34,6 @@ fluxes and the CoupledSimulation object's fluxes fields.
 - the flux of energy due to latent heat, `F_lh`;
 - the flux of energy due to sensible heat, `F_sh`;
 - the flux of moisture, `F_turb_moisture`;
-- the Obukhov length, `L_MO`;
-- the buoyancy flux, `buoyancy_flux`;
-- the roughness lengths for momentum and buoyancy, `z0m` and `z0b`;
-- the frictional velocity `ustar`.
 
 !!! note
 

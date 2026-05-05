@@ -52,16 +52,7 @@ function turbulent_fluxes!(csf, model_sims, thermo_params)
 
     # Reset the coupler fields will compute. We need to do this because we will compute
     # area-weighted averages
-    for p in (
-        :F_turb_ρτxz,
-        :F_turb_ρτyz,
-        :F_lh,
-        :F_sh,
-        :F_turb_moisture,
-        :L_MO,
-        :ustar,
-        :buoyancy_flux,
-    )
+    for p in (:F_turb_ρτxz, :F_turb_ρτyz, :F_lh, :F_sh, :F_turb_moisture)
         fill!(getproperty(csf, p), 0)
     end
 
@@ -135,19 +126,7 @@ function get_surface_fluxes(
         update_q_vap_sfc,
     )
 
-    (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc, L_MO, ustar) = outputs
-
-    buoyancy_flux = SF.buoyancy_flux(
-        surface_fluxes_params,
-        shf,
-        lhf,
-        T_sfc,
-        ρ_int,
-        q_vap_sfc,
-        q_liq_int,
-        q_ice_int,
-        SF.MoistModel(),
-    )
+    (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc) = outputs
 
     return (;
         F_turb_ρτxz = ρτxz,
@@ -155,9 +134,6 @@ function get_surface_fluxes(
         F_sh = shf,
         F_lh = lhf,
         F_turb_moisture = evaporation,
-        L_MO,
-        ustar,
-        buoyancy_flux,
         T_sfc_new = T_sfc,
     )
 end
@@ -321,8 +297,7 @@ the area-weighted fluxes.
 - `fluxes`: [NamedTuple] containing the fluxes to update the surface simulation with.
 """
 function update_flux_fields!(csf, sim::Interfacer.AbstractSurfaceSimulation, fluxes)
-    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) =
-        fluxes
+    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture) = fluxes
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     # Zero out fluxes where the area fraction is zero
@@ -333,9 +308,6 @@ function update_flux_fields!(csf, sim::Interfacer.AbstractSurfaceSimulation, flu
     @. F_sh = ifelse(area_fraction ≈ 0, zero(F_sh), F_sh)
     @. F_lh = ifelse(area_fraction ≈ 0, zero(F_lh), F_lh)
     @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(F_turb_moisture), F_turb_moisture)
-    @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
-    @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
-    @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
 
     # update the fluxes, which are now area fraction-masked, of this surface model
     fields = (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
@@ -350,14 +322,6 @@ function update_flux_fields!(csf, sim::Interfacer.AbstractSurfaceSimulation, flu
     @. csf.F_sh += F_sh * area_fraction
     @. csf.F_turb_moisture += F_turb_moisture * area_fraction
 
-    # NOTE: This is still an area weighted contribution, which maybe doesn't make
-    # too much sense for these quantities...
-
-    # L_MO can be Inf. We don't want to multiply Inf * 0, so we can handle this
-    # separately.
-    @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
-    @. csf.ustar += ustar * area_fraction
-    @. csf.buoyancy_flux += buoyancy_flux * area_fraction
     return nothing
 end
 

@@ -405,15 +405,6 @@ function _init_ocean_isolation_mask!(
     local_vals = vec(Array(parent(ocean_fraction)))
     n_local    = length(local_vals)
 
-    # Derive the BFS adjacency radius from the actual GLL node spacing on this rank.
-    # Within a spectral element the max GLL spacing is at most ~2× the min spacing
-    # (exact ratio depends on quadrature order; 2.0 is a safe upper bound for Nq ≤ 8).
-    # Using the local DOFs is sufficient — GLL spacing is uniform across the grid.
-    lat_gaps   = diff(sort(local_lats))
-    valid_gaps = filter(g -> g > 0.01, lat_gaps)   # exclude co-located element-boundary DOFs
-    min_gap    = isempty(valid_gaps) ? 1.0 : minimum(valid_gaps)
-    r          = 2.0 * Float64(min_gap)
-
     # Gather global coordinate + value arrays to all ranks so each rank can search
     # across partition boundaries.
     if comms_ctx isa ClimaComms.SingletonCommsContext
@@ -436,6 +427,15 @@ function _init_ocean_isolation_mask!(
     keep        = falses(n)
     perm        = sortperm(lats)
     sorted_lats = lats[perm]
+
+    # Derive the BFS adjacency radius from the actual GLL node spacing in the global grid.
+    # Within a spectral element the max GLL spacing is at most ~2× the min spacing
+    # (exact ratio depends on quadrature order; 2.0 is a safe upper bound for Nq ≤ 8).
+    # Use the global data for a robust estimate that works across all MPI ranks and resolutions.
+    lat_gaps   = diff(sorted_lats)
+    valid_gaps = filter(g -> g > 0.01, lat_gaps)   # exclude co-located element-boundary DOFs
+    min_gap    = isempty(valid_gaps) ? 1.0 : minimum(valid_gaps)
+    r          = 2.0 * Float64(min_gap)
 
     # Seed: strong ocean cells within the tropical/subtropical band.
     queue = Int[]

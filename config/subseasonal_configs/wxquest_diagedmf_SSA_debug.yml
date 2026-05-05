@@ -45,8 +45,8 @@ extra_atmos_diagnostics:
       loadss,
       mmrss, mmrsslt01, mmrsslt02, mmrsslt03, mmrsslt04, mmrsslt05,
       emiss, emisslt01, emisslt02, emisslt03, emisslt04, emisslt05,
-      sslt_u10, u10_mo, u10_ext, z1_mo, z1_ext,
-      ustar, buoy_flux, obukhovlen,
+      u10_mo, u10_ext, uz1_mo, uz1_ext, uz1_true,
+      ustar, buoyflux, obukhovlen,
       oceanfrac
     ]
     period: 6hours

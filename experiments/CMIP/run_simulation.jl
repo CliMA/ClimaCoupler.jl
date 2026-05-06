@@ -33,7 +33,7 @@ include("code_loading.jl")
 
 ## using GeometryOps
 ## using ConservativeRegridding
-## 
+##
 ## @eval GeometryOps.UnitSpherical.RobustCrossProduct begin
 ##     function robust_cross_product(a::AbstractVector, b::AbstractVector)
 ##         result, was_stable = stable_cross_product(a, b)
@@ -47,11 +47,11 @@ include("code_loading.jl")
 ##         return normalize(result)
 ##     end
 ## end
-## 
+##
 ## @eval ConservativeRegridding begin
 ##    function regrid!(dst_field::DenseVector, regridder::Regridder, src_field::DenseVector)
 ##        T = eltype(regridder.intersections)
-## 
+##
 ##        # Ensure src eltype matches the matrix so CUSPARSE.mul! can dispatch
 ##        src = if eltype(src_field) == T
 ##            src_field
@@ -59,7 +59,7 @@ include("code_loading.jl")
 ##            regridder.src_temp .= src_field   # in-place convert via the existing work buffer
 ##            regridder.src_temp
 ##        end
-## 
+##
 ##        if eltype(dst_field) == T
 ##            LinearAlgebra.mul!(dst_field, regridder.intersections, src)
 ##            dst_field ./= regridder.dst_areas
@@ -74,14 +74,14 @@ include("code_loading.jl")
 ## end
 
 # Get the configuration file from the command line (or manually set it here)
-config_file = "../../config/longrun_configs/cmip_edonly_bucket.yml"
+config_file = Input.parse_commandline(Input.argparse_settings())["config_file"]
 
 # Set up and run the coupled simulation
 cs = CoupledSimulation(config_file)
 
 import Oceananigans as OC
 wall_time = Ref(time_ns())
-function progress(sim) 
+function progress(sim)
     ocean = sim.model
 
     (Tmax, Tmin) = extrema(ocean.tracers.T)
@@ -99,7 +99,7 @@ function progress(sim)
           "($(round(Smin, digits=2)), $(round(Smax, digits=2))) psu " *
           "maximum(u): ($(round(umax, sigdigits=2)), $(round(vmax, sigdigits=2)), $(round(wmax, sigdigits=2))) m/s, " *
           "wall time: $(OC.prettytime(step_time))"
-    
+
     wall_time[] = time_ns()
 
     return nothing

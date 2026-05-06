@@ -38,7 +38,7 @@ end
         depth::FT = FT(15),
         dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
         shared_surface_space = nothing,
-        land_spun_up_ic::Bool = true,
+        land_spun_up_ic::Bool = false,
         surface_elevation = nothing,
         atmos_h,
         land_temperature_anomaly::String = "amip",
@@ -72,7 +72,7 @@ function ClimaLandSimulation(
     depth::FT = FT(15),
     dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
     shared_surface_space = nothing,
-    land_spun_up_ic::Bool = true,
+    land_spun_up_ic::Bool = false,
     surface_elevation = nothing,
     atmos_h,
     land_temperature_anomaly::String = "amip",
@@ -157,15 +157,7 @@ function ClimaLandSimulation(
     canopy_forcing = (; forcing.atmos, forcing.radiation, ground)
     prognostic_land_components = (:canopy, :snow, :soil, :soilco2)
     surface_domain = CL.Domains.obtain_surface_domain(domain)
-    biomass = CL.Canopy.PrescribedBiomassModel{FT}(
-        domain,
-        LAI,
-        toml_dict;
-        height = CL.Canopy.clm_canopy_height(
-            domain.space.surface;
-            max_height = minimum(atmos_h) * FT(0.9),
-        ),
-    )
+    biomass = CL.Canopy.PrescribedBiomassModel{FT}(domain, LAI, toml_dict)
     canopy = CL.Canopy.CanopyModel{FT}(
         surface_domain,
         canopy_forcing,
@@ -178,7 +170,9 @@ function ClimaLandSimulation(
     # Snow model setup
     # Set β = 0 in order to regain model without density dependence
     α_snow = CL.Snow.ZenithAngleAlbedoModel(toml_dict)
-    horz_degree_res = FT(sum(CL.Domains.average_horizontal_resolution_degrees(domain)) / 2) # mean of resolution in latitude and longitude, in degrees
+    horz_degree_res =
+        domain isa CL.Domains.Column ? FT(1) :
+        FT(sum(CL.Domains.average_horizontal_resolution_degrees(domain)) / 2)
     scf = CL.Snow.WuWuSnowCoverFractionModel(toml_dict, horz_degree_res)
     snow = CL.Snow.SnowModel(
         FT,
@@ -376,12 +370,7 @@ function Interfacer.update_field!(
         StaticArrays.SVector.(sim.integrator.p.scratch1, sim.integrator.p.scratch2)
 end
 
-function Interfacer.step!(sim::ClimaLandSimulation, t)
-    while float(sim.integrator.t) < float(t)
-        Interfacer.step!(sim.integrator)
-    end
-    return nothing
-end
+
 Interfacer.close_output_writers(sim::ClimaLandSimulation) =
     isnothing(sim.output_writer) || close(sim.output_writer)
 
@@ -645,7 +634,7 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_energy}) =
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_temp}) =
     sim.integrator.u.canopy.energy.T
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_water}) =
-    sim.integrator.u.canopy.hydraulics.ϑ_l.:1
+    sim.integrator.u.canopy.hydraulics.ϑ_l
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_energy}) =
     sim.integrator.u.snow.U
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_water_equiv}) =

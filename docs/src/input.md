@@ -164,7 +164,7 @@ specific timesteps should be specified, rather than only `dt`.
 | `--land_model` | String | `"bucket"` | `bucket`, `integrated` | Land model to use |
 | `--land_temperature_anomaly` | String | `"aquaplanet"` | `amip`, `aquaplanet`, `nothing` | Type of temperature anomaly for land model |
 | `--use_land_diagnostics` | Bool | `true` | `true`, `false` | Whether to compute and output land model diagnostics |
-| `--land_spun_up_ic` | Bool | `true` | `true`, `false` | Whether to use integrated land initial conditions from spun up state |
+| `--land_spun_up_ic` | Bool | `false` | `true`, `false` | Whether to use integrated land initial conditions from spun up state |
 | `--lai_source` | String | `"modis_monthly"` | `modis_monthly`, `modis_monthly_climatology` | Source for leaf area index data. `modis_monthly` uses full MODIS monthly data, `modis_monthly_climatology` uses MODIS monthly climatology with periodic calendar |
 | `--bucket_albedo_type` | String | `"map_static"` | `map_static`, `function`, `map_temporal`, `era5` | Access bucket surface albedo information from data file. Use `era5` for ERA5-derived processed albedo files (requires `era5_initial_condition_dir`) |
 | `--bucket_initial_condition` | String | `""` | Any valid file path | File path for a NetCDF file (read documentation about requirements). In subseasonal mode, automatically inferred from `era5_initial_condition_dir` if not specified |
@@ -184,6 +184,14 @@ specific timesteps should be specified, rather than only `dt`.
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
 | `--evolving_ocean` | Bool | `true` | `true`, `false` | Whether to use a dynamic slab ocean model, as opposed to constant surface temperatures |
+
+#### Single-column model (SCM) settings
+
+| Argument | Type | Default | Valid Options | Description |
+|----------|------|---------|---------------|-------------|
+| `--domain_type` | String | `"global"` | `global`, `column` | Domain type for the simulation. Use `column` for single-column model runs |
+| `--column_latlon` | Vector{Float64} | `[0.0, 0.0]` | `[lat, lon]` in degrees | Latitude within [-90, 90] and longitude within [-180, 180] for the SCM column location |
+| `--scm_surface_type` | String | `nothing` | `land`, `ocean`, `sea_ice` (required for `column`) | Select SCM surface model: enables exactly one of land, ocean, or sea ice. Ignored for global runs. |
 
 ## Input API
 

@@ -24,9 +24,18 @@ model_interface = joinpath(
     "model_interface.jl",
 )
 
+"""
+    module_load_string(::ClimaCalibrate.ClimaGPUBackend)
+
+Load the appropriate module for `clima`.
+
+This is needed to load the right `climacommon` version on `clima`. This function
+will be removed after support is added in ClimaCalibrate.jl for choosing which
+version of `climacommon` to load.
+"""
 function ClimaCalibrate.module_load_string(::ClimaCalibrate.ClimaGPUBackend)
     return """module purge
-    module load climacommon/2026_02_18"""
+    module load climacommon/2025_05_15"""
 end
 
 years = 2018:2021

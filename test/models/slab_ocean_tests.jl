@@ -1,7 +1,7 @@
 import Test: @test, @testset
 import ClimaCore as CC
 import ClimaParams as CP
-import ClimaCoupler
+import ClimaCoupler: Utilities
 import SurfaceFluxes as SF
 import ClimaCoupler.Models
 
@@ -16,9 +16,6 @@ for FT in (Float32, Float64)
             h_elem = 4,
         )
 
-        # construct dss buffer to put in cache
-        dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(boundary_space))
-
         # set up objects for test
         u = CC.Fields.FieldVector(;
             state_field1 = CC.Fields.ones(boundary_space),
@@ -29,7 +26,7 @@ for FT in (Float32, Float64)
         coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
         p = (;
             cache_field = CC.Fields.zeros(boundary_space),
-            dss_buffer = CC.Spaces.create_dss_buffer(u),
+            dss_buffer = Utilities.init_dss_buffer(u),
             coare3_roughness_params,
         )
         integrator = (; u, p)

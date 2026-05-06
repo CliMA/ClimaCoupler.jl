@@ -135,18 +135,21 @@ function postprocess(
     # Plot all model states and coupler fields (useful for debugging)
     ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext && debug(cs, artifacts_dir)
 
-    # If we have enough data (in time, but also enough variables), plot the leaderboard.
-    # We need pressure to compute the leaderboard.
-    simdir = CAN.SimDir(atmos_output_dir)
-    if !isempty(simdir)
-        pressure_in_output = "pfull" in CAN.available_vars(simdir)
-        t_end = float(cs.t[])
-        if t_end > 84600 * 31 * 3 # 3 months for spin up
-            leaderboard_base_path = artifacts_dir
-            compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
-            rmse_check && SimOutput.test_rmse_thresholds(atmos_output_dir, 3)
-            pressure_in_output &&
-                compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
+    # Leaderboard requires global spatial data; skip in column / SCM mode.
+    if !Interfacer.is_column_mode(cs)
+        simdir = CAN.SimDir(atmos_output_dir)
+        if !isempty(simdir)
+            # We need pressure to compute the leaderboard.
+            pressure_in_output = "pfull" in CAN.available_vars(simdir)
+            t_end = float(cs.t[])
+            # Make sure we have enough data to compute the leaderboard.
+            if t_end > 84600 * 31 * 3 # 3 months for spin up
+                leaderboard_base_path = artifacts_dir
+                compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
+                rmse_check && SimOutput.test_rmse_thresholds(atmos_output_dir, 3)
+                pressure_in_output &&
+                    compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
+            end
         end
     end
 

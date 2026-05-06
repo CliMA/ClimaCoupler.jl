@@ -10,7 +10,6 @@ dt_rad: "1hours"
 dt_seaice: "150secs"
 dt: "150secs"
 energy_check: false
-era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_v1_dev"
 extra_atmos_diagnostics:
   - short_name: [tas, pr, mslp, rsut, rsutcs, rlut, rlutcs, rsdt]
     period: monthly
@@ -34,7 +33,7 @@ non_orographic_gravity_wave: true
 ode_algo: "ARS232"
 output_default_diagnostics: false
 radiation_reset_rng_seed: true
-start_date: "20100924"
+start_date: "20100101"
 strict_params: false
 surface_setup: "PrescribedSurface"
 t_end: "39days"

@@ -17,7 +17,7 @@ Here we will describe the structure and internals of `CoupledSimulation`.
 | `t`                   | `Ref` of `ITime` or `Float64` | Current simulation time (Float64 seconds or `ITime`) |
 | `tspan`               | `Tuple` of `ITime` or `Float64` | Start and end times of the simulation (Float64 seconds or `ITime`) |
 | `Δt_cpl`              | `Int` or `Float64` | Coupling timestep in seconds |
-| `start_date`          | `Ref{Dates.DateTime}` | Calendar date corresponding to `t = t_start` |
+| `start_date`          | `Dates.DateTime` | Calendar date corresponding to `t = t_start` |
 | `dir_paths`           | `NamedTuple` of `String` | Output, checkpoint, artifacts, and per-model output directories |
 | `callbacks`           | `NamedTuple` of `TimeManager.Callback` | Scheduled callbacks triggered each coupling step (e.g. checkpointing) |
 | `conservation_checks` | `NamedTuple{(:energy,:water)}` or `nothing` | Energy and water conservation accumulators; `nothing` when disabled |

@@ -1,5 +1,7 @@
 [specific_humidity_precipitation_threshold]
 value = 1
+type = "float"
 
 [precipitation_timescale]
 value = 1e10
+type = "float"

@@ -22,13 +22,11 @@ steps:
 
       # - echo "--- Instantiate AMIP env"
       # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
       # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 
       # - echo "--- Instantiate CMIP env"
       # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
       # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
 
@@ -45,13 +43,11 @@ steps:
 
       - echo "--- Instantiate AMIP env"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate CMIP env"
       - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
 
@@ -139,11 +135,11 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 32GB
 
-      - label: "GPU AMIP + prog. EDMF + bucket"
-        key: "amip_progedmf"
+      - label: "GPU AMIP + prog. EDMF + integrated land"
+        key: "amip_progedmf_land"
         command:
-          - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_progedmf.yml --job_id amip_progedmf"
-        artifact_paths: "output/amip_progedmf/artifacts/*"
+          - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_progedmf_land.yml --job_id amip_progedmf_land"
+        artifact_paths: "output/amip_progedmf_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -218,19 +214,6 @@ steps:
           queue: clima
           slurm_mem: 32GB
           slurm_gpus: 1
-
-  - group: "Calibration experiments"
-
-    steps:
-      - label: "Subseasonal calibration test"
-        key: "subseasonal_calibration"
-        command:
-          - julia --color=yes --project=experiments/AMIP/ experiments/calibration/subseasonal/generate_observations.jl
-          - julia --color=yes --project=experiments/AMIP/ experiments/calibration/subseasonal/run_calibration.jl
-        artifact_paths: "experiments/calibration/subseasonal/output/*"
-        agents:
-          queue: clima
-          slurm_time: 24:00:00
 
   - wait
 

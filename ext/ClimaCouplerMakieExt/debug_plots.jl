@@ -124,9 +124,13 @@ plot the anomalies of the fields with respect to `cs_fields_ref`.
 
 For vector fields which are not defined on a Cartesian basis, rotate them to the Cartesian
 basis before plotting so they can be interpreted physically.
+
+For single-column (PointSpace) fields, each subplot shows only the title with extrema;
+no heatmap or table is drawn.
 """
 function Plotting.debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
     field_names = propertynames(cs_fields)
+
     fig = Makie.Figure(size = (1500, 800))
     min_square_len = ceil(Int, sqrt(length(field_names)))
 
@@ -233,17 +237,90 @@ end
 """
     Plotting.debug_plot!(ax, fig, field::CC.Fields.Field, i, j)
 
-Helper function to plot a heatmap of a ClimaCore field in the given figure at position (i, j).
-If the field is constant, skip plotting it to avoid heatmap errors.
+Helper function to plot a ClimaCore field in the given figure at position (i, j).
+Dispatches on the field's space type via `_debug_plot_field!`.
 """
 function Plotting.debug_plot!(ax, fig, field::CC.Fields.Field, i, j)
-    # Copy field onto cpu space if necessary
     cpu_field = CC.to_cpu(field)
-    if cpu_field isa CC.Fields.ExtrudedCubedSphereSpectralElementField3D
-        cpu_field = CC.Fields.level(cpu_field, 1)
-    end
+    _debug_plot_field!(ax, fig, cpu_field, axes(cpu_field), i, j)
+end
 
-    # ClimaCoreMakie doesn't support NaNs/Infs, so we substitute them with 100max
+"""
+    _debug_plot_field!(ax, fig, cpu_field, space::CC.Spaces.FiniteDifferenceSpace, i, j)
+
+Plot a 1D column field (center or face FD space) as a line with z on the y-axis.
+"""
+function _debug_plot_field!(
+    ax,
+    fig,
+    cpu_field,
+    space::CC.Spaces.FiniteDifferenceSpace,
+    i,
+    j,
+)
+    _debug_plot_column!(ax, cpu_field)
+    return nothing
+end
+
+"""
+    _debug_plot_field!(ax, fig, cpu_field, space::CC.Spaces.ExtrudedFiniteDifferenceSpace, i, j)
+
+Plot a 3D extruded field: if horizontal space is cubed-sphere, take level 1 and heatmap;
+otherwise extract a single column and plot as a line (for BoxGrid column mode, used by atmos).
+"""
+function _debug_plot_field!(
+    ax,
+    fig,
+    cpu_field,
+    space::CC.Spaces.ExtrudedFiniteDifferenceSpace,
+    i,
+    j,
+)
+    hspace = CC.Spaces.horizontal_space(space)
+    if hspace isa CC.Spaces.CubedSphereSpectralElementSpace2D
+        # Cubed sphere case: make heatmap of level 1
+        _debug_plot_heatmap!(ax, fig, CC.Fields.level(cpu_field, 1), i, j)
+    else
+        # BoxGrid column mode: extract a single column and plot as a line
+        col_field = CC.Fields.column(cpu_field, 1, 1, 1)
+        _debug_plot_column!(ax, col_field)
+    end
+    return nothing
+end
+
+"""
+    _debug_plot_field!(ax, fig, cpu_field, space, i, j)
+
+Fallback: plot a 2D spatial field as a heatmap (e.g. `SpectralElementSpace2D`).
+"""
+function _debug_plot_field!(ax, fig, cpu_field, space, i, j)
+    _debug_plot_heatmap!(ax, fig, cpu_field, i, j)
+    return nothing
+end
+
+"""
+    _debug_plot_column!(ax, field)
+
+Plot a 1D column field as a line with z on the y-axis.
+"""
+function _debug_plot_column!(ax, field)
+    z = vec(Array(parent(CC.Fields.coordinate_field(field).z)))
+    vals = vec(Array(parent(field)))
+
+    valid = @. !(isnan(vals) || isinf(vals))
+    any(valid) || return nothing
+
+    Makie.lines!(ax, vals[valid], z[valid])
+    ax.ylabel = "z"
+    return nothing
+end
+
+"""
+    _debug_plot_heatmap!(ax, fig, cpu_field, i, j)
+
+Plot a 2D spatial field as a heatmap with colorbar.
+"""
+function _debug_plot_heatmap!(ax, fig, cpu_field, i, j)
     FT = CC.Spaces.undertype(axes(cpu_field))
     isinvalid = (x) -> isnan(x) || isinf(x)
     field_valid_min, field_valid_max =

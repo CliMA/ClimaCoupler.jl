@@ -1,8 +1,7 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
-bucket_albedo_type: "map_temporal"
-checkpoint_dt: "186days"
+checkpoint_dt: "366days"
 coupler_toml: ["toml/amip_progedmf.toml"]
 dt: "180secs"
 dt_cpl: "180secs"
@@ -15,6 +14,7 @@ extra_atmos_diagnostics:
     pressure_coordinates: true
     compute_every: 6hours
 h_elem: 8
+land_model: "integrated"
 mode_name: "amip"
 netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
@@ -23,7 +23,7 @@ output_default_diagnostics: true
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "186days"
+t_end: "465days"
 topo_smoothing: true
 topography: "Earth"
 z_elem: 39

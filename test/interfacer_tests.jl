@@ -7,6 +7,7 @@ import Dates
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 import ClimaCoupler: Interfacer
+import ClimaUtilities.TimeManager: ITime
 
 function Interfacer.remap(::Nothing, field)
     return field
@@ -297,8 +298,8 @@ end
 end
 
 @testset "SurfaceStub step!" begin
-    FT = Float32
-    @test isnothing(Interfacer.step!(Interfacer.SurfaceStub(FT(0)), 1))
+    FT = Float64
+    @test isnothing(Interfacer.step!(Interfacer.SurfaceStub(FT(0)), FT(1)))
 end
 
 @testset "remap" begin
@@ -328,4 +329,63 @@ end
     # The ClimaCore DataLayout underlying the remapped field uses
     # Array instead of SubArray, so we can't compare the fields directly without Copy
     @test field_source_space ≈ copy(field)
+end
+
+@testset "Floating Point time-stepping" begin
+    TT = Float64
+    t = TT(10^7)
+    smallest_dt = TT(60)
+    struct FakeIntegratorF64
+        dt::TT
+        t::Ref{TT}
+        n_steps::Ref{Int}
+    end
+    # Allow access to the time field as a property within the simulation's `step!`
+    Base.getproperty(integrator::FakeIntegratorF64, s::Symbol) =
+        s == :t ? getfield(integrator, s)[] : getfield(integrator, s)
+    struct FakeSimF64 <: Interfacer.AbstractComponentSimulation
+        integrator::FakeIntegratorF64
+    end
+    function Interfacer.step!(integrator::FakeIntegratorF64)
+        getfield(integrator, :t)[] += integrator.dt
+        getfield(integrator, :n_steps)[] += 1
+        return
+    end
+    fake_sim = FakeSimF64(FakeIntegratorF64(smallest_dt, Ref(t), Ref(0)))
+    # Take a sufficiently-large number of steps to test robustness against floating point drift
+    n_steps = 9999999
+    for _ in 1:n_steps
+        t += smallest_dt
+        Interfacer.step!(fake_sim, t)
+    end
+    @test fake_sim.integrator.n_steps[] == n_steps
+end
+
+@testset "ITime time-stepping" begin
+    dt = ITime(60)
+    t = ITime(10^7)
+    struct FakeIntegratorITime{DT, TT}
+        dt::DT
+        t::Ref{TT}
+        n_steps::Ref{Int}
+    end
+    # Allow access to the time field as a property within the simulation's `step!`
+    Base.getproperty(integrator::FakeIntegratorITime, s::Symbol) =
+        s == :t ? getfield(integrator, s)[] : getfield(integrator, s)
+    struct FakeSimITime <: Interfacer.AbstractComponentSimulation
+        integrator::FakeIntegratorITime
+    end
+    function Interfacer.step!(integrator::FakeIntegratorITime)
+        getfield(integrator, :t)[] += integrator.dt
+        getfield(integrator, :n_steps)[] += 1
+        return
+    end
+    fake_sim = FakeSimITime(FakeIntegratorITime(dt, Ref(t), Ref(0)))
+    # Take a sufficiently-large number of steps to test robustness against floating point drift
+    n_steps = 9999999
+    for _ in 1:n_steps
+        t += dt
+        Interfacer.step!(fake_sim, t)
+    end
+    @test fake_sim.integrator.n_steps[] == n_steps
 end

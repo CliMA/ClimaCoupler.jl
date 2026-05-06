@@ -31,7 +31,6 @@ steps:
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"RRTMGP\", rev=\"main\"))'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.resolve()'"
 
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(\"MPI\")'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 
@@ -78,12 +77,12 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 30GB
 
-      - label: "Coarse current AMIP: progedmf + 0M + bucket land"
-        key: "amip_progedmf"
+      - label: "Coarse current AMIP: progedmf + 0M + integrated land"
+        key: "amip_progedmf_land"
         command:
           - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_progedmf.yml --job_id amip_coarse_progedmf"
-        artifact_paths: "output/amip_coarse_progedmf/artifacts/*"
+          - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_progedmf_land.yml --job_id amip_coarse_progedmf_land"
+        artifact_paths: "output/amip_coarse_progedmf_land/artifacts/*"
         timeout_in_minutes: 840
         env:
           CLIMACOMMS_DEVICE: "CUDA"

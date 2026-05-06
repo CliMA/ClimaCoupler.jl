@@ -1,12 +1,23 @@
 import Test: @test, @testset
 import ClimaCore as CC
 import ClimaCoupler
+import ClimaCoupler.Utilities
 
 import ClimaAtmos
 import ClimaParams as CP
 
 # Needed to construct ClimaAtmosSimulation
 ClimaAtmosExt = Base.get_extension(ClimaCoupler, :ClimaCouplerClimaAtmosExt)
+function ClimaCoupler.Utilities.apply_dss!(field::NamedTuple, buffer)
+    if isnothing(buffer)
+        return nothing
+    else
+        return map(
+            key -> ClimaCoupler.Utilities.apply_dss!(getproperty(field, key), buffer[key]),
+            propertynames(field),
+        )
+    end
+end
 
 for FT in (Float32, Float64)
     @testset "dss_state! ClimaAtmosSimulation for FT=$FT" begin

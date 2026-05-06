@@ -2,7 +2,7 @@
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "efed04f45f8685843605ebeb9be95a606fada55e"
+project_hash = "f55afce78150fc72c848c2dd1dab40d0aad5c12f"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -592,7 +592,7 @@ version = "0.1.28"
 
 [[deps.CloudMicrophysics]]
 deps = ["ClimaParams", "DocStringExtensions", "ForwardDiff", "InteractiveUtils", "LazyArtifacts", "LogExpFunctions", "RootSolvers", "SpecialFunctions", "StaticArrays", "Thermodynamics", "UnrolledUtilities"]
-git-tree-sha1 = "a094c3d33cee64cb8ac2420bd7b22298f7b1f958"
+path = "../../../CloudMicrophysics.jl-mod"
 uuid = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
 version = "0.35.0"
 

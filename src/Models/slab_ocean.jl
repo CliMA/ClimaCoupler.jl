@@ -61,10 +61,10 @@ Initialize the `OceanSlabParameters` object with the coupled parameters.
 """
 function OceanSlabParameters{FT}(
     coupled_param_dict;
-    h = FT(20),
+    h = FT(1),
     ρ = FT(1500),
     c = FT(800),
-    T_init = FT(271),
+    T_init = FT(250),
     z0m = FT(5e-4),
     z0b = FT(5e-4),
     α = FT(0.38),
@@ -249,6 +249,10 @@ function Interfacer.update_field!(
 )
     Interfacer.remap!(sim.integrator.p.α_diffuse, field)
 end
+
+# Silence warnings for lacking precip tracking in the slab ocean model
+Interfacer.update_field!(::SlabOceanSimulation, ::Val{:liquid_precipitation}, field) = nothing
+Interfacer.update_field!(::SlabOceanSimulation, ::Val{:snow_precipitation}, field) = nothing
 
 
 function FluxCalculator.update_turbulent_fluxes!(

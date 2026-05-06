@@ -1,8 +1,8 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
-atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
-checkpoint_dt: "366days"
-coupler_toml: ["toml/amip_diagedmf.toml"]
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
+checkpoint_dt: "1months"
+coupler_toml: ["toml/amip_progedmf.toml"]
 dt: "120secs"
 dt_cpl: "120secs"
 energy_check: false

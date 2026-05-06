@@ -16,7 +16,6 @@ land_model: "integrated"
 microphysics_model: "1M"
 mode_name: "amip"
 netcdf_output_at_levels: true
-ode_algo: "ARS222"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 start_date: "20100101"

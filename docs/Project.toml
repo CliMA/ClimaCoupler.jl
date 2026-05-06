@@ -18,6 +18,9 @@ Oceananigans = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
 Poppler_jll = "9c32591e-4766-534b-9725-b71a8799265b"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
+[sources]
+ConservativeRegridding = {url = "https://github.com/JuliaGeo/ConservativeRegridding.jl", rev = "ss-js/update-spectral"}
+
 [compat]
 Documenter = "0.27"
 Poppler_jll = "24"

@@ -118,19 +118,12 @@ end
 ### Extensions of Interfacer.jl remapping functions for Oceananigans fields/grids
 # Non-allocating ClimaCore -> Oceananigans remap
 function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
-    get_ConservativeRegriddingCCExt().get_value_per_element!(
-        remapping.value_per_element_cc,
-        source_field,
-        remapping.field_ones_cc,
-    )
-
     # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
     z = size(target_field, 3)
     dst = vec(OC.interior(target_field, :, :, z))
-    src = remapping.value_per_element_cc
 
-    # Regrid the source field to the target field
-    CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
+    # Regrid the SE source field directly into the FV destination vector
+    CR.regrid!(dst, remapping.remapper_cc_to_oc, source_field)
     return nothing
 end
 # Allocating ClimaCore -> Oceananigans remap
@@ -154,14 +147,10 @@ function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field
     z = size(source_field, 3)
     src = vec(OC.interior(source_field, :, :, z))
 
-    # Store the remapped FV values in a vector of length equal to the number of elements in the target space
-    dst = remapping.value_per_element_cc
-
-    # Regrid the source field to the target field
-    CR.regrid!(dst, remapping.remapper_oc_to_cc, src)
-
-    # Convert the vector of remapped values to a ClimaCore Field with one value per element
-    get_ConservativeRegriddingCCExt().set_value_per_element!(target_field, dst)
+    # Regrid the FV source vector directly into the SE target field; the
+    # principled FV→SE regridder writes back via `vec_to_se_field!` and
+    # applies weighted DSS internally to reconcile shared boundary nodes.
+    CR.regrid!(target_field, remapping.remapper_oc_to_cc, src)
     return nothing
 end
 # Allocating Oceananigans Field -> ClimaCore remap

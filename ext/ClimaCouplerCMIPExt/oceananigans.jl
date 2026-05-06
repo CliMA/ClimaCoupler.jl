@@ -233,35 +233,40 @@ end
 Given an Oceananigans grid and a ClimaCore boundary space, construct the
 remappers needed to remap between the two grids in both directions.
 
-Returns a remapper from the Oceananigans grid to the ClimaCore boundary space.
-To regrid from Oceananigans to ClimaCore, use `CR.regrid!(dest_vector, remapper_oc_to_cc, src_vector)`.
-To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest_vector, transpose(remapper_oc_to_cc), src_vector)`.
+Returns a NamedTuple holding two regridders:
+- `remapper_oc_to_cc`: FV → SE (per-element L2 projection with weighted DSS).
+- `remapper_cc_to_oc`: SE → FV (principled polygon-intersection regridding).
+
+To regrid from Oceananigans to ClimaCore, use `CR.regrid!(target_field, remapping.remapper_oc_to_cc, src_vector)`,
+where `target_field` is a ClimaCore Field. To regrid from ClimaCore to Oceananigans,
+use `CR.regrid!(dest_vector, remapping.remapper_cc_to_oc, source_field)`,
+where `source_field` is a ClimaCore Field.
 """
 function construct_remapper(grid_oc, boundary_space)
     # Move grids to CPU since ConservativeRegridding doesn't support GPU grids yet
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), grid_oc.underlying_grid)
     boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
 
-    # Create the remapper from the Oceananigans grid to the ClimaCore boundary space
+    # Build SE↔FV regridders. With the principled SE↔FV regridding the two
+    # directions are not transposes of each other, so we construct them
+    # explicitly.
+    # FV → SE (Regridder dispatches on dst::SpectralElementSpace)
     remapper_oc_to_cc = CR.Regridder(
         boundary_space_cpu,
         grid_oc_underlying_cpu;
-        normalize = false,
+        threaded = false,
+    )
+    # SE → FV (Regridder dispatches on src::SpectralElementSpace)
+    remapper_cc_to_oc = CR.Regridder(
+        grid_oc_underlying_cpu,
+        boundary_space_cpu;
         threaded = false,
     )
 
-    # Move remapper to GPU if needed
-    remapper_oc_to_cc = OC.on_architecture(OC.architecture(grid_oc), remapper_oc_to_cc)
-
-    # Create a field of ones on the boundary space so we can compute element areas
-    field_ones_cc = CC.Fields.ones(boundary_space)
-
-    # Allocate a vector with length equal to the number of elements in the target space
-    # To be used as a temp field for remapping
-    FT = CC.Spaces.undertype(boundary_space)
-    ArrayType = ClimaComms.array_type(boundary_space)
-    value_per_element_cc =
-        ArrayType(zeros(FT, CC.Meshes.nelements(boundary_space.grid.topology.mesh)))
+    # Move regridders to the same architecture as the Oceananigans grid
+    arch = OC.architecture(grid_oc)
+    remapper_oc_to_cc = OC.on_architecture(arch, remapper_oc_to_cc)
+    remapper_cc_to_oc = OC.on_architecture(arch, remapper_cc_to_oc)
 
     # Construct 2D Oceananigans Center/Center fields as scratch space while remapping
     scratch_field_oc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
@@ -269,6 +274,7 @@ function construct_remapper(grid_oc, boundary_space)
     scratch_field_oc3 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
 
     # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
+    FT = CC.Spaces.undertype(boundary_space)
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
     # Precompute 2D ocean-grid mask for polar flux suppression on LatitudeLongitudeGrid only.
@@ -280,8 +286,7 @@ function construct_remapper(grid_oc, boundary_space)
 
     return (;
         remapper_oc_to_cc,
-        field_ones_cc,
-        value_per_element_cc,
+        remapper_cc_to_oc,
         scratch_field_oc1,
         scratch_field_oc2,
         scratch_field_oc3,

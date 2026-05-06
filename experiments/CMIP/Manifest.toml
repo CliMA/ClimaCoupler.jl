@@ -770,9 +770,11 @@ version = "0.2.34"
 
 [[deps.ConservativeRegridding]]
 deps = ["ChunkSplitters", "DocStringExtensions", "Extents", "GeoInterface", "GeometryOps", "GeometryOpsCore", "LinearAlgebra", "ProgressMeter", "SciMLPublic", "SortTileRecursiveTree", "SparseArrays", "StableTasks", "StaticArrays"]
-git-tree-sha1 = "e19620549be3442ed7387271273460cf6d333dd7"
+git-tree-sha1 = "66e48f79d1276003f318807a983adb19a9b7204f"
+repo-rev = "ss-js/update-spectral"
+repo-url = "https://github.com/JuliaGeo/ConservativeRegridding.jl"
 uuid = "8e50ac2c-eb48-49bc-a402-07c87b949343"
-version = "0.2.1"
+version = "0.2.0"
 
     [deps.ConservativeRegridding.extensions]
     ConservativeRegriddingClimaCoreExt = "ClimaCore"

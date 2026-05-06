@@ -1,7 +1,7 @@
 name = "ClimaCoupler"
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
-version = "0.1.2"
 authors = ["CliMA Contributors <clima-software@caltech.edu>"]
+version = "0.1.2"
 
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
@@ -63,10 +63,10 @@ ClimaDiagnostics = "0.2.6, 0.3"
 ClimaLand = "1.7"
 ClimaOcean = "0.9.5"
 ClimaParams = "1.0"
-ClimaSeaIce = "0.4.0 - 0.4.5" # [0.4.0, 0.4.5]
+ClimaSeaIce = "0.4.0 - 0.4.5"
 ClimaTimeSteppers = "0.7, 0.8"
 ClimaUtilities = "0.1.22"
-ConservativeRegridding = "0.2.1"
+ConservativeRegridding = "0.2, 0.3"
 Dates = "1"
 GeoMakie = "0.7"
 Insolation = "1.1"
@@ -88,3 +88,10 @@ SurfaceFluxes = "0.15.0, 1"
 Thermodynamics = "0.15.3, ~1.0, ~1.1, ~1.2"
 YAML = "0.4"
 julia = "1.10"
+
+[extras]
+ConservativeRegridding = "8e50ac2c-eb48-49bc-a402-07c87b949343"
+
+[sources.ConservativeRegridding]
+rev = "ss-js/update-spectral"
+url = "https://github.com/JuliaGeo/ConservativeRegridding.jl"

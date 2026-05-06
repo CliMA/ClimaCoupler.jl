@@ -428,14 +428,16 @@ function _init_ocean_isolation_mask!(
     perm        = sortperm(lats)
     sorted_lats = lats[perm]
 
-    # Derive the BFS adjacency radius from the actual GLL node spacing in the global grid.
-    # Within a spectral element the max GLL spacing is at most ~2× the min spacing
-    # (exact ratio depends on quadrature order; 2.0 is a safe upper bound for Nq ≤ 8).
-    # Use the global data for a robust estimate that works across all MPI ranks and resolutions.
-    lat_gaps   = diff(sorted_lats)
-    valid_gaps = filter(g -> g > 0.01, lat_gaps)   # exclude co-located element-boundary DOFs
-    min_gap    = isempty(valid_gaps) ? 1.0 : minimum(valid_gaps)
-    r          = 2.0 * Float64(min_gap)
+    # Derive the BFS adjacency radius from the largest inter-cell gap in latitude.
+    # On a cubed sphere, the equatorial→polar face transition produces a structural
+    # latitude gap (no GLL points between the highest equatorial-face row and the
+    # lowest polar-face row) that exceeds the typical within-face spacing — at
+    # h_elem=8 this gap is ~1.9°. The radius must be able to bridge it, so we base
+    # `r` on the global maximum positive gap with a 1.5× safety factor.
+    lat_gaps      = diff(sorted_lats)
+    positive_gaps = filter(g -> g > 1e-8, lat_gaps)   # only drop truly colocated DOFs
+    max_gap       = isempty(positive_gaps) ? 1.0 : maximum(positive_gaps)
+    r             = 1.5 * Float64(max_gap)
 
     # Seed: strong ocean cells within the tropical/subtropical band.
     queue = Int[]

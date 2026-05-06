@@ -2,12 +2,13 @@
   "permissions": {
     "allow": [
       "Read",
-      "Bash(ls:*)",
-      "Bash(cat:*)",
-      "Bash(grep:*)",
-      "Bash(find:*)",
-      "Bash(rg:*)",
-      "Bash(xargs ls *)"
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Bash(rg *)",
+      "Bash(xargs ls *)",
+      "Bash(julia *)"
     ]
   }
 }

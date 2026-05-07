@@ -20,6 +20,7 @@ mode_name: "cmip"
 nh_poly: 2
 ocean_model: "oceananigans"
 output_default_diagnostics: true
+radiation_reset_rng_seed: true
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"

@@ -19,6 +19,7 @@ land_spun_up_ic: false
 mode_name: "cmip"
 nh_poly: 2
 ocean_model: "oceananigans"
+radiation_reset_rng_seed: true
 output_default_diagnostics: true
 rmse_check: true
 start_date: "20100101"

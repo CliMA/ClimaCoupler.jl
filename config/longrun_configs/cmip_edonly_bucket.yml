@@ -16,6 +16,7 @@ insolation: "timevarying"
 mode_name: "cmip"
 nh_poly: 3
 ocean_model: "oceananigans"
+radiation_reset_rng_seed: true
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"

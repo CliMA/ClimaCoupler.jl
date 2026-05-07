@@ -26,7 +26,7 @@ output_default_diagnostics: true
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "186days"
+t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
 z_elem: 39

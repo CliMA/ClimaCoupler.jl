@@ -58,6 +58,7 @@ dispatch in coupling.
 - `dt`: Time step (default: `nothing`)
 - `comms_ctx`: Communication context (default: `ClimaComms.context()`)
 - `coupled_param_dict`: Coupled parameter dictionary (default: created from `area_fraction`)
+- `progress_interval`: iteration interval for printing progress information (default: `nothing`)
 
 Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
@@ -72,6 +73,7 @@ function OceananigansSimulation(
     dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
+    progress_interval = nothing,
     extra_kwargs...,
 ) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
@@ -180,6 +182,42 @@ function OceananigansSimulation(
         free_surface,
         closure,
     )
+
+    wall_time = Ref(time_ns())
+
+    """
+        progress(sim)
+
+    Output the extrema of some prognostic variables, which can be useful for debugging.
+    The frequency with which this is output is determined by the interval passed to
+    `OC.add_callback!` below.
+    """
+    function progress(sim)
+        ocean = sim.model
+
+        (Tmax, Tmin) = extrema(ocean.tracers.T)
+        (Smax, Smin) = extrema(ocean.tracers.S)
+        (ηmax, ηmin) = extrema(ocean.free_surface.displacement)
+        umax = maximum(abs, ocean.velocities.u)
+        vmax = maximum(abs, ocean.velocities.v)
+        wmax = maximum(abs, ocean.velocities.w)
+        step_time = 1e-9 * (time_ns() - wall_time[])
+        @info "time: $(OC.Utils.prettytime(sim)), iteration: $(OC.iteration(sim)), Δt: $(OC.Utils.prettytime(sim.Δt)), " *
+              "extrema(η): ($(round(ηmin, sigdigits=2)), $(round(ηmax, sigdigits=2))) " *
+              "extrema(T, S): ($(round(Tmin, digits=2)), $(round(Tmax, digits=2))) ᵒC, " *
+              "($(round(Smin, digits=2)), $(round(Smax, digits=2))) psu " *
+              "maximum(u): ($(round(umax, sigdigits=2)), $(round(vmax, sigdigits=2)), $(round(wmax, sigdigits=2))) m/s, " *
+              "wall time: $(OC.Utils.prettytime(step_time))"
+
+        wall_time[] = time_ns()
+
+        return nothing
+    end
+
+    # Attaching a progress function to the ocean
+    if !isnothing(progress_interval)
+        OC.add_callback!(ocean, progress, OC.IterationInterval(progress_interval))
+    end
 
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])

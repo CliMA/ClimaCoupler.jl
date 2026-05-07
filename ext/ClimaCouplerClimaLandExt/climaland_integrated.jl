@@ -155,39 +155,21 @@ function ClimaLandSimulation(
             "Unknown lai_source: $lai_source. Must be \"modis_monthly\" or \"modis_monthly_climatology\"",
         )
     end
-
     ground = CL.PrognosticGroundConditions{FT}()
     canopy_forcing = (; forcing.atmos, forcing.radiation, ground)
     prognostic_land_components = (:canopy, :snow, :soil, :soilco2)
     surface_domain = CL.Domains.obtain_surface_domain(domain)
-    biomass = CL.Canopy.PrescribedBiomassModel{FT}(domain, LAI, toml_dict)
+    photosynthesis = CL.Canopy.FarquharModel{FT}(surface_domain, toml_dict)
+    conductance = CL.Canopy.MedlynConductanceModel{FT}(surface_domain, toml_dict)
     canopy = CL.Canopy.CanopyModel{FT}(
         surface_domain,
         canopy_forcing,
         LAI,
         toml_dict;
         prognostic_land_components,
-        biomass,
+        photosynthesis,
+        conductance,
     )
-
-    # Snow model setup
-    # Set β = 0 in order to regain model without density dependence
-    α_snow = CL.Snow.ZenithAngleAlbedoModel(toml_dict)
-    horz_degree_res =
-        domain isa CL.Domains.Column ? FT(1) :
-        FT(sum(CL.Domains.average_horizontal_resolution_degrees(domain)) / 2)
-    scf = CL.Snow.WuWuSnowCoverFractionModel(toml_dict, horz_degree_res)
-    snow = CL.Snow.SnowModel(
-        FT,
-        surface_domain,
-        forcing,
-        toml_dict,
-        dt;
-        prognostic_land_components,
-        α_snow,
-        scf,
-    )
-
     model = CL.LandModel{FT}(
         forcing,
         LAI,
@@ -195,7 +177,6 @@ function ClimaLandSimulation(
         domain,
         dt;
         prognostic_land_components,
-        snow,
         canopy,
     )
 

@@ -576,6 +576,14 @@ function Interfacer.update_field!(sim::OceananigansSimulation, ::Val{:area_fract
     return nothing
 end
 
+function FluxCalculator.reset_fluxes!(sim::OceananigansSimulation)
+    oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
+    OC.interior(oc_flux_T, :, :, 1) .= 0
+    oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
+    OC.interior(oc_flux_S, :, :, 1) .= 0
+    return nothing
+end
+
 """
     FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
 
@@ -585,8 +593,9 @@ by the coupler.
 Update the portion of the surface_fluxes for T and S that is due to radiation and
 precipitation. The rest will be updated in `update_turbulent_fluxes!`.
 
-This function sets the surface fluxes directly, overwriting any previous values.
-Additional contributions will be made in `update_turbulent_fluxes!` and `ocean_seaice_fluxes!`.
+Flux tendencies are expected to be reset at the start of the coupler timestep via
+[`FluxCalculator.reset_fluxes!`](@ref). Additional contributions are made in `update_turbulent_fluxes!`
+and `ocean_seaice_fluxes!`.
 
 A note on sign conventions:
 ClimaAtmos and Oceananigans both use the convention that a positive flux is an upward flux.
@@ -600,12 +609,8 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     grid = sim.ocean.model.grid
     Nz = grid.Nz
     ice_concentration = OC.interior(sim.ice_concentration, :, :, 1)
-
-    # Reset fluxes to 0 at the start of the step
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
-    OC.interior(oc_flux_T, :, :, 1) .= 0
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
-    OC.interior(oc_flux_S, :, :, 1) .= 0
 
     # for masking out the poles
     polar_mask = sim.remapping.polar_mask

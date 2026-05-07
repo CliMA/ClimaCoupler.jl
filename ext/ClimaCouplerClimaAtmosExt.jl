@@ -16,6 +16,7 @@ import ClimaParams as CP
 import ClimaCore as CC
 import ClimaCore.Geometry: ⊗
 import SurfaceFluxes as SF
+import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
 import ClimaCoupler:
     Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities, Plotting
@@ -499,15 +500,39 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
     sim.integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot .=
         temp_field_surface .* surface_normal # (evap)
 
-    Interfacer.remap!(
-        sim.integrator.p.precomputed.sfc_conditions.obukhov_length,
-        fields.L_MO,
+    # Compute buoyancy flux, ustar, and L_MO using combined coupler fields
+    surface_fluxes_params = FluxCalculator.get_surface_params(sim)
+    (; T_sfc, ρ_atmos, q_tot_atmos, q_liq_atmos, q_ice_atmos, scalar_temp1, scalar_temp2) =
+        fields
+    # Note: It isn't clear that q_vap_sfc should come from q_vap_int like this, but this is
+    # easy and not too wrong (see https://github.com/CliMA/ClimaCoupler.jl/issues/1817)
+    @. scalar_temp1 = q_tot_atmos - q_liq_atmos - q_ice_atmos
+    q_vap_atmos = scalar_temp1 # rename for clarity
+    @. scalar_temp2 = SF.buoyancy_flux(
+        surface_fluxes_params,
+        F_sh,
+        F_lh,
+        T_sfc, # Same note here as the one above for q_vap_sfc
+        ρ_atmos,
+        q_vap_atmos,
+        q_liq_atmos,
+        q_ice_atmos,
+        SF.MoistModel(),
     )
-    Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.ustar, fields.ustar)
+    buoyancy_flux = scalar_temp2 # rename for clarity
     Interfacer.remap!(
         sim.integrator.p.precomputed.sfc_conditions.buoyancy_flux,
-        fields.buoyancy_flux,
+        buoyancy_flux,
     )
+
+    @. scalar_temp1 = sqrt(sqrt(F_turb_ρτxz^2 + F_turb_ρτyz^2) / ρ_atmos) # reuse (q_vap_atmos no longer needed)
+    ustar = scalar_temp1 # rename for clarity
+    Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.ustar, ustar)
+
+    @. scalar_temp1 =
+        -ustar^3 / SFP.von_karman_const(surface_fluxes_params) / SF.non_zero(buoyancy_flux) # reuse (ustar no longer needed)
+    L_MO = scalar_temp1 # rename for clarity
+    Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.obukhov_length, L_MO)
 
     return nothing
 end
@@ -518,14 +543,12 @@ Extend Interfacer.add_coupler_fields! to add the fields required for ClimaAtmosS
 The fields added are:
 - `:surface_direct_albedo` (for radiation)
 - `:surface_diffuse_albedo` (for radiation)
-- `:ustar`, `:L_MO`, `:buoyancy_flux` (for EDMF boundary conditions)
 """
 function Interfacer.add_coupler_fields!(
     coupler_field_names,
     atmos_sim::ClimaAtmosSimulation,
 )
-    atmos_coupler_fields =
-        [:surface_direct_albedo, :surface_diffuse_albedo, :ustar, :L_MO, :buoyancy_flux]
+    atmos_coupler_fields = [:surface_direct_albedo, :surface_diffuse_albedo]
     push!(coupler_field_names, atmos_coupler_fields...)
 end
 

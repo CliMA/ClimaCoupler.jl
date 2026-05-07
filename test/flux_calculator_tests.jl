@@ -148,14 +148,7 @@ for FT in (Float32, Float64)
 
         model_sims = (; atmos_sim, ocean_sim, ocean_sim2)
 
-        coupler_cache_additional = [
-            :surface_direct_albedo,
-            :surface_diffuse_albedo,
-            :P_net,
-            :L_MO,
-            :ustar,
-            :buoyancy_flux,
-        ]
+        coupler_cache_additional = [:surface_direct_albedo, :surface_diffuse_albedo, :P_net]
 
         coupler_cache_names = Interfacer.default_coupler_fields()
         push!(coupler_cache_names, coupler_cache_additional...)

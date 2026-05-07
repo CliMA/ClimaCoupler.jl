@@ -500,12 +500,12 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     @. F_turb_ρτyz_cell = polar_mask * F_turb_ρτyz_cell
 
     # Weight by (1 - sea ice concentration)
-    ice_concentration = OC.interior(ice_concentration_field,:,:,1)
-    OC.interior(F_turb_ρτxz_cell,:,:,1) .=
-        OC.interior(F_turb_ρτxz_cell,:,:,1) .* (1.0 .- ice_concentration) ./
+    ice_concentration = OC.interior(ice_concentration_field, :, :, 1)
+    OC.interior(F_turb_ρτxz_cell, :, :, 1) .=
+        OC.interior(F_turb_ρτxz_cell, :, :, 1) .* (1.0 .- ice_concentration) ./
         reference_density
-    OC.interior(F_turb_ρτyz_cell,:,:,1) .=
-        OC.interior(F_turb_ρτyz_cell,:,:,1) .* (1.0 .- ice_concentration) ./
+    OC.interior(F_turb_ρτyz_cell, :, :, 1) .=
+        OC.interior(F_turb_ρτyz_cell, :, :, 1) .* (1.0 .- ice_concentration) ./
         reference_density
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
@@ -533,7 +533,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     # mask out the poles
     @. remapped_F_lh = polar_mask * remapped_F_lh
     @. remapped_F_sh = polar_mask * remapped_F_sh
-    OC.interior(oc_flux_T,:,:,1) .+=
+    OC.interior(oc_flux_T, :, :, 1) .+=
         (1.0 .- ice_concentration) .* (remapped_F_lh .+ remapped_F_sh) ./
         (reference_density * heat_capacity)
 
@@ -546,10 +546,10 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     )
     moisture_fresh_water_flux = sim.remapping.scratch_arr1 ./ reference_density
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
-    surface_salinity = OC.interior(sim.ocean.model.tracers.S,:,:,grid.Nz)
+    surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
     # mask out the poles
     @. moisture_fresh_water_flux = polar_mask * moisture_fresh_water_flux
-    OC.interior(oc_flux_S,:,:,1) .-=
+    OC.interior(oc_flux_S, :, :, 1) .-=
         (1.0 .- ice_concentration) .* surface_salinity .* moisture_fresh_water_flux
     return nothing
 end
@@ -582,13 +582,13 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     (; reference_density, heat_capacity) = sim.ocean_properties
     grid = sim.ocean.model.grid
     Nz = grid.Nz
-    ice_concentration = OC.interior(sim.ice_concentration,:,:,1)
+    ice_concentration = OC.interior(sim.ice_concentration, :, :, 1)
 
     # Reset fluxes to 0 at the start of the step
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
-    OC.interior(oc_flux_T,:,:,1) .= 0
+    OC.interior(oc_flux_T, :, :, 1) .= 0
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
-    OC.interior(oc_flux_S,:,:,1) .= 0
+    OC.interior(oc_flux_S, :, :, 1) .= 0
 
     # for masking out the poles
     polar_mask = sim.remapping.polar_mask
@@ -621,12 +621,12 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
             -(1 - α) .* remapped_SW_d .-
             ϵ * (
                 remapped_LW_d .-
-                σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T,:,:,Nz)) .^ 4
+                σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T, :, :, Nz)) .^ 4
             )
         ) ./ (reference_density * heat_capacity)
     # mask out the poles
     @. rad_T_flux = polar_mask * rad_T_flux
-    OC.interior(oc_flux_T,:,:,1) .+= rad_T_flux
+    OC.interior(oc_flux_T, :, :, 1) .+= rad_T_flux
 
     # Remap precipitation fields onto scratch arrays; rename for clarity
     CC.Remapping.interpolate!(
@@ -646,8 +646,8 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     @. remapped_P_snow = polar_mask * remapped_P_snow
 
     # Update salinity flux with precipitation contribution
-    OC.interior(oc_flux_S,:,:,1) .-=
-        OC.interior(sim.ocean.model.tracers.S,:,:,Nz) .* (1.0 .- ice_concentration) .*
+    OC.interior(oc_flux_S, :, :, 1) .-=
+        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
         (remapped_P_liq .+ remapped_P_snow) ./ reference_density
     return nothing
 end

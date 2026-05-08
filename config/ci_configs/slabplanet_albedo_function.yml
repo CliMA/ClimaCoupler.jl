@@ -11,3 +11,4 @@ share_surface_space: false
 t_end: "1days"
 use_itime: false
 vert_diff: "true"
+check_nan_every: 1

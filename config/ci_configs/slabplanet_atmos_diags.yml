@@ -9,3 +9,4 @@ microphysics_model: "0M"
 t_end: "1days"
 vert_diff: "true"
 
+check_nan_every: 1

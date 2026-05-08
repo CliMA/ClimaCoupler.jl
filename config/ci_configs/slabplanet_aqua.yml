@@ -10,3 +10,4 @@ start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "400secs"
 vert_diff: "DecayWithHeightDiffusion"
+check_nan_every: 1

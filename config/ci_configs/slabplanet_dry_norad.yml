@@ -11,3 +11,4 @@ rad: nothing
 microphysics_model: "dry"
 t_end: "1days"
 vert_diff: "true"
+check_nan_every: 1

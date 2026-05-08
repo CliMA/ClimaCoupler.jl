@@ -464,6 +464,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
     temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
 
     Y = sim.integrator.u
+    FT = eltype(sim.integrator.p.params)
     surface_local_geometry =
         CC.Fields.level(CC.Fields.local_geometry_field(Y.f), CC.Utilities.half)
     surface_normal = @. CA.C3(CA.unit_basis_vector_data(CA.C3, surface_local_geometry))
@@ -525,7 +526,8 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
         buoyancy_flux,
     )
 
-    @. scalar_temp1 = sqrt(sqrt(F_turb_ρτxz^2 + F_turb_ρτyz^2) / ρ_atmos) # reuse (q_vap_atmos no longer needed)
+    # ustar needs to be non-zero for EDMF boundary conditions
+    @. scalar_temp1 = max(eps(FT), sqrt(sqrt(F_turb_ρτxz^2 + F_turb_ρτyz^2) / ρ_atmos)) # reuse (q_vap_atmos no longer needed)
     ustar = scalar_temp1 # rename for clarity
     Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.ustar, ustar)
 

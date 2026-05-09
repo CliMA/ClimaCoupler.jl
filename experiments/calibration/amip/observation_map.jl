@@ -2,6 +2,8 @@ using Dates: Week, Month, Year, Day, Millisecond
 import JLD2
 import ClimaAnalysis
 import ClimaCoupler
+import ClimaCalibrate
+import ClimaCalibrate: EnsembleBuilder
 import ClimaCalibrate.Checker: SequentialIndicesChecker
 import CairoMakie
 import GeoMakie
@@ -17,15 +19,6 @@ include(
         "calibration",
         "amip",
         "preprocessing.jl",
-    ),
-)
-include(
-    joinpath(
-        pkgdir(ClimaCoupler),
-        "experiments",
-        "calibration",
-        "amip",
-        "post_analyze_iteration.jl",
     ),
 )
 
@@ -61,7 +54,14 @@ function preprocess_sim_vars(vars)
     return vars
 end
 
-function load_and_preprocess_vars(simdir, short_names)
+"""
+    load_and_preprocess_vars(simdir, short_names)
+
+Load and preprocess variables from `simdir`.
+
+The short names `swcre` and `lwcre` are also available.
+"""
+function load_and_preprocess_vars(simdir::ClimaAnalysis.SimDir, short_names)
     vars = []
     for short_name in short_names
         if short_name == "swcre"
@@ -83,7 +83,7 @@ function load_and_preprocess_vars(simdir, short_names)
             push!(vars, var)
             continue
         end
-        coord_types = available_coord_types(
+        coord_types = ClimaAnalysis.available_coord_types(
             simdir;
             short_name = short_name,
             reduction = "average",
@@ -103,9 +103,15 @@ function load_and_preprocess_vars(simdir, short_names)
     return vars
 end
 
-function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, iteration)
+"""
+    process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx)
+
+Process the `col_idx`th member of the G ensemble matrix using `g_ens_builder`
+by loading the diagnostics at `diagnostics_folder_path` and processing the
+variables.
+"""
+function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx)
     short_names = EnsembleBuilder.missing_short_names(g_ens_builder, col_idx)
-    sample_date_ranges = CALIBRATE_CONFIG.sample_date_ranges[iteration + 1]
     @info "Short names: $short_names"
 
     simdir = ClimaAnalysis.SimDir(diagnostics_folder_path)
@@ -124,26 +130,35 @@ function process_member_data!(g_ens_builder, diagnostics_folder_path, col_idx, i
     return vars
 end
 
-# Get job_id from config file name (e.g., "wxquest_diagedmf_weekly_calibration.yml" -> "wxquest_diagedmf_weekly_calibration")
-function get_job_id()
-    config_file = CALIBRATE_CONFIG.config_file
+"""
+    get_job_id(config::ClimaCoupler.CalibrationTools.CalibrateConfig)
+
+Get the job ID from the calibration config.
+"""
+function get_job_id(config::ClimaCoupler.CalibrationTools.CalibrateConfig)
+    (; config_file) = config
     return replace(basename(config_file), ".yml" => "")
 end
 
-# Override observation_map to use correct job_id path
-function ClimaCalibrate.observation_map(iteration)
-    output_dir = CALIBRATE_CONFIG.output_dir
+"""
+    ClimaCalibrate.observation_map(interface::CouplerModelInterface, iteration)
+
+Compute the G ensemble matrix from the forward model outputs.
+"""
+function ClimaCalibrate.observation_map(interface::CouplerModelInterface, iteration)
+    (; config) = interface
+    (; output_dir) = config
     ekp = JLD2.load_object(ClimaCalibrate.ekp_path(output_dir, iteration))
 
     g_ens_builder = EnsembleBuilder.GEnsembleBuilder(ekp)
-    job_id = get_job_id()
+    job_id = get_job_id(config)
 
     for m in 1:EKP.get_N_ens(ekp)
         member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, m)
         simdir_path = joinpath(member_path, job_id, "output_active")
         @info "Processing member $m: $simdir_path"
         try
-            process_member_data!(g_ens_builder, simdir_path, m, iteration)
+            process_member_data!(g_ens_builder, simdir_path, m)
         catch e
             @error "Ensemble member $m failed" exception = (e, catch_backtrace())
             # Fill failed member column with NaN so EKP can handle the failure

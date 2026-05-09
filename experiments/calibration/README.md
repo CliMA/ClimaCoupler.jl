@@ -1,23 +1,33 @@
 # ClimaCoupler Calibration Experiments
 
+The `amip` experiment calibrates parameters against ERA5 pressure-level
+observations of `ta` and `hur` at 200, 500, and 850 hPa with a latitude-weighted
+scalar covariance matrix. The observations are z-score normalized for each variable and pressure level.
 
-This folder contains pipelines to reproduce coupled calibration experiments.
-Each pipeline has its own subfolder:
+## Configs:
 
-- perfect_model: A trivial perfect-model calibration of the atmosphere coupled
-with the bucket model. The calibration uses 30-day and lat/lon averages of
-top-of-atmosphere shortwave radiation to calibrate the `total_solar_irradiance`
-parameter in a perfect model setting. The current run script uses the
- `ClimaCalibrate.SlurmManager` to add Slurm workers which run each ensemble
- member in parallel.
-- subseasonal: Calibrates the inverse entrainment timescale to ERA5 October
-  monthly surface fluxes and surface temperature from 2018 to 2024.
-- amip: Calibrates `ta` and `hur` for October 1, 2010 with a latitude-weighted
-  scalar covariance matrix.
+- `pressure_levels.jl`: 6 iterations using `ta` and `hur` observations of
+  October 2010.
+- `pipeline_test.jl`: an end-to-end test that runs a single iteration using `ta`
+  and `hur` observations of October 2010. To use this config, you
+  should set the environment variable `TEST_CALIBRATION` to anything before
+  generating the observations and starting the calibration.
 
-To run a pipeline on a Slurm cluster, ensure that the given runscript
-`experiments/calibration/<pipeline>/run_calibration.jl` is configured for your
-cluster and run:
+## Running a calibration
+
+### Generate observations
+
+Before running a calibration, you need to generate the observations with:
+
+
+```bash
+julia --project=experiments/AMIP experiments/calibration/amip/generate_observations.jl
 ```
-julia --project=experiments/AMIP experiments/calibration/<pipeline>/run_calibration.jl
+
+### Run calibration
+
+Then, you can run the calibration with
+
+```bash
+julia --project=experiments/AMIP experiments/calibration/amip/run_calibration.jl
 ```

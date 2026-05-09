@@ -1,22 +1,20 @@
-include(
-    joinpath(
-        pkgdir(ClimaCoupler),
-        "experiments",
-        "calibration",
-        "subseasonal",
-        "observation_map.jl",
-    ),
+bias_plot_extrema = Dict(
+    "tas" => (-6, 6),
+    "tas - ta" => (-6, 6),
+    "hfls" => (-50, 50),
+    "hfss" => (-25, 25),
+    "rsus" => (-50, 50),
+    "rlus" => (-50, 50),
+    "mslp" => (-1000, 1000),
+    "pr" => (-1e-4, 1e-4),
+    "ta_850hPa" => (-2, 2),
+    "ta_500hPa" => (-2, 2),
+    "ta_200hPa" => (-2, 2),
+    "hur_850hPa" => (-2, 2),
+    "hur_500hPa" => (-2, 2),
+    "hur_200hPa" => (-2, 2),
 )
 
-# Extend bias_plot_extrema (defined in subseasonal/observation_map.jl) with weekly variables
-bias_plot_extrema["ta_850hPa"] = (-2, 2)
-bias_plot_extrema["ta_500hPa"] = (-2, 2)
-bias_plot_extrema["ta_200hPa"] = (-2, 2)
-bias_plot_extrema["hur_850hPa"] = (-2, 2)
-bias_plot_extrema["hur_500hPa"] = (-2, 2)
-bias_plot_extrema["hur_200hPa"] = (-2, 2)
-
-# TODO: Unify this with `plot_bias` in the subseasonal observation_map.jl
 """
     plot_bias_weekly(ekp, simdir, iteration; output_dir)
 
@@ -26,15 +24,12 @@ object and denormalized to physical units when normalization is enabled.
 """
 function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation_path)
     (; short_names, sample_date_ranges) = CALIBRATE_CONFIG
-    sample_date_range = sample_date_ranges[iteration + 1]
+    sample_date_range = sample_date_ranges[iteration]
     calib_start, _ = sample_date_range
 
     # Reconstruct ERA5 OutputVars from the EKP observation object
     obs_series = EKP.get_observation_series(ekp)
-    minibatch_obs = ClimaCalibrate.ObservationRecipe.get_observations_for_nth_iteration(
-        obs_series,
-        iteration + 1,
-    )
+    minibatch_obs = ClimaCalibrate.get_observations_for_nth_iteration(obs_series, iteration)
 
     era5_vars =
         mapreduce(ClimaCalibrate.ObservationRecipe.reconstruct_vars, vcat, minibatch_obs)
@@ -61,16 +56,30 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
     fig = GeoMakie.Figure(size = (2000, 500 * length(var_pairs)))
     for (i, (sim_var, era5_var)) in enumerate(var_pairs)
         sn = ClimaAnalysis.short_name(sim_var)
-        sim_var_t = ClimaAnalysis.select(sim_var; by = MatchValue(), time = calib_start)
-        era5_var_t = ClimaAnalysis.select(era5_var; by = MatchValue(), time = calib_start)
+        sim_var_t = ClimaAnalysis.select(
+            sim_var;
+            by = ClimaAnalysis.MatchValue(),
+            time = calib_start,
+        )
+        era5_var_t = ClimaAnalysis.select(
+            era5_var;
+            by = ClimaAnalysis.MatchValue(),
+            time = calib_start,
+        )
         cmap_extrema = get(bias_plot_extrema, sn, extrema(sim_var_t.data))
         try
             if ClimaAnalysis.has_pressure(sim_var_t)
                 for (j, pressure) in enumerate(ClimaAnalysis.pressures(sim_var_t))
-                    sim_var_t_p =
-                        ClimaAnalysis.select(sim_var_t; by = MatchValue(), pressure)
-                    era5_var_t_p =
-                        ClimaAnalysis.select(era5_var_t; by = MatchValue(), pressure)
+                    sim_var_t_p = ClimaAnalysis.select(
+                        sim_var_t;
+                        by = ClimaAnalysis.MatchValue(),
+                        pressure,
+                    )
+                    era5_var_t_p = ClimaAnalysis.select(
+                        era5_var_t;
+                        by = ClimaAnalysis.MatchValue(),
+                        pressure,
+                    )
                     # Sometimes the float type of the dims don't match so we resample...
                     # sim_var_t_p = ClimaAnalysis.resampled_as(sim_var_t_p, era5_var_t_p)
                     ClimaAnalysis.Visualize.plot_bias_on_globe!(
@@ -90,7 +99,7 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
                 )
             end
         catch e
-            @error "bias plot error: $(short_name(sim_var_t))"
+            @error "bias plot error: $(ClimaAnalysis.short_name(sim_var_t))"
         end
     end
 
@@ -98,11 +107,34 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
     return nothing
 end
 
-function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, iteration)
+"""
+    ClimaCalibrate.analyze_iteration(
+        interface::CouplerModelInterface,
+        ekp,
+        g_ensemble,
+        prior,
+        output_dir,
+        iteration,
+    )
+
+Analyze each iteration is completed by
+- plotting the contrained parameters and errors,
+- plotting the bias,
+- computing the ensemble spread.
+"""
+function ClimaCalibrate.analyze_iteration(
+    interface::CouplerModelInterface,
+    ekp,
+    g_ensemble,
+    prior,
+    output_dir,
+    iteration,
+)
     plot_output_path = ClimaCalibrate.path_to_iteration(output_dir, iteration)
     plot_constrained_params_and_errors(output_dir, ekp, prior)
 
-    job_id = get_job_id()
+    (; config) = interface
+    job_id = get_job_id(config)
     member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, 1)
     simdir_path = joinpath(member_path, job_id, "output_active")
     try
@@ -114,4 +146,35 @@ function ClimaCalibrate.analyze_iteration(ekp, g_ensemble, prior, output_dir, it
 
     @info "Ensemble spread: $(scalar_spread(ekp))"
     return nothing
+end
+
+"""
+    plot_constrained_params_and_errors(output_dir, ekp, prior)
+
+Plot the constrained parameters and errors from `ekp` and `prior` and save
+them to `output_dir`.
+"""
+function plot_constrained_params_and_errors(output_dir, ekp, prior)
+    dim_size = sum(length.(EKP.batch(prior)))
+    fig = CairoMakie.Figure(size = ((dim_size + 1) * 500, 500))
+    for i in 1:dim_size
+        EKP.Visualize.plot_ϕ_over_iters(fig[1, i], ekp, prior, i)
+    end
+    EKP.Visualize.plot_error_over_iters(fig[1, dim_size + 1], ekp, error_metric = "loss")
+    EKP.Visualize.plot_error_over_time(fig[1, dim_size + 2], ekp, error_metric = "loss")
+    CairoMakie.save(joinpath(output_dir, "constrained_params_and_error.png"), fig)
+    return nothing
+end
+
+"""
+    scalar_spread(ekp)
+
+Compute the mean over ensemble members of the squared Euclidean distance of the
+forward model outputs from the ensemble mean.
+"""
+function scalar_spread(ekp)
+    g_mean_final = EKP.get_g_mean_final(ekp)
+    g_final = EKP.get_g_final(ekp)
+    sq_dists = [sum((col .- g_mean_final) .^ 2) for col in eachcol(g_final)]
+    return Statistics.mean(sq_dists)
 end

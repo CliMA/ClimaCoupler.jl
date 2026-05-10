@@ -4,7 +4,9 @@ atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
 coupler_toml: ["toml/amip_progedmf.toml"]
 strict_params: false
 mode_name: "subseasonal"
-era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+# era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_ml_correct_v1"
+coupler_output_dir: "/net/sampo/data1/cchristo/coupler_runs/wxquest_progedmf"
 initial_condition: "WeatherModel"
 checkpoint_dt: "1000days"
 dt: "80secs"
@@ -27,7 +29,9 @@ land_spun_up_ic: false
 land_temperature_anomaly: "nothing"
 use_land_diagnostics: true
 radiation_reset_rng_seed: true
-start_date: "20100101"
+# start_date: "20100101"
+start_date: "20090101"
+# start_date: "20081001"
 surface_setup: "PrescribedSurface"
 topo_smoothing: true
 topography: "Earth"
@@ -38,3 +42,6 @@ extra_atmos_diagnostics:
   - short_name: [zg, orog, tas, ta, thetaa, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
     period: 24hours
     reduction_time: average
+  - short_name: [zg, tas, ta, thetaa, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, rlut, rsut, wa, waup, edt, lmix]
+    period: 1hours
+    reduction_time: inst

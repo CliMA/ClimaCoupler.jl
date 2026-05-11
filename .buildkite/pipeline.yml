@@ -336,6 +336,17 @@ steps:
 
   - group: "CMIP"
     steps:
+      - label: "GPU CMIP: ClimaAtmos + bucket land + Oceananigans + ClimaSeaIce"
+        key: "gpu_cmip_oceananigans_climaseaice_bucket"
+        command: "julia -O0 --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice_bucket.yml --job_id gpu_cmip_oceananigans_climaseaice_bucket"
+        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_bucket/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
+
       - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce"
         key: "gpu_cmip_oceananigans_climaseaice"
         command: "julia -O0 --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice.yml --job_id gpu_cmip_oceananigans_climaseaice"
@@ -347,6 +358,8 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
+  - group: "Calibration"
+    steps:
       - label: "AMIP calibration pipeline with emulated diagnostics"
         key: "amip_test_calibration"
         command:

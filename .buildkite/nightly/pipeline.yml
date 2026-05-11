@@ -20,6 +20,7 @@ steps:
       - "echo $$JULIA_DEPOT_PATH"
 
       - echo "--- Instantiate AMIP env"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"Insolation\", rev=\"tr/climaparams\"))'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
 
       # For this pipeline, use the main branches of certain upstream packages

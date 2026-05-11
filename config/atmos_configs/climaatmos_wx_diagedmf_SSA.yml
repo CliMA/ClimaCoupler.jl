@@ -32,6 +32,7 @@ edmfx_detr_model: "Generalized"
 edmfx_nh_pressure: true
 edmfx_sgs_mass_flux: true
 edmfx_sgs_diffusive_flux: true
+edmfx_aerosols: true
 
 ### 0M Microphysics ##
 microphysics_model: "0M"

@@ -10,6 +10,7 @@ import ClimaComms
 import ClimaCore as CC
 import Dates
 import Thermodynamics as TD
+import NVTX
 import SciMLBase: step!
 import ClimaUtilities.TimeManager: ITime, date
 import Statistics
@@ -406,7 +407,7 @@ between the simulation time (stored in the integrator) and the coupler time
 `t`, divided by the simulation timestep. This generically handles the cases where
 the simulation's timestep is shorter than, longer than, or equal to that of the coupler.
 """
-function step!(sim::AbstractComponentSimulation, t::Float64)
+NVTX.@annotate function step!(sim::AbstractComponentSimulation, t::Float64)
     model_dt = Float64(sim.integrator.dt)
     # `round(Int, ...)` tolerates floating point drift less than `model_dt / 2`
     n_steps = round(Int, (t - Float64(sim.integrator.t)) / model_dt)
@@ -427,7 +428,7 @@ between the simulation time (stored in the integrator) and the coupler time
 `t`, divided by the simulation timestep. This generically handles the cases where
 the simulation's timestep is shorter than, longer than, or equal to that of the coupler.
 """
-function step!(sim::AbstractComponentSimulation, t::ITime)
+NVTX.@annotate function step!(sim::AbstractComponentSimulation, t::ITime)
     n_steps = div(t - sim.integrator.t, sim.integrator.dt) # integer division; exact for ITime
     for _ in 1:n_steps
         step!(sim.integrator)
@@ -535,24 +536,23 @@ abstract type SlabplanetTerraMode <: AbstractSlabplanetSimulationMode end
     remap(target_space, source_field)
 
 Remap the given `source_field` onto the `target_space`. Note that if the field is already
-on the target space or a compatible one (e.g. another instance of the same space),
-it is returned unchanged. Users should use caution in modifying the returned field
-in this case.
+on the target space it is returned unchanged; users should use caution in modifying the
+returned field in this case. If it is a compatible one (e.g. another instance of the
+same space), the field is copied to the target space.
 
 This is a convenience wrapper around `remap!` that allocates the output field.
+Note that we could call `remap!` directly without checking `spaces_are_compatible`
+here, but then we would allocate a new field even if the spaces are the same.
 
 Non-ClimaCore fields should provide a method to this function.
 """
 function remap end
 
-function remap(target_space::CC.Spaces.AbstractSpace, source_field::CC.Fields.Field)
+NVTX.@annotate function remap(
+    target_space::CC.Spaces.AbstractSpace,
+    source_field::CC.Fields.Field,
+)
     source_space = axes(source_field)
-
-    # Check if the source and target spaces are compatible
-    spaces_are_compatible =
-        source_space == target_space ||
-        CC.Spaces.issubspace(source_space, target_space) ||
-        CC.Spaces.issubspace(target_space, source_space)
 
     # TODO: Handle remapping of Vectors correctly
     if hasproperty(source_field, :components)
@@ -560,8 +560,18 @@ function remap(target_space::CC.Spaces.AbstractSpace, source_field::CC.Fields.Fi
         source_field = source_field.components.data.:1
     end
 
-    # If the spaces are the same or one is a subspace of the other, we can just return the input field
-    spaces_are_compatible && return source_field
+    # Check if the source and target spaces are compatible
+    spaces_are_compatible =
+        source_space == target_space ||
+        CC.Spaces.issubspace(source_space, target_space) ||
+        CC.Spaces.issubspace(target_space, source_space)
+
+    # If the spaces are the same or one is a subspace of the other, we can just copy the
+    # source field to the target space. Note this is a dangerous operation because it accesses
+    # the underlying array of the source field directly, which is not a reliable pattern.
+    if spaces_are_compatible
+        return CC.Fields.Field(CC.Fields.field_values(source_field), target_space)
+    end
 
     # Allocate target field and call remap!
     target_field = CC.Fields.zeros(target_space)
@@ -588,7 +598,7 @@ Note that this method has a lot of allocations and is not efficient.
 """
 function remap! end
 
-function remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field)
+NVTX.@annotate function remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field)
     source_space = axes(source_field)
     target_space = axes(target_field)
     comms_ctx = ClimaComms.context(source_space)
@@ -771,27 +781,26 @@ end
     get_atmos_height_delta(height_int, height_sfc)
 
 Return a Field of the height delta between the atmosphere bottom cell center
-and bottom face, defined on the boundary space.
+and the surface, defined on the boundary space.
 This is used to compute turbulent fluxes.
 
-Since the atmospheric height is defined on centers, we need to copy the values onto
-the boundary space to be able to subtract the surface elevation.
-This pattern is not reliable and should not be reused.
+Both `height_int` and `height_sfc` must already be defined on the same space
+(the boundary space). Use `get_field!` to remap the atmosphere height onto
+the boundary space before calling this function.
 
 Note this function allocates a new field, and the atmosphere heights won't change
 during a simulation, so it should only be called at initialization.
 
 # Arguments
-- `csf`: [NamedTuple] containing coupler fields.
+- `height_int`: [CC.Fields.Field] defined on the boundary space, containing the
+  atmosphere bottom cell center height.
+- `height_sfc`: [CC.Fields.Field] defined on the boundary space.
 
 # Returns
 - [CC.Fields.Field] defined on the boundary space containing the height delta.
 """
 function get_atmos_height_delta(height_int, height_sfc)
-    return CC.Fields.Field(
-        CC.Fields.field_values(height_int),
-        axes(height_sfc), # boundary space
-    ) .- height_sfc
+    return height_int .- height_sfc
 end
 
 end # module

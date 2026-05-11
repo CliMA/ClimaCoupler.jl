@@ -184,15 +184,6 @@ properties needed by a component model.
 | `surface_temperature`    | temperature over the combined surface space              | K     |
 | `turbulent_fluxes`       | turbulent fluxes                                         | W m⁻² |
 
-ClimaAtmos should also add the following coupler fields for Monin-Obukhov similarity theory:
-
-| Coupler name    | Description       | Units  |
-|-----------------|-------------------|--------|
-| `ustar`         | friction velocity | m s⁻¹  |
-| `L_MO`          | Obukhov length    | m      |
-| `buoyancy_flux` | flux of buoyancy  | m⁻²s⁻³ |
-
-
 ### AbstractAtmosSimulation - required functions to run with the ClimaLandSimulation
 
 Coupling with the integrated `ClimaLandSimulation` requires the following functions, in addition

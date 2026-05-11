@@ -192,7 +192,7 @@ function BucketSimulation(
         diagnostics = nothing
     end
 
-    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+    stop_date = start_date + Dates.Second(float(tspan[2]))
     # Convert start_date and stop_date to ITime if using ITime
     if dt isa ITime
         start_date = tspan[1]
@@ -420,9 +420,6 @@ Update the surface simulation `sim` with the values stored in `fluxes,
 without any area-weighting. Then, update the coupler fields `csf` with
 the area-weighted fluxes after remapping to the boundary space.
 
-This method also computes ustar and L_MO from the momentum fluxes and buoyancy flux,
-and updates the coupler fields `csf` with these values.
-
 # Arguments
 - `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields:
     `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
@@ -469,32 +466,6 @@ function FluxCalculator.update_flux_fields!(csf, sim::BucketSimulation, fluxes)
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
     @. csf.F_turb_ρτyz += csf.scalar_temp1 * area_fraction
 
-    # Combine the buoyancy flux from each component of the land model
-    # Note that we exclude the canopy component here for now, since ClimaLand doesn't
-    #  include its extra resistance term in the buoyancy flux calculation.
-    Interfacer.remap!(csf.scalar_temp1, fluxes.buoyancy_flux)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    @. csf.buoyancy_flux += csf.scalar_temp1 * area_fraction
-
-    # Compute ustar from the momentum fluxes and surface air density
-    #  ustar = sqrt(ρτ / ρ)
-    @. csf.scalar_temp1 = sqrt(sqrt(csf.F_turb_ρτxz^2 + csf.F_turb_ρτyz^2) / csf.ρ_atmos)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    # If ustar is zero, set it to eps to avoid division by zero in the atmosphere
-    @. csf.ustar += max(csf.scalar_temp1 * area_fraction, eps(FT))
-
-    # Compute the Monin-Obukhov length from ustar and the buoyancy flux
-    #  L_MO = -u^3 / (k * buoyancy_flux)
-    surface_params = LP.surface_fluxes_parameters(sim.model.parameters.earth_param_set)
-    @. csf.scalar_temp1 =
-        -csf.ustar^3 / SFP.von_karman_const(surface_params) / SF.non_zero(csf.buoyancy_flux)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    # When L_MO is infinite, avoid multiplication by zero to prevent NaN
-    @. csf.L_MO +=
-        ifelse(isinf(csf.scalar_temp1), csf.scalar_temp1, csf.scalar_temp1 * area_fraction)
     return nothing
 end
 

@@ -215,8 +215,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         Δt_cpl,
         component_dt_dict,
         share_surface_space,
-        nh_poly,
-        h_elem,
+        nh_poly_coupler,
+        h_elem_coupler,
         saveat,
         checkpoint_dt,
         detect_restart_files,
@@ -240,6 +240,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         ocean_model,
         simple_ocean,
         sst_adjustment,
+        progress_interval,
         ice_model,
         land_fraction_source,
         binary_area_fraction,
@@ -291,16 +292,16 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         share_surface_space,
         comms_ctx;
         column_latlon,
-        nh_poly,
-        h_elem,
+        nh_poly_coupler,
+        h_elem_coupler,
         coupled_param_dict,
     )
 
     surface_elevation = Interfacer.get_field(boundary_space, atmos_sim, Val(:height_sfc))
-    atmos_h = Interfacer.get_atmos_height_delta(
-        Interfacer.get_field(atmos_sim, Val(:height_int)),
-        surface_elevation,
-    )
+    atmos_bottom_center_height =
+        Interfacer.get_field(boundary_space, atmos_sim, Val(:height_int))
+    atmos_h =
+        Interfacer.get_atmos_height_delta(atmos_bottom_center_height, surface_elevation)
 
     land_fraction = Input.get_land_fraction(
         boundary_space,
@@ -355,6 +356,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         coupled_param_dict,
         thermo_params,
         comms_ctx,
+        progress_interval,
         boundary_space,
         output_dir = dir_paths.ocean_output_dir,
         simple_ocean,
@@ -398,10 +400,19 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
 
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 
-    # set initial area fractions
-    coupler_fields.land_area_fraction .= land_fraction
-    coupler_fields.ice_area_fraction .= 0  # initialized as 0 since we start with no sea ice, but will evolve in time
-    coupler_fields.ocean_area_fraction .= 1 .- land_fraction  # no sea ice
+    # set initial area fractions (remain set to 0 if model does not exist)
+    if haskey(model_sims, :land_sim)
+        coupler_fields.land_area_fraction .=
+            Interfacer.get_field(model_sims.land_sim, Val(:area_fraction))
+    end
+    if haskey(model_sims, :ice_sim)
+        coupler_fields.ice_area_fraction .=
+            Interfacer.get_field(model_sims.ice_sim, Val(:area_fraction))
+    end
+    if haskey(model_sims, :ocean_sim)
+        coupler_fields.ocean_area_fraction .=
+            Interfacer.get_field(model_sims.ocean_sim, Val(:area_fraction))
+    end
 
     ## Conservation checks (only applicable to global slabplanet mode)
     conservation_checks = nothing

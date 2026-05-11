@@ -57,6 +57,10 @@ steps:
       - label: "MPI Utilities unit tests"
         key: "utilities_mpi_tests"
         command: "srun julia -O0 --color=yes --project=test/ test/utilities_tests.jl"
+        retry: &retry_policy
+          automatic:
+            - exit_status: -1  # Retry on agent lost
+              limit: 1
         timeout_in_minutes: 5
         env:
           CLIMACOMMS_CONTEXT: "MPI"
@@ -67,6 +71,7 @@ steps:
       - label: "MPI Interfacer unit tests"
         key: "interfacer_mpi_tests"
         command: "srun julia -O0 --color=yes --project=test/ test/interfacer_tests.jl"
+        retry: *retry_policy
         timeout_in_minutes: 5
         env:
           CLIMACOMMS_CONTEXT: "MPI"
@@ -78,6 +83,7 @@ steps:
     steps:
       - label: "GPU runtests"
         command: "julia -O0 --color=yes --project=test/ test/runtests.jl"
+        retry: *retry_policy
         timeout_in_minutes: 20
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -89,12 +95,14 @@ steps:
     steps:
       - label: "AMIP runtests"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/test/runtests.jl"
+        retry: *retry_policy
         agents:
           slurm_mem: 16GB
 
       - label: "MPI restarts"
         key: "mpi_restarts"
         command: "srun julia --color=yes --project=experiments/AMIP/ experiments/test/restart.jl"
+        retry: *retry_policy
         env:
           CLIMACOMMS_CONTEXT: "MPI"
         timeout_in_minutes: 50
@@ -109,6 +117,7 @@ steps:
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/test/restart.jl"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
         agents:
           slurm_gpus: 1
           slurm_mem: 32GB
@@ -117,6 +126,7 @@ steps:
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/test/restart_state_only.jl"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
         agents:
           slurm_gpus: 1
           slurm_mem: 32GB
@@ -126,6 +136,7 @@ steps:
       - label: "SCM: slabplanet aqua (atmos + slab ocean column)"
         key: "scm_slabplanet_aqua"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_slabplanet_aqua.yml --job_id scm_slabplanet_aqua"
+        retry: *retry_policy
         artifact_paths: "output/scm_slabplanet_aqua/artifacts/*"
         agents:
           slurm_mem: 20GB
@@ -133,6 +144,7 @@ steps:
       - label: "SCM: slabplanet terra bucket (atmos + bucket land column)"
         key: "scm_slabplanet_terra_bucket"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_slabplanet_terra_bucket.yml --job_id scm_slabplanet_terra_bucket"
+        retry: *retry_policy
         artifact_paths: "output/scm_slabplanet_terra_bucket/artifacts/*"
         agents:
           slurm_mem: 20GB
@@ -140,6 +152,7 @@ steps:
       - label: "SCM: slabplanet terra land (atmos + integrated land column)"
         key: "scm_slabplanet_terra_land"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_slabplanet_terra_land.yml --job_id scm_slabplanet_terra_land"
+        retry: *retry_policy
         artifact_paths: "output/scm_slabplanet_terra_land/artifacts/*"
         agents:
           slurm_mem: 20GB
@@ -147,6 +160,7 @@ steps:
       - label: "SCM: AMIP ocean (atmos + prescribed ocean column)"
         key: "scm_amip_ocean"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_amip_ocean.yml --job_id scm_amip_ocean"
+        retry: *retry_policy
         artifact_paths: "output/scm_amip_ocean/artifacts/*"
         agents:
           slurm_mem: 20GB
@@ -154,6 +168,7 @@ steps:
       - label: "SCM: AMIP sea ice (atmos + prescribed sea ice column)"
         key: "scm_amip_ice"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_amip_ice.yml --job_id scm_amip_ice"
+        retry: *retry_policy
         artifact_paths: "output/scm_amip_ice/artifacts/*"
         agents:
           slurm_mem: 20GB
@@ -172,6 +187,7 @@ steps:
       - label: "Slabplanet: default"
         key: "slabplanet_default"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_default.yml --job_id slabplanet_default"
+        retry: *retry_policy
         artifact_paths: "output/slabplanet_default/artifacts/*"
         agents:
           slurm_mem: 20GB
@@ -179,6 +195,7 @@ steps:
       - label: "Slabplanet: dry, no radiation, fixed ocean T"
         key: "slabplanet_dry_norad"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_dry_norad.yml --job_id slabplanet_dry_norad"
+        retry: *retry_policy
         artifact_paths: "output/slabplanet_dry_norad/artifacts/*"
         agents:
           slurm_mem: 20GB
@@ -186,6 +203,7 @@ steps:
       - label: "Slabplanet: extra atmos diagnostics"
         key: "slabplanet_atmos_diags"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_atmos_diags.yml --job_id slabplanet_atmos_diags"
+        retry: *retry_policy
         artifact_paths: "output/slabplanet_atmos_diags/artifacts/*"
         agents:
           slurm_mem: 20GB
@@ -193,6 +211,7 @@ steps:
       - label: "Slabplanet terra: atmos and bucket"
         key: "slabplanet_terra"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_terra.yml --job_id slabplanet_terra"
+        retry: *retry_policy
         artifact_paths: "output/slabplanet_terra/artifacts/*"
         agents:
           slurm_mem: 20GB
@@ -200,6 +219,7 @@ steps:
       - label: "Slabplanet aqua: atmos and slab ocean"
         key: "slabplanet_aqua"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_aqua.yml --job_id slabplanet_aqua"
+        retry: *retry_policy
         artifact_paths: "output/slabplanet_aqua/artifacts/*"
         agents:
           slurm_mem: 20GB
@@ -210,12 +230,14 @@ steps:
       - label: "AMIP: default"
         key: "amip_default"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl"
+        retry: *retry_policy
         artifact_paths: "output/amip_default/artifacts/*"
         agents:
           slurm_mem: 20GB
 
       - label: "AMIP: integrated land non-spun up initial condition test"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_land_ic.yml --job_id amip_land_ic"
+        retry: *retry_policy
         artifact_paths: "output/amip_land_ic/artifacts/*"
         agents:
           slurm_ntasks: 1
@@ -224,6 +246,7 @@ steps:
       - label: "AMIP - Float64 + hourly checkpoint"
         key: "amip"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_ft64_hourly_checkpoints.yml --job_id amip_coarse_ft64_hourly_checkpoints"
+        retry: *retry_policy
         artifact_paths: "output/amip_coarse_ft64_hourly_checkpoints/artifacts/*"
         env:
           FLAME_PLOT: ""
@@ -234,6 +257,7 @@ steps:
 
       - label: "AMIP - Component dts test"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_component_dts.yml --job_id target_amip_component_dts"
+        retry: *retry_policy
         artifact_paths: "output/target_amip_component_dts/artifacts/*"
         agents:
           slurm_ntasks: 1
@@ -241,6 +265,7 @@ steps:
 
       - label: "MPI AMIP"
         command: "srun julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_mpi.yml --job_id amip_coarse_mpi"
+        retry: *retry_policy
         artifact_paths: "output/amip_coarse_mpi/artifacts/*"
         timeout_in_minutes: 30
         env:
@@ -253,6 +278,7 @@ steps:
       - label: "Unthreaded AMIP FINE" # also reported by longruns with a flame graph
         key: "unthreaded_amip_fine"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_n1_shortrun.yml --job_id target_amip_n1_shortrun"
+        retry: *retry_policy
         artifact_paths: "output/target_amip_n1_shortrun/artifacts/*"
         env:
           BUILD_HISTORY_HANDLE: ""
@@ -269,6 +295,7 @@ steps:
         artifact_paths: "output/gpu_slabplanet_albedo_function/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
@@ -280,6 +307,7 @@ steps:
         artifact_paths: "output/gpu_amip_diagedmf_integrated_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
@@ -290,6 +318,7 @@ steps:
         artifact_paths: "output/gpu_amip_progedmf_bucket/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
@@ -300,6 +329,7 @@ steps:
         artifact_paths: "output/gpu_amip_albedo_temporal_map/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
@@ -312,6 +342,7 @@ steps:
         artifact_paths: "output/gpu_cmip_oceananigans_climaseaice/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
@@ -321,6 +352,7 @@ steps:
         command:
           - "julia -O0 --color=yes --project=experiments/AMIP/ experiments/calibration/amip/generate_observations.jl"
           - "julia -O0 --color=yes --project=experiments/AMIP/ experiments/calibration/amip/run_calibration.jl"
+        retry: *retry_policy
         artifact_paths: "amip_calibration/*"
         env:
           CLIMACOMMS_DEVICE: "CPU"
@@ -337,5 +369,6 @@ steps:
   - label: ":chart_with_downwards_trend: build history"
     command:
       - build_history staging # name of branch to plot
+    retry: *retry_policy
     artifact_paths:
       - "build_history.html"

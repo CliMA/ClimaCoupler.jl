@@ -859,10 +859,10 @@ end
         end_date::Dates.DateTime
     )
 
-Update "start_date" and "t_end" in `config_dict` to match `start_date` and
+Update "start\\_date" and "t\\_end" in `config_dict` to match `start_date` and
 `end_date`.
 
-The `start_date` and `end_date` are converted to strings and the keys
+The `start\\_date` and `end\\_date` are converted to strings and the keys
 "start_date" and "t_end" in `config_dict` are updated accordingly. Note that any
 precision beyond days (e.g. hours, seconds, etc.) are not used for setting the
 start date.

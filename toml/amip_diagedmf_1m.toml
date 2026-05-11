@@ -74,26 +74,14 @@ type = "float"
 value = 0.29736273245468714
 type = "float"
 
-[Tq_correlation_coefficient]
-value = -1
-type = "float"
-
 [tracer_vertical_diffusion_factor]
 value = 0
 type = "float"
 
 [condensation_evaporation_timescale]
-value = 150
+value = 100
 type = "float"
 
 [sublimation_deposition_timescale]
-value = 150
-type = "float"
-
-[snow_autoconversion_timescale]
-value = 1e3
-type = "float"
-
-[rain_autoconversion_timescale]
-value = 150
+value = 100
 type = "float"

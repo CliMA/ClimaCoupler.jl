@@ -45,7 +45,7 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 [extensions]
 ClimaCouplerCMIPExt = ["ClimaOcean", "ClimaSeaIce", "KernelAbstractions", "Oceananigans"]
 ClimaCouplerCMIPMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
-ClimaCouplerClimaAtmosExt = ["ClimaAtmos"]
+ClimaCouplerClimaAtmosExt = ["ClimaLand"]
 ClimaCouplerClimaLandExt = ["ClimaLand"]
 ClimaCouplerMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Poppler_jll", "Printf"]
 

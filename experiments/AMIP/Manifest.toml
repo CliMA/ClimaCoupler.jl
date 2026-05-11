@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.10"
+julia_version = "1.10.5"
 manifest_format = "2.0"
 project_hash = "c71f46af9c5e555f1560f963acfb5322b8a975b5"
 
@@ -480,7 +480,7 @@ version = "0.1.2"
     [deps.ClimaCoupler.extensions]
     ClimaCouplerCMIPExt = ["ClimaOcean", "ClimaSeaIce", "KernelAbstractions", "Oceananigans"]
     ClimaCouplerCMIPMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
-    ClimaCouplerClimaAtmosExt = ["ClimaAtmos"]
+    ClimaCouplerClimaAtmosExt = ["ClimaLand"]
     ClimaCouplerClimaLandExt = ["ClimaLand"]
     ClimaCouplerMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Poppler_jll", "Printf"]
 
@@ -1460,10 +1460,13 @@ uuid = "22cec73e-a1b8-11e9-2c92-598750a2cf9c"
 version = "0.3.1"
 
 [[deps.Insolation]]
-deps = ["Adapt", "Artifacts", "ClimaParams", "Dates", "DelimitedFiles", "Interpolations"]
-git-tree-sha1 = "e406cece91ec7b68f562dc90708a4300bdac2420"
+deps = ["Adapt", "Artifacts", "Dates", "DelimitedFiles", "Interpolations"]
+git-tree-sha1 = "9f95bd60c54c2d5ad91244ca7e833ae581890839"
+repo-rev = "tr/climaparams"
+repo-url = "https://github.com/CliMA/Insolation.jl.git"
 uuid = "e98cc03f-d57e-4e3c-b70c-8d51efe9e0d8"
 version = "1.1.0"
+weakdeps = ["ClimaParams"]
 
     [deps.Insolation.extensions]
     CreateParametersExt = "ClimaParams"
@@ -2284,7 +2287,7 @@ version = "2.5.5+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.5+0"
+version = "0.8.1+2"
 
 [[deps.OpenMPI_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Hwloc_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML", "Zlib_jll"]

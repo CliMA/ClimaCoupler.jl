@@ -81,11 +81,11 @@ value = 5.0
 type = "float"
 
 [fixed_snow_terminal_velocity]
-value = 1.5
+value = 1.0
 type = "float"
 
 [rain_cross_section_size_relation_coefficient_chia]
-value = 0.5
+value = 1.0
 
 [snow_cross_section_size_relation_coefficient_chia]
-value = 4.0
+value = 1.0

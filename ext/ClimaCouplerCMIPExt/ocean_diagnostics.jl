@@ -1,5 +1,4 @@
 import Dates
-import ClimaOcean.Diagnostics: MixedLayerDepthField
 
 """
     add_ocean_diagnostics!(ocean_sim::OceananigansSimulation;
@@ -13,9 +12,8 @@ import ClimaOcean.Diagnostics: MixedLayerDepthField
 Attach averaged-output writers to the underlying Oceananigans simulation inside an `OceananigansSimulation`. 
 Three writers are added to `ocean_sim.ocean.output_writers`:
 
-1. **Surface diagnostics** (`<prefix>_surface.jld2`): 2-D fields averaged over `surface_averaging_interval` — 
-   SST, SSS, SSH, surface velocities, squared surface fields for variance, mixed-layer depth, surface momentum/heat/
-   freshwater fluxes.
+1. **Surface diagnostics** (`<prefix>_surface.jld2`): 2-D fields averaged over `surface_averaging_interval` —
+   SST, SSS, SSH, surface velocities, squared surface fields for variance, surface momentum/heat/freshwater fluxes.
 2. **3-D field diagnostics** (`<prefix>_fields.jld2`): full 3-D temperature, salinity, velocity (and TKE if a `:e` tracer is present), 
    averaged over `field_averaging_interval`.
 3. **Checkpointer** (`<prefix>_checkpoint`): JLD2 checkpoint of the ocean model at `checkpoint_interval`.
@@ -35,8 +33,7 @@ function add_ocean_diagnostics!(
     file_splitting_interval = Dates.Day(15),
 )
     ocean = ocean_sim.ocean
-    grid = ocean.model.grid
-    Nz = size(grid, 3)
+    Nz = size(ocean.model.grid, 3)
     file_splitting = OC.TimeInterval(file_splitting_interval)
 
     T, S = ocean.model.tracers.T, ocean.model.tracers.S
@@ -48,16 +45,17 @@ function add_ocean_diagnostics!(
     JT = surface_flux(T)
     Js = surface_flux(S)
 
-    mld = MixedLayerDepthField(ocean.model.buoyancy, grid, ocean.model.tracers)
+    # Seed FieldStatus with the clock time so computed fields adopt the clock's time type
+    computed_field_status = OC.Fields.FieldStatus(ocean.model.clock.time)
 
     surface_indices = (:, :, Nz)
     sea_surface_temperature = OC.Field(T; indices = surface_indices)
     sea_surface_salinity = OC.Field(S; indices = surface_indices)
     sea_surface_zonal_velocity = OC.Field(u; indices = surface_indices)
     sea_surface_meridional_velocity = OC.Field(v; indices = surface_indices)
-    sea_surface_temperature_squared = OC.Field(T * T; indices = surface_indices)
-    sea_surface_salinity_squared = OC.Field(S * S; indices = surface_indices)
-    sea_surface_height_squared = η * η
+    sea_surface_temperature_squared = OC.Field(T * T; indices = surface_indices, status = computed_field_status)
+    sea_surface_salinity_squared = OC.Field(S * S; indices = surface_indices, status = computed_field_status)
+    sea_surface_height_squared = OC.Field(η * η; status = computed_field_status)
 
     surface_outputs = Dict{Symbol, Any}(
         :sea_surface_temperature => sea_surface_temperature,
@@ -68,7 +66,6 @@ function add_ocean_diagnostics!(
         :sea_surface_temperature_squared => sea_surface_temperature_squared,
         :sea_surface_salinity_squared => sea_surface_salinity_squared,
         :sea_surface_height_squared => sea_surface_height_squared,
-        :mixed_layer_depth => mld,
         :zonal_wind_stress => τx,
         :meridional_wind_stress => τy,
         :surface_heat_flux => JT,

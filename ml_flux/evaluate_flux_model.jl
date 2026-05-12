@@ -7,13 +7,11 @@ and produces diagnostic plots comparing predicted vs target tendencies, flux
 profiles, and spatial error maps.
 
 Usage:
-    julia --project=. evaluate_flux_model.jl                          # defaults
-    julia --project=. evaluate_flux_model.jl path/to/model.bson       # custom model
+    julia --project=. evaluate_flux_model.jl                          # latest run
+    julia --project=. evaluate_flux_model.jl runs/001_cnn_h128_lr1e-3 # specific run dir
+    julia --project=. evaluate_flux_model.jl path/to/model.bson       # direct model path
 =#
 
-# Include shared code from the training script (config, data loaders, regridding,
-# normalisation, model builders). The train() function won't run because we
-# don't call it.
 include("train_flux_correction.jl")
 
 using CairoMakie
@@ -21,9 +19,38 @@ using CairoMakie
 # ─────────────────────────────────────────────────────────────────────────────
 # Configuration
 # ─────────────────────────────────────────────────────────────────────────────
-const MODEL_PATH = length(ARGS) >= 1 ? ARGS[1] : "flux_correction_model.bson"
-const PLOT_DIR   = "plots"
-const N_EXAMPLE_COLS = 8   # number of example columns for profile plots
+
+function resolve_run_dir()
+    if length(ARGS) >= 1
+        arg = ARGS[1]
+        if isdir(arg)
+            return arg
+        elseif endswith(arg, ".bson") && isfile(arg)
+            return dirname(abspath(arg))
+        end
+    end
+    # Default: read latest_run.txt written by training
+    latest_path = joinpath(@__DIR__, "latest_run.txt")
+    if isfile(latest_path)
+        d = strip(read(latest_path, String))
+        if isdir(d)
+            return d
+        end
+    end
+    # Fallback: highest-numbered run directory
+    if isdir(RUNS_DIR)
+        dirs = sort(filter(d -> occursin(r"^\d{3}_", d), readdir(RUNS_DIR)))
+        if !isempty(dirs)
+            return joinpath(RUNS_DIR, dirs[end])
+        end
+    end
+    return @__DIR__
+end
+
+const RUN_DIR    = resolve_run_dir()
+const MODEL_PATH = joinpath(RUN_DIR, "flux_correction_model.bson")
+const PLOT_DIR   = joinpath(RUN_DIR, "plots")
+const N_EXAMPLE_COLS = 8
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Load model
@@ -35,6 +62,7 @@ function load_trained_model(path)
     ps = data[:ps]
     st = data[:st]
     X_norm_stats = data[:X_norm_stats]
+    Y_norm_stats = get(data, :Y_norm_stats, nothing)
     nz = data[:nz]
     input_dim = data[:input_dim]
     arch = get(data, :arch, ARCHITECTURE)
@@ -46,7 +74,7 @@ function load_trained_model(path)
         build_mlp_model(input_dim, nz)
     end
     println("  Architecture: $arch, input_dim=$input_dim, nz=$nz")
-    return model, ps, st, X_norm_stats, nz
+    return model, ps, st, X_norm_stats, Y_norm_stats, nz
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -55,7 +83,11 @@ end
 
 """
 Run the model on input X and convert face fluxes → cell-centre tendencies.
-Returns (dT_pred, dq_pred) each of shape (nz, n_samples).
+Returns (dT_pred, dq_pred) each of shape (nz, n_samples) in physical units,
+plus the raw face fluxes F_T and F_q.
+
+If Y_norm_stats is available (model was trained with normalised targets),
+the predicted divergences are denormalised back to physical units.
 """
 function predict_tendencies(model, ps, st, X, dz, nz)
     X_norm = normalise(X, X_norm_stats_global)
@@ -69,8 +101,19 @@ function predict_tendencies(model, ps, st, X, dz, nz)
     F_T = vcat(z_row, F_T_int, z_row)
     F_q = vcat(z_row, F_q_int, z_row)
 
-    dT_pred = -(F_T[2:nz+1, :] .- F_T[1:nz, :]) ./ dz
-    dq_pred = -(F_q[2:nz+1, :] .- F_q[1:nz, :]) ./ dz
+    dT_pred_raw = -(F_T[2:nz+1, :] .- F_T[1:nz, :]) ./ dz
+    dq_pred_raw = -(F_q[2:nz+1, :] .- F_q[1:nz, :]) ./ dz
+
+    # Denormalise if model was trained with normalised targets
+    if Y_norm_stats_global !== nothing
+        pred_norm = vcat(dT_pred_raw, dq_pred_raw)
+        pred_phys = denormalise(pred_norm, Y_norm_stats_global)
+        dT_pred = pred_phys[1:nz, :]
+        dq_pred = pred_phys[nz+1:2*nz, :]
+    else
+        dT_pred = dT_pred_raw
+        dq_pred = dq_pred_raw
+    end
 
     return dT_pred, dq_pred, F_T, F_q
 end
@@ -292,10 +335,14 @@ end
 # ─────────────────────────────────────────────────────────────────────────────
 
 function evaluate()
+    println("=" ^ 60)
+    println("Evaluating run: $RUN_DIR")
+    println("=" ^ 60)
     mkpath(PLOT_DIR)
 
-    model, ps, st, X_norm_stats, nz = load_trained_model(MODEL_PATH)
+    model, ps, st, X_norm_stats, Y_norm_stats, nz = load_trained_model(MODEL_PATH)
     global X_norm_stats_global = X_norm_stats
+    global Y_norm_stats_global = Y_norm_stats
 
     println("\nBuilding evaluation dataset...")
     cached = load_dataset_cache()
@@ -322,6 +369,13 @@ function evaluate()
     corr_q = cor(vec(dq_pred), vec(dq_target))
     @printf("  RMSE  T: %.4f K/hr    q: %.4f g/kg/hr\n", rmse_T, rmse_q)
     @printf("  Corr  T: %.4f         q: %.4f\n", corr_T, corr_q)
+
+    open(joinpath(RUN_DIR, "metrics.txt"), "w") do io
+        @printf(io, "rmse_T_Khr   = %.6f\n", rmse_T)
+        @printf(io, "rmse_q_gkghr = %.6f\n", rmse_q)
+        @printf(io, "corr_T       = %.6f\n", corr_T)
+        @printf(io, "corr_q       = %.6f\n", corr_q)
+    end
 
     z_km = get_z_centres(nz)
     z_faces_km = get_z_faces(z_km)

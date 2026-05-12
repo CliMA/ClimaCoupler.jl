@@ -422,7 +422,7 @@ function main()
             ylabel = ip == 1 ? "lat" : "",
             title = @sprintf("z ≈ %.1f km (k=%d)", z_km[k], k),
         )
-        level_data = slab_Khr[:, :, k]'
+        level_data = slab_Khr[:, :, k]
         clev = Float64(maximum(abs, level_data; init = 1f-6))
         hm = heatmap!(ax, lon, lat, level_data; colormap = :balance,
                        colorrange = (-clev, clev))
@@ -444,7 +444,7 @@ function main()
             ylabel = ip == 1 ? "lat" : "",
             title = @sprintf("z ≈ %.1f km (k=%d)", z_km[k], k),
         )
-        level_data = slab_qhr[:, :, k]'
+        level_data = slab_qhr[:, :, k]
         clev = Float64(maximum(abs, level_data; init = 1f-6))
         hm = heatmap!(ax, lon, lat, level_data; colormap = :balance,
                        colorrange = (-clev, clev))

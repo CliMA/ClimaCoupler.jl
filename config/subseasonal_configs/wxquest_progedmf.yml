@@ -30,18 +30,19 @@ land_temperature_anomaly: "nothing"
 use_land_diagnostics: true
 radiation_reset_rng_seed: true
 # start_date: "20100101"
-start_date: "20090101"
+start_date: "20091001"
 # start_date: "20081001"
 surface_setup: "PrescribedSurface"
 topo_smoothing: true
 topography: "Earth"
-t_end: "8days"
+# t_end: "8days"
+t_end: "30days"
 netcdf_output_at_levels: true
 use_coupler_diagnostics: true
 extra_atmos_diagnostics:
   - short_name: [zg, orog, tas, ta, thetaa, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
     period: 24hours
     reduction_time: average
-  - short_name: [zg, tas, ta, thetaa, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, rlut, rsut, wa, waup, edt, lmix]
-    period: 1hours
-    reduction_time: inst
+  # - short_name: [zg, tas, ta, thetaa, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, rlut, rsut, wa, waup, edt, lmix]
+  #   period: 1hours
+  #   reduction_time: inst

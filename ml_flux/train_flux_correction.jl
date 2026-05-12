@@ -26,6 +26,7 @@ using Optimisers
 using Zygote
 using BSON
 using SHA
+using CairoMakie
 
 # GPU support — set USE_GPU=true via environment variable to enable.
 # On SLURM GPU jobs, the sbatch script sets this before launching.
@@ -66,9 +67,8 @@ const TRAIN_FRACTION = 0.8
 const HIDDEN_DIM     = 128
 const PATIENCE       = 15     # early stopping: stop after this many epochs without improvement
 
-const LOSS_WEIGHT_T  = 1.0f0
-# LOSS_WEIGHT_Q is computed from data: var(target_T) / var(target_q)
-# so both terms contribute equally to the total loss.
+const WEIGHT_DECAY       = 1f-4  # AdamW L2 regularisation
+const FLUX_SMOOTH_WEIGHT = 1f-4  # light penalty on flux curvature
 
 const ARCHITECTURE   = :cnn    # :unet, :mlp, or :cnn
 
@@ -77,24 +77,47 @@ const ARCHITECTURE   = :cnn    # :unet, :mlp, or :cnn
 # after loading. Add/remove entries here to change what the NN sees.
 const INPUT_FEATURES = [
     ("ta",    identity),       # temperature (K) — the variable we're correcting
-    ("hus",   identity),       # specific humidity (kg/kg) — the other target variable
+    # ("hus",   identity),       # specific humidity (kg/kg) — the other target variable
     ("pfull", x -> log(max(x, 1f0))),  # log-pressure — encodes altitude / stratification
     ("hur",   identity),       # relative humidity — key for cloud/convection regimes
     ("tke",   identity),       # turbulent kinetic energy — characterises SGS turbulence
+    # ('')
 ]
 const N_FEATURES = length(INPUT_FEATURES)
 
 # ── Data subsetting ──────────────────────────────────────────────────────────
 # Time window: only use model timesteps within this day range (1-indexed from
 # the start of the run). Set to (1, Inf) to use all available timesteps.
-const TIME_DAY_START = 3       # skip day 1 (spinup)
-const TIME_DAY_END   = 4      # through end of day 8
+const TIME_DAY_START = 3       # skip first 2 days (spinup)
+const TIME_DAY_END   = 8      # through end of day 8
 
 # Spatial subsampling: randomly keep this fraction of columns per timestep.
 # Set to 1.0 to use all columns (no subsampling).
-const COLUMN_SUBSAMPLE_FRACTION = 0.02   # 5% of 192×96 ≈ 922 columns per step
+const COLUMN_SUBSAMPLE_FRACTION = 0.05   # 5% of 192×96 ≈ 922 columns per step
 
 const DATASET_CACHE_DIR = joinpath(@__DIR__, "cached_datasets")
+const RUNS_DIR = joinpath(@__DIR__, "runs")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Run directory management
+# ─────────────────────────────────────────────────────────────────────────────
+
+function next_run_index()
+    isdir(RUNS_DIR) || return 1
+    existing = filter(d -> occursin(r"^\d{3}_", d), readdir(RUNS_DIR))
+    isempty(existing) && return 1
+    max_idx = maximum(parse(Int, m.match) for d in existing for m in eachmatch(r"^(\d{3})", d))
+    return max_idx + 1
+end
+
+function make_run_dir()
+    idx = next_run_index()
+    name = @sprintf("%03d_%s_h%d", idx, ARCHITECTURE, HIDDEN_DIM)
+    path = joinpath(RUNS_DIR, name)
+    mkpath(path)
+    println("Run directory: $path")
+    return path
+end
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dataset caching — skip the expensive ERA5 regridding pipeline on repeat runs
@@ -446,10 +469,27 @@ struct NormStats
     std::Vector{Float32}
 end
 
+"""Per-dimension normalisation for input features."""
 function compute_norm(X::Matrix{Float32})
     m = vec(mean(X, dims = 2))
     s = vec(std(X, dims = 2))
     s[s .< 1f-8] .= 1f0
+    NormStats(m, s)
+end
+
+"""
+Per-variable normalisation for targets: one (mean, std) for all T levels,
+one for all q levels. This preserves the vertical structure within each
+variable while bringing both to O(1).
+"""
+function compute_target_norm(Y::Matrix{Float32}, nz::Int)
+    mean_T = Float32(mean(Y[1:nz, :]))
+    std_T  = Float32(std(Y[1:nz, :]))
+    mean_q = Float32(mean(Y[nz+1:2*nz, :]))
+    std_q  = Float32(std(Y[nz+1:2*nz, :]))
+
+    m = vcat(fill(mean_T, nz), fill(mean_q, nz))
+    s = vcat(fill(std_T, nz), fill(std_q, nz))
     NormStats(m, s)
 end
 
@@ -624,15 +664,18 @@ end
 
 """
 Given interior face fluxes (nz-1 per variable), reconstruct full face fluxes
-(nz+1) with zero BCs, compute the divergence, and compare to target.
+(nz+1) with zero BCs, compute the divergence, and compare to normalised target.
 
 flux_interior: (2*(nz-1), batch)
-target:        (2*nz, batch) — target correction tendencies
+target_norm:   (2*nz, batch) — normalised target correction tendencies
 dz:            (nz, batch)
-loss_weight_q: scalar weight for moisture term (computed from data variance ratio)
+
+Targets are normalised per-dimension (each level of T and q has zero mean,
+unit variance), so both variables contribute equally without manual weighting.
+A smoothness penalty on the second derivative of the flux suppresses
+oscillations in the predicted divergence.
 """
-function flux_divergence_loss(flux_interior, target, dz, nz, loss_weight_q)
-    batch = size(flux_interior, 2)
+function flux_divergence_loss(flux_interior, target_norm, dz, nz)
     nf = nz - 1
 
     F_T_int = flux_interior[1:nf, :]
@@ -645,13 +688,103 @@ function flux_divergence_loss(flux_interior, target, dz, nz, loss_weight_q)
     dFdz_T = -(F_T[2:nz+1, :] .- F_T[1:nz, :]) ./ dz
     dFdz_q = -(F_q[2:nz+1, :] .- F_q[1:nz, :]) ./ dz
 
-    target_T = target[1:nz, :]
-    target_q = target[nz+1:2*nz, :]
+    target_T = target_norm[1:nz, :]
+    target_q = target_norm[nz+1:2*nz, :]
 
     loss_T = mean((dFdz_T .- target_T) .^ 2)
     loss_q = mean((dFdz_q .- target_q) .^ 2)
 
-    return LOSS_WEIGHT_T * loss_T + loss_weight_q * loss_q
+    # Smoothness: penalise second derivative of flux (curvature)
+    if nf >= 3
+        d2F_T = F_T_int[1:nf-2, :] .- 2f0 .* F_T_int[2:nf-1, :] .+ F_T_int[3:nf, :]
+        d2F_q = F_q_int[1:nf-2, :] .- 2f0 .* F_q_int[2:nf-1, :] .+ F_q_int[3:nf, :]
+        smooth = mean(d2F_T .^ 2) + mean(d2F_q .^ 2)
+    else
+        smooth = 0f0
+    end
+
+    return loss_T + loss_q + FLUX_SMOOTH_WEIGHT * smooth
+end
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Live training progress plots
+# ─────────────────────────────────────────────────────────────────────────────
+
+function save_loss_plot(train_losses, val_losses, path)
+    fig = Figure(size = (700, 400))
+    ax = Axis(fig[1, 1]; xlabel = "Epoch", ylabel = "Loss",
+              title = "Training progress", yscale = log10)
+    lines!(ax, 1:length(train_losses), train_losses; label = "Train", linewidth = 2)
+    lines!(ax, 1:length(val_losses), val_losses; label = "Val", linewidth = 2)
+    axislegend(ax; position = :rt)
+    save(path, fig; px_per_unit = 2)
+end
+
+"""
+Save snapshot of predicted vs target profiles for a few validation columns.
+Shows T and q tendencies side by side.
+"""
+function save_profile_snapshot(model, ps, st, X_val, Y_val, dz_val,
+                               nz, Y_norm_stats, z_km, epoch, path)
+    rng_plot = Random.MersenneTwister(77)
+    n_val = size(X_val, 2)
+    n_cols = min(4, n_val)
+    col_idx = randperm(rng_plot, n_val)[1:n_cols]
+
+    Xb = X_val[:, col_idx]
+    Yb = Y_val[:, col_idx]
+    dzb = dz_val[:, col_idx]
+
+    # Move to CPU for plotting
+    Xb_cpu = Xb |> cpu_device()
+    Yb_cpu = Yb |> cpu_device()
+    dzb_cpu = dzb |> cpu_device()
+
+    flux_pred, _ = Lux.apply(model, Xb, ps, st)
+    flux_pred_cpu = flux_pred |> cpu_device()
+
+    nf = nz - 1
+    F_T = vcat(zeros(Float32, 1, n_cols), flux_pred_cpu[1:nf, :], zeros(Float32, 1, n_cols))
+    F_q = vcat(zeros(Float32, 1, n_cols), flux_pred_cpu[nf+1:2*nf, :], zeros(Float32, 1, n_cols))
+
+    dFdz_T = -(F_T[2:nz+1, :] .- F_T[1:nz, :]) ./ dzb_cpu
+    dFdz_q = -(F_q[2:nz+1, :] .- F_q[1:nz, :]) ./ dzb_cpu
+
+    # Denormalise both prediction and target back to physical units (K/hr, g/kg/hr)
+    std_T = Y_norm_stats.std[1]
+    mean_T = Y_norm_stats.mean[1]
+    std_q = Y_norm_stats.std[nz+1]
+    mean_q = Y_norm_stats.mean[nz+1]
+
+    fig = Figure(size = (300 * n_cols, 600))
+    Label(fig[0, :], "Epoch $epoch: predicted vs target tendency"; fontsize = 14)
+
+    for (p, ci) in enumerate(1:n_cols)
+        pred_T = (dFdz_T[:, ci] .* std_T .+ mean_T) .* 3600
+        tgt_T  = (Yb_cpu[1:nz, ci] .* std_T .+ mean_T) .* 3600
+        pred_q = (dFdz_q[:, ci] .* std_q .+ mean_q) .* 3600 .* 1000
+        tgt_q  = (Yb_cpu[nz+1:2*nz, ci] .* std_q .+ mean_q) .* 3600 .* 1000
+
+        ax_t = Axis(fig[1, p]; xlabel = "K/hr", ylabel = p == 1 ? "Height (km)" : "",
+                     title = "Col $ci — T")
+        lines!(ax_t, tgt_T, z_km; label = "Target", linewidth = 1.5)
+        lines!(ax_t, pred_T, z_km; label = "Predicted", linewidth = 1.5, linestyle = :dash)
+        p == 1 && axislegend(ax_t; position = :rt, labelsize = 9)
+
+        ax_q = Axis(fig[2, p]; xlabel = "g/kg/hr", ylabel = p == 1 ? "Height (km)" : "",
+                     title = "Col $ci — q")
+        lines!(ax_q, tgt_q, z_km; linewidth = 1.5)
+        lines!(ax_q, pred_q, z_km; linewidth = 1.5, linestyle = :dash)
+    end
+
+    save(path, fig; px_per_unit = 2)
+end
+
+function get_z_km(nz)
+    grid = load_model_grid()
+    z_mask = grid.z_ref .<= Z_MAX
+    z_idx = findall(z_mask)
+    return Float32.(grid.z_ref[z_idx] ./ 1000.0)
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -679,18 +812,16 @@ function train()
 
     println("\nComputing normalisation statistics...")
     X_norm_stats = compute_norm(X_raw)
-    Y_norm_stats = compute_norm(Y_raw)
+    Y_norm_stats = compute_target_norm(Y_raw, nz)
 
     X = normalise(X_raw, X_norm_stats)
-    Y = Y_raw
+    Y = normalise(Y_raw, Y_norm_stats)
 
-    # Compute loss weight for q from the variance ratio so both terms
-    # contribute equally to the total gradient signal.
-    var_T = var(Y_raw[1:nz, :])
-    var_q = var(Y_raw[nz+1:2*nz, :])
-    loss_weight_q = Float32(var_T / var_q)
-    @printf("  var(target_T)=%.4e  var(target_q)=%.4e  loss_weight_q=%.2f\n",
-            var_T, var_q, loss_weight_q)
+    @printf("  target T: mean=%.4e  std=%.4e (K/s)\n",
+            Y_norm_stats.mean[1], Y_norm_stats.std[1])
+    @printf("  target q: mean=%.4e  std=%.4e (kg/kg/s)\n",
+            Y_norm_stats.mean[nz+1], Y_norm_stats.std[nz+1])
+    println("  Both target variables normalised to O(1) — no manual loss weighting needed")
 
     n_train = round(Int, TRAIN_FRACTION * n_samples)
     perm = randperm(rng, n_samples)
@@ -708,7 +839,7 @@ function train()
 
     ps = ps |> DEV
     st = st |> DEV
-    opt_state = Optimisers.setup(Adam(LEARNING_RATE), ps)
+    opt_state = Optimisers.setup(AdamW(LEARNING_RATE, (0.9f0, 0.999f0), WEIGHT_DECAY), ps)
 
     # Move ALL data to device once — dataset is small enough to fit in VRAM
     X_train_d  = X_train  |> DEV
@@ -718,11 +849,30 @@ function train()
     Y_val_d    = Y_val    |> DEV
     dz_val_d   = dz_val   |> DEV
 
+    # Create run directory now so we can save progress during training
+    run_dir = make_run_dir()
+    plots_dir = joinpath(run_dir, "plots")
+    mkpath(plots_dir)
+
+    z_km = get_z_km(nz)
+
+    # How often to save progress plots (every ~10% of training)
+    plot_interval = max(1, N_EPOCHS ÷ 10)
+
     best_val_loss = Inf32
     best_ps = deepcopy(ps)
     epochs_without_improvement = 0
+    train_losses = Float32[]
+    val_losses = Float32[]
+
+    # Initialise the CSV log
+    log_path = joinpath(run_dir, "training_log.csv")
+    open(log_path, "w") do io
+        println(io, "epoch,train_loss,val_loss,best_val_loss")
+    end
 
     println("\nTraining for $N_EPOCHS epochs, batch_size=$BATCH_SIZE, device=$(USE_GPU ? "GPU" : "CPU")")
+    println("Progress plots saved to: $plots_dir")
     println("-" ^ 60)
 
     n_train_samples = size(X_train_d, 2)
@@ -741,7 +891,7 @@ function train()
 
             loss_val, grads = Zygote.withgradient(ps) do p
                 flux_pred, _ = Lux.apply(model, Xb, p, st)
-                flux_divergence_loss(flux_pred, Yb, dzb, nz, loss_weight_q)
+                flux_divergence_loss(flux_pred, Yb, dzb, nz)
             end
 
             epoch_loss += loss_val
@@ -752,7 +902,10 @@ function train()
 
         # Validation loss
         flux_val, _ = Lux.apply(model, X_val_d, ps, st)
-        val_loss = flux_divergence_loss(flux_val, Y_val_d, dz_val_d, nz, loss_weight_q)
+        val_loss = flux_divergence_loss(flux_val, Y_val_d, dz_val_d, nz)
+
+        push!(train_losses, epoch_loss)
+        push!(val_losses, val_loss)
 
         if val_loss < best_val_loss
             best_val_loss = val_loss
@@ -768,6 +921,24 @@ function train()
                 epoch, N_EPOCHS, epoch_loss, val_loss, marker)
         flush(stdout)
 
+        # Append to CSV log (live-readable)
+        open(log_path, "a") do io
+            @printf(io, "%d,%.6e,%.6e,%.6e\n", epoch, epoch_loss, val_loss, best_val_loss)
+        end
+
+        # Save progress plots periodically
+        if epoch % plot_interval == 0 || epoch == 1 || epoch == N_EPOCHS
+            try
+                save_loss_plot(train_losses, val_losses,
+                               joinpath(plots_dir, "training_loss.png"))
+                save_profile_snapshot(model, ps, st, X_val_d, Y_val_d, dz_val_d,
+                                     nz, Y_norm_stats, z_km, epoch,
+                                     joinpath(plots_dir, "profiles_epoch_$(@sprintf("%03d", epoch)).png"))
+            catch e
+                @warn "Failed to save progress plot" exception=e
+            end
+        end
+
         if epochs_without_improvement >= PATIENCE
             println("Early stopping: no improvement for $PATIENCE epochs")
             break
@@ -777,16 +948,40 @@ function train()
     println("-" ^ 60)
     @printf("Best validation loss: %.4e\n", best_val_loss)
 
+    # Final loss plot
+    save_loss_plot(train_losses, val_losses, joinpath(plots_dir, "training_loss.png"))
+
     # Move best params back to CPU for saving
     best_ps_cpu = best_ps |> cpu_device()
     st_cpu = st |> cpu_device()
 
-    save_path = joinpath(@__DIR__, "flux_correction_model.bson")
+    save_path = joinpath(run_dir, "flux_correction_model.bson")
     arch = ARCHITECTURE
-    BSON.@save save_path ps=best_ps_cpu st=st_cpu X_norm_stats nz input_dim arch
+    BSON.@save save_path ps=best_ps_cpu st=st_cpu X_norm_stats Y_norm_stats nz input_dim arch
     println("Model saved to $save_path")
 
-    return model, best_ps, st
+    # Write a human-readable summary
+    open(joinpath(run_dir, "config.txt"), "w") do io
+        @printf(io, "architecture  = %s\n", ARCHITECTURE)
+        @printf(io, "hidden_dim    = %d\n", HIDDEN_DIM)
+        @printf(io, "learning_rate = %.1e\n", LEARNING_RATE)
+        @printf(io, "batch_size    = %d\n", BATCH_SIZE)
+        @printf(io, "n_epochs      = %d\n", N_EPOCHS)
+        @printf(io, "patience      = %d\n", PATIENCE)
+        @printf(io, "train_frac    = %.2f\n", TRAIN_FRACTION)
+        @printf(io, "z_max         = %.0f\n", Z_MAX)
+        @printf(io, "features      = %s\n", join([f[1] for f in INPUT_FEATURES], ", "))
+        @printf(io, "col_subsample = %.3f\n", COLUMN_SUBSAMPLE_FRACTION)
+        @printf(io, "time_days     = %d-%d\n", TIME_DAY_START, TIME_DAY_END)
+        @printf(io, "n_train       = %d\n", n_train)
+        @printf(io, "n_val         = %d\n", n_samples - n_train)
+        @printf(io, "best_val_loss = %.6e\n", best_val_loss)
+        @printf(io, "weight_decay  = %.1e\n", WEIGHT_DECAY)
+        @printf(io, "flux_smooth_w = %.1e\n", FLUX_SMOOTH_WEIGHT)
+        @printf(io, "device        = %s\n", USE_GPU ? "GPU" : "CPU")
+    end
+
+    return model, best_ps, st, run_dir
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -794,5 +989,10 @@ end
 # ─────────────────────────────────────────────────────────────────────────────
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    train()
+    _, _, _, run_dir = train()
+    # Write a pointer so evaluate_flux_model.jl can find the latest run
+    open(joinpath(@__DIR__, "latest_run.txt"), "w") do io
+        println(io, run_dir)
+    end
+    println("\nRun directory: $run_dir")
 end

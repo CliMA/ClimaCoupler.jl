@@ -18,4 +18,13 @@ julia --project=. -e '
     Pkg.status()
 '
 
+# Train (writes latest_run.txt with the run directory path)
 USE_GPU=true julia -t 8 --project=. train_flux_correction.jl
+
+echo ""
+echo "============================================================"
+echo "Training complete. Running evaluation..."
+echo "============================================================"
+
+# Evaluate (reads latest_run.txt automatically, saves plots into the run dir)
+USE_GPU=true julia -t 32 --project=. evaluate_flux_model.jl

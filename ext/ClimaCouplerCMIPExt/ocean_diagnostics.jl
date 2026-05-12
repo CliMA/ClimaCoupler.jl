@@ -53,8 +53,10 @@ function add_ocean_diagnostics!(
     sea_surface_salinity = OC.Field(S; indices = surface_indices)
     sea_surface_zonal_velocity = OC.Field(u; indices = surface_indices)
     sea_surface_meridional_velocity = OC.Field(v; indices = surface_indices)
-    sea_surface_temperature_squared = OC.Field(T * T; indices = surface_indices, status = computed_field_status)
-    sea_surface_salinity_squared = OC.Field(S * S; indices = surface_indices, status = computed_field_status)
+    sea_surface_temperature_squared =
+        OC.Field(T * T; indices = surface_indices, status = computed_field_status)
+    sea_surface_salinity_squared =
+        OC.Field(S * S; indices = surface_indices, status = computed_field_status)
     sea_surface_height_squared = OC.Field(η * η; status = computed_field_status)
 
     surface_outputs = Dict{Symbol, Any}(

@@ -2,7 +2,7 @@
 
 julia_version = "1.11.9"
 manifest_format = "2.0"
-project_hash = "bca350e948c0680799cbca66ccefa34cddffd425"
+project_hash = "5e0cfd7c746742c6cfe8842524f909d76456e222"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -2398,9 +2398,9 @@ version = "0.5.5"
 
 [[deps.Oceananigans]]
 deps = ["Adapt", "Crayons", "CubedSphere", "Dates", "Distances", "DocStringExtensions", "FFTW", "GPUArraysCore", "Glob", "InteractiveUtils", "JLD2", "KernelAbstractions", "Krylov", "LinearAlgebra", "Logging", "MPI", "MuladdMacro", "OffsetArrays", "OrderedCollections", "Pkg", "Printf", "ReactantCore", "Rotations", "SeawaterPolynomials", "SparseArrays", "StaticArrays", "Statistics", "StructArrays"]
-git-tree-sha1 = "985c51ec987b5b479b88428473a6160f177ee83e"
+git-tree-sha1 = "b91e5bea8b0f2bf735f3c9b1a1a9ed64a22df8bf"
 uuid = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
-version = "0.107.5"
+version = "0.107.6"
 
     [deps.Oceananigans.extensions]
     OceananigansAMDGPUExt = ["AMDGPU", "AbstractFFTs"]

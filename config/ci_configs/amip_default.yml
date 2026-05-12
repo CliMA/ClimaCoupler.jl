@@ -14,3 +14,4 @@ use_itime: true
 vert_diff: "true"
 z_elem: 50
 z_stretch: false
+check_nan_every: 1

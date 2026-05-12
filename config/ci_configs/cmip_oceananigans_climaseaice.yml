@@ -28,3 +28,4 @@ topography: "Earth"
 viscous_sponge: true
 z_elem: 39
 z_max: 60000.0
+check_nan_every: 1

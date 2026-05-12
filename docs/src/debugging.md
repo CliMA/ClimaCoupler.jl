@@ -82,6 +82,10 @@ end
 Look for: negative temperatures, extremely large or small fluxes, NaN
 values in any field, or values that are zero where they shouldn't be.
 
+!!! note
+    Sometimes NaNs can occur without fully breaking the simulation.
+    One way to ensure that NaNs are caught quickly is by setting the `check_nan_every` config option as part of the ClimaAtmos model (see [the ClimaAtmos docs](https://clima.github.io/ClimaAtmos.jl/dev/config/#Default-Configuration) for details).
+
 ### Plotting ClimaCore fields
 
 The built-in `Plotting.debug` function produces a grid of heatmaps of all coupler and

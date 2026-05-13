@@ -26,8 +26,9 @@ It contains the following objects:
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ocean_ice_interface::NT`: A NamedTuple containing fluxes between the ocean and sea ice, computed at each coupling step,
                              the interfacial temperature and salinity, and the flux formulation used to compute the fluxes.
-- `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
-    and the Celsius to Kelvin conversion constant.
+- `ice_properties::IP`: A NamedTuple of sea ice properties: Stefan–Boltzmann constant `σ`,
+    Celsius offset `C_to_K` (water freezing point in K), and skin-temperature cap `T_melt` [K]
+    (defaults to `C_to_K`; override with coupled parameter `temperature_sea_ice_melt` when present).
 """
 struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, MDT} <:
        Interfacer.AbstractSeaIceSimulation
@@ -58,8 +59,8 @@ If a start date is provided, we initialize the sea ice concentration and thickne
 using the ECCO4Monthly dataset. If no start date is provided, we initialize with zero sea ice.
 
 The top heat boundary condition is `PrescribedTemperature`: the coupler iteratively
-diagnoses T_sfc via the `update_T_sfc` callback and writes it back to the ice model
-after each flux computation (see `compute_surface_fluxes!`).
+diagnoses T_sfc via the `update_T_sfc_cb` closure passed to `FluxCalculator.get_surface_fluxes!`
+and writes it back to the ice model after each flux computation (see `compute_surface_fluxes!`).
 
 # Arguments
 - `ocean`: [OceananigansSimulation] the ocean simulation to couple with.
@@ -119,6 +120,11 @@ function ClimaSeaIceSimulation(
     ice_properties = (;
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         C_to_K = coupled_param_dict["temperature_water_freeze"],
+        T_melt = get(
+            coupled_param_dict,
+            "temperature_sea_ice_melt",
+            coupled_param_dict["temperature_water_freeze"],
+        ),
     )
 
     # Since ocean and sea ice share the same grid, we can also share the remapping objects
@@ -237,7 +243,8 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
     FluxCalculator.compute_surface_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim, thermo_params)
 
 Compute surface fluxes for `ClimaSeaIceSimulation`, iteratively diagnosing T_sfc
-via the `update_T_sfc` callback to satisfy the skin-temperature flux balance.
+via the per-column `update_T_sfc_cb` closure (from `ClimaCouplerCMIPExt.update_T_sfc`) to satisfy
+the skin-temperature flux balance.
 
 The diagnosed T_sfc is written back to ClimaSeaIce's `top_surface_temperature`
 (used by `PrescribedTemperature`) so the ice thermodynamics stays consistent.
@@ -254,8 +261,9 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
 
     uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
 
-    # Sea ice parameters for the update_T_sfc callback (load into boundary-space scratch
-    # Fields first to avoid GPU scalar indexing when building the callback)
+
+    # Sea ice parameters for `update_T_sfc_cb` (load into boundary space scratch Fields first
+    # to avoid GPU scalar indexing when building the closure)
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:ice_thickness))
     Interfacer.get_field!(csf.scalar_temp2, sim, Val(:internal_temperature))
     Interfacer.get_field!(csf.scalar_temp3, sim, Val(:emissivity))
@@ -273,10 +281,10 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     σ = FT(sim.ice_properties.σ)
     SW_d = csf.SW_d
     LW_d = csf.LW_d
-    T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
+    T_melt = FT(sim.ice_properties.T_melt) # Melting temperature (freezing point of water)
 
-    # Build element-wise update_T_sfc callbacks (each closes over local ice parameters)
-    update_T_sfc_callback =
+    # Build element-wise update_T_sfc_cb closures (each closes over local ice parameters)
+    update_T_sfc_cb =
         ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
 
     # Surface temperature guess from last timestep
@@ -319,7 +327,7 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
             csf.height_sfc,
             FT(0),
             config,
-            update_T_sfc_callback,
+            update_T_sfc_cb,
         )
 
     FluxCalculator.update_flux_fields!(csf, sim, fluxes)

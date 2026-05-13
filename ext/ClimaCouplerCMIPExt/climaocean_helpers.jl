@@ -172,7 +172,7 @@ function Interfacer.remap!(
         target_field,
         source_field,
         remapping,
-        remapping.remapper,
+        remapping.remapper_cc_to_oc,
     )
 end
 
@@ -186,7 +186,7 @@ function Interfacer.remap!(
         target_field,
         source_field,
         remapping,
-        remapping.remapper,
+        remapping.remapper_cc_to_oc,
     )
 end
 
@@ -207,7 +207,7 @@ function _remap_helper!(
     # (strided, non-contiguous) interior.
     CR.regrid!(
         vec(remapping.remap_scratch_arr),
-        transpose(remapping.remapper),
+        remapping.remapper_cc_to_oc,
         remapping.value_per_element_cc,
     )
     # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
@@ -221,14 +221,14 @@ function _remap_helper!(
     target_field::OC.Field,
     source_field::CC.Fields.Field,
     remapping,
-    remapper::CC.Remapping.Remapper,
+    remapper_cc_to_oc::CC.Remapping.Remapper,
 )
     # `CC.Remapping.interpolate!` is written to fill a plain (contiguous) 2D buffer,
     # so we route through `remap_scratch_arr` and then copy into the OC.Field's
     # interior, rather than handing it a strided `OC.interior` view directly.
     CC.Remapping.interpolate!(
         remapping.remap_scratch_arr,
-        remapper,
+        remapper_cc_to_oc,
         source_field,
     )
     # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
@@ -251,10 +251,11 @@ function _remap_helper!(
     z = size(source_field, 3)
     remapping.remap_scratch_arr .= OC.interior(source_field, :, :, z)
 
-    # Regrid the source field; results land in the per-element CC vector
+    # Regrid the source field; results land in the per-element CC vector. The
+    # regridder is built CC → OC, so we use `transpose` to go the other way.
     CR.regrid!(
         remapping.value_per_element_cc,
-        remapping.remapper,
+        transpose(remapping.remapper_cc_to_oc),
         vec(remapping.remap_scratch_arr),
     )
 

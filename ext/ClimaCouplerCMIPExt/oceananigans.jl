@@ -326,12 +326,9 @@ both directions.
 
 The returned `NamedTuple` has the same outer field names regardless of the
 underlying grid type, so that the remapper type can be used for dispatch:
-- `remapper` — the remapper itself (a `CR.Regridder` for conservative, or a
-  `CC.Remapping.Remapper` for non-conservative). The two remappers have opposite
-  natural directions (the regridder is built OC → CC and transposed for the
-  reverse, while the `Remapper` is built CC → OC and the reverse direction is
-  done via `map_interpolate!` instead), so the field name avoids implying a
-  direction.
+- `remapper_cc_to_oc` — the remapper itself (a `CR.Regridder` for conservative, or a
+  `CC.Remapping.Remapper` for non-conservative). Both variants are built in the
+  natural **CC → OC** direction.
 - `scratch_field_oc1/2/3` — three 2D Center/Center Oceananigans scratch fields
 - `temp_uv_vec` — a UV-vector scratch field on the boundary space
 - `remap_scratch_arr` — a plain `(Nx, Ny)` Array/CuArray (on the OC architecture)
@@ -357,9 +354,9 @@ construct_remapper(grid_oc, boundary_space) =
         boundary_space,
     )
 
-Construct a ConservativeRegridding remapper for orthogonal spherical shell grids (e.g. TripolarGrid).
-To regrid from Oceananigans to ClimaCore, use `CR.regrid!(dest, remapper_oc_to_cc, src)`.
-To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest, transpose(remapper_oc_to_cc), src)`.
+Construct a ConservativeRegridding remapper for orthogonal spherical shell grids
+(e.g. `TripolarGrid`). The regridder is built in the **CC → OC** direction (i.e.
+`Regridder(dst = OC grid, src = CC boundary space)`).
 """
 function construct_remapper(
     ::OC.OrthogonalSphericalShellGrid,
@@ -370,16 +367,17 @@ function construct_remapper(
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), grid_oc.underlying_grid)
     boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
 
-    # Create the regridder from the Oceananigans grid to the ClimaCore boundary space
-    remapper = CR.Regridder(
-        boundary_space_cpu,
-        grid_oc_underlying_cpu;
+    # Build the regridder with the OC grid as the destination and the CC boundary
+    # space as the source, so the natural direction is CC → OC.
+    remapper_cc_to_oc = CR.Regridder(
+        grid_oc_underlying_cpu,
+        boundary_space_cpu;
         normalize = false,
         threaded = false,
     )
 
-    # Move remapper to GPU if needed
-    remapper = OC.on_architecture(OC.architecture(grid_oc), remapper)
+    # Move remapper_cc_to_oc to GPU if needed
+    remapper_cc_to_oc = OC.on_architecture(OC.architecture(grid_oc), remapper_cc_to_oc)
 
     # Create a field of ones on the boundary space so we can compute element areas
     field_ones_cc = CC.Fields.ones(boundary_space)
@@ -414,7 +412,7 @@ function construct_remapper(
     )
 
     return (;
-        remapper,
+        remapper_cc_to_oc,
         field_ones_cc,
         value_per_element_cc,
         scratch_field_oc1,
@@ -435,10 +433,10 @@ end
 
 Non-conservative remapper construction for `LatitudeLongitudeGrid`s, using
 `ClimaCore.Remapping` to interpolate from the boundary space to Oceananigans
-center/center points. The Remapper is built in the CC → OC direction (i.e.
-applied to a CC field, evaluated at OC cell centers); the reverse direction is
-handled in `_remap_helper!` via `map_interpolate!`, which does not need a
-precomputed remapper.
+center/center points. The Remapper is built in the **CC → OC** direction,
+matching the natural direction of the conservative `CR.Regridder` variant.
+The reverse direction is handled in `_remap_helper!` via `map_interpolate!`,
+which does not need a precomputed remapper.
 """
 function construct_remapper(
     underlying_grid::OC.LatitudeLongitudeGrid,
@@ -454,7 +452,7 @@ function construct_remapper(
     lat_cc = reshape(lat_cc, 1, length(lat_cc))
     target_points_cc = @. CC.Geometry.LatLongPoint(lat_cc, long_cc)
 
-    remapper = CC.Remapping.Remapper(boundary_space, target_points_cc)
+    remapper_cc_to_oc = CC.Remapping.Remapper(boundary_space, target_points_cc)
 
     # Construct 2D Oceananigans Center/Center fields as scratch space while remapping.
     # These are used for downstream operations that work directly with OC fields.
@@ -479,7 +477,7 @@ function construct_remapper(
     )
 
     return (;
-        remapper,
+        remapper_cc_to_oc,
         scratch_field_oc1,
         scratch_field_oc2,
         scratch_field_oc3,

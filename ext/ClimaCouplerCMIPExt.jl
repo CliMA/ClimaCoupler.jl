@@ -16,7 +16,13 @@ module ClimaCouplerCMIPExt
 
 import ClimaCoupler
 import ClimaCoupler:
-    Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities, Plotting
+    Checkpointer,
+    FieldExchanger,
+    FluxCalculator,
+    Interfacer,
+    TimeManager,
+    Utilities,
+    Plotting
 import Oceananigans as OC
 import ClimaOcean as CO
 import ClimaSeaIce as CSI

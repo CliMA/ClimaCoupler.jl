@@ -1,20 +1,26 @@
 """
     add_seaice_diagnostics!(ice_sim::ClimaSeaIceSimulation;
-                            output_dir = ".",
-                            surface_averaging_interval = Dates.Day(1),
+                            output_dir = joinpath("output_active", "clima_seaice"),
+                            interval = Dates.Day(1),
+                            mode = :averaged,
                             filename_prefix = "seaice",
                             file_splitting_interval = Dates.Day(15))
 
-Attach an averaged-output writer to the underlying ClimaSeaIce simulation inside a `ClimaSeaIceSimulation`.
+Attach an output writer to the underlying ClimaSeaIce simulation inside a `ClimaSeaIceSimulation`.
 A single writer is added to `ice_sim.ice.output_writers`:
 
 1. **Surface diagnostics** (`<prefix>_surface.jld2`): sea-ice concentration, thickness, velocities, and top
-   surface temperature, averaged over `surface_averaging_interval`.
+   surface temperature, sampled every `interval`.
+
+`mode` selects the reduction:
+- `:averaged` uses `Oceananigans.AveragedTimeInterval(interval)` (time-averaged fields).
+- `:instantaneous` uses `Oceananigans.TimeInterval(interval)` (snapshots).
 """
 function add_seaice_diagnostics!(
     ice_sim::ClimaSeaIceSimulation;
-    output_dir = ".",
-    surface_averaging_interval = Dates.Day(1),
+    output_dir = joinpath("output_active", "clima_seaice"),
+    interval = Dates.Day(1),
+    mode = :averaged,
     filename_prefix = "seaice",
     file_splitting_interval = Dates.Day(15),
 )
@@ -35,17 +41,17 @@ function add_seaice_diagnostics!(
         :ice_top_temperature => sitemptop,
     )
 
-    ice.output_writers[:surface_averages] = OC.JLD2Writer(
+    ice.output_writers[:surface_diagnostics] = OC.JLD2Writer(
         ice.model,
         surface_outputs;
-        schedule = OC.AveragedTimeInterval(surface_averaging_interval),
+        schedule = diagnostic_schedule(mode, interval),
         filename = joinpath(output_dir, filename_prefix * "_surface"),
         file_splitting,
         overwrite_existing = true,
     )
 
     @info "Sea-ice diagnostics attached:" *
-          " surface ($(length(surface_outputs)) fields, every $surface_averaging_interval)"
+          " surface ($(length(surface_outputs)) fields, $mode, every $interval)"
 
     return nothing
 end

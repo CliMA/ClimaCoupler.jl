@@ -75,6 +75,8 @@ function ClimaSeaIceSimulation(
     start_date = nothing,
     coupled_param_dict = CP.create_toml_dict(FT),
     dt = 5 * 60.0, # 5 minutes
+    seaice_diagnostic_interval = "1days",
+    seaice_diagnostic_mode = :averaged,
     extra_kwargs...,
 ) where {FT}
     # Initialize the sea ice with the same grid as the ocean
@@ -163,7 +165,12 @@ function ClimaSeaIceSimulation(
         model_Δt,
     )
 
-    add_seaice_diagnostics!(sim; output_dir)
+    add_seaice_diagnostics!(
+        sim;
+        output_dir,
+        interval = TimeManager.time_to_period(seaice_diagnostic_interval),
+        mode = seaice_diagnostic_mode,
+    )
 
     # Ensure ocean temperature is above freezing where there is sea ice
     CO.OceanSeaIceModels.above_freezing_ocean_temperature!(ocean.ocean, grid, ice)

@@ -1,26 +1,55 @@
 import Dates
 
 """
+    diagnostic_schedule(mode, interval)
+
+Return an Oceananigans output schedule corresponding to `mode`:
+- `:averaged` → `OC.AveragedTimeInterval(interval)`
+- `:instantaneous` → `OC.TimeInterval(interval)`
+
+Throws for any other value.
+"""
+function diagnostic_schedule(mode::Symbol, interval)
+    if mode === :averaged
+        return OC.AveragedTimeInterval(interval)
+    elseif mode === :instantaneous
+        return OC.TimeInterval(interval)
+    else
+        error(
+            "Unknown diagnostic mode `$(mode)`. Expected `:averaged` or `:instantaneous`.",
+        )
+    end
+end
+
+"""
     add_ocean_diagnostics!(ocean_sim::OceananigansSimulation;
-                           output_dir = ".",
-                           surface_averaging_interval = Dates.Day(1),
-                           field_averaging_interval = Dates.Day(15),
+                           output_dir = joinpath("output_active", "clima_ocean"),
+                           interval = Dates.Day(1),
+                           mode = :averaged,
                            filename_prefix = "ocean",
                            file_splitting_interval = Dates.Day(15))
 
-Attach averaged-output writers to the underlying Oceananigans simulation inside an `OceananigansSimulation`.
-Two writers are added to `ocean_sim.ocean.output_writers`:
+Attach output writers to the underlying Oceananigans simulation inside an `OceananigansSimulation`.
+Two writers are added to `ocean_sim.ocean.output_writers`, both with the same `interval` and `mode`:
 
-1. **Surface diagnostics** (`<prefix>_surface.jld2`): 2-D fields averaged over `surface_averaging_interval` —
+1. **Surface diagnostics** (`<prefix>_surface.jld2`): 2-D fields —
    SST, SSS, SSH, surface velocities, squared surface fields for variance, surface momentum/heat/freshwater fluxes.
-2. **3-D field diagnostics** (`<prefix>_fields.jld2`): full 3-D temperature, salinity, velocity (and TKE if a `:e` tracer is present),
-   averaged over `field_averaging_interval`.
+2. **3-D field diagnostics** (`<prefix>_fields.jld2`): full 3-D temperature, salinity, velocity (and TKE if a `:e` tracer is present).
+
+`mode` selects the reduction:
+- `:averaged` uses `Oceananigans.AveragedTimeInterval(interval)` (time-averaged fields).
+- `:instantaneous` uses `Oceananigans.TimeInterval(interval)` (snapshots).
+
+!!! note
+    `tauuo`, `tauvo`, `hfds`, and `wfo` here are the *combined* surface fluxes on the ocean (atmosphere + sea-ice contributions),
+    not the atmosphere-only contribution. Sensible/latent heat (`hfss`/`hfls`) are not stored as standalone fields in CMIP —
+    they are folded into `oc_flux_T` inside `update_turbulent_fluxes!` — and are therefore omitted.
 """
 function add_ocean_diagnostics!(
     ocean_sim::OceananigansSimulation;
-    output_dir = ".",
-    surface_averaging_interval = Dates.Day(1),
-    field_averaging_interval = Dates.Day(15),
+    output_dir = joinpath("output_active", "clima_ocean"),
+    interval = Dates.Day(1),
+    mode = :averaged,
     filename_prefix = "ocean",
     file_splitting_interval = Dates.Day(15),
 )
@@ -66,10 +95,12 @@ function add_ocean_diagnostics!(
         :surface_salinity_flux => Js,
     )
 
-    ocean.output_writers[:surface_averages] = OC.JLD2Writer(
+    schedule = diagnostic_schedule(mode, interval)
+
+    ocean.output_writers[:surface_diagnostics] = OC.JLD2Writer(
         ocean.model,
         surface_outputs;
-        schedule = OC.AveragedTimeInterval(surface_averaging_interval),
+        schedule,
         filename = joinpath(output_dir, filename_prefix * "_surface"),
         file_splitting,
         overwrite_existing = true,
@@ -87,18 +118,18 @@ function add_ocean_diagnostics!(
         field_outputs[:turbulent_kinetic_energy] = ocean.model.tracers.e
     end
 
-    ocean.output_writers[:field_averages] = OC.JLD2Writer(
+    ocean.output_writers[:field_diagnostics] = OC.JLD2Writer(
         ocean.model,
         field_outputs;
-        schedule = OC.AveragedTimeInterval(field_averaging_interval),
+        schedule,
         filename = joinpath(output_dir, filename_prefix * "_fields"),
         file_splitting,
         overwrite_existing = true,
     )
 
     @info "Ocean diagnostics attached:" *
-          " surface ($(length(surface_outputs)) fields, every $surface_averaging_interval)," *
-          " 3-D ($(length(field_outputs)) fields, every $field_averaging_interval)"
+          " surface ($(length(surface_outputs)) fields, $mode, every $interval)," *
+          " 3-D ($(length(field_outputs)) fields, $mode, every $interval)"
 
     return nothing
 end

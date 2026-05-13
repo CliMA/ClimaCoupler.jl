@@ -241,7 +241,11 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         simple_ocean,
         sst_adjustment,
         progress_interval,
+        ocean_diagnostic_interval,
+        ocean_diagnostic_mode,
         ice_model,
+        seaice_diagnostic_interval,
+        seaice_diagnostic_mode,
         land_fraction_source,
         binary_area_fraction,
         domain_type,
@@ -364,6 +368,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         sst_adjustment,
         saveat,
         evolving = evolving_ocean,
+        ocean_diagnostic_interval,
+        ocean_diagnostic_mode,
     )
 
     ice_sim = Interfacer.SeaIceSimulation(
@@ -383,6 +389,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         sic_path,
         binary_area_fraction,
         domain_type,
+        seaice_diagnostic_interval,
+        seaice_diagnostic_mode,
     )
 
     #=

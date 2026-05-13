@@ -75,6 +75,8 @@ function OceananigansSimulation(
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
     progress_interval = nothing,
+    ocean_diagnostic_interval = "1days",
+    ocean_diagnostic_mode = :averaged,
     extra_kwargs...,
 ) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
@@ -296,7 +298,12 @@ function OceananigansSimulation(
         model_Δt,
     )
 
-    add_ocean_diagnostics!(sim; output_dir)
+    add_ocean_diagnostics!(
+        sim;
+        output_dir,
+        interval = TimeManager.time_to_period(ocean_diagnostic_interval),
+        mode = ocean_diagnostic_mode,
+    )
 
     return sim
 end

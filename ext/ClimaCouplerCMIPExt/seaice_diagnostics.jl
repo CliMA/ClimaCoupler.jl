@@ -8,7 +8,7 @@
 Attach an averaged-output writer to the underlying ClimaSeaIce simulation inside a `ClimaSeaIceSimulation`.
 A single writer is added to `ice_sim.ice.output_writers`:
 
-1. **Surface diagnostics** (`<prefix>_surface.jld2`): sea-ice concentration, thickness, velocities, and (when present) top
+1. **Surface diagnostics** (`<prefix>_surface.jld2`): sea-ice concentration, thickness, velocities, and top
    surface temperature, averaged over `surface_averaging_interval`.
 """
 function add_seaice_diagnostics!(

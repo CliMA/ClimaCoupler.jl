@@ -163,11 +163,7 @@ end
 
 ### Extensions of Interfacer.jl remapping functions for Oceananigans fields/grids
 # Non-allocating ClimaCore -> Oceananigans remap
-function Interfacer.remap!(
-    target_field::OC.Field,
-    source_field::CC.Fields.Field,
-    remapping,
-)
+function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
     return _remap_helper!(
         target_field,
         source_field,
@@ -177,11 +173,7 @@ function Interfacer.remap!(
 end
 
 # Non-allocating Oceananigans -> ClimaCore remap
-function Interfacer.remap!(
-    target_field::CC.Fields.Field,
-    source_field::OC.Field,
-    remapping,
-)
+function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field, remapping)
     return _remap_helper!(
         target_field,
         source_field,
@@ -226,11 +218,7 @@ function _remap_helper!(
     # `CC.Remapping.interpolate!` is written to fill a plain (contiguous) 2D buffer,
     # so we route through `remap_scratch_arr` and then copy into the OC.Field's
     # interior, rather than handing it a strided `OC.interior` view directly.
-    CC.Remapping.interpolate!(
-        remapping.remap_scratch_arr,
-        remapper_cc_to_oc,
-        source_field,
-    )
+    CC.Remapping.interpolate!(remapping.remap_scratch_arr, remapper_cc_to_oc, source_field)
     # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
     z = size(target_field, 3)
     OC.interior(target_field, :, :, z) .= remapping.remap_scratch_arr

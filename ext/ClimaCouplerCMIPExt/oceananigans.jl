@@ -358,11 +358,7 @@ Construct a ConservativeRegridding remapper for orthogonal spherical shell grids
 (e.g. `TripolarGrid`). The regridder is built in the **CC → OC** direction (i.e.
 `Regridder(dst = OC grid, src = CC boundary space)`).
 """
-function construct_remapper(
-    ::OC.OrthogonalSphericalShellGrid,
-    grid_oc,
-    boundary_space,
-)
+function construct_remapper(::OC.OrthogonalSphericalShellGrid, grid_oc, boundary_space)
     # Move grids to CPU since ConservativeRegridding doesn't support GPU grids yet
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), grid_oc.underlying_grid)
     boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
@@ -401,8 +397,7 @@ function construct_remapper(
     # strided arrays incorrectly.
     arch_oc = OC.Architectures.architecture(grid_oc)
     Nx_oc, Ny_oc = size(scratch_field_oc1, 1), size(scratch_field_oc1, 2)
-    remap_scratch_arr =
-        OC.Architectures.on_architecture(arch_oc, zeros(FT, Nx_oc, Ny_oc))
+    remap_scratch_arr = OC.Architectures.on_architecture(arch_oc, zeros(FT, Nx_oc, Ny_oc))
 
     # Precompute 2D ocean-grid mask for polar flux suppression on LatitudeLongitudeGrid only.
     # On TripolarGrid, `ocean_polar_mask` returns all ones (no suppression); same shape/device as lat–lon.

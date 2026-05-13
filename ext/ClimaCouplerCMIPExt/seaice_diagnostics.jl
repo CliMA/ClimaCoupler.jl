@@ -11,7 +11,7 @@ Two writers are added to `ice_sim.ice.output_writers`:
 
 1. **Surface diagnostics** (`<prefix>_surface.jld2`): sea-ice concentration, thickness, velocities, and (when present) top 
    surface temperature, averaged over `surface_averaging_interval`.
-2. **Checkpointer** (`<prefix>_checkpoint.jld2`): JLD2 checkpoint of the sea-ice model at `checkpoint_interval`.
+2. **Checkpointer** (`<prefix>_checkpoint_iteration<N>.jld2`): JLD2 checkpoint of the sea-ice model at `checkpoint_interval`.
 """
 function add_seaice_diagnostics!(
     ice_sim::ClimaSeaIceSimulation;

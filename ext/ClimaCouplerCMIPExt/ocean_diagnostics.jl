@@ -16,7 +16,7 @@ Three writers are added to `ocean_sim.ocean.output_writers`:
    SST, SSS, SSH, surface velocities, squared surface fields for variance, surface momentum/heat/freshwater fluxes.
 2. **3-D field diagnostics** (`<prefix>_fields.jld2`): full 3-D temperature, salinity, velocity (and TKE if a `:e` tracer is present), 
    averaged over `field_averaging_interval`.
-3. **Checkpointer** (`<prefix>_checkpoint`): JLD2 checkpoint of the ocean model at `checkpoint_interval`.
+3. **Checkpointer** (`<prefix>_checkpoint_iteration<N>.jld2`): JLD2 checkpoint of the ocean model at `checkpoint_interval`.
 
 !!! note
     `tauuo`, `tauvo`, `hfds`, and `wfo` here are the *combined* surface fluxes on the ocean (atmosphere + sea-ice contributions), 

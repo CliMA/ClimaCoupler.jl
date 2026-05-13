@@ -2,22 +2,19 @@
     add_seaice_diagnostics!(ice_sim::ClimaSeaIceSimulation;
                             output_dir = ".",
                             surface_averaging_interval = Dates.Day(1),
-                            checkpoint_interval = Dates.Day(90),
                             filename_prefix = "seaice",
                             file_splitting_interval = Dates.Day(15))
 
-Attach averaged-output writers to the underlying ClimaSeaIce simulation inside a `ClimaSeaIceSimulation`. 
-Two writers are added to `ice_sim.ice.output_writers`:
+Attach an averaged-output writer to the underlying ClimaSeaIce simulation inside a `ClimaSeaIceSimulation`.
+A single writer is added to `ice_sim.ice.output_writers`:
 
-1. **Surface diagnostics** (`<prefix>_surface.jld2`): sea-ice concentration, thickness, velocities, and (when present) top 
+1. **Surface diagnostics** (`<prefix>_surface.jld2`): sea-ice concentration, thickness, velocities, and (when present) top
    surface temperature, averaged over `surface_averaging_interval`.
-2. **Checkpointer** (`<prefix>_checkpoint`): JLD2 checkpoint of the sea-ice model at `checkpoint_interval`.
 """
 function add_seaice_diagnostics!(
     ice_sim::ClimaSeaIceSimulation;
     output_dir = ".",
     surface_averaging_interval = Dates.Day(1),
-    checkpoint_interval = Dates.Day(90),
     filename_prefix = "seaice",
     file_splitting_interval = Dates.Day(15),
 )
@@ -54,17 +51,8 @@ function add_seaice_diagnostics!(
         overwrite_existing = true,
     )
 
-    ice.output_writers[:checkpointer] = OC.Checkpointer(
-        ice.model;
-        schedule = OC.TimeInterval(checkpoint_interval),
-        prefix = joinpath(output_dir, filename_prefix * "_checkpoint"),
-        cleanup = false,
-        verbose = true,
-    )
-
     @info "Sea-ice diagnostics attached:" *
-          " surface ($(length(surface_outputs)) fields, every $surface_averaging_interval)," *
-          " checkpointer (every $checkpoint_interval)"
+          " surface ($(length(surface_outputs)) fields, every $surface_averaging_interval)"
 
     return nothing
 end

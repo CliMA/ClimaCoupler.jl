@@ -25,22 +25,15 @@ function add_seaice_diagnostics!(
     ℵi = ice.model.ice_concentration
     ui, vi = ice.model.velocities
 
-    sitemptop = try
-        ice.model.ice_thermodynamics.top_surface_temperature
-    catch
-        nothing
-    end
+    sitemptop = ice.model.ice_thermodynamics.top_surface_temperature
 
     surface_outputs = Dict{Symbol, Any}(
         :ice_concentration => ℵi,
         :ice_thickness => hi,
         :ice_zonal_velocity => ui,
         :ice_meridional_velocity => vi,
+        :ice_top_temperature => sitemptop,
     )
-
-    if !isnothing(sitemptop)
-        surface_outputs[:ice_top_temperature] = sitemptop
-    end
 
     ice.output_writers[:surface_averages] = OC.JLD2Writer(
         ice.model,

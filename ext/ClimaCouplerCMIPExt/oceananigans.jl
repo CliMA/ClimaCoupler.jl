@@ -28,9 +28,10 @@ dispatch in coupling.
 - `start_date`: Start date for the simulation
 - `stop_date`: Stop date for the simulation
 - `output_dir`: Directory for output files
-- `simple_ocean`: Whether to use a simple ocean model setup
 
 # Optional keyword arguments
+- `simple_ocean`: Whether to use a simple ocean model setup
+- `oceananigans_grid_type`: Grid type for the Oceananigans and ClimaSeaIce models.
 - `dt`: Time step (default: `nothing`)
 - `comms_ctx`: Communication context (default: `ClimaComms.context()`)
 - `coupled_param_dict`: Coupled parameter dictionary (default: created from `area_fraction`)
@@ -46,6 +47,7 @@ function OceananigansSimulation(
     tspan,
     output_dir,
     simple_ocean = false,
+    oceananigans_grid_type::Val = Val(:lat_lon),
     dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
@@ -66,34 +68,8 @@ function OceananigansSimulation(
     CO.EN4.download_dataset(en4_temperature)
     CO.EN4.download_dataset(en4_salinity)
 
-    # Set up tripolar ocean grid (0.5 degree)
-    Nx = 720
-    Ny = 360
-    Nz = 100
-    depth = 6000 # meters
-    z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 1800)
-
-    underlying_grid = OC.TripolarGrid(
-        arch;
-        size = (Nx, Ny, Nz),
-        halo = (7, 7, 7),
-        z,
-        fold_topology = OC.Grids.RightFaceFolded,
-    )
-
-    # TODO revert this
-    bottom_height = CO.regrid_bathymetry(
-        underlying_grid;
-        minimum_depth = 20,
-        interpolation_passes = 2,
-        major_basins = 1,
-    )
-
-    grid = OC.ImmersedBoundaryGrid(
-        underlying_grid,
-        OC.GridFittedBottom(bottom_height);
-        active_cells_map = true,
-    )
+    # Build the Oceananigans ocean grid (LatitudeLongitudeGrid or TripolarGrid)
+    grid = construct_ocean_grid(oceananigans_grid_type, arch)
 
     # Create ocean simulation
     if !simple_ocean
@@ -267,22 +243,135 @@ function OceananigansSimulation(
 end
 
 """
+    construct_ocean_grid(::Val{:lat_lon}, arch)
+
+Construct an Oceananigans `ImmersedBoundaryGrid` over a 1° `LatitudeLongitudeGrid`
+covering ±80° latitude. This grid should be used with with non-conservative
+ClimaCore remapping.
+"""
+function construct_ocean_grid(::Val{:lat_lon}, arch)
+    # 1° lat-lon ocean grid
+    resolution_points = (360, 160, 32)
+    Nz = last(resolution_points)
+    depth = 4000 # meters
+    z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 0.85 * depth)
+
+    # NOTE: Don't extend the LatLongGrid too close to the poles, or the cells
+    # become too small.
+    underlying_grid = OC.LatitudeLongitudeGrid(
+        arch;
+        size = resolution_points,
+        longitude = (-180, 180),
+        latitude = (-80, 80),
+        z,
+        halo = (7, 7, 7),
+    )
+
+    bottom_height = CO.regrid_bathymetry(
+        underlying_grid;
+        minimum_depth = 30,
+        interpolation_passes = 20,
+        major_basins = 1,
+    )
+
+    return OC.ImmersedBoundaryGrid(
+        underlying_grid,
+        OC.GridFittedBottom(bottom_height);
+        active_cells_map = true,
+    )
+end
+
+"""
+    construct_ocean_grid(::Val{:tripolar}, arch)
+
+Construct an Oceananigans `ImmersedBoundaryGrid` over a 0.5° `TripolarGrid`.
+This grid pairs with `ConservativeRegridding`-based remapping.
+"""
+function construct_ocean_grid(::Val{:tripolar}, arch)
+    # 0.5° tripolar ocean grid
+    Nx = 720
+    Ny = 360
+    Nz = 100
+    depth = 6000 # meters
+    z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 1800)
+
+    underlying_grid = OC.TripolarGrid(
+        arch;
+        size = (Nx, Ny, Nz),
+        halo = (7, 7, 7),
+        z,
+        fold_topology = OC.Grids.RightFaceFolded,
+    )
+
+    bottom_height = CO.regrid_bathymetry(
+        underlying_grid;
+        minimum_depth = 20,
+        interpolation_passes = 2,
+        major_basins = 1,
+    )
+
+    return OC.ImmersedBoundaryGrid(
+        underlying_grid,
+        OC.GridFittedBottom(bottom_height);
+        active_cells_map = true,
+    )
+end
+
+"""
     construct_remapper(grid_oc, boundary_space)
 
 Given an Oceananigans grid and a ClimaCore boundary space, construct the
-remappers needed to remap between the two grids in both directions.
+remappers and scratch space needed to remap fields between the two grids in
+both directions.
 
-Returns a remapper from the Oceananigans grid to the ClimaCore boundary space.
-To regrid from Oceananigans to ClimaCore, use `CR.regrid!(dest_vector, remapper_oc_to_cc, src_vector)`.
-To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest_vector, transpose(remapper_oc_to_cc), src_vector)`.
+The returned `NamedTuple` has the same outer field names regardless of the
+underlying grid type, so that the remapper type can be used for dispatch:
+- `remapper` — the remapper itself (a `CR.Regridder` for conservative, or a
+  `CC.Remapping.Remapper` for non-conservative). The two remappers have opposite
+  natural directions (the regridder is built OC → CC and transposed for the
+  reverse, while the `Remapper` is built CC → OC and the reverse direction is
+  done via `map_interpolate!` instead), so the field name avoids implying a
+  direction.
+- `scratch_field_oc1/2/3` — three 2D Center/Center Oceananigans scratch fields
+- `temp_uv_vec` — a UV-vector scratch field on the boundary space
+- `remap_scratch_arr` — a plain `(Nx, Ny)` Array/CuArray (on the OC architecture)
+  used as a contiguous staging buffer around the underlying remapping call, since
+  `OC.interior(field, :, :, z)` is a strided, non-contiguous SubArray of the
+  halo'd parent storage
+- `polar_mask` — 2D ocean-grid polar mask
+
+The conservative variant additionally exposes `field_ones_cc` and
+`value_per_element_cc`, which are used only by the conservative remap path.
+
+Dispatches on `grid_oc.underlying_grid` to choose between the conservative
+(`OrthogonalSphericalShellGrid` such as `TripolarGrid`) and non-conservative
+(`LatitudeLongitudeGrid`) implementations.
 """
-function construct_remapper(grid_oc, boundary_space)
+construct_remapper(grid_oc, boundary_space) =
+    construct_remapper(grid_oc.underlying_grid, grid_oc, boundary_space)
+
+"""
+    construct_remapper(
+        ::OC.OrthogonalSphericalShellGrid,
+        grid_oc,
+        boundary_space,
+    )
+
+Construct a ConservativeRegridding remapper for orthogonal spherical shell grids (e.g. TripolarGrid).
+To regrid from Oceananigans to ClimaCore, use `CR.regrid!(dest, remapper_oc_to_cc, src)`.
+To regrid from ClimaCore to Oceananigans, use `CR.regrid!(dest, transpose(remapper_oc_to_cc), src)`.
+"""
+function construct_remapper(
+    ::OC.OrthogonalSphericalShellGrid,
+    grid_oc,
+    boundary_space,
+)
     # Move grids to CPU since ConservativeRegridding doesn't support GPU grids yet
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), grid_oc.underlying_grid)
     boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
 
-    # Create the remapper from the Oceananigans grid to the ClimaCore boundary space
-    remapper_oc_to_cc = CR.Regridder(
+    # Create the regridder from the Oceananigans grid to the ClimaCore boundary space
+    remapper = CR.Regridder(
         boundary_space_cpu,
         grid_oc_underlying_cpu;
         normalize = false,
@@ -290,7 +379,7 @@ function construct_remapper(grid_oc, boundary_space)
     )
 
     # Move remapper to GPU if needed
-    remapper_oc_to_cc = OC.on_architecture(OC.architecture(grid_oc), remapper_oc_to_cc)
+    remapper = OC.on_architecture(OC.architecture(grid_oc), remapper)
 
     # Create a field of ones on the boundary space so we can compute element areas
     field_ones_cc = CC.Fields.ones(boundary_space)
@@ -310,6 +399,13 @@ function construct_remapper(grid_oc, boundary_space)
     # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
+    # Plain (Nx, Ny) buffer on the OC architecture, used to avoid filling
+    # strided arrays incorrectly.
+    arch_oc = OC.Architectures.architecture(grid_oc)
+    Nx_oc, Ny_oc = size(scratch_field_oc1, 1), size(scratch_field_oc1, 2)
+    remap_scratch_arr =
+        OC.Architectures.on_architecture(arch_oc, zeros(FT, Nx_oc, Ny_oc))
+
     # Precompute 2D ocean-grid mask for polar flux suppression on LatitudeLongitudeGrid only.
     # On TripolarGrid, `ocean_polar_mask` returns all ones (no suppression); same shape/device as lat–lon.
     polar_mask = ocean_polar_mask(
@@ -318,13 +414,77 @@ function construct_remapper(grid_oc, boundary_space)
     )
 
     return (;
-        remapper_oc_to_cc,
+        remapper,
         field_ones_cc,
         value_per_element_cc,
         scratch_field_oc1,
         scratch_field_oc2,
         scratch_field_oc3,
         temp_uv_vec,
+        remap_scratch_arr,
+        polar_mask,
+    )
+end
+
+"""
+    construct_remapper(
+        underlying_grid::OC.LatitudeLongitudeGrid,
+        grid_oc,
+        boundary_space,
+    )
+
+Non-conservative remapper construction for `LatitudeLongitudeGrid`s, using
+`ClimaCore.Remapping` to interpolate from the boundary space to Oceananigans
+center/center points. The Remapper is built in the CC → OC direction (i.e.
+applied to a CC field, evaluated at OC cell centers); the reverse direction is
+handled in `_remap_helper!` via `map_interpolate!`, which does not need a
+precomputed remapper.
+"""
+function construct_remapper(
+    underlying_grid::OC.LatitudeLongitudeGrid,
+    grid_oc,
+    boundary_space,
+)
+    long_cc = OC.λnodes(grid_oc, OC.Center(), OC.Center(), OC.Center())
+    lat_cc = OC.φnodes(grid_oc, OC.Center(), OC.Center(), OC.Center())
+    Nx, Ny = length(long_cc), length(lat_cc)
+
+    # Build a remapper from `boundary_space` onto the OC cell centers (i.e. CC → OC).
+    long_cc = reshape(long_cc, length(long_cc), 1)
+    lat_cc = reshape(lat_cc, 1, length(lat_cc))
+    target_points_cc = @. CC.Geometry.LatLongPoint(lat_cc, long_cc)
+
+    remapper = CC.Remapping.Remapper(boundary_space, target_points_cc)
+
+    # Construct 2D Oceananigans Center/Center fields as scratch space while remapping.
+    # These are used for downstream operations that work directly with OC fields.
+    scratch_field_oc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
+    scratch_field_oc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
+    scratch_field_oc3 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
+
+    # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
+    FT = CC.Spaces.undertype(boundary_space)
+    temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
+
+    # Plain (Nx, Ny) buffer on the OC architecture, used as the destination of
+    # `CC.Remapping.interpolate!` before copying into an OC.Field's (potentially
+    # strided) interior.
+    arch_oc = OC.Architectures.architecture(grid_oc)
+    remap_scratch_arr = OC.Architectures.on_architecture(arch_oc, zeros(FT, Nx, Ny))
+
+    # Precompute 2D ocean-grid polar mask (zero where |lat| ≥ 78°)
+    polar_mask = ocean_polar_mask(
+        underlying_grid;
+        location = (OC.Center(), OC.Center(), OC.Center()),
+    )
+
+    return (;
+        remapper,
+        scratch_field_oc1,
+        scratch_field_oc2,
+        scratch_field_oc3,
+        temp_uv_vec,
+        remap_scratch_arr,
         polar_mask,
     )
 end

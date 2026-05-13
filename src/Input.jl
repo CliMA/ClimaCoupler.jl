@@ -254,6 +254,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use a simpler ocean model setup with Oceananigans [`false` (default), `true`]"
         arg_type = Bool
         default = false
+        "--oceananigans_grid_type"
+        help = "Grid type for the Oceananigans and ClimaSeaIce models. [`lat_lon` (default), `tripolar`]"
+        arg_type = String
+        default = "lat_lon"
         "--sst_adjustment"
         help = "Adjustment to add to prescribed SST after conversion to Kelvin (default: 0.0)"
         arg_type = Float64
@@ -524,6 +528,13 @@ function get_coupler_args(config_dict::Dict)
     simple_ocean = config_dict["simple_ocean"]
     sst_adjustment = FT(config_dict["sst_adjustment"])
     progress_interval = config_dict["ocean_progress_interval"]
+    oceananigans_grid_type = Val(Symbol(config_dict["oceananigans_grid_type"]))
+    if !(oceananigans_grid_type isa Union{Val{:lat_lon}, Val{:tripolar}})
+        error(
+            "Unknown oceananigans_grid_type: $(config_dict["oceananigans_grid_type"]). " *
+            "Must be \"lat_lon\" or \"tripolar\".",
+        )
+    end
 
     # Ice model-specific information
     ice_model = Val(Symbol(config_dict["ice_model"]))
@@ -603,6 +614,7 @@ function get_coupler_args(config_dict::Dict)
         simple_ocean,
         sst_adjustment,
         progress_interval,
+        oceananigans_grid_type,
         ice_model,
         land_fraction_source,
         binary_area_fraction,

@@ -96,6 +96,7 @@ end
         "ocean_model" => "prescribed",
         "simple_ocean" => false,
         "sst_adjustment" => 2.0,
+        "oceananigans_grid_type" => "lat_lon",
         "ice_model" => "prescribed",
         "ocean_progress_interval" => nothing,
         "land_fraction_source" => "etopo",

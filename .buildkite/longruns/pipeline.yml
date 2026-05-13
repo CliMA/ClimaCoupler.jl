@@ -179,6 +179,19 @@ steps:
           slurm_mem: 32GB
           slurm_gpus: 1
 
+      - label: "GPU CMIP (tripolar): ED only + bucket"
+        key: "cmip_edonly_bucket_tripolar"
+        command:
+            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_edonly_bucket_tripolar.yml --job_id cmip_edonly_bucket_tripolar"
+        artifact_paths: "output/cmip_edonly_bucket_tripolar/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        soft_fail: true
+        agents:
+          queue: clima
+          slurm_mem: 32GB
+          slurm_gpus: 1
+
       - label: "GPU CMIP: ED only + integrated land"
         key: "cmip_edonly_land"
         command:

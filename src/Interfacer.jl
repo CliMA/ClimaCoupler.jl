@@ -546,8 +546,6 @@ here, but then we would allocate a new field even if the spaces are the same.
 
 Non-ClimaCore fields should provide a method to this function.
 """
-function remap end
-
 NVTX.@annotate function remap(
     target_space::CC.Spaces.AbstractSpace,
     source_field::CC.Fields.Field,
@@ -596,8 +594,6 @@ Non-ClimaCore fields should provide a method to this function.
 
 Note that this method has a lot of allocations and is not efficient.
 """
-function remap! end
-
 NVTX.@annotate function remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field)
     source_space = axes(source_field)
     target_space = axes(target_field)

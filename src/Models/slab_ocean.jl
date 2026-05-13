@@ -62,11 +62,11 @@ Initialize the `OceanSlabParameters` object with the coupled parameters.
 function OceanSlabParameters{FT}(
     coupled_param_dict;
     h = FT(1),
-    ρ = FT(1500),
-    c = FT(800),
+    ρ = FT(1020),    # HACK: mirror standalone ClimaAtmos SlabOceanSST default
+    c = FT(4184),    # HACK: mirror standalone ClimaAtmos SlabOceanSST default
     T_init = FT(250),
-    z0m = FT(5e-4),
-    z0b = FT(5e-4),
+    z0m = FT(1e-3),  # HACK: Pithan 2016 — match EC-Earth, ECHAM, ECMWF, WRF
+    z0b = FT(1e-3),  # HACK: Pithan 2016 — match EC-Earth, ECHAM, ECMWF, WRF
     α = FT(0.38),
     ϵ = FT(1),
     evolving_switch = FT(1),
@@ -96,8 +96,8 @@ function slab_ocean_space_init(space, params)
     coords = CC.Fields.coordinate_field(space)
 
     # initial condition
-    # FT(271) close to the average of T_1 in atmos
-    T_sfc = params.T_init .+ temp_anomaly.(coords)
+    # HACK: removed temp_anomaly.(coords) to initialize T_sfc uniformly at T_init (250 K) for Larcform1
+    T_sfc = CC.Fields.zeros(space) .+ params.T_init
 
     # prognostic variable
     Y = CC.Fields.FieldVector(; T_sfc = T_sfc)
@@ -200,7 +200,7 @@ Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_diffuse_albedo}) =
     sim.integrator.p.α_diffuse
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:surface_temperature}) =
     sim.integrator.u.T_sfc
-Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_model}) = :coare3
+Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:roughness_model}) = :constant # HACK: modified to match Larcform1 implementation in standalone ClimaAtmos SlabOceanSST
 Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:coare3_roughness_params}) =
     sim.integrator.p.coare3_roughness_params
 

@@ -7,8 +7,8 @@ evolving_ocean: false
 h_elem: 4
 mode_name: "slabplanet"
 output_default_diagnostics: false
-rad: nothing
+rad: ~
 microphysics_model: "dry"
 t_end: "1days"
-vert_diff: "true"
+vert_diff: VerticalDiffusion
 check_nan_every: 1

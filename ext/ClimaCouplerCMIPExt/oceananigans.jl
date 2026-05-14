@@ -75,6 +75,8 @@ function OceananigansSimulation(
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
     progress_interval = nothing,
+    ocean_diagnostic_interval = "1days",
+    ocean_diagnostic_mode = :averaged,
     extra_kwargs...,
 ) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
@@ -280,45 +282,6 @@ function OceananigansSimulation(
         coare3_roughness_params,
     )
 
-    # Before version 0.96.22, the NetCDFWriter was broken on GPU
-    if arch isa OC.CPU
-        # Save all tracers and velocities to a NetCDF file at daily frequency
-        outputs = merge(ocean.model.tracers, ocean.model.velocities)
-        surface_writer = OC.NetCDFWriter(
-            ocean.model,
-            outputs;
-            schedule = OC.TimeInterval(86400), # Daily output
-            filename = joinpath(output_dir, "ocean_diagnostics.nc"),
-            indices = (:, :, grid.Nz),
-            overwrite_existing = true,
-            array_type = Array{FT},
-        )
-        free_surface_writer = OC.NetCDFWriter(
-            ocean.model,
-            (; displacement = ocean.model.free_surface.displacement);
-            schedule = OC.TimeInterval(3600), # hourly snapshots
-            filename = joinpath(output_dir, "ocean_free_surface.nc"),
-            overwrite_existing = true,
-            array_type = Array{FT},
-        )
-        Tflux = ocean.model.tracers.T.boundary_conditions.top.condition
-        Sflux = ocean.model.tracers.S.boundary_conditions.top.condition
-        uflux = ocean.model.velocities.u.boundary_conditions.top.condition
-        vflux = ocean.model.velocities.v.boundary_conditions.top.condition
-        fluxes_writer = OC.NetCDFWriter(
-            ocean.model,
-            (; Tflux, Sflux, uflux, vflux);
-            schedule = OC.TimeInterval(3600), # hourly snapshots
-            filename = joinpath(output_dir, "ocean_fluxes.nc"),
-            overwrite_existing = true,
-            array_type = Array{FT},
-        )
-
-        ocean.output_writers[:surface] = surface_writer
-        ocean.output_writers[:free_surface] = free_surface_writer
-        ocean.output_writers[:fluxes] = fluxes_writer
-    end
-
     # Initialize with 0 ice concentration; this will be updated in `resolve_area_fractions!`
     # if the ocean is coupled to a non-prescribed sea ice model.
     ice_concentration = OC.Field{OC.Center, OC.Center, Nothing}(grid)
@@ -326,7 +289,7 @@ function OceananigansSimulation(
     # Create a dummy area fraction that will get overwritten in `update_surface_fractions!`
     area_fraction = ones(boundary_space)
 
-    return OceananigansSimulation(
+    sim = OceananigansSimulation(
         ocean,
         area_fraction,
         ocean_properties,
@@ -334,6 +297,15 @@ function OceananigansSimulation(
         ice_concentration,
         model_Δt,
     )
+
+    add_ocean_diagnostics!(
+        sim;
+        output_dir,
+        interval = TimeManager.time_to_period(ocean_diagnostic_interval),
+        mode = ocean_diagnostic_mode,
+    )
+
+    return sim
 end
 
 """

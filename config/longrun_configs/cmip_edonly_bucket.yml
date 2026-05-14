@@ -19,6 +19,10 @@ mode_name: "cmip"
 nh_poly: 3
 nh_poly_coupler: 2
 ocean_model: "oceananigans"
+ocean_diagnostic_interval: "1days"
+ocean_diagnostic_mode: "averaged"
+seaice_diagnostic_interval: "1days"
+seaice_diagnostic_mode: "averaged"
 rmse_check: true
 share_surface_space: false
 start_date: "20100101"

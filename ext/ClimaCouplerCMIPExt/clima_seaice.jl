@@ -75,6 +75,8 @@ function ClimaSeaIceSimulation(
     start_date = nothing,
     coupled_param_dict = CP.create_toml_dict(FT),
     dt = 5 * 60.0, # 5 minutes
+    seaice_diagnostic_interval = "1days",
+    seaice_diagnostic_mode = :averaged,
     extra_kwargs...,
 ) where {FT}
     # Initialize the sea ice with the same grid as the ocean
@@ -124,21 +126,6 @@ function ClimaSeaIceSimulation(
     # Since ocean and sea ice share the same grid, we can also share the remapping objects
     remapping = ocean.remapping
 
-    # Before version 0.96.22, the NetCDFWriter was broken on GPU
-    if arch isa OC.CPU
-        # Save all tracers and velocities to a NetCDF file at daily frequency
-        outputs = OC.prognostic_fields(ice.model)
-        jld_writer = OC.JLD2Writer(
-            ice.model,
-            outputs;
-            schedule = OC.TimeInterval(86400), # Daily output
-            filename = joinpath(output_dir, "seaice_diagnostics.jld2"),
-            overwrite_existing = true,
-            array_type = Array{FT},
-        )
-        ice.output_writers[:diagnostics] = jld_writer
-    end
-
     # Allocate space for the sea ice-ocean (io) fluxes
     io_bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     io_frazil_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
@@ -176,6 +163,13 @@ function ClimaSeaIceSimulation(
         ocean_ice_interface,
         ice_properties,
         model_Δt,
+    )
+
+    add_seaice_diagnostics!(
+        sim;
+        output_dir,
+        interval = TimeManager.time_to_period(seaice_diagnostic_interval),
+        mode = seaice_diagnostic_mode,
     )
 
     # Ensure ocean temperature is above freezing where there is sea ice

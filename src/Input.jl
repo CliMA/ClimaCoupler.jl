@@ -262,11 +262,27 @@ function argparse_settings()
         help = "Iteration interval for printing progress information [`nothing`, `<:Integer`] (default: nothing)"
         arg_type = Integer
         default = nothing
+        "--ocean_diagnostic_interval"
+        help = "Time interval between ocean diagnostic outputs [\"1days\" (default), allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\"]"
+        arg_type = String
+        default = "1days"
+        "--ocean_diagnostic_mode"
+        help = "Reduction mode for ocean diagnostic outputs. [`averaged` (default) uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval`]"
+        arg_type = String
+        default = "averaged"
         # Ice model specific
         "--ice_model"
         help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`, `nothing`]"
         arg_type = String
         default = "prescribed"
+        "--seaice_diagnostic_interval"
+        help = "Time interval between sea-ice diagnostic outputs [\"1days\" (default), allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\"]"
+        arg_type = String
+        default = "1days"
+        "--seaice_diagnostic_mode"
+        help = "Reduction mode for sea-ice diagnostic outputs. [`averaged` (default) uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval`]"
+        arg_type = String
+        default = "averaged"
         "--land_fraction_source"
         help = "Source for land fraction data. [`etopo` (default) uses ETOPO-derived landsea_mask artifact, `era5` uses ERA5 land fraction artifact]"
         arg_type = String
@@ -524,9 +540,13 @@ function get_coupler_args(config_dict::Dict)
     simple_ocean = config_dict["simple_ocean"]
     sst_adjustment = FT(config_dict["sst_adjustment"])
     progress_interval = config_dict["ocean_progress_interval"]
+    ocean_diagnostic_interval = config_dict["ocean_diagnostic_interval"]
+    ocean_diagnostic_mode = Symbol(config_dict["ocean_diagnostic_mode"])
 
     # Ice model-specific information
     ice_model = Val(Symbol(config_dict["ice_model"]))
+    seaice_diagnostic_interval = config_dict["seaice_diagnostic_interval"]
+    seaice_diagnostic_mode = Symbol(config_dict["seaice_diagnostic_mode"])
 
     # SCM settings
     domain_type = config_dict["domain_type"]
@@ -603,7 +623,11 @@ function get_coupler_args(config_dict::Dict)
         simple_ocean,
         sst_adjustment,
         progress_interval,
+        ocean_diagnostic_interval,
+        ocean_diagnostic_mode,
         ice_model,
+        seaice_diagnostic_interval,
+        seaice_diagnostic_mode,
         land_fraction_source,
         binary_area_fraction,
         domain_type,

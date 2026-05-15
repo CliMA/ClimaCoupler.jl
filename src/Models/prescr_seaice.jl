@@ -1,4 +1,3 @@
-import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
 import ClimaUtilities.TimeManager: ITime
@@ -310,9 +309,8 @@ function PrescribedIceSimulation(
         tspan = Float64.(tspan)
         saveat = Float64.(saveat)
     end
-    problem = SciMLBase.ODEProblem(ode_function, Y, tspan, (; cache..., params = params))
-    integrator =
-        SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
+    problem = CTS.ODEProblem(ode_function, Y, tspan, (; cache..., params = params))
+    integrator = CTS.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
 
     sim = PrescribedIceSimulation(params, integrator)
 

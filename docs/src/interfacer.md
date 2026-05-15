@@ -38,7 +38,7 @@ function varies across component models.
 - `step!(::AbstractComponentSimulation, t)`: A function to update the
 simulation in-place with values calculate for time `t`. For the
 models we currently have implemented, this is a simple wrapper around
-the `step!` function implemented in SciMLBase.jl.
+the `step!` function implemented in ClimaTimeSteppers.jl.
 
 ### AbstractComponentSimulation - optional functions
 - `Checkpointer.get_model_prog_state(::AbstractComponentSimulation)`:

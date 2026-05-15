@@ -2,7 +2,7 @@
 
 julia_version = "1.11.9"
 manifest_format = "2.0"
-project_hash = "ffb8414753aaed439d19e599e119e4e795b9030a"
+project_hash = "6cb1bf2558553283a328fb24831b4e206a81f60a"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -556,9 +556,9 @@ version = "1.8.1"
 
 [[deps.ClimaOcean]]
 deps = ["Adapt", "CFTime", "CUDA", "ClimaSeaIce", "CopernicusClimateDataStore", "CubicSplines", "DataDeps", "Dates", "DocStringExtensions", "Downloads", "Glob", "ImageMorphology", "JLD2", "KernelAbstractions", "MPI", "MeshArrays", "NCDatasets", "Oceananigans", "OffsetArrays", "PrecompileTools", "Printf", "Scratch", "SeawaterPolynomials", "StaticArrays", "Statistics", "Thermodynamics", "ZipFile"]
-git-tree-sha1 = "844bb9768f0382b0559398a65fbbdb981a58a28d"
+git-tree-sha1 = "6196f08be0d172985b52ccab8e41a10d2ca6a197"
 uuid = "0376089a-ecfe-4b0e-a64f-9c555d74d754"
-version = "0.9.6"
+version = "0.9.7"
 
     [deps.ClimaOcean.extensions]
     ClimaOceanCopernicusClimateDataStoreExt = "CopernicusClimateDataStore"

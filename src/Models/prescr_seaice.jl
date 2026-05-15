@@ -5,9 +5,10 @@ import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Thermodynamics as TD
-import ..Checkpointer, ..FluxCalculator, ..Interfacer, ..Utilities
+import ..Checkpointer, ..FluxCalculator, ..Interfacer, ..Utilities, ..TimeManager
 import ClimaComms
 import NCDatasets
+import ClimaDiagnostics as CD
 
 """
     PrescribedIceSimulation{P, I}
@@ -309,14 +310,41 @@ function PrescribedIceSimulation(
         tspan = Float64.(tspan)
         saveat = Float64.(saveat)
     end
+
+    # Create a schedule to update the SIC daily. The data provides monthly
+    # averages, so it doesn't make sense to update the SIC more frequently than daily.
+    SIC_schedule = CD.Schedules.EveryCalendarDtSchedule(
+        TimeManager.time_to_period("1days");
+        start_date,
+    )
+    SIC_update_cb =
+        CTS.DiscreteCallback((_, _, integrator) -> SIC_schedule(integrator), read_sic_data!)
+
     problem = CTS.ODEProblem(ode_function, Y, tspan, (; cache..., params = params))
-    integrator = CTS.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
+    integrator = CTS.init(
+        problem,
+        ode_algo,
+        dt = dt,
+        saveat = saveat,
+        adaptive = false,
+        callback = CTS.CallbackSet(SIC_update_cb),
+    )
 
     sim = PrescribedIceSimulation(params, integrator)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)
     return sim
+end
+
+"""
+    read_sic_data!(integrator)
+
+Read in the sea ice concentration data at the current time.
+This function is intended to be used within a callback.
+"""
+function read_sic_data!(integrator)
+    evaluate!(integrator.p.area_fraction, integrator.p.SIC_timevaryinginput, integrator.t)
 end
 
 # extensions required by Interfacer
@@ -430,7 +458,6 @@ function ice_rhs!(dY, Y, p, t)
     if p.domain_type == "column"
         @. p.area_fraction = FT(1)
     else
-        evaluate!(p.area_fraction, p.SIC_timevaryinginput, t)
         @. p.area_fraction = ifelse(isfinite(p.area_fraction), p.area_fraction, FT(0))
         # binary ice fraction (threshold at 0.5)
         if p.binary_area_fraction

@@ -11,7 +11,7 @@ rayleigh_sponge: true
 t_end: "300secs"
 time_varying_trace_gases: ["CO2"]
 use_itime: true
-vert_diff: "true"
+vert_diff: VerticalDiffusion
 z_elem: 50
 z_stretch: false
 check_nan_every: 1

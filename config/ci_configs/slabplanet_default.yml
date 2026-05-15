@@ -8,5 +8,5 @@ output_default_diagnostics: false
 rad: "gray"
 microphysics_model: "0M"
 t_end: "1days"
-vert_diff: "true"
+vert_diff: VerticalDiffusion
 check_nan_every: 1

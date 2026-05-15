@@ -5,13 +5,12 @@ This modules contains abstract types, interface templates and model stubs for co
 """
 module Interfacer
 
-import SciMLBase
 import ClimaComms
 import ClimaCore as CC
 import Dates
 import Thermodynamics as TD
 import NVTX
-import SciMLBase: step!
+import ClimaTimeSteppers: step!
 import ClimaUtilities.TimeManager: ITime, date
 import Statistics
 
@@ -388,7 +387,7 @@ Base.nameof(sim::AbstractComponentSimulation) = string(nameof(typeof(sim)))
 
 A function to update the simulation in-place with values calculate for time `t`.
 For the models we currently have implemented, this is a simple wrapper around
-the `step!` function implemented in SciMLBase.jl.
+the `step!` function implemented in ClimaTimeSteppers.jl.
 
 This must be extended for all component models - otherwise this default
 function will be called and an error will be raised.
@@ -399,8 +398,8 @@ step!(sim::AbstractComponentSimulation, t) = error("undefined step! for $(nameof
     step!(sim::AbstractComponentSimulation, t::Float64)
 
 Default step method for simulations using `Float64` as the time type.
-This method is suitable for simulations that use a SciMLBase-style integrator,
-but should be extended for other models.
+This method is suitable for simulations that use a ClimaTimeSteppers-style
+integrator, but should be extended for other models.
 
 This method computes the number of steps to take based on the difference
 between the simulation time (stored in the integrator) and the coupler time
@@ -420,8 +419,8 @@ end
     step!(sim::AbstractComponentSimulation, t::ITime)
 
 Default step method for simulations using `ITime` as the time type.
-This method is suitable for simulations that use a SciMLBase-style integrator,
-but should be extended for other models.
+This method is suitable for simulations that use a ClimaTimeSteppers-style
+integrator, but should be extended for other models.
 
 This method computes the number of steps to take based on the difference
 between the simulation time (stored in the integrator) and the coupler time

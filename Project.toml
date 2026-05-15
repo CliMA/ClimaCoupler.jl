@@ -1,7 +1,7 @@
 name = "ClimaCoupler"
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
-authors = ["CliMA Contributors <clima-software@caltech.edu>"]
 version = "0.1.2"
+authors = ["CliMA Contributors <clima-software@caltech.edu>"]
 
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
@@ -61,7 +61,7 @@ ClimaDiagnostics = "0.2.6, 0.3"
 ClimaLand = "1.8"
 ClimaOcean = "0.9.5"
 ClimaParams = "1.0"
-ClimaSeaIce = "0.4"
+ClimaSeaIce = "0.4, 0.5"
 ClimaTimeSteppers = "0.7, 0.8, 0.9"
 ClimaUtilities = "0.1.22"
 Dates = "1"

@@ -1,4 +1,4 @@
-# This test runs a small AMIP simulation twice times.
+# This test runs a small AMIP simulation twice.
 #
 # - The first time the simulation is run for two steps
 # - The second time the simulation is run for two steps, but restarting from the
@@ -21,7 +21,7 @@ using Test
 # Uncomment the following for cleaner output (but more difficult debugging)
 # Logging.disable_logging(Logging.Warn)
 
-include("compare.jl")
+include("compare_amip.jl")
 include("../AMIP/code_loading.jl")
 
 comms_ctx = ClimaComms.context()
@@ -77,6 +77,6 @@ two_steps_reading["save_cache"] = false
 Input.update_t_start_for_restarts!(two_steps_reading)
 
 cs_two_steps_reading = setup_and_run(two_steps_reading)
-@testset "Restarts from command line arguments" begin
+@testset "AMIP restarts (state only)" begin
     @test cs_two_steps_reading.tspan[1] == cs_two_steps.tspan[2]
 end

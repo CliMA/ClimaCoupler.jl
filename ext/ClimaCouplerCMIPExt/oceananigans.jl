@@ -150,8 +150,6 @@ function OceananigansSimulation(
         # Simpler setup
         @info "Using simpler ocean setup; to be used for software testing only."
         free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
-        momentum_advection = OC.WENOVectorInvariant(order = 5)
-        horizontal_viscosity = OC.HorizontalScalarDiffusivity(ν = 1e4)
         tracer_advection = OC.WENO(order = 5)
         vertical_mixing = OC.ConvectiveAdjustmentVerticalDiffusivity(
             background_κz = 1e-5,
@@ -159,7 +157,8 @@ function OceananigansSimulation(
             background_νz = 1e-4,
             convective_νz = 0.1,
         )
-
+        momentum_advection = OC.WENOVectorInvariant(order = 5)
+        horizontal_viscosity = OC.HorizontalScalarDiffusivity(ν = 1e4)
         closure = (horizontal_viscosity, vertical_mixing)
     end
 
@@ -623,19 +622,6 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
         OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
         (remapped_P_liq .+ remapped_P_snow) ./ reference_density
     return nothing
-end
-
-"""
-    get_model_prog_state(sim::OceananigansSimulation)
-
-Returns the model state of a simulation as a `ClimaCore.FieldVector`.
-It's okay to leave this unimplemented for now, but we won't be able to use the
-restart system.
-
-TODO extend this for non-ClimaCore states.
-"""
-function Checkpointer.get_model_prog_state(sim::OceananigansSimulation)
-    @warn "get_model_prog_state not implemented for OceananigansSimulation"
 end
 
 # Additional OceananigansSimulation getter methods for plotting debug fields

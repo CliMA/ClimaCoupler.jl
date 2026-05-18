@@ -66,15 +66,18 @@ function load_trained_model(path)
     nz = data[:nz]
     input_dim = data[:input_dim]
     arch = get(data, :arch, ARCHITECTURE)
+    temporal_avg = get(data, :temporal_averaging, TEMPORAL_AVERAGING)
+    pm = get(data, :predict_mode, :flux)
+    tv = get(data, :target_vars, :both)
     model = if arch == :unet
-        build_unet_model(input_dim, nz)
+        build_unet_model(input_dim, nz; predict_mode = pm)
     elseif arch == :cnn
-        build_cnn_model(input_dim, nz)
+        build_cnn_model(input_dim, nz; predict_mode = pm)
     else
-        build_mlp_model(input_dim, nz)
+        build_mlp_model(input_dim, nz; predict_mode = pm)
     end
-    println("  Architecture: $arch, input_dim=$input_dim, nz=$nz")
-    return model, ps, st, X_norm_stats, Y_norm_stats, nz
+    println("  Architecture: $arch, predict_mode=$pm, target_vars=$tv, input_dim=$input_dim, nz=$nz")
+    return model, ps, st, X_norm_stats, Y_norm_stats, nz, temporal_avg, pm, tv
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -82,40 +85,46 @@ end
 # ─────────────────────────────────────────────────────────────────────────────
 
 """
-Run the model on input X and convert face fluxes → cell-centre tendencies.
-Returns (dT_pred, dq_pred) each of shape (nz, n_samples) in physical units,
-plus the raw face fluxes F_T and F_q.
-
-If Y_norm_stats is available (model was trained with normalised targets),
-the predicted divergences are denormalised back to physical units.
+Run the model on input X and produce cell-centre tendency predictions.
+Returns a Dict mapping variable symbol (:T and/or :q) to (nz, n_samples) arrays
+in physical units, plus a Dict of face fluxes (nothing entries in direct mode).
 """
-function predict_tendencies(model, ps, st, X, dz, nz)
+function predict_tendencies(model, ps, st, X, dz, nz, tv)
+    st_test = Lux.testmode(st)
     X_norm = normalise(X, X_norm_stats_global)
-    flux_pred, _ = Lux.apply(model, X_norm, ps, st)
+    raw_pred, _ = Lux.apply(model, X_norm, ps, st_test)
 
-    nf = nz - 1
-    F_T_int = flux_pred[1:nf, :]
-    F_q_int = flux_pred[nf+1:2*nf, :]
+    nv = tv == :both ? 2 : 1
 
-    z_row = F_T_int[1:1, :] .* 0f0
-    F_T = vcat(z_row, F_T_int, z_row)
-    F_q = vcat(z_row, F_q_int, z_row)
-
-    dT_pred_raw = -(F_T[2:nz+1, :] .- F_T[1:nz, :]) ./ dz
-    dq_pred_raw = -(F_q[2:nz+1, :] .- F_q[1:nz, :]) ./ dz
-
-    # Denormalise if model was trained with normalised targets
-    if Y_norm_stats_global !== nothing
-        pred_norm = vcat(dT_pred_raw, dq_pred_raw)
-        pred_phys = denormalise(pred_norm, Y_norm_stats_global)
-        dT_pred = pred_phys[1:nz, :]
-        dq_pred = pred_phys[nz+1:2*nz, :]
+    if predict_mode_global == :direct
+        pred_norm = raw_pred
+        fluxes = Dict{Symbol, Any}()
     else
-        dT_pred = dT_pred_raw
-        dq_pred = dq_pred_raw
+        nf = nz - 1
+        z_row = raw_pred[1:1, :] .* 0f0
+        pred_parts = Matrix{Float32}[]
+        for v in 1:nv
+            F_int = raw_pred[(v-1)*nf+1 : v*nf, :]
+            F_full = vcat(z_row, F_int, z_row)
+            push!(pred_parts, -(F_full[2:nz+1, :] .- F_full[1:nz, :]) ./ dz)
+        end
+        pred_norm = vcat(pred_parts...)
+        fluxes = Dict{Symbol, Any}()
     end
 
-    return dT_pred, dq_pred, F_T, F_q
+    if Y_norm_stats_global !== nothing
+        pred_phys = denormalise(pred_norm, Y_norm_stats_global)
+    else
+        pred_phys = pred_norm
+    end
+
+    results = Dict{Symbol, Matrix{Float32}}()
+    var_order = tv == :both ? [:T, :q] : tv == :T ? [:T] : [:q]
+    for (vi, sym) in enumerate(var_order)
+        results[sym] = pred_phys[(vi-1)*nz+1 : vi*nz, :]
+    end
+
+    return results
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -141,53 +150,39 @@ function get_z_faces(z_centres_km)
     return z_faces
 end
 
+const VAR_INFO = Dict(
+    :T => (label = "Temperature", xlabel_tendency = "dT/dt (K/hr)", unit = "K/hr",
+           color = :firebrick, scale = 3600.0f0),
+    :q => (label = "Moisture", xlabel_tendency = "dq/dt (g/kg/hr)", unit = "g/kg/hr",
+           color = :steelblue, scale = 3600.0f0 * 1000.0f0),
+)
+
 """Plot 1: Mean vertical profiles of target vs predicted tendency."""
-function plot_mean_profiles(z_km, dT_target, dT_pred, dq_target, dq_pred)
-    fig = Figure(size = (1000, 500))
+function plot_mean_profiles(z_km, targets, preds, vars; temporal_avg = :hourly)
+    nv = length(vars)
+    fig = Figure(size = (500 * nv, 500))
+    avg_label = temporal_avg == :daily ? " (daily mean)" : ""
 
-    ax1 = Axis(fig[1, 1]; xlabel = "dT/dt tendency (K/hr)", ylabel = "Height (km)",
-               title = "Temperature tendency correction")
-    dT_tgt_mean = vec(mean(dT_target, dims = 2)) .* 3600
-    dT_prd_mean = vec(mean(dT_pred, dims = 2)) .* 3600
-    lines!(ax1, dT_tgt_mean, z_km; label = "Target (ERA5 - model)", linewidth = 2)
-    lines!(ax1, dT_prd_mean, z_km; label = "Predicted (-dF/dz)", linewidth = 2, linestyle = :dash)
-    axislegend(ax1; position = :rt)
-
-    ax2 = Axis(fig[1, 2]; xlabel = "dq/dt tendency (g/kg/hr)", ylabel = "Height (km)",
-               title = "Moisture tendency correction")
-    dq_tgt_mean = vec(mean(dq_target, dims = 2)) .* 3600 .* 1000
-    dq_prd_mean = vec(mean(dq_pred, dims = 2)) .* 3600 .* 1000
-    lines!(ax2, dq_tgt_mean, z_km; label = "Target", linewidth = 2)
-    lines!(ax2, dq_prd_mean, z_km; label = "Predicted", linewidth = 2, linestyle = :dash)
-    axislegend(ax2; position = :rt)
-
-    return fig
-end
-
-"""Plot 2: Mean predicted flux profiles F_T(z) and F_q(z)."""
-function plot_mean_fluxes(z_faces_km, F_T, F_q)
-    fig = Figure(size = (1000, 500))
-
-    ax1 = Axis(fig[1, 1]; xlabel = "F_T flux (K·m/s)", ylabel = "Height (km)",
-               title = "Mean temperature flux correction")
-    F_T_mean = vec(mean(F_T, dims = 2))
-    lines!(ax1, F_T_mean, z_faces_km; linewidth = 2, color = :firebrick)
-    vlines!(ax1, [0]; color = :gray, linestyle = :dot)
-
-    ax2 = Axis(fig[1, 2]; xlabel = "F_q flux (g/kg·m/s)", ylabel = "Height (km)",
-               title = "Mean moisture flux correction")
-    F_q_mean = vec(mean(F_q, dims = 2)) .* 1000
-    lines!(ax2, F_q_mean, z_faces_km; linewidth = 2, color = :steelblue)
-    vlines!(ax2, [0]; color = :gray, linestyle = :dot)
-
+    for (i, sym) in enumerate(vars)
+        info = VAR_INFO[sym]
+        ax = Axis(fig[1, i]; xlabel = info.xlabel_tendency, ylabel = "Height (km)",
+                  title = "$(info.label) tendency correction" * avg_label)
+        tgt_mean = vec(mean(targets[sym], dims = 2)) .* info.scale
+        prd_mean = vec(mean(preds[sym], dims = 2)) .* info.scale
+        lines!(ax, tgt_mean, z_km; label = "Target (ERA5 - model)", linewidth = 2)
+        lines!(ax, prd_mean, z_km; label = "Predicted (-dF/dz)", linewidth = 2, linestyle = :dash)
+        axislegend(ax; position = :rt)
+    end
     return fig
 end
 
 """Plot 3: Example individual column profiles (target vs predicted)."""
-function plot_example_columns(z_km, dT_target, dT_pred, dq_target, dq_pred, n_examples)
+function plot_example_columns(z_km, targets, preds, vars, n_examples; temporal_avg = :hourly)
     rng = Random.MersenneTwister(99)
-    n_samples = size(dT_target, 2)
+    first_var = first(vars)
+    n_samples = size(targets[first_var], 2)
     idx = randperm(rng, n_samples)[1:min(n_examples, n_samples)]
+    avg_label = temporal_avg == :daily ? " (daily mean)" : ""
 
     ncols = min(4, length(idx))
     nrows = cld(length(idx), ncols)
@@ -196,137 +191,109 @@ function plot_example_columns(z_km, dT_target, dT_pred, dq_target, dq_pred, n_ex
     for (panel, ci) in enumerate(idx)
         r = cld(panel, ncols)
         c = mod1(panel, ncols)
-        ax = Axis(fig[r, c]; xlabel = "dT/dt (K/hr)", ylabel = "Height (km)",
+        info = VAR_INFO[first_var]
+        ax = Axis(fig[r, c]; xlabel = info.unit, ylabel = "Height (km)",
                   title = "Column $ci")
-        lines!(ax, dT_target[:, ci] .* 3600, z_km; label = "Target", linewidth = 1.5)
-        lines!(ax, dT_pred[:, ci] .* 3600, z_km; label = "Predicted",
+        lines!(ax, targets[first_var][:, ci] .* info.scale, z_km; label = "Target", linewidth = 1.5)
+        lines!(ax, preds[first_var][:, ci] .* info.scale, z_km; label = "Predicted",
                linewidth = 1.5, linestyle = :dash)
-        if panel == 1
-            axislegend(ax; position = :rt, labelsize = 10)
-        end
+        panel == 1 && axislegend(ax; position = :rt, labelsize = 10)
     end
 
-    Label(fig[0, :], "Temperature tendency: individual columns"; fontsize = 16)
+    Label(fig[0, :], "$(VAR_INFO[first_var].label) tendency: individual columns" * avg_label; fontsize = 16)
     return fig
 end
 
 """Plot 4: Scatter plot of predicted vs target tendencies."""
-function plot_scatter(dT_target, dT_pred, dq_target, dq_pred)
-    fig = Figure(size = (1000, 500))
+function plot_scatter(targets, preds, vars; temporal_avg = :hourly)
+    nv = length(vars)
+    fig = Figure(size = (500 * nv, 500))
+    avg_label = temporal_avg == :daily ? " (daily mean)" : ""
 
-    # Subsample for plotting speed
-    n = size(dT_target, 2) * size(dT_target, 1)
-    max_pts = 50_000
-    stride = max(1, n ÷ max_pts)
+    for (i, sym) in enumerate(vars)
+        info = VAR_INFO[sym]
+        n = length(targets[sym])
+        max_pts = 50_000
+        stride = max(1, n ÷ max_pts)
 
-    ax1 = Axis(fig[1, 1]; xlabel = "Target dT/dt (K/hr)", ylabel = "Predicted dT/dt (K/hr)",
-               title = "Temperature tendency", aspect = 1)
-    tgt = vec(dT_target)[1:stride:end] .* 3600
-    prd = vec(dT_pred)[1:stride:end] .* 3600
-    scatter!(ax1, tgt, prd; markersize = 1, color = (:firebrick, 0.15))
-    lims = extrema(vcat(tgt, prd))
-    lines!(ax1, [lims...], [lims...]; color = :black, linewidth = 1)
-
-    ax2 = Axis(fig[1, 2]; xlabel = "Target dq/dt (g/kg/hr)", ylabel = "Predicted dq/dt (g/kg/hr)",
-               title = "Moisture tendency", aspect = 1)
-    tgt_q = vec(dq_target)[1:stride:end] .* 3600 .* 1000
-    prd_q = vec(dq_pred)[1:stride:end] .* 3600 .* 1000
-    scatter!(ax2, tgt_q, prd_q; markersize = 1, color = (:steelblue, 0.15))
-    lims_q = extrema(vcat(tgt_q, prd_q))
-    lines!(ax2, [lims_q...], [lims_q...]; color = :black, linewidth = 1)
-
+        ax = Axis(fig[1, i]; xlabel = "Target " * info.xlabel_tendency,
+                  ylabel = "Predicted " * info.xlabel_tendency,
+                  title = "$(info.label) tendency" * avg_label, aspect = 1)
+        tgt = vec(targets[sym])[1:stride:end] .* info.scale
+        prd = vec(preds[sym])[1:stride:end] .* info.scale
+        scatter!(ax, tgt, prd; markersize = 1, color = (info.color, 0.15))
+        lims = extrema(vcat(tgt, prd))
+        lines!(ax, [lims...], [lims...]; color = :black, linewidth = 1)
+    end
     return fig
 end
 
 """Plot 5: Vertical profile of RMSE and bias."""
-function plot_error_profiles(z_km, dT_target, dT_pred, dq_target, dq_pred)
-    fig = Figure(size = (1000, 500))
+function plot_error_profiles(z_km, targets, preds, vars; temporal_avg = :hourly)
+    nv = length(vars)
+    fig = Figure(size = (500 * nv, 500))
+    avg_label = temporal_avg == :daily ? " (daily mean)" : ""
 
-    dT_err = dT_pred .- dT_target
-    dq_err = dq_pred .- dq_target
+    for (i, sym) in enumerate(vars)
+        info = VAR_INFO[sym]
+        err = preds[sym] .- targets[sym]
+        rmse = sqrt.(vec(mean(err .^ 2, dims = 2))) .* info.scale
+        bias = vec(mean(err, dims = 2)) .* info.scale
 
-    dT_rmse = sqrt.(vec(mean(dT_err .^ 2, dims = 2))) .* 3600
-    dT_bias = vec(mean(dT_err, dims = 2)) .* 3600
-    dq_rmse = sqrt.(vec(mean(dq_err .^ 2, dims = 2))) .* 3600 .* 1000
-    dq_bias = vec(mean(dq_err, dims = 2)) .* 3600 .* 1000
-
-    ax1 = Axis(fig[1, 1]; xlabel = "K/hr", ylabel = "Height (km)",
-               title = "Temperature error profile")
-    lines!(ax1, dT_rmse, z_km; label = "RMSE", linewidth = 2, color = :firebrick)
-    lines!(ax1, dT_bias, z_km; label = "Bias", linewidth = 2, color = :firebrick,
-           linestyle = :dash)
-    vlines!(ax1, [0]; color = :gray, linestyle = :dot)
-    axislegend(ax1; position = :rt)
-
-    ax2 = Axis(fig[1, 2]; xlabel = "g/kg/hr", ylabel = "Height (km)",
-               title = "Moisture error profile")
-    lines!(ax2, dq_rmse, z_km; label = "RMSE", linewidth = 2, color = :steelblue)
-    lines!(ax2, dq_bias, z_km; label = "Bias", linewidth = 2, color = :steelblue,
-           linestyle = :dash)
-    vlines!(ax2, [0]; color = :gray, linestyle = :dot)
-    axislegend(ax2; position = :rt)
-
+        ax = Axis(fig[1, i]; xlabel = info.unit, ylabel = "Height (km)",
+                  title = "$(info.label) error profile" * avg_label)
+        lines!(ax, rmse, z_km; label = "RMSE", linewidth = 2, color = info.color)
+        lines!(ax, bias, z_km; label = "Bias", linewidth = 2, color = info.color, linestyle = :dash)
+        vlines!(ax, [0]; color = :gray, linestyle = :dot)
+        axislegend(ax; position = :rt)
+    end
     return fig
 end
 
 """Plot 6: R² skill score as a function of height."""
-function plot_r2_profile(z_km, dT_target, dT_pred, dq_target, dq_pred)
+function plot_r2_profile(z_km, targets, preds, vars; temporal_avg = :hourly)
     fig = Figure(size = (600, 500))
+    avg_label = temporal_avg == :daily ? " (daily mean)" : ""
+    ax = Axis(fig[1, 1]; xlabel = "R² score", ylabel = "Height (km)",
+              title = "Skill score by level" * avg_label)
 
-    r2_T = zeros(length(z_km))
-    r2_q = zeros(length(z_km))
-    for k in eachindex(z_km)
-        ss_res_T = sum((dT_pred[k, :] .- dT_target[k, :]) .^ 2)
-        ss_tot_T = sum((dT_target[k, :] .- mean(dT_target[k, :])) .^ 2)
-        r2_T[k] = ss_tot_T > 0 ? 1 - ss_res_T / ss_tot_T : 0.0
-
-        ss_res_q = sum((dq_pred[k, :] .- dq_target[k, :]) .^ 2)
-        ss_tot_q = sum((dq_target[k, :] .- mean(dq_target[k, :])) .^ 2)
-        r2_q[k] = ss_tot_q > 0 ? 1 - ss_res_q / ss_tot_q : 0.0
+    for sym in vars
+        info = VAR_INFO[sym]
+        r2 = zeros(length(z_km))
+        for k in eachindex(z_km)
+            ss_res = sum((preds[sym][k, :] .- targets[sym][k, :]) .^ 2)
+            ss_tot = sum((targets[sym][k, :] .- mean(targets[sym][k, :])) .^ 2)
+            r2[k] = ss_tot > 0 ? 1 - ss_res / ss_tot : 0.0
+        end
+        lines!(ax, r2, z_km; label = info.label, linewidth = 2, color = info.color)
     end
 
-    ax = Axis(fig[1, 1]; xlabel = "R² score", ylabel = "Height (km)",
-              title = "Skill score by level")
-    lines!(ax, r2_T, z_km; label = "Temperature", linewidth = 2, color = :firebrick)
-    lines!(ax, r2_q, z_km; label = "Moisture", linewidth = 2, color = :steelblue)
     vlines!(ax, [0]; color = :gray, linestyle = :dot)
     vlines!(ax, [1]; color = :gray, linestyle = :dot)
     xlims!(ax, -0.5, 1.05)
     axislegend(ax; position = :lb)
-
     return fig
 end
 
-"""Plot 7: Magnitude of correction vs model/ERA5 tendencies."""
-function plot_tendency_magnitudes(z_km, dT_pred, dq_pred, Y, nz)
-    fig = Figure(size = (1000, 500))
+"""Plot 7: Magnitude of correction — RMS target, predicted, and residual."""
+function plot_tendency_magnitudes(z_km, targets, preds, vars; temporal_avg = :hourly)
+    nv = length(vars)
+    fig = Figure(size = (500 * nv, 500))
+    avg_label = temporal_avg == :daily ? " (daily mean)" : ""
 
-    target_T = Y[1:nz, :]
-    target_q = Y[nz+1:2*nz, :]
+    for (i, sym) in enumerate(vars)
+        info = VAR_INFO[sym]
+        rms_tgt = sqrt.(vec(mean(targets[sym] .^ 2, dims = 2))) .* info.scale
+        rms_prd = sqrt.(vec(mean(preds[sym] .^ 2, dims = 2))) .* info.scale
+        rms_res = sqrt.(vec(mean((preds[sym] .- targets[sym]) .^ 2, dims = 2))) .* info.scale
 
-    # RMS of target tendency (= ERA5 - model) gives the correction magnitude
-    rms_correction_T = sqrt.(vec(mean(target_T .^ 2, dims = 2))) .* 3600
-    rms_pred_T = sqrt.(vec(mean(dT_pred .^ 2, dims = 2))) .* 3600
-    rms_residual_T = sqrt.(vec(mean((dT_pred .- target_T) .^ 2, dims = 2))) .* 3600
-
-    ax1 = Axis(fig[1, 1]; xlabel = "RMS tendency (K/hr)", ylabel = "Height (km)",
-               title = "Temperature: correction magnitude")
-    lines!(ax1, rms_correction_T, z_km; label = "Target correction", linewidth = 2)
-    lines!(ax1, rms_pred_T, z_km; label = "Predicted correction", linewidth = 2, linestyle = :dash)
-    lines!(ax1, rms_residual_T, z_km; label = "Residual error", linewidth = 2, linestyle = :dot)
-    axislegend(ax1; position = :rt)
-
-    rms_correction_q = sqrt.(vec(mean(target_q .^ 2, dims = 2))) .* 3600 .* 1000
-    rms_pred_q = sqrt.(vec(mean(dq_pred .^ 2, dims = 2))) .* 3600 .* 1000
-    rms_residual_q = sqrt.(vec(mean((dq_pred .- target_q) .^ 2, dims = 2))) .* 3600 .* 1000
-
-    ax2 = Axis(fig[1, 2]; xlabel = "RMS tendency (g/kg/hr)", ylabel = "Height (km)",
-               title = "Moisture: correction magnitude")
-    lines!(ax2, rms_correction_q, z_km; label = "Target correction", linewidth = 2)
-    lines!(ax2, rms_pred_q, z_km; label = "Predicted correction", linewidth = 2, linestyle = :dash)
-    lines!(ax2, rms_residual_q, z_km; label = "Residual error", linewidth = 2, linestyle = :dot)
-    axislegend(ax2; position = :rt)
-
+        ax = Axis(fig[1, i]; xlabel = "RMS tendency (" * info.unit * ")", ylabel = "Height (km)",
+                  title = "$(info.label): correction magnitude" * avg_label)
+        lines!(ax, rms_tgt, z_km; label = "Target correction", linewidth = 2)
+        lines!(ax, rms_prd, z_km; label = "Predicted correction", linewidth = 2, linestyle = :dash)
+        lines!(ax, rms_res, z_km; label = "Residual error", linewidth = 2, linestyle = :dot)
+        axislegend(ax; position = :rt)
+    end
     return fig
 end
 
@@ -340,11 +307,14 @@ function evaluate()
     println("=" ^ 60)
     mkpath(PLOT_DIR)
 
-    model, ps, st, X_norm_stats, Y_norm_stats, nz = load_trained_model(MODEL_PATH)
+    model, ps, st, X_norm_stats, Y_norm_stats, nz, temporal_avg, pm, tv = load_trained_model(MODEL_PATH)
     global X_norm_stats_global = X_norm_stats
     global Y_norm_stats_global = Y_norm_stats
+    global predict_mode_global = pm
 
-    println("\nBuilding evaluation dataset...")
+    vars = tv == :both ? [:T, :q] : tv == :T ? [:T] : [:q]
+
+    println("\nBuilding evaluation dataset (temporal_averaging=$temporal_avg)...")
     cached = load_dataset_cache()
     X_raw, Y_raw, dz_all, nz_data = if cached !== nothing
         cached
@@ -357,56 +327,53 @@ function evaluate()
     println("Evaluation set: $(size(X_raw, 2)) columns")
 
     println("\nRunning inference...")
-    dT_pred, dq_pred, F_T, F_q = predict_tendencies(model, ps, st, X_raw, dz_all, nz)
+    preds = predict_tendencies(model, ps, st, X_raw, dz_all, nz, tv)
 
-    dT_target = Y_raw[1:nz, :]
-    dq_target = Y_raw[nz+1:2*nz, :]
+    nv = length(vars)
+    targets = Dict{Symbol, Matrix{Float32}}()
+    for (vi, sym) in enumerate(vars)
+        targets[sym] = Y_raw[(vi-1)*nz+1 : vi*nz, :]
+    end
 
     # Overall metrics
-    rmse_T = sqrt(mean((dT_pred .- dT_target) .^ 2)) * 3600
-    rmse_q = sqrt(mean((dq_pred .- dq_target) .^ 2)) * 3600 * 1000
-    corr_T = cor(vec(dT_pred), vec(dT_target))
-    corr_q = cor(vec(dq_pred), vec(dq_target))
-    @printf("  RMSE  T: %.4f K/hr    q: %.4f g/kg/hr\n", rmse_T, rmse_q)
-    @printf("  Corr  T: %.4f         q: %.4f\n", corr_T, corr_q)
-
     open(joinpath(RUN_DIR, "metrics.txt"), "w") do io
-        @printf(io, "rmse_T_Khr   = %.6f\n", rmse_T)
-        @printf(io, "rmse_q_gkghr = %.6f\n", rmse_q)
-        @printf(io, "corr_T       = %.6f\n", corr_T)
-        @printf(io, "corr_q       = %.6f\n", corr_q)
+        for sym in vars
+            info = VAR_INFO[sym]
+            rmse = sqrt(mean((preds[sym] .- targets[sym]) .^ 2)) * info.scale
+            corr_val = cor(vec(preds[sym]), vec(targets[sym]))
+            @printf("  RMSE %s: %.4f %s   Corr: %.4f\n", sym, rmse, info.unit, corr_val)
+            @printf(io, "rmse_%s = %.6f\n", sym, rmse)
+            @printf(io, "corr_%s = %.6f\n", sym, corr_val)
+        end
+        @printf(io, "temporal_avg = %s\n", temporal_avg)
+        @printf(io, "target_vars  = %s\n", tv)
     end
 
     z_km = get_z_centres(nz)
-    z_faces_km = get_z_faces(z_km)
 
     println("\nGenerating plots...")
 
-    fig1 = plot_mean_profiles(z_km, dT_target, dT_pred, dq_target, dq_pred)
+    fig1 = plot_mean_profiles(z_km, targets, preds, vars; temporal_avg)
     save(joinpath(PLOT_DIR, "01_mean_tendency_profiles.png"), fig1; px_per_unit = 2)
     println("  01_mean_tendency_profiles.png")
 
-    fig2 = plot_mean_fluxes(z_faces_km, F_T, F_q)
-    save(joinpath(PLOT_DIR, "02_mean_flux_profiles.png"), fig2; px_per_unit = 2)
-    println("  02_mean_flux_profiles.png")
-
-    fig3 = plot_example_columns(z_km, dT_target, dT_pred, dq_target, dq_pred, N_EXAMPLE_COLS)
+    fig3 = plot_example_columns(z_km, targets, preds, vars, N_EXAMPLE_COLS; temporal_avg)
     save(joinpath(PLOT_DIR, "03_example_columns.png"), fig3; px_per_unit = 2)
     println("  03_example_columns.png")
 
-    fig4 = plot_scatter(dT_target, dT_pred, dq_target, dq_pred)
+    fig4 = plot_scatter(targets, preds, vars; temporal_avg)
     save(joinpath(PLOT_DIR, "04_scatter_pred_vs_target.png"), fig4; px_per_unit = 2)
     println("  04_scatter_pred_vs_target.png")
 
-    fig5 = plot_error_profiles(z_km, dT_target, dT_pred, dq_target, dq_pred)
+    fig5 = plot_error_profiles(z_km, targets, preds, vars; temporal_avg)
     save(joinpath(PLOT_DIR, "05_error_profiles.png"), fig5; px_per_unit = 2)
     println("  05_error_profiles.png")
 
-    fig6 = plot_r2_profile(z_km, dT_target, dT_pred, dq_target, dq_pred)
+    fig6 = plot_r2_profile(z_km, targets, preds, vars; temporal_avg)
     save(joinpath(PLOT_DIR, "06_r2_skill_score.png"), fig6; px_per_unit = 2)
     println("  06_r2_skill_score.png")
 
-    fig7 = plot_tendency_magnitudes(z_km, dT_pred, dq_pred, Y_raw, nz)
+    fig7 = plot_tendency_magnitudes(z_km, targets, preds, vars; temporal_avg)
     save(joinpath(PLOT_DIR, "07_tendency_magnitudes.png"), fig7; px_per_unit = 2)
     println("  07_tendency_magnitudes.png")
 

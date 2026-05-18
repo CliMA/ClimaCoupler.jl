@@ -63,27 +63,36 @@ const Z_MAX = 20_000.0f0  # only train on levels below this height (m)
 const N_EPOCHS       = 100
 const BATCH_SIZE     = 1024
 const LEARNING_RATE  = 1f-3
+const LR_MIN         = 1f-5    # cosine annealing floor
 const TRAIN_FRACTION = 0.8
 const HIDDEN_DIM     = 128
 const PATIENCE       = 15     # early stopping: stop after this many epochs without improvement
+const DROPOUT_RATE   = 0.1f0  # spatial dropout between conv layers
 
-const WEIGHT_DECAY       = 1f-4  # AdamW L2 regularisation
+# const WEIGHT_DECAY       = 1f-3  # AdamW L2 regularisation
+const WEIGHT_DECAY       = 3f-4  # AdamW L2 regularisation
 const FLUX_SMOOTH_WEIGHT = 1f-4  # light penalty on flux curvature
 
-const ARCHITECTURE   = :cnn    # :unet, :mlp, or :cnn
+const ARCHITECTURE       = :cnn    # :unet, :mlp, or :cnn
+const TEMPORAL_AVERAGING = :daily  # :hourly or :daily
+const PREDICT_MODE       = :direct # :flux (predict fluxes, loss on -dF/dz) or :direct (predict tendencies)
+const TARGET_VARS        = :T      # :both, :T (temperature only), or :q (moisture only)
 
 # ── Input features ───────────────────────────────────────────────────────────
 # Each entry is (netcdf_varname, transform) where transform is applied per-element
 # after loading. Add/remove entries here to change what the NN sees.
 const INPUT_FEATURES = [
     ("ta",    identity),       # temperature (K) — the variable we're correcting
-    # ("hus",   identity),       # specific humidity (kg/kg) — the other target variable
+    ("hus",   identity),       # specific humidity (kg/kg) — the other target variable
     ("pfull", x -> log(max(x, 1f0))),  # log-pressure — encodes altitude / stratification
-    ("hur",   identity),       # relative humidity — key for cloud/convection regimes
+    # ("hur",   identity),       # relative humidity — key for cloud/convection regimes
     ("tke",   identity),       # turbulent kinetic energy — characterises SGS turbulence
-    # ('')
+    # ("arup",  identity),       # updraft area fraction — convective activity indicator
+    # ("waup",  identity),       # updraft vertical velocity — convective intensity
 ]
 const N_FEATURES = length(INPUT_FEATURES)
+
+n_target_vars() = TARGET_VARS == :both ? 2 : 1
 
 # ── Data subsetting ──────────────────────────────────────────────────────────
 # Time window: only use model timesteps within this day range (1-indexed from
@@ -93,7 +102,7 @@ const TIME_DAY_END   = 8      # through end of day 8
 
 # Spatial subsampling: randomly keep this fraction of columns per timestep.
 # Set to 1.0 to use all columns (no subsampling).
-const COLUMN_SUBSAMPLE_FRACTION = 0.05   # 5% of 192×96 ≈ 922 columns per step
+const COLUMN_SUBSAMPLE_FRACTION = 0.10   # 20% of 192×96 ≈ 3686 columns per step
 
 const DATASET_CACHE_DIR = joinpath(@__DIR__, "cached_datasets")
 const RUNS_DIR = joinpath(@__DIR__, "runs")
@@ -112,7 +121,8 @@ end
 
 function make_run_dir()
     idx = next_run_index()
-    name = @sprintf("%03d_%s_h%d", idx, ARCHITECTURE, HIDDEN_DIM)
+    tavg = TEMPORAL_AVERAGING == :daily ? "day" : "1h"
+    name = @sprintf("%03d_%s_h%d_%s", idx, ARCHITECTURE, HIDDEN_DIM, tavg)
     path = joinpath(RUNS_DIR, name)
     mkpath(path)
     println("Run directory: $path")
@@ -128,7 +138,8 @@ function dataset_cache_key()
         MODEL_DIR, "|", ERA5_DIR, "|",
         Z_MAX, "|", TIME_DAY_START, "-", TIME_DAY_END, "|",
         COLUMN_SUBSAMPLE_FRACTION, "|",
-        join([f[1] for f in INPUT_FEATURES], ","),
+        join([f[1] for f in INPUT_FEATURES], ","), "|",
+        TEMPORAL_AVERAGING, "|", TARGET_VARS,
     )
     return bytes2hex(sha256(parts))
 end
@@ -300,13 +311,21 @@ end
 # Build training dataset
 # ─────────────────────────────────────────────────────────────────────────────
 
+function build_dataset()
+    if TEMPORAL_AVERAGING == :daily
+        return build_dataset_daily_mean()
+    else
+        return build_dataset_hourly()
+    end
+end
+
 """
-Build the full training dataset:
+Build the full training dataset (hourly instantaneous mode):
   - features X: (n_features × n_levels, n_columns)
   - targets  Y: (2 × n_levels, n_columns)   [T tendency, q tendency]
   - dz:         (n_levels, n_columns)
 """
-function build_dataset()
+function build_dataset_hourly()
     rng_data = Random.MersenneTwister(123)
 
     println("Loading model grid...")
@@ -412,8 +431,9 @@ function build_dataset()
         end
         nc = length(col_sample)
 
+        nv = n_target_vars()
         X_step = zeros(Float32, N_FEATURES * nz, nc)
-        Y_step = zeros(Float32, 2 * nz, nc)
+        Y_step = zeros(Float32, nv * nz, nc)
         dz_step = zeros(Float32, nz, nc)
 
         Threads.@threads for col in 1:nc
@@ -434,8 +454,14 @@ function build_dataset()
                 X_step[offset+1:offset+nz, col] = transform.(raw)
             end
 
-            Y_step[1:nz, col]     = dT_corr[i, j, :]
-            Y_step[nz+1:2*nz, col] = dq_corr[i, j, :]
+            if TARGET_VARS == :T || TARGET_VARS == :both
+                Y_step[1:nz, col] = dT_corr[i, j, :]
+            end
+            if TARGET_VARS == :q
+                Y_step[1:nz, col] = dq_corr[i, j, :]
+            elseif TARGET_VARS == :both
+                Y_step[nz+1:2*nz, col] = dq_corr[i, j, :]
+            end
         end
 
         push!(all_X, X_step)
@@ -445,6 +471,208 @@ function build_dataset()
     end
 
     println("  Built $n_valid_pairs valid timestep pairs, total columns: $(sum(size.(all_X, 2)))")
+
+    X = hcat(all_X...)
+    Y = hcat(all_Y...)
+    dz = hcat(all_dz...)
+
+    nan_cols = vec(any(isnan.(X), dims = 1) .| any(isnan.(Y), dims = 1))
+    good = .!nan_cols
+    X = X[:, good]
+    Y = Y[:, good]
+    dz = dz[:, good]
+    println("  After NaN filtering: $(size(X, 2)) columns remain")
+
+    return X, Y, dz, nz
+end
+
+"""
+Build training dataset using daily-mean averaging.
+
+For each day in the time window, averages both model state inputs and
+ERA5-minus-model tendency corrections over all valid hourly pairs within
+that day. This removes gravity waves, tides, and diurnal cycle noise,
+leaving the mean bias signal that a column NN can learn.
+
+Returns the same format as build_dataset_hourly():
+  - features X: (n_features × n_levels, n_columns)
+  - targets  Y: (2 × n_levels, n_columns)
+  - dz:         (n_levels, n_columns)
+"""
+function build_dataset_daily_mean()
+    rng_data = Random.MersenneTwister(123)
+
+    println("Loading model grid...")
+    grid = load_model_grid()
+    nlon = length(grid.lon)
+    nlat = length(grid.lat)
+    nz_full = length(grid.z_ref)
+    model_dates = grid.dates
+    nt = length(model_dates)
+
+    z_mask = grid.z_ref .<= Z_MAX
+    z_idx  = findall(z_mask)
+    nz     = length(z_idx)
+
+    # Time subsetting
+    t0 = model_dates[1]
+    ti_start = max(1, findfirst(d -> (d - t0).value / (3600_000) >= 24 * (TIME_DAY_START - 1), model_dates))
+    ti_end   = something(findlast(d -> (d - t0).value / (3600_000) < 24 * TIME_DAY_END, model_dates), nt)
+    ti_end = min(ti_end, nt) - 1
+
+    # Group timestep indices into days
+    day_groups = Dict{Date, Vector{Int}}()
+    for ti in ti_start:ti_end
+        d = Date(model_dates[ti])
+        if !haskey(day_groups, d)
+            day_groups[d] = Int[]
+        end
+        push!(day_groups[d], ti)
+    end
+    days_sorted = sort(collect(keys(day_groups)))
+
+    println("  Grid: $(nlon) lon × $(nlat) lat × $(nz_full) z ($(nz) below $(Z_MAX)m), $(nt) timesteps")
+    println("  Date range: $(model_dates[1]) to $(model_dates[end])")
+    println("  Daily-mean mode: $(length(days_sorted)) days ($(days_sorted[1]) to $(days_sorted[end]))")
+
+    col_subsample = TEMPORAL_AVERAGING == :daily ? max(COLUMN_SUBSAMPLE_FRACTION, 0.25) : COLUMN_SUBSAMPLE_FRACTION
+    println("  Column subsample: $(col_subsample * 100)% of $(nlon * nlat) = ~$(round(Int, col_subsample * nlon * nlat)) columns/day")
+
+    feat_names = [f[1] for f in INPUT_FEATURES]
+
+    println("Loading model variables...")
+    println("  Input features: ", join(feat_names, ", "), " ($N_FEATURES total)")
+
+    vars_needed = unique(vcat(feat_names, ["ta", "hus"]))
+    feat_data = Dict{String, Array{Float32, 4}}()
+    for name in vars_needed
+        println("    loading $name ...")
+        feat_data[name] = load_model_var(name)
+    end
+    ta_model  = feat_data["ta"]
+    hus_model = feat_data["hus"]
+
+    all_col_ij = [(i, j) for j in 1:nlat for i in 1:nlon]
+    ncols_total = length(all_col_ij)
+    ncols_sample = max(1, round(Int, col_subsample * ncols_total))
+
+    n_valid_days = 0
+    all_X = Vector{Matrix{Float32}}()
+    all_Y = Vector{Matrix{Float32}}()
+    all_dz = Vector{Matrix{Float32}}()
+
+    for day in days_sorted
+        hours = day_groups[day]
+        println("  Processing day $day ($(length(hours)) hourly pairs)")
+        flush(stdout)
+
+        # Accumulators over the full grid
+        X_accum  = zeros(Float32, N_FEATURES, nlon, nlat, nz)
+        dT_accum = zeros(Float32, nlon, nlat, nz)
+        dq_accum = zeros(Float32, nlon, nlat, nz)
+        n_hours_valid = 0
+
+        for ti in hours
+            dt_now  = model_dates[ti]
+            dt_next = model_dates[ti + 1]
+
+            era5_now  = load_era5_pressure(dt_now)
+            era5_next = load_era5_pressure(dt_next)
+            if era5_now === nothing || era5_next === nothing
+                continue
+            end
+
+            t_now  = regrid_horizontal(era5_now.t,  era5_now.lon, era5_now.lat, grid.lon, grid.lat)
+            t_next = regrid_horizontal(era5_next.t, era5_next.lon, era5_next.lat, grid.lon, grid.lat)
+            q_now  = regrid_horizontal(era5_now.q,  era5_now.lon, era5_now.lat, grid.lon, grid.lat)
+            q_next = regrid_horizontal(era5_next.q, era5_next.lon, era5_next.lat, grid.lon, grid.lat)
+            z_now  = regrid_horizontal(era5_now.z,  era5_now.lon, era5_now.lat, grid.lon, grid.lat)
+
+            t_era5_now  = interp_vertical_3d(t_now,  z_now, grid.z_phys)
+            t_era5_next = interp_vertical_3d(t_next, z_now, grid.z_phys)
+            q_era5_now  = interp_vertical_3d(q_now,  z_now, grid.z_phys)
+            q_era5_next = interp_vertical_3d(q_next, z_now, grid.z_phys)
+
+            dT_era5 = (t_era5_next[:, :, z_idx] .- t_era5_now[:, :, z_idx]) ./ DT
+            dq_era5 = (q_era5_next[:, :, z_idx] .- q_era5_now[:, :, z_idx]) ./ DT
+
+            ta_now_z   = ta_model[ti, :, :, z_idx]
+            ta_next_z  = ta_model[ti + 1, :, :, z_idx]
+            hus_now_z  = hus_model[ti, :, :, z_idx]
+            hus_next_z = hus_model[ti + 1, :, :, z_idx]
+
+            dT_model = (ta_next_z .- ta_now_z) ./ DT
+            dq_model = (hus_next_z .- hus_now_z) ./ DT
+
+            dT_accum .+= (dT_era5 .- dT_model)
+            dq_accum .+= (dq_era5 .- dq_model)
+
+            # Accumulate input features
+            for (fi, (name, transform)) in enumerate(INPUT_FEATURES)
+                raw = feat_data[name][ti, :, :, z_idx]
+                X_accum[fi, :, :, :] .+= transform.(raw)
+            end
+
+            n_hours_valid += 1
+        end
+
+        if n_hours_valid == 0
+            continue
+        end
+
+        # Average over valid hours
+        inv_n = 1.0f0 / n_hours_valid
+        X_accum  .*= inv_n
+        dT_accum .*= inv_n
+        dq_accum .*= inv_n
+
+        # Subsample columns
+        col_sample = if col_subsample >= 1.0
+            all_col_ij
+        else
+            all_col_ij[randperm(rng_data, ncols_total)[1:ncols_sample]]
+        end
+        nc = length(col_sample)
+
+        nv = n_target_vars()
+        X_day  = zeros(Float32, N_FEATURES * nz, nc)
+        Y_day  = zeros(Float32, nv * nz, nc)
+        dz_day = zeros(Float32, nz, nc)
+
+        Threads.@threads for col in 1:nc
+            i, j = col_sample[col]
+            z_col = grid.z_phys[i, j, z_idx]
+
+            for k in 1:nz
+                if k < nz
+                    dz_day[k, col] = z_col[k + 1] - z_col[k]
+                else
+                    dz_day[k, col] = dz_day[k - 1, col]
+                end
+            end
+
+            for fi in 1:N_FEATURES
+                offset = (fi - 1) * nz
+                X_day[offset+1:offset+nz, col] = X_accum[fi, i, j, :]
+            end
+
+            if TARGET_VARS == :T || TARGET_VARS == :both
+                Y_day[1:nz, col] = dT_accum[i, j, :]
+            end
+            if TARGET_VARS == :q
+                Y_day[1:nz, col] = dq_accum[i, j, :]
+            elseif TARGET_VARS == :both
+                Y_day[nz+1:2*nz, col] = dq_accum[i, j, :]
+            end
+        end
+
+        push!(all_X, X_day)
+        push!(all_Y, Y_day)
+        push!(all_dz, dz_day)
+        n_valid_days += 1
+    end
+
+    println("  Built $n_valid_days valid days, total columns: $(sum(size.(all_X, 2)))")
 
     X = hcat(all_X...)
     Y = hcat(all_Y...)
@@ -478,18 +706,18 @@ function compute_norm(X::Matrix{Float32})
 end
 
 """
-Per-variable normalisation for targets: one (mean, std) for all T levels,
-one for all q levels. This preserves the vertical structure within each
-variable while bringing both to O(1).
+Per-variable normalisation for targets: one (mean, std) per target variable
+across all levels. This preserves vertical structure while bringing each to O(1).
 """
 function compute_target_norm(Y::Matrix{Float32}, nz::Int)
-    mean_T = Float32(mean(Y[1:nz, :]))
-    std_T  = Float32(std(Y[1:nz, :]))
-    mean_q = Float32(mean(Y[nz+1:2*nz, :]))
-    std_q  = Float32(std(Y[nz+1:2*nz, :]))
-
-    m = vcat(fill(mean_T, nz), fill(mean_q, nz))
-    s = vcat(fill(std_T, nz), fill(std_q, nz))
+    nv = n_target_vars()
+    m = Float32[]
+    s = Float32[]
+    for v in 1:nv
+        rows = (v-1)*nz+1 : v*nz
+        push!(m, fill(Float32(mean(Y[rows, :])), nz)...)
+        push!(s, fill(Float32(std(Y[rows, :])), nz)...)
+    end
     NormStats(m, s)
 end
 
@@ -501,28 +729,28 @@ denormalise(X, ns::NormStats) = X .* ns.std .+ ns.mean
 # ─────────────────────────────────────────────────────────────────────────────
 
 """
-Build the flux-correction NN. Dispatches on ARCHITECTURE.
+Build the correction NN. Dispatches on ARCHITECTURE and PREDICT_MODE.
 
 Input:  (n_features × nz, batch)
-Output: (2*(nz-1), batch) — interior face fluxes for T and q
-
-Boundary fluxes F[bottom]=0, F[top]=0 are enforced in the loss.
+Output: depends on PREDICT_MODE:
+  :flux   → (2*(nz-1), batch) — interior face fluxes for T and q
+  :direct → (2*nz, batch)     — tendency corrections for T and q at cell centres
 """
-function build_model(input_dim::Int, nz::Int)
+function build_model(input_dim::Int, nz::Int; predict_mode = PREDICT_MODE)
     if ARCHITECTURE == :unet
-        return build_unet_model(input_dim, nz)
+        return build_unet_model(input_dim, nz; predict_mode)
     elseif ARCHITECTURE == :mlp
-        return build_mlp_model(input_dim, nz)
+        return build_mlp_model(input_dim, nz; predict_mode)
     elseif ARCHITECTURE == :cnn
-        return build_cnn_model(input_dim, nz)
+        return build_cnn_model(input_dim, nz; predict_mode)
     else
         error("Unknown ARCHITECTURE: $ARCHITECTURE. Use :unet, :mlp, or :cnn")
     end
 end
 
-function build_mlp_model(input_dim::Int, nz::Int)
-    n_interior_faces = nz - 1
-    output_dim = 2 * n_interior_faces
+function build_mlp_model(input_dim::Int, nz::Int; predict_mode = PREDICT_MODE)
+    nv = n_target_vars()
+    output_dim = predict_mode == :direct ? nv * nz : nv * (nz - 1)
 
     model = Chain(
         Dense(input_dim => HIDDEN_DIM, gelu),
@@ -544,43 +772,49 @@ With 6 layers of kernel=3 and dilations [1,1,2,4,1,1], the receptive field
 is 19 levels — enough that every level sees ~40% of the 49-level column,
 and the network remains simple and robust.
 """
-function build_cnn_model(input_dim::Int, nz::Int)
+function build_cnn_model(input_dim::Int, nz::Int; predict_mode = PREDICT_MODE)
     n_feat = N_FEATURES
+    nv = n_target_vars()
     @assert input_dim == n_feat * nz "input_dim ($input_dim) != N_FEATURES ($n_feat) * nz ($nz)"
 
     nf = nz - 1
     ch = max(HIDDEN_DIM ÷ 4, 16)
+    direct = predict_mode == :direct
 
     dilations = [1, 1, 2, 4, 1, 1]
 
     model = @compact(
         conv1 = Conv((3,), n_feat => ch, gelu; pad = 1 * dilations[1], dilation = dilations[1]),
         conv2 = Conv((3,), ch => ch, gelu; pad = 1 * dilations[2], dilation = dilations[2]),
+        drop1 = Dropout(DROPOUT_RATE),
         conv3 = Conv((3,), ch => 2ch, gelu; pad = 1 * dilations[3], dilation = dilations[3]),
         conv4 = Conv((3,), 2ch => 2ch, gelu; pad = 1 * dilations[4], dilation = dilations[4]),
+        drop2 = Dropout(DROPOUT_RATE),
         conv5 = Conv((3,), 2ch => ch, gelu; pad = 1 * dilations[5], dilation = dilations[5]),
         conv6 = Conv((3,), ch => ch, gelu; pad = 1 * dilations[6], dilation = dilations[6]),
-        out_conv = Conv((1,), ch => 2),
+        out_conv = Conv((1,), ch => nv),
     ) do x
         B = size(x, 2)
 
-        # (input_dim, B) → (nz, n_feat, B)
         h = reshape(x, nz, n_feat, B)
 
         h = conv1(h)
         h = conv2(h)
+        h = drop1(h)
         h = conv3(h)
         h = conv4(h)
+        h = drop2(h)
         h = conv5(h)
         h = conv6(h)
 
-        out = out_conv(h)  # (nz, 2, B)
+        out = out_conv(h)  # (nz, nv, B)
 
-        # Interpolate cell centres → interior faces
-        faces = (out[1:nf, :, :] .+ out[2:nz, :, :]) ./ 2f0  # (nf, 2, B)
-
-        @return vcat(reshape(faces[:, 1:1, :], nf, B),
-                     reshape(faces[:, 2:2, :], nf, B))
+        if direct
+            @return vcat([reshape(out[:, v:v, :], nz, B) for v in 1:nv]...)
+        else
+            faces = (out[1:nf, :, :] .+ out[2:nz, :, :]) ./ 2f0
+            @return vcat([reshape(faces[:, v:v, :], nf, B) for v in 1:nv]...)
+        end
     end
 
     return model
@@ -596,114 +830,106 @@ Output:   Conv to 2 channels (T, q) at cell centres, then interpolated to faces
 The vertical dimension is padded to the next multiple of 4 for clean pooling,
 then cropped back after the decoder.
 """
-function build_unet_model(input_dim::Int, nz::Int)
+function build_unet_model(input_dim::Int, nz::Int; predict_mode = PREDICT_MODE)
     n_feat = N_FEATURES
+    nv = n_target_vars()
     @assert input_dim == n_feat * nz "input_dim ($input_dim) != N_FEATURES ($n_feat) * nz ($nz)"
 
     nf = nz - 1
     nz_pad = nz % 4 == 0 ? nz : nz + (4 - nz % 4)
-    ch = max(HIDDEN_DIM ÷ 4, 16)  # base channels (32 for HIDDEN_DIM=128)
+    ch = max(HIDDEN_DIM ÷ 4, 16)
+    direct = predict_mode == :direct
 
     model = @compact(
-        # ── Encoder ──
         enc1 = Chain(Conv((3,), n_feat => ch, gelu; pad = 1),
                      Conv((3,), ch => ch, gelu; pad = 1)),
         enc2 = Chain(Conv((3,), ch => 2ch, gelu; pad = 1),
                      Conv((3,), 2ch => 2ch, gelu; pad = 1)),
-        # ── Bottleneck ──
         bneck = Chain(Conv((3,), 2ch => 4ch, gelu; pad = 1),
                       Conv((3,), 4ch => 4ch, gelu; pad = 1)),
-        # ── Decoder ──
         up2     = ConvTranspose((2,), 4ch => 2ch; stride = 2),
         dec2    = Chain(Conv((3,), 4ch => 2ch, gelu; pad = 1),
                         Conv((3,), 2ch => 2ch, gelu; pad = 1)),
         up1     = ConvTranspose((2,), 2ch => ch; stride = 2),
         dec1    = Chain(Conv((3,), 2ch => ch, gelu; pad = 1),
                         Conv((3,), ch => ch, gelu; pad = 1)),
-        # ── Output head ──
-        out_conv = Conv((1,), ch => 2),
+        out_conv = Conv((1,), ch => nv),
         pool     = MaxPool((2,)),
     ) do x
         B = size(x, 2)
 
-        # (input_dim, B) → (nz, n_feat, B)
         x3d = reshape(x, nz, n_feat, B)
 
-        # Pad vertical dim to multiple of 4
         if nz_pad > nz
             x3d = cat(x3d, x3d[1:nz_pad - nz, :, :] .* 0f0; dims = 1)
         end
 
-        # Encoder
-        e1 = enc1(x3d)        # (nz_pad,   ch,  B)
-        e2 = enc2(pool(e1))   # (nz_pad/2, 2ch, B)
-        b  = bneck(pool(e2))  # (nz_pad/4, 4ch, B)
+        e1 = enc1(x3d)
+        e2 = enc2(pool(e1))
+        b  = bneck(pool(e2))
 
-        # Decoder — upsample + cat skip + conv
-        d2 = dec2(cat(up2(b), e2; dims = 2))   # (nz_pad/2, 2ch, B)
-        d1 = dec1(cat(up1(d2), e1; dims = 2))  # (nz_pad,   ch,  B)
+        d2 = dec2(cat(up2(b), e2; dims = 2))
+        d1 = dec1(cat(up1(d2), e1; dims = 2))
 
-        # 1×1 conv → 2 channels (T, q) at cell centres
-        out = out_conv(d1)                      # (nz_pad, 2, B)
+        out = out_conv(d1)  # (nz_pad, nv, B)
+        c = out[1:nz, :, :]  # (nz, nv, B)
 
-        # Crop padding, interpolate centres → interior faces
-        c = out[1:nz, :, :]                     # (nz, 2, B)
-        faces = (c[1:nf, :, :] .+ c[2:nz, :, :]) ./ 2f0  # (nf, 2, B)
-
-        # Stack as [T_faces; q_faces]  →  (2*nf, B)
-        @return vcat(reshape(faces[:, 1:1, :], nf, B),
-                     reshape(faces[:, 2:2, :], nf, B))
+        if direct
+            @return vcat([reshape(c[:, v:v, :], nz, B) for v in 1:nv]...)
+        else
+            faces = (c[1:nf, :, :] .+ c[2:nz, :, :]) ./ 2f0
+            @return vcat([reshape(faces[:, v:v, :], nf, B) for v in 1:nv]...)
+        end
     end
 
     return model
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Loss function: flux divergence must match target tendency
+# Loss functions
 # ─────────────────────────────────────────────────────────────────────────────
 
+"""Direct tendency MSE loss: prediction and target are both (2*nz, batch)."""
+function direct_tendency_loss(pred, target_norm, dz, nz)
+    return mean((pred .- target_norm) .^ 2)
+end
+
 """
-Given interior face fluxes (nz-1 per variable), reconstruct full face fluxes
-(nz+1) with zero BCs, compute the divergence, and compare to normalised target.
+Flux divergence loss: predict face fluxes, compare -dF/dz to target tendency.
 
-flux_interior: (2*(nz-1), batch)
-target_norm:   (2*nz, batch) — normalised target correction tendencies
+flux_interior: (nv*(nz-1), batch)
+target_norm:   (nv*nz, batch)
 dz:            (nz, batch)
-
-Targets are normalised per-dimension (each level of T and q has zero mean,
-unit variance), so both variables contribute equally without manual weighting.
-A smoothness penalty on the second derivative of the flux suppresses
-oscillations in the predicted divergence.
 """
 function flux_divergence_loss(flux_interior, target_norm, dz, nz)
     nf = nz - 1
-
-    F_T_int = flux_interior[1:nf, :]
-    F_q_int = flux_interior[nf+1:2*nf, :]
-
+    nv = n_target_vars()
     z_row = flux_interior[1:1, :] .* 0f0
-    F_T = vcat(z_row, F_T_int, z_row)
-    F_q = vcat(z_row, F_q_int, z_row)
+    total_loss = 0f0
+    smooth = 0f0
 
-    dFdz_T = -(F_T[2:nz+1, :] .- F_T[1:nz, :]) ./ dz
-    dFdz_q = -(F_q[2:nz+1, :] .- F_q[1:nz, :]) ./ dz
+    for v in 1:nv
+        F_int = flux_interior[(v-1)*nf+1 : v*nf, :]
+        F_full = vcat(z_row, F_int, z_row)
+        dFdz = -(F_full[2:nz+1, :] .- F_full[1:nz, :]) ./ dz
+        target_v = target_norm[(v-1)*nz+1 : v*nz, :]
+        total_loss += mean((dFdz .- target_v) .^ 2)
 
-    target_T = target_norm[1:nz, :]
-    target_q = target_norm[nz+1:2*nz, :]
-
-    loss_T = mean((dFdz_T .- target_T) .^ 2)
-    loss_q = mean((dFdz_q .- target_q) .^ 2)
-
-    # Smoothness: penalise second derivative of flux (curvature)
-    if nf >= 3
-        d2F_T = F_T_int[1:nf-2, :] .- 2f0 .* F_T_int[2:nf-1, :] .+ F_T_int[3:nf, :]
-        d2F_q = F_q_int[1:nf-2, :] .- 2f0 .* F_q_int[2:nf-1, :] .+ F_q_int[3:nf, :]
-        smooth = mean(d2F_T .^ 2) + mean(d2F_q .^ 2)
-    else
-        smooth = 0f0
+        if nf >= 3
+            d2F = F_int[1:nf-2, :] .- 2f0 .* F_int[2:nf-1, :] .+ F_int[3:nf, :]
+            smooth += mean(d2F .^ 2)
+        end
     end
 
-    return loss_T + loss_q + FLUX_SMOOTH_WEIGHT * smooth
+    return total_loss + FLUX_SMOOTH_WEIGHT * smooth
+end
+
+function compute_loss(pred, target_norm, dz, nz)
+    if PREDICT_MODE == :direct
+        return direct_tendency_loss(pred, target_norm, dz, nz)
+    else
+        return flux_divergence_loss(pred, target_norm, dz, nz)
+    end
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -722,7 +948,7 @@ end
 
 """
 Save snapshot of predicted vs target profiles for a few validation columns.
-Shows T and q tendencies side by side.
+Adapts to TARGET_VARS — shows whichever variables are being trained.
 """
 function save_profile_snapshot(model, ps, st, X_val, Y_val, dz_val,
                                nz, Y_norm_stats, z_km, epoch, path)
@@ -735,46 +961,57 @@ function save_profile_snapshot(model, ps, st, X_val, Y_val, dz_val,
     Yb = Y_val[:, col_idx]
     dzb = dz_val[:, col_idx]
 
-    # Move to CPU for plotting
     Xb_cpu = Xb |> cpu_device()
     Yb_cpu = Yb |> cpu_device()
     dzb_cpu = dzb |> cpu_device()
 
-    flux_pred, _ = Lux.apply(model, Xb, ps, st)
-    flux_pred_cpu = flux_pred |> cpu_device()
+    st_test = Lux.testmode(st)
+    raw_pred, _ = Lux.apply(model, Xb, ps, st_test)
+    raw_pred_cpu = raw_pred |> cpu_device()
 
-    nf = nz - 1
-    F_T = vcat(zeros(Float32, 1, n_cols), flux_pred_cpu[1:nf, :], zeros(Float32, 1, n_cols))
-    F_q = vcat(zeros(Float32, 1, n_cols), flux_pred_cpu[nf+1:2*nf, :], zeros(Float32, 1, n_cols))
+    nv = n_target_vars()
 
-    dFdz_T = -(F_T[2:nz+1, :] .- F_T[1:nz, :]) ./ dzb_cpu
-    dFdz_q = -(F_q[2:nz+1, :] .- F_q[1:nz, :]) ./ dzb_cpu
+    # Convert model output to tendency predictions in normalised space per variable
+    pred_norms = Vector{Matrix{Float32}}(undef, nv)
+    if PREDICT_MODE == :direct
+        for v in 1:nv
+            pred_norms[v] = raw_pred_cpu[(v-1)*nz+1 : v*nz, :]
+        end
+    else
+        nf = nz - 1
+        for v in 1:nv
+            F_int = raw_pred_cpu[(v-1)*nf+1 : v*nf, :]
+            F_full = vcat(zeros(Float32, 1, n_cols), F_int, zeros(Float32, 1, n_cols))
+            pred_norms[v] = -(F_full[2:nz+1, :] .- F_full[1:nz, :]) ./ dzb_cpu
+        end
+    end
 
-    # Denormalise both prediction and target back to physical units (K/hr, g/kg/hr)
-    std_T = Y_norm_stats.std[1]
-    mean_T = Y_norm_stats.mean[1]
-    std_q = Y_norm_stats.std[nz+1]
-    mean_q = Y_norm_stats.mean[nz+1]
+    var_labels = TARGET_VARS == :both ? ["T", "q"] :
+                 TARGET_VARS == :T   ? ["T"] : ["q"]
+    var_units  = TARGET_VARS == :both ? ["K/hr", "g/kg/hr"] :
+                 TARGET_VARS == :T   ? ["K/hr"] : ["g/kg/hr"]
+    var_scales = TARGET_VARS == :both ? [3600f0, 3600f0 * 1000f0] :
+                 TARGET_VARS == :T   ? [3600f0] : [3600f0 * 1000f0]
 
-    fig = Figure(size = (300 * n_cols, 600))
+    fig = Figure(size = (300 * n_cols, 300 * nv))
     Label(fig[0, :], "Epoch $epoch: predicted vs target tendency"; fontsize = 14)
 
     for (p, ci) in enumerate(1:n_cols)
-        pred_T = (dFdz_T[:, ci] .* std_T .+ mean_T) .* 3600
-        tgt_T  = (Yb_cpu[1:nz, ci] .* std_T .+ mean_T) .* 3600
-        pred_q = (dFdz_q[:, ci] .* std_q .+ mean_q) .* 3600 .* 1000
-        tgt_q  = (Yb_cpu[nz+1:2*nz, ci] .* std_q .+ mean_q) .* 3600 .* 1000
+        for v in 1:nv
+            std_v  = Y_norm_stats.std[(v-1)*nz + 1]
+            mean_v = Y_norm_stats.mean[(v-1)*nz + 1]
+            scale  = var_scales[v]
 
-        ax_t = Axis(fig[1, p]; xlabel = "K/hr", ylabel = p == 1 ? "Height (km)" : "",
-                     title = "Col $ci — T")
-        lines!(ax_t, tgt_T, z_km; label = "Target", linewidth = 1.5)
-        lines!(ax_t, pred_T, z_km; label = "Predicted", linewidth = 1.5, linestyle = :dash)
-        p == 1 && axislegend(ax_t; position = :rt, labelsize = 9)
+            pred_phys = (pred_norms[v][:, ci] .* std_v .+ mean_v) .* scale
+            tgt_phys  = (Yb_cpu[(v-1)*nz+1 : v*nz, ci] .* std_v .+ mean_v) .* scale
 
-        ax_q = Axis(fig[2, p]; xlabel = "g/kg/hr", ylabel = p == 1 ? "Height (km)" : "",
-                     title = "Col $ci — q")
-        lines!(ax_q, tgt_q, z_km; linewidth = 1.5)
-        lines!(ax_q, pred_q, z_km; linewidth = 1.5, linestyle = :dash)
+            ax = Axis(fig[v, p]; xlabel = var_units[v],
+                       ylabel = p == 1 ? "Height (km)" : "",
+                       title = "Col $ci — $(var_labels[v])")
+            lines!(ax, tgt_phys, z_km; label = "Target", linewidth = 1.5)
+            lines!(ax, pred_phys, z_km; label = "Predicted", linewidth = 1.5, linestyle = :dash)
+            v == 1 && p == 1 && axislegend(ax; position = :rt, labelsize = 9)
+        end
     end
 
     save(path, fig; px_per_unit = 2)
@@ -817,11 +1054,14 @@ function train()
     X = normalise(X_raw, X_norm_stats)
     Y = normalise(Y_raw, Y_norm_stats)
 
-    @printf("  target T: mean=%.4e  std=%.4e (K/s)\n",
-            Y_norm_stats.mean[1], Y_norm_stats.std[1])
-    @printf("  target q: mean=%.4e  std=%.4e (kg/kg/s)\n",
-            Y_norm_stats.mean[nz+1], Y_norm_stats.std[nz+1])
-    println("  Both target variables normalised to O(1) — no manual loss weighting needed")
+    nv = n_target_vars()
+    var_names = TARGET_VARS == :both ? ["T", "q"] : TARGET_VARS == :T ? ["T"] : ["q"]
+    var_unit  = TARGET_VARS == :both ? ["K/s", "kg/kg/s"] : TARGET_VARS == :T ? ["K/s"] : ["kg/kg/s"]
+    for v in 1:nv
+        @printf("  target %s: mean=%.4e  std=%.4e (%s)\n",
+                var_names[v], Y_norm_stats.mean[(v-1)*nz+1], Y_norm_stats.std[(v-1)*nz+1], var_unit[v])
+    end
+    println("  Target variables normalised to O(1)")
 
     n_train = round(Int, TRAIN_FRACTION * n_samples)
     perm = randperm(rng, n_samples)
@@ -840,6 +1080,8 @@ function train()
     ps = ps |> DEV
     st = st |> DEV
     opt_state = Optimisers.setup(AdamW(LEARNING_RATE, (0.9f0, 0.999f0), WEIGHT_DECAY), ps)
+
+    cosine_lr(epoch, T) = LR_MIN + 0.5f0 * (LEARNING_RATE - LR_MIN) * (1 + cos(Float32(π) * epoch / T))
 
     # Move ALL data to device once — dataset is small enough to fit in VRAM
     X_train_d  = X_train  |> DEV
@@ -868,7 +1110,7 @@ function train()
     # Initialise the CSV log
     log_path = joinpath(run_dir, "training_log.csv")
     open(log_path, "w") do io
-        println(io, "epoch,train_loss,val_loss,best_val_loss")
+        println(io, "epoch,lr,train_loss,val_loss,best_val_loss")
     end
 
     println("\nTraining for $N_EPOCHS epochs, batch_size=$BATCH_SIZE, device=$(USE_GPU ? "GPU" : "CPU")")
@@ -877,6 +1119,9 @@ function train()
 
     n_train_samples = size(X_train_d, 2)
     for epoch in 1:N_EPOCHS
+        lr = cosine_lr(epoch - 1, N_EPOCHS)
+        Optimisers.adjust!(opt_state; eta = lr)
+
         shuffle_perm = randperm(rng, n_train_samples)
         n_batches = cld(n_train_samples, BATCH_SIZE)
         epoch_loss = 0.0f0
@@ -890,8 +1135,8 @@ function train()
             dzb = dz_train_d[:, idx]
 
             loss_val, grads = Zygote.withgradient(ps) do p
-                flux_pred, _ = Lux.apply(model, Xb, p, st)
-                flux_divergence_loss(flux_pred, Yb, dzb, nz)
+                pred, _ = Lux.apply(model, Xb, p, st)
+                compute_loss(pred, Yb, dzb, nz)
             end
 
             epoch_loss += loss_val
@@ -900,9 +1145,10 @@ function train()
 
         epoch_loss /= n_batches
 
-        # Validation loss
-        flux_val, _ = Lux.apply(model, X_val_d, ps, st)
-        val_loss = flux_divergence_loss(flux_val, Y_val_d, dz_val_d, nz)
+        # Validation loss (disable dropout)
+        st_test = Lux.testmode(st)
+        pred_val, _ = Lux.apply(model, X_val_d, ps, st_test)
+        val_loss = compute_loss(pred_val, Y_val_d, dz_val_d, nz)
 
         push!(train_losses, epoch_loss)
         push!(val_losses, val_loss)
@@ -917,13 +1163,13 @@ function train()
             marker = ""
         end
 
-        @printf("Epoch %3d/%d  train_loss=%.4e  val_loss=%.4e%s\n",
-                epoch, N_EPOCHS, epoch_loss, val_loss, marker)
+        @printf("Epoch %3d/%d  lr=%.2e  train_loss=%.4e  val_loss=%.4e%s\n",
+                epoch, N_EPOCHS, lr, epoch_loss, val_loss, marker)
         flush(stdout)
 
         # Append to CSV log (live-readable)
         open(log_path, "a") do io
-            @printf(io, "%d,%.6e,%.6e,%.6e\n", epoch, epoch_loss, val_loss, best_val_loss)
+            @printf(io, "%d,%.4e,%.6e,%.6e,%.6e\n", epoch, lr, epoch_loss, val_loss, best_val_loss)
         end
 
         # Save progress plots periodically
@@ -957,14 +1203,22 @@ function train()
 
     save_path = joinpath(run_dir, "flux_correction_model.bson")
     arch = ARCHITECTURE
-    BSON.@save save_path ps=best_ps_cpu st=st_cpu X_norm_stats Y_norm_stats nz input_dim arch
+    temporal_averaging = TEMPORAL_AVERAGING
+    predict_mode = PREDICT_MODE
+    target_vars = TARGET_VARS
+    BSON.@save save_path ps=best_ps_cpu st=st_cpu X_norm_stats Y_norm_stats nz input_dim arch temporal_averaging predict_mode target_vars
     println("Model saved to $save_path")
 
     # Write a human-readable summary
     open(joinpath(run_dir, "config.txt"), "w") do io
         @printf(io, "architecture  = %s\n", ARCHITECTURE)
+        @printf(io, "temporal_avg  = %s\n", TEMPORAL_AVERAGING)
+        @printf(io, "predict_mode  = %s\n", PREDICT_MODE)
+        @printf(io, "target_vars   = %s\n", TARGET_VARS)
         @printf(io, "hidden_dim    = %d\n", HIDDEN_DIM)
         @printf(io, "learning_rate = %.1e\n", LEARNING_RATE)
+        @printf(io, "lr_min        = %.1e\n", LR_MIN)
+        @printf(io, "lr_schedule   = cosine_annealing\n")
         @printf(io, "batch_size    = %d\n", BATCH_SIZE)
         @printf(io, "n_epochs      = %d\n", N_EPOCHS)
         @printf(io, "patience      = %d\n", PATIENCE)

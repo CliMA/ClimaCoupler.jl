@@ -1,26 +1,37 @@
 #!/usr/bin/env julia
 #=
+
+julia -t 24 --project=. sanity_check_compute_tendencies.jl
+
 Sanity checks for the offline *computed tendencies* used in flux-correction
 training (ERA5 − model hourly finite differences).
 
 Reuses the same loaders and time/level window as `train_flux_correction.jl`
-(MODEL_DIR, ERA5_DIR, Z_MAX, TIME_DAY_START/END, DT).
+(MODEL_DIR, ERA5_DIR, Z_MAX, TIME_DAY_START/END, DT, TEMPORAL_AVERAGING).
+
+Supports both :hourly and :daily modes (reads TEMPORAL_AVERAGING from the
+training config).  In :daily mode the hourly corrections within each calendar
+day are averaged before accumulating — matching what the NN actually sees.
 
 Checks
-  1) Telescoping identity: sum over valid hourly pairs of
-     dT_corr*DT  should match  (T_ERA5[last]−T_ERA5[first]) − (T_model[last]−T_model[first])
-     (and similarly for humidity), where “first/last” are the endpoints of the
-     chain of valid pairs (skips break the calendar identity — we report skips).
+  1) Telescoping identity (hourly mode only): sum over valid hourly pairs of
+     dT_corr*DT  ≈  (T_ERA5[last]−T_ERA5[first]) − (T_model[last]−T_model[first])
 
 Plots (written to output dir, default `ml_flux/sanity_tendency_plots/`):
-  - Mean vertical profiles of dT/dt from ERA5, model, and correction (q too)
-  - Several sample column profiles (random columns / timesteps)
-  - Profile of RMS(|sum(dT_corr*DT) − direct_delta|) vs height (column-wise check)
-  - Spatial maps of dT_corr at selected levels for one snapshot hour
+  01  Mean vertical profiles of dT/dt from ERA5, model, and correction (q too)
+  02  Telescoping identity RMS vs height (T) — hourly mode only
+  03  Telescoping identity RMS vs height (q) — hourly mode only
+  04  Sample column profiles
+  05  Spatial dT_corr at selected levels (single snapshot)
+  06  Spatial dq_corr at selected levels
+  07  Zonal-mean latitude-height cross-section of correction
+  08  RMS vs |mean| vertical profiles
+  09  Temporal evolution of global-mean correction
+  10  Histograms of dT_corr at representative levels
 
 Usage:
-    julia --project=. sanity_check_compute_tendencies.jl
-    julia --project=. sanity_check_compute_tendencies.jl /path/to/output_dir
+    julia -t 24 --project=. sanity_check_compute_tendencies.jl
+    julia -t 24 --project=. sanity_check_compute_tendencies.jl runs/007_cnn_h128_day
 =#
 
 include("train_flux_correction.jl")
@@ -53,10 +64,547 @@ function level_indices_for_maps(nz::Int)
     return ks
 end
 
+function regrid_era5_to_model_z(era5, grid, z_idx)
+    t_rg = regrid_horizontal(era5.t, era5.lon, era5.lat, grid.lon, grid.lat)
+    q_rg = regrid_horizontal(era5.q, era5.lon, era5.lat, grid.lon, grid.lat)
+    z_rg = regrid_horizontal(era5.z, era5.lon, era5.lat, grid.lon, grid.lat)
+    t_on_z = interp_vertical_3d(t_rg, z_rg, grid.z_phys)[:, :, z_idx]
+    q_on_z = interp_vertical_3d(q_rg, z_rg, grid.z_phys)[:, :, z_idx]
+    return t_on_z, q_on_z
+end
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Result container — populated by both hourly and daily loops
+# ─────────────────────────────────────────────────────────────────────────────
+struct SanityResults
+    z_km::Vector{Float32}
+    nlon::Int
+    nlat::Int
+    nz::Int
+    lon::Vector{Float64}
+    lat::Vector{Float64}
+    mean_dT_era5::Vector{Float32}
+    mean_dT_model::Vector{Float32}
+    mean_dT_corr::Vector{Float32}
+    mean_dq_era5::Vector{Float32}
+    mean_dq_model::Vector{Float32}
+    mean_dq_corr::Vector{Float32}
+    # Telescoping (hourly only — empty vectors otherwise)
+    rms_diff_T_z::Vector{Float64}
+    rms_diff_q_z::Vector{Float64}
+    max_abs_diff_T::Float64
+    max_abs_diff_q::Float64
+    n_valid::Int
+    n_skipped::Int
+    has_telescoping::Bool
+    # Zonal mean, RMS, samples, snapshots, temporal, histogram
+    acc_dT_corr_zonal::Matrix{Float64}
+    acc_dq_corr_zonal::Matrix{Float64}
+    acc_dT_corr_sq::Vector{Float64}
+    acc_dq_corr_sq::Vector{Float64}
+    n_prof::Int
+    sample_dT_era5::Vector{Vector{Float32}}
+    sample_dT_mod::Vector{Vector{Float32}}
+    sample_dT_corr::Vector{Vector{Float32}}
+    sample_meta::Vector{String}
+    dT_corr_snapshot::Array{Float32, 3}
+    dq_corr_snapshot::Array{Float32, 3}
+    snapshot_label::String
+    ts_dT_corr_mean::Vector{Float64}
+    ts_dq_corr_mean::Vector{Float64}
+    ts_dates::Vector{DateTime}
+    hist_levels::Vector{Int}
+    hist_dT_data::Dict{Int, Vector{Float32}}
+    mode_label::String   # "hourly" or "daily-mean"
+end
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Hourly processing loop
+# ─────────────────────────────────────────────────────────────────────────────
+function process_hourly(grid, ta_model, hus_model, z_idx, nz, ti_start, ti_end, model_dates)
+    nlon, nlat = length(grid.lon), length(grid.lat)
+    rng = MersenneTwister(42)
+
+    acc_dT_era5 = zeros(Float64, nz);  acc_dT_model = zeros(Float64, nz);  acc_dT_corr = zeros(Float64, nz)
+    acc_dq_era5 = zeros(Float64, nz);  acc_dq_model = zeros(Float64, nz);  acc_dq_corr = zeros(Float64, nz)
+    n_prof = 0
+
+    sum_dT_corr_dt = zeros(Float64, nlon, nlat, nz)
+    sum_dq_corr_dt = zeros(Float64, nlon, nlat, nz)
+    n_skipped = 0;  n_valid = 0
+
+    era5_t0 = zeros(Float32, nlon, nlat, nz); era5_t1 = similar(era5_t0)
+    q_era5_t0 = similar(era5_t0);  q_era5_t1 = similar(era5_t0)
+    model_t0 = similar(era5_t0);   model_t1 = similar(era5_t0)
+    hus_t0 = similar(era5_t0);     hus_t1 = similar(era5_t0)
+    chain_started = false
+
+    acc_dT_corr_zonal = zeros(Float64, nlat, nz)
+    acc_dq_corr_zonal = zeros(Float64, nlat, nz)
+    acc_dT_corr_sq = zeros(Float64, nz)
+    acc_dq_corr_sq = zeros(Float64, nz)
+
+    ts_dT = Float64[];  ts_dq = Float64[];  ts_dt = DateTime[]
+
+    hist_levels = level_indices_for_maps(nz)
+    hist_dT = Dict{Int, Vector{Float32}}(k => Float32[] for k in hist_levels)
+
+    n_samples_wanted = 12
+    s_era5 = Vector{Vector{Float32}}();  s_mod = Vector{Vector{Float32}}()
+    s_corr = Vector{Vector{Float32}}();  s_meta = Vector{String}()
+
+    ti_mid = (ti_start + ti_end) ÷ 2
+    dT_snap = zeros(Float32, nlon, nlat, nz)
+    dq_snap = zeros(Float32, nlon, nlat, nz)
+    snap_label = ""
+    best_snap_dist = typemax(Int)
+
+    prev_dt_next = nothing
+    cache_t = Array{Float32}(undef, 0, 0, 0)
+    cache_q = Array{Float32}(undef, 0, 0, 0)
+
+    for ti in ti_start:ti_end
+        dt_now = model_dates[ti];  dt_next = model_dates[ti + 1]
+        era5_now = load_era5_pressure(dt_now)
+        era5_next = load_era5_pressure(dt_next)
+        if era5_now === nothing || era5_next === nothing
+            n_skipped += 1;  prev_dt_next = nothing;  continue
+        end
+        n_valid += 1
+
+        if ti == ti_start || ti % 24 == 0
+            @printf("  [hourly] ti %d / %d  %s\n", ti, ti_end, dt_now);  flush(stdout)
+        end
+
+        if prev_dt_next == dt_now
+            t_now_z, q_now_z = cache_t, cache_q
+        else
+            t_now_z, q_now_z = regrid_era5_to_model_z(era5_now, grid, z_idx)
+        end
+        t_next_z, q_next_z = regrid_era5_to_model_z(era5_next, grid, z_idx)
+        cache_t, cache_q, prev_dt_next = t_next_z, q_next_z, dt_next
+
+        ta_now_z  = ta_model[ti, :, :, z_idx];     ta_next_z  = ta_model[ti+1, :, :, z_idx]
+        hus_now_z = hus_model[ti, :, :, z_idx];     hus_next_z = hus_model[ti+1, :, :, z_idx]
+
+        dT_era5  = (t_next_z  .- t_now_z)  ./ DT
+        dq_era5  = (q_next_z  .- q_now_z)  ./ DT
+        dT_model = (ta_next_z .- ta_now_z) ./ DT
+        dq_model = (hus_next_z .- hus_now_z) ./ DT
+        dT_corr  = dT_era5 .- dT_model
+        dq_corr  = dq_era5 .- dq_model
+
+        n_prof += nlon * nlat
+        for k in 1:nz
+            acc_dT_era5[k]  += sum(Float64, @view dT_era5[:, :, k])
+            acc_dT_model[k] += sum(Float64, @view dT_model[:, :, k])
+            acc_dT_corr[k]  += sum(Float64, @view dT_corr[:, :, k])
+            acc_dq_era5[k]  += sum(Float64, @view dq_era5[:, :, k])
+            acc_dq_model[k] += sum(Float64, @view dq_model[:, :, k])
+            acc_dq_corr[k]  += sum(Float64, @view dq_corr[:, :, k])
+        end
+        for k in 1:nz, j in 1:nlat
+            acc_dT_corr_zonal[j, k] += sum(Float64, @view dT_corr[:, j, k])
+            acc_dq_corr_zonal[j, k] += sum(Float64, @view dq_corr[:, j, k])
+        end
+        for k in 1:nz
+            acc_dT_corr_sq[k] += mapreduce(x -> Float64(x)^2, +, @view dT_corr[:, :, k])
+            acc_dq_corr_sq[k] += mapreduce(x -> Float64(x)^2, +, @view dq_corr[:, :, k])
+        end
+
+        push!(ts_dT, Float64(mean(dT_corr)));  push!(ts_dq, Float64(mean(dq_corr)));  push!(ts_dt, dt_now)
+
+        for k in hist_levels
+            slab = @view dT_corr[:, :, k]
+            stride = max(1, length(slab) ÷ 500)
+            append!(hist_dT[k], slab[1:stride:end])
+        end
+
+        sum_dT_corr_dt .+= Float64.(dT_corr) .* Float64(DT)
+        sum_dq_corr_dt .+= Float64.(dq_corr) .* Float64(DT)
+
+        if !chain_started
+            era5_t0 .= t_now_z;  q_era5_t0 .= q_now_z
+            model_t0 .= ta_now_z;  hus_t0 .= hus_now_z
+            chain_started = true
+        end
+        era5_t1 .= t_next_z;  q_era5_t1 .= q_next_z
+        model_t1 .= ta_next_z;  hus_t1 .= hus_next_z
+
+        d = abs(ti - ti_mid)
+        if d < best_snap_dist
+            best_snap_dist = d
+            dT_snap .= dT_corr;  dq_snap .= dq_corr
+            snap_label = "hourly ti=$ti  $dt_now"
+        end
+
+        if length(s_corr) < n_samples_wanted
+            for _ in 1:min(2, n_samples_wanted - length(s_corr))
+                i, j = rand(rng, 1:nlon), rand(rng, 1:nlat)
+                push!(s_era5, collect(Float32, dT_era5[i, j, :]))
+                push!(s_mod,  collect(Float32, dT_model[i, j, :]))
+                push!(s_corr, collect(Float32, dT_corr[i, j, :]))
+                push!(s_meta, @sprintf("ti=%d i=%d j=%d %s", ti, i, j, dt_now))
+            end
+        end
+    end
+
+    chain_started || error("No valid ERA5 pairs — check ERA5_DIR and dates.")
+    z_km = Float32.(grid.z_ref[z_idx] ./ 1000.0)
+
+    inv_n = 1.0 / max(n_prof, 1)
+    mn(a) = Float32.(a .* inv_n)
+
+    direct_dT = era5_t1 .- era5_t0 .- (model_t1 .- model_t0)
+    direct_dq = q_era5_t1 .- q_era5_t0 .- (hus_t1 .- hus_t0)
+    diff_T = sum_dT_corr_dt .- Float64.(direct_dT)
+    diff_q = sum_dq_corr_dt .- Float64.(direct_dq)
+    rms_T = [sqrt(mean(diff_T[:, :, k] .^ 2)) for k in 1:nz]
+    rms_q = [sqrt(mean(diff_q[:, :, k] .^ 2)) for k in 1:nz]
+
+    return SanityResults(
+        z_km, nlon, nlat, nz, grid.lon, grid.lat,
+        mn(acc_dT_era5), mn(acc_dT_model), mn(acc_dT_corr),
+        mn(acc_dq_era5), mn(acc_dq_model), mn(acc_dq_corr),
+        rms_T, rms_q, maximum(abs, diff_T), maximum(abs, diff_q),
+        n_valid, n_skipped, true,
+        acc_dT_corr_zonal, acc_dq_corr_zonal,
+        acc_dT_corr_sq, acc_dq_corr_sq, n_prof,
+        s_era5, s_mod, s_corr, s_meta,
+        dT_snap, dq_snap, snap_label,
+        ts_dT, ts_dq, ts_dt,
+        hist_levels, hist_dT,
+        "hourly",
+    )
+end
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Daily-mean processing loop
+# ─────────────────────────────────────────────────────────────────────────────
+function process_daily(grid, ta_model, hus_model, z_idx, nz, ti_start, ti_end, model_dates)
+    nlon, nlat = length(grid.lon), length(grid.lat)
+    rng = MersenneTwister(42)
+
+    # Group hourly timestep indices by calendar day
+    day_groups = Dict{Date, Vector{Int}}()
+    for ti in ti_start:ti_end
+        d = Date(model_dates[ti])
+        push!(get!(day_groups, d, Int[]), ti)
+    end
+    days_sorted = sort(collect(keys(day_groups)))
+    println("  Daily-mean mode: $(length(days_sorted)) days ($(days_sorted[1]) to $(days_sorted[end]))")
+
+    acc_dT_era5 = zeros(Float64, nz);  acc_dT_model = zeros(Float64, nz);  acc_dT_corr = zeros(Float64, nz)
+    acc_dq_era5 = zeros(Float64, nz);  acc_dq_model = zeros(Float64, nz);  acc_dq_corr = zeros(Float64, nz)
+    n_prof = 0;  n_valid_days = 0;  n_skipped_hours = 0
+
+    acc_dT_corr_zonal = zeros(Float64, nlat, nz)
+    acc_dq_corr_zonal = zeros(Float64, nlat, nz)
+    acc_dT_corr_sq = zeros(Float64, nz)
+    acc_dq_corr_sq = zeros(Float64, nz)
+
+    ts_dT = Float64[];  ts_dq = Float64[];  ts_dt = DateTime[]
+
+    hist_levels = level_indices_for_maps(nz)
+    hist_dT = Dict{Int, Vector{Float32}}(k => Float32[] for k in hist_levels)
+
+    n_samples_wanted = 12
+    s_era5 = Vector{Vector{Float32}}();  s_mod = Vector{Vector{Float32}}()
+    s_corr = Vector{Vector{Float32}}();  s_meta = Vector{String}()
+
+    mid_day_idx = max(1, length(days_sorted) ÷ 2)
+    dT_snap = zeros(Float32, nlon, nlat, nz)
+    dq_snap = zeros(Float32, nlon, nlat, nz)
+    snap_label = ""
+
+    for (di, day) in enumerate(days_sorted)
+        hours = day_groups[day]
+        @printf("  [daily] day %s  (%d hourly pairs)\n", day, length(hours))
+        flush(stdout)
+
+        dT_era5_acc = zeros(Float64, nlon, nlat, nz)
+        dT_mod_acc  = zeros(Float64, nlon, nlat, nz)
+        dq_era5_acc = zeros(Float64, nlon, nlat, nz)
+        dq_mod_acc  = zeros(Float64, nlon, nlat, nz)
+        n_hrs = 0
+
+        prev_dt_next_d = nothing
+        cache_t_d = Array{Float32}(undef, 0, 0, 0)
+        cache_q_d = Array{Float32}(undef, 0, 0, 0)
+
+        for ti in hours
+            dt_now = model_dates[ti];  dt_next = model_dates[ti + 1]
+            era5_now = load_era5_pressure(dt_now)
+            era5_next = load_era5_pressure(dt_next)
+            if era5_now === nothing || era5_next === nothing
+                n_skipped_hours += 1;  prev_dt_next_d = nothing;  continue
+            end
+
+            if prev_dt_next_d == dt_now
+                t_now_z, q_now_z = cache_t_d, cache_q_d
+            else
+                t_now_z, q_now_z = regrid_era5_to_model_z(era5_now, grid, z_idx)
+            end
+            t_next_z, q_next_z = regrid_era5_to_model_z(era5_next, grid, z_idx)
+            cache_t_d, cache_q_d, prev_dt_next_d = t_next_z, q_next_z, dt_next
+
+            ta_now_z  = ta_model[ti, :, :, z_idx];     ta_next_z  = ta_model[ti+1, :, :, z_idx]
+            hus_now_z = hus_model[ti, :, :, z_idx];     hus_next_z = hus_model[ti+1, :, :, z_idx]
+
+            dT_era5_acc .+= Float64.((t_next_z .- t_now_z) ./ DT)
+            dq_era5_acc .+= Float64.((q_next_z .- q_now_z) ./ DT)
+            dT_mod_acc  .+= Float64.((ta_next_z .- ta_now_z) ./ DT)
+            dq_mod_acc  .+= Float64.((hus_next_z .- hus_now_z) ./ DT)
+            n_hrs += 1
+        end
+
+        n_hrs == 0 && continue
+        n_valid_days += 1
+        inv_h = 1.0 / n_hrs
+        dT_era5_day = Float32.(dT_era5_acc .* inv_h)
+        dT_mod_day  = Float32.(dT_mod_acc .* inv_h)
+        dq_era5_day = Float32.(dq_era5_acc .* inv_h)
+        dq_mod_day  = Float32.(dq_mod_acc .* inv_h)
+        dT_corr_day = dT_era5_day .- dT_mod_day
+        dq_corr_day = dq_era5_day .- dq_mod_day
+
+        n_prof += nlon * nlat
+        for k in 1:nz
+            acc_dT_era5[k]  += sum(Float64, @view dT_era5_day[:, :, k])
+            acc_dT_model[k] += sum(Float64, @view dT_mod_day[:, :, k])
+            acc_dT_corr[k]  += sum(Float64, @view dT_corr_day[:, :, k])
+            acc_dq_era5[k]  += sum(Float64, @view dq_era5_day[:, :, k])
+            acc_dq_model[k] += sum(Float64, @view dq_mod_day[:, :, k])
+            acc_dq_corr[k]  += sum(Float64, @view dq_corr_day[:, :, k])
+        end
+        for k in 1:nz, j in 1:nlat
+            acc_dT_corr_zonal[j, k] += sum(Float64, @view dT_corr_day[:, j, k])
+            acc_dq_corr_zonal[j, k] += sum(Float64, @view dq_corr_day[:, j, k])
+        end
+        for k in 1:nz
+            acc_dT_corr_sq[k] += mapreduce(x -> Float64(x)^2, +, @view dT_corr_day[:, :, k])
+            acc_dq_corr_sq[k] += mapreduce(x -> Float64(x)^2, +, @view dq_corr_day[:, :, k])
+        end
+
+        push!(ts_dT, Float64(mean(dT_corr_day)));  push!(ts_dq, Float64(mean(dq_corr_day)))
+        push!(ts_dt, DateTime(day))
+
+        for k in hist_levels
+            slab = @view dT_corr_day[:, :, k]
+            stride = max(1, length(slab) ÷ 500)
+            append!(hist_dT[k], slab[1:stride:end])
+        end
+
+        if di == mid_day_idx
+            dT_snap .= dT_corr_day;  dq_snap .= dq_corr_day
+            snap_label = "daily-mean $day ($n_hrs hrs)"
+        end
+
+        if length(s_corr) < n_samples_wanted
+            for _ in 1:min(2, n_samples_wanted - length(s_corr))
+                i, j = rand(rng, 1:nlon), rand(rng, 1:nlat)
+                push!(s_era5, collect(Float32, dT_era5_day[i, j, :]))
+                push!(s_mod,  collect(Float32, dT_mod_day[i, j, :]))
+                push!(s_corr, collect(Float32, dT_corr_day[i, j, :]))
+                push!(s_meta, @sprintf("day=%s i=%d j=%d", day, i, j))
+            end
+        end
+    end
+
+    n_valid_days > 0 || error("No valid days — check ERA5_DIR and dates.")
+    z_km = Float32.(grid.z_ref[z_idx] ./ 1000.0)
+    inv_n = 1.0 / max(n_prof, 1)
+    mn(a) = Float32.(a .* inv_n)
+
+    return SanityResults(
+        z_km, nlon, nlat, nz, grid.lon, grid.lat,
+        mn(acc_dT_era5), mn(acc_dT_model), mn(acc_dT_corr),
+        mn(acc_dq_era5), mn(acc_dq_model), mn(acc_dq_corr),
+        Float64[], Float64[], 0.0, 0.0,
+        n_valid_days, n_skipped_hours, false,
+        acc_dT_corr_zonal, acc_dq_corr_zonal,
+        acc_dT_corr_sq, acc_dq_corr_sq, n_prof,
+        s_era5, s_mod, s_corr, s_meta,
+        dT_snap, dq_snap, snap_label,
+        ts_dT, ts_dq, ts_dt,
+        hist_levels, hist_dT,
+        "daily-mean",
+    )
+end
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared plotting
+# ─────────────────────────────────────────────────────────────────────────────
+function make_plots(r::SanityResults, out_dir::String)
+    mkpath(out_dir)
+    z_km = r.z_km
+
+    # ── 01: mean vertical profiles ──────────────────────────────────────
+    fig = Figure(size = (1000, 500))
+    ax1 = Axis(fig[1, 1]; xlabel = "dT/dt (K/hr)", ylabel = "Height (km)",
+               title = "Mean T tendencies ($(r.mode_label))")
+    lines!(ax1, r.mean_dT_era5 .* 3600, z_km; label = "ERA5", linewidth = 2)
+    lines!(ax1, r.mean_dT_model .* 3600, z_km; label = "Model", linewidth = 2)
+    lines!(ax1, r.mean_dT_corr .* 3600, z_km; label = "Correction", linewidth = 2, linestyle = :dash)
+    axislegend(ax1; position = :rt)
+    ax2 = Axis(fig[1, 2]; xlabel = "dq/dt (g/kg/hr)", ylabel = "Height (km)",
+               title = "Mean q tendencies ($(r.mode_label))")
+    lines!(ax2, r.mean_dq_era5 .* 3600 .* 1000, z_km; label = "ERA5", linewidth = 2)
+    lines!(ax2, r.mean_dq_model .* 3600 .* 1000, z_km; label = "Model", linewidth = 2)
+    lines!(ax2, r.mean_dq_corr .* 3600 .* 1000, z_km; label = "Correction", linewidth = 2, linestyle = :dash)
+    axislegend(ax2; position = :rt)
+    save(joinpath(out_dir, "01_mean_tendency_profiles.png"), fig; px_per_unit = 2)
+    println("Wrote 01_mean_tendency_profiles.png")
+
+    # ── 02/03: telescoping (hourly only) ─────────────────────────────────
+    if r.has_telescoping
+        for (idx, rms_z, unit, var, color) in [
+            ("02", r.rms_diff_T_z, "K", "T", :darkred),
+            ("03", r.rms_diff_q_z, "kg/kg", "q", :steelblue)]
+            f = Figure(size = (700, 500))
+            ax = Axis(f[1, 1]; xlabel = "RMS column error ($unit)", ylabel = "Height (km)",
+                       title = "Telescoping mismatch ($var) vs z")
+            lines!(ax, rms_z, z_km; linewidth = 2, color = color)
+            save(joinpath(out_dir, "$(idx)_integral_identity_rms_$(var).png"), f; px_per_unit = 2)
+            println("Wrote $(idx)_integral_identity_rms_$(var).png")
+        end
+    end
+
+    # ── 04: sample column profiles ─────────────────────────────────────
+    n_s = length(r.sample_dT_corr)
+    if n_s > 0
+        ncols = min(4, max(1, n_s));  nrows = cld(n_s, ncols)
+        f = Figure(size = (280 * ncols, 320 * nrows))
+        for p in 1:n_s
+            rc, cc = cld(p, ncols), mod1(p, ncols)
+            ax = Axis(f[rc, cc]; xlabel = "dT/dt (K/hr)",
+                       ylabel = cc == 1 ? "z (km)" : "", title = r.sample_meta[p])
+            lines!(ax, r.sample_dT_era5[p] .* 3600, z_km; label = "ERA5", linewidth = 1.5)
+            lines!(ax, r.sample_dT_mod[p] .* 3600, z_km; label = "Model", linewidth = 1.5)
+            lines!(ax, r.sample_dT_corr[p] .* 3600, z_km; label = "Corr", linewidth = 1.5, linestyle = :dash)
+            p == 1 && axislegend(ax; position = :rt, labelsize = 8)
+        end
+        Label(f[0, :], "Sample dT/dt profiles ($(r.mode_label))"; fontsize = 14)
+        save(joinpath(out_dir, "04_sample_column_profiles.png"), f; px_per_unit = 2)
+        println("Wrote 04_sample_column_profiles.png")
+    end
+
+    # ── 05/06: spatial maps (per-level colorscale) ─────────────────────
+    ks = level_indices_for_maps(r.nz);  nmaps = length(ks)
+    for (pnum, snap, unit, scale, label) in [
+        ("05", r.dT_corr_snapshot, "K/hr", 3600f0, "dT_corr"),
+        ("06", r.dq_corr_snapshot, "g/kg/hr", 3600f0 * 1000f0, "dq_corr")]
+        f = Figure(size = (320 * nmaps, 320))
+        Label(f[0, :], "$label ($unit)  $(r.snapshot_label)"; fontsize = 12)
+        slab = snap .* scale
+        for (ip, k) in enumerate(ks)
+            ax = Axis(f[1, ip]; aspect = DataAspect(), xlabel = "lon",
+                       ylabel = ip == 1 ? "lat" : "",
+                       title = @sprintf("z ≈ %.1f km", z_km[k]))
+            ld = slab[:, :, k]
+            cl = Float64(maximum(abs, ld; init = 1f-6))
+            hm = heatmap!(ax, r.lon, r.lat, ld; colormap = :balance, colorrange = (-cl, cl))
+            Colorbar(f[2, ip], hm; label = unit, vertical = false, flipaxis = false)
+        end
+        save(joinpath(out_dir, "$(pnum)_spatial_$(label)_levels.png"), f; px_per_unit = 2)
+        println("Wrote $(pnum)_spatial_$(label)_levels.png")
+    end
+
+    # ── 07: zonal-mean lat-height ──────────────────────────────────────
+    nd = max(r.n_prof ÷ r.nlat, 1)
+    zT = Float32.(r.acc_dT_corr_zonal ./ nd) .* 3600
+    zq = Float32.(r.acc_dq_corr_zonal ./ nd) .* 3600 .* 1000
+    f = Figure(size = (1000, 450))
+    for (col, zd, unit, ttl) in [(1, zT, "K/hr", "T"), (3, zq, "g/kg/hr", "q")]
+        ax = Axis(f[1, col]; xlabel = "Latitude", ylabel = "Height (km)",
+                   title = "Zonal-mean d$(ttl)_corr ($unit, $(r.mode_label))")
+        cl = Float64(maximum(abs, zd; init = 1f-6))
+        hm = heatmap!(ax, Float32.(r.lat), z_km, zd; colormap = :balance, colorrange = (-cl, cl))
+        Colorbar(f[1, col+1], hm; label = unit)
+    end
+    save(joinpath(out_dir, "07_zonal_mean_correction.png"), f; px_per_unit = 2)
+    println("Wrote 07_zonal_mean_correction.png")
+
+    # ── 08: RMS vs |mean| profiles ────────────────────────────────────
+    inv_np = 1.0 / max(r.n_prof, 1)
+    rms_dT = Float32.(sqrt.(r.acc_dT_corr_sq .* inv_np)) .* 3600
+    rms_dq = Float32.(sqrt.(r.acc_dq_corr_sq .* inv_np)) .* 3600 .* 1000
+    abs_mT = abs.(r.mean_dT_corr) .* 3600;  abs_mq = abs.(r.mean_dq_corr) .* 3600 .* 1000
+    f = Figure(size = (1000, 500))
+    for (col, rms, abm, unit, ttl, clr) in [
+        (1, rms_dT, abs_mT, "K/hr", "T", :firebrick),
+        (2, rms_dq, abs_mq, "g/kg/hr", "q", :steelblue)]
+        ax = Axis(f[1, col]; xlabel = unit, ylabel = "Height (km)",
+                   title = "$ttl correction: RMS vs |mean|")
+        lines!(ax, rms, z_km; label = "RMS", linewidth = 2, color = clr)
+        lines!(ax, abm, z_km; label = "|Mean|", linewidth = 2, color = clr, linestyle = :dash)
+        axislegend(ax; position = :rt)
+    end
+    save(joinpath(out_dir, "08_rms_vs_mean_profiles.png"), f; px_per_unit = 2)
+    println("Wrote 08_rms_vs_mean_profiles.png")
+
+    # ── 09: temporal evolution ─────────────────────────────────────────
+    n_ts = length(r.ts_dates)
+    if n_ts > 1
+        x_label = r.mode_label == "daily-mean" ? "Day index" : "Hours since start"
+        xs = r.mode_label == "daily-mean" ?
+             Float64.(1:n_ts) :
+             Float64[(r.ts_dates[i] - r.ts_dates[1]).value / 3600_000 for i in 1:n_ts]
+        f = Figure(size = (1000, 450))
+        ax1 = Axis(f[1, 1]; xlabel = x_label, ylabel = "K/hr",
+                    title = "Global-mean dT_corr vs time ($(r.mode_label))")
+        lines!(ax1, xs, r.ts_dT_corr_mean .* 3600; linewidth = 1.5, color = :firebrick)
+        hlines!(ax1, [0]; color = :gray, linestyle = :dot)
+        ax2 = Axis(f[1, 2]; xlabel = x_label, ylabel = "g/kg/hr",
+                    title = "Global-mean dq_corr vs time")
+        lines!(ax2, xs, r.ts_dq_corr_mean .* 3600 .* 1000; linewidth = 1.5, color = :steelblue)
+        hlines!(ax2, [0]; color = :gray, linestyle = :dot)
+        save(joinpath(out_dir, "09_temporal_evolution.png"), f; px_per_unit = 2)
+        println("Wrote 09_temporal_evolution.png")
+    end
+
+    # ── 10: histograms ────────────────────────────────────────────────
+    nhist = length(r.hist_levels)
+    f = Figure(size = (300 * min(nhist, 5), 350))
+    Label(f[0, :], "Distribution of dT_corr (K/hr, $(r.mode_label))"; fontsize = 13)
+    for (ip, k) in enumerate(r.hist_levels)
+        vals = r.hist_dT_data[k] .* 3600
+        ax = Axis(f[1, ip]; xlabel = "K/hr",
+                   ylabel = ip == 1 ? "Count" : "",
+                   title = @sprintf("z ≈ %.1f km", z_km[k]))
+        hist!(ax, vals; bins = 80, color = (:firebrick, 0.6))
+        vlines!(ax, [0]; color = :black, linestyle = :dot)
+    end
+    save(joinpath(out_dir, "10_histogram_dT_corr.png"), f; px_per_unit = 2)
+    println("Wrote 10_histogram_dT_corr.png")
+end
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────────────────────────────────────
+function next_sanity_index(base_dir)
+    isdir(base_dir) || return 1
+    existing = filter(d -> occursin(r"^\d{3}_", d), readdir(base_dir))
+    isempty(existing) && return 1
+    max_idx = maximum(parse(Int, m.match) for d in existing for m in eachmatch(r"^(\d{3})", d))
+    return max_idx + 1
+end
+
+function make_sanity_dir()
+    base = joinpath(@__DIR__, "sanity_tendency_plots")
+    idx = next_sanity_index(base)
+    tavg = TEMPORAL_AVERAGING == :daily ? "daily" : "hourly"
+    name = @sprintf("%03d_%s_d%d-%d", idx, tavg, TIME_DAY_START, TIME_DAY_END)
+    path = joinpath(base, name)
+    mkpath(path)
+    return path
+end
+
 function main()
-    out_dir = length(ARGS) >= 1 ? ARGS[1] : joinpath(@__DIR__, "sanity_tendency_plots")
+    out_dir = length(ARGS) >= 1 ? ARGS[1] : make_sanity_dir()
     mkpath(out_dir)
     println("Output directory: ", out_dir)
+    println("Temporal mode:    ", TEMPORAL_AVERAGING)
 
     println("Loading model grid...")
     grid = load_model_grid()
@@ -74,464 +622,46 @@ function main()
     println("  Time pairs: ti = $ti_start : $ti_end ($(model_dates[ti_start]) → $(model_dates[ti_end+1]))")
 
     println("Loading ta, hus...")
-    ta_model = load_model_var("ta")
-    hus_model = load_model_var("hus")
+    ta_mod = load_model_var("ta")
+    hus_mod = load_model_var("hus")
 
-    # Accumulators for mean profiles (all columns, valid pairs only)
-    acc_dT_era5 = zeros(Float64, nz)
-    acc_dT_model = zeros(Float64, nz)
-    acc_dT_corr = zeros(Float64, nz)
-    acc_dq_era5 = zeros(Float64, nz)
-    acc_dq_model = zeros(Float64, nz)
-    acc_dq_corr = zeros(Float64, nz)
-    n_prof = Ref(0)
-
-    # Integral identity: sum of d*corr * DT over valid pairs
-    sum_dT_corr_dt = zeros(Float64, nlon, nlat, nz)
-    sum_dq_corr_dt = zeros(Float64, nlon, nlat, nz)
-    n_skipped = Ref(0)
-    n_valid_pairs = Ref(0)
-
-    # Chain endpoints for direct delta (updated each valid pair)
-    era5_t0 = zeros(Float32, nlon, nlat, nz)
-    era5_t1 = zeros(Float32, nlon, nlat, nz)
-    q_era5_t0 = zeros(Float32, nlon, nlat, nz)
-    q_era5_t1 = zeros(Float32, nlon, nlat, nz)
-    model_t0 = zeros(Float32, nlon, nlat, nz)
-    model_t1 = zeros(Float32, nlon, nlat, nz)
-    hus_t0 = zeros(Float32, nlon, nlat, nz)
-    hus_t1 = zeros(Float32, nlon, nlat, nz)
-    chain_started = Ref(false)
-
-    # Sample profiles: store (dT_era5, dT_model, dT_corr) columns for a few draws
-    rng = MersenneTwister(42)
-    n_samples_wanted = 12
-    sample_dT_era5 = Vector{Vector{Float32}}()
-    sample_dT_mod = Vector{Vector{Float32}}()
-    sample_dT_corr = Vector{Vector{Float32}}()
-    sample_meta = Vector{String}()
-
-    # Zonal-mean accumulator: (nlat, nz) for latitude-height cross-section
-    acc_dT_corr_zonal = zeros(Float64, nlat, nz)
-    acc_dq_corr_zonal = zeros(Float64, nlat, nz)
-
-    # Per-level RMS accumulator
-    acc_dT_corr_sq = zeros(Float64, nz)
-    acc_dq_corr_sq = zeros(Float64, nz)
-
-    # Temporal evolution: mean correction per valid timestep
-    ts_dT_corr_mean = Float64[]
-    ts_dq_corr_mean = Float64[]
-    ts_dates = DateTime[]
-
-    # Histogram data: store all correction values at a few representative levels
-    hist_levels = level_indices_for_maps(nz)
-    hist_dT_data = Dict{Int, Vector{Float32}}(k => Float32[] for k in hist_levels)
-
-    # Snapshot for spatial maps: use valid timestep closest to ti_mid (ti_mid itself may be skipped)
-    ti_mid = (ti_start + ti_end) ÷ 2
-    dT_corr_snapshot = zeros(Float32, nlon, nlat, nz)
-    dq_corr_snapshot = zeros(Float32, nlon, nlat, nz)
-    snapshot_time = Ref{Union{Nothing, DateTime}}(nothing)
-    snapshot_ti = Ref{Int}(ti_mid)
-    best_snap_dist = Ref(typemax(Int))
-
-    # Cache regridded/interpolated ERA5 fields: the "next" of step ti becomes
-    # the "now" of step ti+1, cutting ERA5 I/O roughly in half.
-    prev_dt_next = nothing                        # DateTime of cached "next"
-    cache_t_next_z = Array{Float32}(undef, 0, 0, 0)
-    cache_q_next_z = Array{Float32}(undef, 0, 0, 0)
-
-    function regrid_era5_to_model_z(era5, grid, z_idx)
-        t_rg = regrid_horizontal(era5.t, era5.lon, era5.lat, grid.lon, grid.lat)
-        q_rg = regrid_horizontal(era5.q, era5.lon, era5.lat, grid.lon, grid.lat)
-        z_rg = regrid_horizontal(era5.z, era5.lon, era5.lat, grid.lon, grid.lat)
-        t_on_z = interp_vertical_3d(t_rg, z_rg, grid.z_phys)[:, :, z_idx]
-        q_on_z = interp_vertical_3d(q_rg, z_rg, grid.z_phys)[:, :, z_idx]
-        return t_on_z, q_on_z
+    r = if TEMPORAL_AVERAGING == :daily
+        process_daily(grid, ta_mod, hus_mod, z_idx, nz, ti_start, ti_end, model_dates)
+    else
+        process_hourly(grid, ta_mod, hus_mod, z_idx, nz, ti_start, ti_end, model_dates)
     end
 
-    for ti in ti_start:ti_end
-        dt_now = model_dates[ti]
-        dt_next = model_dates[ti + 1]
-
-        era5_now = load_era5_pressure(dt_now)
-        era5_next = load_era5_pressure(dt_next)
-        if era5_now === nothing || era5_next === nothing
-            n_skipped[] += 1
-            prev_dt_next = nothing   # invalidate cache on skip
-            continue
-        end
-        n_valid_pairs[] += 1
-
-        if ti == ti_start || ti % 24 == 0
-            @printf("  timestep %d / %d  %s\n", ti, ti_end, dt_now)
-            flush(stdout)
-        end
-
-        # Reuse cached "next" from previous iteration if available
-        if prev_dt_next == dt_now
-            t_now_z = cache_t_next_z
-            q_now_z = cache_q_next_z
-        else
-            t_now_z, q_now_z = regrid_era5_to_model_z(era5_now, grid, z_idx)
-        end
-
-        t_next_z, q_next_z = regrid_era5_to_model_z(era5_next, grid, z_idx)
-
-        # Cache this "next" for the following iteration
-        cache_t_next_z = t_next_z
-        cache_q_next_z = q_next_z
-        prev_dt_next = dt_next
-
-        ta_now_z = ta_model[ti, :, :, z_idx]
-        ta_next_z = ta_model[ti + 1, :, :, z_idx]
-        hus_now_z = hus_model[ti, :, :, z_idx]
-        hus_next_z = hus_model[ti + 1, :, :, z_idx]
-
-        dT_era5 = (t_next_z .- t_now_z) ./ DT
-        dq_era5 = (q_next_z .- q_now_z) ./ DT
-        dT_model = (ta_next_z .- ta_now_z) ./ DT
-        dq_model = (hus_next_z .- hus_now_z) ./ DT
-        dT_corr = dT_era5 .- dT_model
-        dq_corr = dq_era5 .- dq_model
-
-        # Mean profiles
-        n_prof[] += nlon * nlat
-        for k in 1:nz
-            acc_dT_era5[k] += sum(Float64, @view dT_era5[:, :, k])
-            acc_dT_model[k] += sum(Float64, @view dT_model[:, :, k])
-            acc_dT_corr[k] += sum(Float64, @view dT_corr[:, :, k])
-            acc_dq_era5[k] += sum(Float64, @view dq_era5[:, :, k])
-            acc_dq_model[k] += sum(Float64, @view dq_model[:, :, k])
-            acc_dq_corr[k] += sum(Float64, @view dq_corr[:, :, k])
-        end
-
-        # Zonal-mean cross-section (average over longitudes)
-        for k in 1:nz, j in 1:nlat
-            acc_dT_corr_zonal[j, k] += sum(Float64, @view dT_corr[:, j, k])
-            acc_dq_corr_zonal[j, k] += sum(Float64, @view dq_corr[:, j, k])
-        end
-
-        # Per-level sum-of-squares for RMS
-        for k in 1:nz
-            acc_dT_corr_sq[k] += mapreduce(x -> Float64(x)^2, +, @view dT_corr[:, :, k])
-            acc_dq_corr_sq[k] += mapreduce(x -> Float64(x)^2, +, @view dq_corr[:, :, k])
-        end
-
-        # Temporal evolution
-        push!(ts_dT_corr_mean, Float64(mean(dT_corr)))
-        push!(ts_dq_corr_mean, Float64(mean(dq_corr)))
-        push!(ts_dates, dt_now)
-
-        # Histogram samples at representative levels (subsample to keep memory bounded)
-        for k in hist_levels
-            slab = @view dT_corr[:, :, k]
-            stride = max(1, length(slab) ÷ 500)
-            append!(hist_dT_data[k], slab[1:stride:end])
-        end
-
-        sum_dT_corr_dt .+= Float64.(dT_corr) .* Float64(DT)
-        sum_dq_corr_dt .+= Float64.(dq_corr) .* Float64(DT)
-
-        if !chain_started[]
-            era5_t0 .= t_now_z
-            q_era5_t0 .= q_now_z
-            model_t0 .= ta_now_z
-            hus_t0 .= hus_now_z
-            chain_started[] = true
-        end
-        era5_t1 .= t_next_z
-        q_era5_t1 .= q_next_z
-        model_t1 .= ta_next_z
-        hus_t1 .= hus_next_z
-
-        dist_snap = abs(ti - ti_mid)
-        if dist_snap < best_snap_dist[]
-            best_snap_dist[] = dist_snap
-            dT_corr_snapshot .= dT_corr
-            dq_corr_snapshot .= dq_corr
-            snapshot_time[] = dt_now
-            snapshot_ti[] = ti
-        end
-
-        # Random sample columns for profile plots (spread across timesteps)
-        if length(sample_dT_corr) < n_samples_wanted
-            n_draw = min(2, n_samples_wanted - length(sample_dT_corr))
-            for _ in 1:n_draw
-                i = rand(rng, 1:nlon)
-                j = rand(rng, 1:nlat)
-                push!(sample_dT_era5, collect(Float32, dT_era5[i, j, :]))
-                push!(sample_dT_mod, collect(Float32, dT_model[i, j, :]))
-                push!(sample_dT_corr, collect(Float32, dT_corr[i, j, :]))
-                push!(sample_meta, @sprintf("ti=%d i=%d j=%d %s", ti, i, j, dt_now))
-            end
-        end
-    end
-
-    if !chain_started[]
-        error("No valid ERA5 pairs in the requested time window — check ERA5_DIR and dates.")
-    end
-
-    z_km = Float32.(grid.z_ref[z_idx] ./ 1000.0)
-
-    mean_dT_era5 = Float32.(acc_dT_era5 ./ max(n_prof[], 1))
-    mean_dT_model = Float32.(acc_dT_model ./ max(n_prof[], 1))
-    mean_dT_corr = Float32.(acc_dT_corr ./ max(n_prof[], 1))
-    mean_dq_era5 = Float32.(acc_dq_era5 ./ max(n_prof[], 1))
-    mean_dq_model = Float32.(acc_dq_model ./ max(n_prof[], 1))
-    mean_dq_corr = Float32.(acc_dq_corr ./ max(n_prof[], 1))
-
-    # Direct residual over the integrated chain
-    direct_dT = era5_t1 .- era5_t0 .- (model_t1 .- model_t0)
-    direct_dq = q_era5_t1 .- q_era5_t0 .- (hus_t1 .- hus_t0)
-
-    diff_T = sum_dT_corr_dt .- Float64.(direct_dT)
-    diff_q = sum_dq_corr_dt .- Float64.(direct_dq)
-
-    rms_diff_T_z = [sqrt(mean(diff_T[:, :, k] .^ 2)) for k in 1:nz]
-    rms_diff_q_z = [sqrt(mean(diff_q[:, :, k] .^ 2)) for k in 1:nz]
-    max_abs_diff_T = maximum(abs, diff_T)
-    max_abs_diff_q = maximum(abs, diff_q)
-
+    # Print summary
     println()
-    println("=== Hourly pair statistics ===")
-    @printf("  Valid hourly pairs: %d   Skipped (missing ERA5): %d\n", n_valid_pairs[], n_skipped[])
-    if n_skipped[] > 0
-        @warn "Skipped model hours break the telescoping check: sum(d*corr*dt) uses only processed pairs, while direct delta uses ERA5/model at the first and last valid pair endpoints. Expect nonzero mismatch if gaps exist."
-    end
+    println("=== $(r.mode_label) statistics ===")
+    @printf("  Valid %s: %d   Skipped ERA5 hours: %d\n",
+            r.mode_label == "daily-mean" ? "days" : "pairs", r.n_valid, r.n_skipped)
 
-    println()
-    println("=== Telescoping identity (full horizontal column, all levels) ===")
-    @printf("  max |sum(dT_corr*dt) - direct_delta_T| : %.3e K\n", max_abs_diff_T)
-    @printf("  max |sum(dq_corr*dt) - direct_delta_q| : %.3e kg/kg\n", max_abs_diff_q)
-    @printf("  RMS of column mismatch, T (all lev): %.3e K\n", sqrt(mean(diff_T .^ 2)))
-    @printf("  RMS of column mismatch, q (all lev): %.3e kg/kg\n", sqrt(mean(diff_q .^ 2)))
+    if r.has_telescoping
+        if r.n_skipped > 0
+            @warn "Skipped hours break the telescoping identity — expect nonzero mismatch."
+        end
+        println()
+        println("=== Telescoping identity ===")
+        @printf("  max |sum(dT_corr*dt) - direct_delta_T| : %.3e K\n", r.max_abs_diff_T)
+        @printf("  max |sum(dq_corr*dt) - direct_delta_q| : %.3e kg/kg\n", r.max_abs_diff_q)
+    end
 
     open(joinpath(out_dir, "sanity_summary.txt"), "w") do io
         println(io, "sanity_check_compute_tendencies.jl")
+        println(io, "mode=", r.mode_label)
         println(io, "MODEL_DIR=", MODEL_DIR)
         println(io, "ERA5_DIR=", ERA5_DIR)
         println(io, "TIME_DAY_START=", TIME_DAY_START, " TIME_DAY_END=", TIME_DAY_END)
-        println(io, "Z_MAX=", Z_MAX, " nz=", nz)
-        println(io, "ti_start=", ti_start, " ti_end=", ti_end)
-        println(io, "valid_hourly_pairs=", n_valid_pairs[])
-        println(io, "skipped_era5_pairs=", n_skipped[])
-        println(io, "snapshot_ti=", snapshot_ti[])
-        println(io, "note_telescoping=Exact only if every hour in [ti_start,ti_end] has ERA5 pairs (no skips).")
-        @printf(io, "max_abs_diff_T_K %.6e\n", max_abs_diff_T)
-        @printf(io, "max_abs_diff_q_kgkg %.6e\n", max_abs_diff_q)
-        @printf(io, "rms_diff_T_K %.6e\n", sqrt(mean(diff_T .^ 2)))
-        @printf(io, "rms_diff_q_kgkg %.6e\n", sqrt(mean(diff_q .^ 2)))
-    end
-
-    # ── Plot: mean vertical profiles (K/hr, g/kg/hr) ─────────────────────
-    fig_mean = Figure(size = (1000, 500))
-    ax1 = Axis(
-        fig_mean[1, 1];
-        xlabel = "dT/dt (K/hr)",
-        ylabel = "Height (km)",
-        title = "Mean vertical profiles (computed hourly)",
-    )
-    lines!(ax1, mean_dT_era5 .* 3600, z_km; label = "ERA5 dT/dt", linewidth = 2)
-    lines!(ax1, mean_dT_model .* 3600, z_km; label = "Model dT/dt", linewidth = 2)
-    lines!(ax1, mean_dT_corr .* 3600, z_km; label = "Correction (ERA5−model)", linewidth = 2, linestyle = :dash)
-    axislegend(ax1; position = :rt)
-
-    ax2 = Axis(
-        fig_mean[1, 2];
-        xlabel = "dq/dt (g/kg/hr)",
-        ylabel = "Height (km)",
-        title = "Mean moisture tendencies",
-    )
-    lines!(ax2, mean_dq_era5 .* 3600 .* 1000, z_km; label = "ERA5", linewidth = 2)
-    lines!(ax2, mean_dq_model .* 3600 .* 1000, z_km; label = "Model", linewidth = 2)
-    lines!(ax2, mean_dq_corr .* 3600 .* 1000, z_km; label = "Correction", linewidth = 2, linestyle = :dash)
-    axislegend(ax2; position = :rt)
-
-    save(joinpath(out_dir, "01_mean_tendency_profiles.png"), fig_mean; px_per_unit = 2)
-    println("Wrote ", joinpath(out_dir, "01_mean_tendency_profiles.png"))
-
-    # ── Plot: telescoping error vs height ──────────────────────────────────
-    fig_err = Figure(size = (700, 500))
-    axe = Axis(
-        fig_err[1, 1];
-        xlabel = "RMS column error (K)",
-        ylabel = "Height (km)",
-        title = "RMS(|Σ dT_corr Δt − ΔT_residual|) vs z",
-    )
-    lines!(axe, rms_diff_T_z, z_km; linewidth = 2, color = :darkred)
-    save(joinpath(out_dir, "02_integral_identity_rms_T.png"), fig_err; px_per_unit = 2)
-    println("Wrote ", joinpath(out_dir, "02_integral_identity_rms_T.png"))
-
-    fig_errq = Figure(size = (700, 500))
-    axq = Axis(
-        fig_errq[1, 1];
-        xlabel = "RMS column error (kg/kg)",
-        ylabel = "Height (km)",
-        title = "RMS(|Σ dq_corr Δt − Δq_residual|) vs z",
-    )
-    lines!(axq, rms_diff_q_z, z_km; linewidth = 2, color = :steelblue)
-    save(joinpath(out_dir, "03_integral_identity_rms_q.png"), fig_errq; px_per_unit = 2)
-    println("Wrote ", joinpath(out_dir, "03_integral_identity_rms_q.png"))
-
-    # ── Plot: sample columns ────────────────────────────────────────────────
-    n_s = length(sample_dT_corr)
-    if n_s > 0
-        ncols = min(4, max(1, n_s))
-        nrows = cld(n_s, ncols)
-        fig_samp = Figure(size = (280 * ncols, 320 * nrows))
-        for p in 1:n_s
-            r = cld(p, ncols)
-            c = mod1(p, ncols)
-            ax = Axis(
-                fig_samp[r, c];
-                xlabel = "dT/dt (K/hr)",
-                ylabel = c == 1 ? "z (km)" : "",
-                title = sample_meta[p],
-            )
-            lines!(ax, sample_dT_era5[p] .* 3600, z_km; label = "ERA5", linewidth = 1.5)
-            lines!(ax, sample_dT_mod[p] .* 3600, z_km; label = "Model", linewidth = 1.5)
-            lines!(ax, sample_dT_corr[p] .* 3600, z_km; label = "Corr", linewidth = 1.5, linestyle = :dash)
-            p == 1 && axislegend(ax; position = :rt, labelsize = 8)
+        println(io, "Z_MAX=", Z_MAX, " nz=", r.nz)
+        println(io, "valid=", r.n_valid, " skipped_hours=", r.n_skipped)
+        if r.has_telescoping
+            @printf(io, "max_abs_diff_T_K %.6e\n", r.max_abs_diff_T)
+            @printf(io, "max_abs_diff_q_kgkg %.6e\n", r.max_abs_diff_q)
         end
-        Label(fig_samp[0, :], "Sample hourly dT/dt profiles"; fontsize = 14)
-        save(joinpath(out_dir, "04_sample_column_profiles.png"), fig_samp; px_per_unit = 2)
-        println("Wrote ", joinpath(out_dir, "04_sample_column_profiles.png"))
-    else
-        @warn "No sample columns collected; skipping 04_sample_column_profiles.png"
     end
 
-    # ── Spatial maps with PER-LEVEL colorscale ──────────────────────────────
-    ks = level_indices_for_maps(nz)
-    nmaps = length(ks)
-    lon = grid.lon
-    lat = grid.lat
-    snap_str = something(snapshot_time[], model_dates[ti_mid])
-    snap_ti = snapshot_ti[]
-
-    # T correction
-    fig_map = Figure(size = (320 * nmaps, 320))
-    Label(fig_map[0, :], "dT_corr (K/hr) snapshot: $snap_str (ti=$snap_ti)"; fontsize = 12)
-    slab_Khr = dT_corr_snapshot .* 3600
-    for (ip, k) in enumerate(ks)
-        ax = Axis(
-            fig_map[1, ip];
-            aspect = DataAspect(),
-            xlabel = "lon",
-            ylabel = ip == 1 ? "lat" : "",
-            title = @sprintf("z ≈ %.1f km (k=%d)", z_km[k], k),
-        )
-        level_data = slab_Khr[:, :, k]
-        clev = Float64(maximum(abs, level_data; init = 1f-6))
-        hm = heatmap!(ax, lon, lat, level_data; colormap = :balance,
-                       colorrange = (-clev, clev))
-        Colorbar(fig_map[2, ip], hm; label = "K/hr", vertical = false,
-                 flipaxis = false)
-    end
-    save(joinpath(out_dir, "05_spatial_dT_corr_levels.png"), fig_map; px_per_unit = 2)
-    println("Wrote ", joinpath(out_dir, "05_spatial_dT_corr_levels.png"))
-
-    # q correction
-    fig_mapq = Figure(size = (320 * nmaps, 320))
-    Label(fig_mapq[0, :], "dq_corr (g/kg/hr) snapshot: $snap_str (ti=$snap_ti)"; fontsize = 12)
-    slab_qhr = dq_corr_snapshot .* 3600 .* 1000
-    for (ip, k) in enumerate(ks)
-        ax = Axis(
-            fig_mapq[1, ip];
-            aspect = DataAspect(),
-            xlabel = "lon",
-            ylabel = ip == 1 ? "lat" : "",
-            title = @sprintf("z ≈ %.1f km (k=%d)", z_km[k], k),
-        )
-        level_data = slab_qhr[:, :, k]
-        clev = Float64(maximum(abs, level_data; init = 1f-6))
-        hm = heatmap!(ax, lon, lat, level_data; colormap = :balance,
-                       colorrange = (-clev, clev))
-        Colorbar(fig_mapq[2, ip], hm; label = "g/kg/hr", vertical = false,
-                 flipaxis = false)
-    end
-    save(joinpath(out_dir, "06_spatial_dq_corr_levels.png"), fig_mapq; px_per_unit = 2)
-    println("Wrote ", joinpath(out_dir, "06_spatial_dq_corr_levels.png"))
-
-    # ── Zonal-mean latitude-height cross-section ─────────────────────────
-    n_zonal_denom = max(n_prof[] ÷ nlat, 1)  # nlon * n_valid_pairs
-    zonal_dT = Float32.(acc_dT_corr_zonal ./ (n_zonal_denom)) .* 3600
-    zonal_dq = Float32.(acc_dq_corr_zonal ./ (n_zonal_denom)) .* 3600 .* 1000
-
-    fig_zonal = Figure(size = (1000, 450))
-    ax_z1 = Axis(fig_zonal[1, 1]; xlabel = "Latitude", ylabel = "Height (km)",
-                  title = "Zonal-mean dT_corr (K/hr)")
-    clim_z1 = Float64(maximum(abs, zonal_dT; init = 1f-6))
-    hm_z1 = heatmap!(ax_z1, Float32.(grid.lat), z_km, zonal_dT;
-                      colormap = :balance, colorrange = (-clim_z1, clim_z1))
-    Colorbar(fig_zonal[1, 2], hm_z1; label = "K/hr")
-
-    ax_z2 = Axis(fig_zonal[1, 3]; xlabel = "Latitude", ylabel = "Height (km)",
-                  title = "Zonal-mean dq_corr (g/kg/hr)")
-    clim_z2 = Float64(maximum(abs, zonal_dq; init = 1f-6))
-    hm_z2 = heatmap!(ax_z2, Float32.(grid.lat), z_km, zonal_dq;
-                      colormap = :balance, colorrange = (-clim_z2, clim_z2))
-    Colorbar(fig_zonal[1, 4], hm_z2; label = "g/kg/hr")
-    save(joinpath(out_dir, "07_zonal_mean_correction.png"), fig_zonal; px_per_unit = 2)
-    println("Wrote ", joinpath(out_dir, "07_zonal_mean_correction.png"))
-
-    # ── RMS and std vertical profiles of correction ──────────────────────
-    rms_dT_corr = Float32.(sqrt.(acc_dT_corr_sq ./ max(n_prof[], 1))) .* 3600
-    rms_dq_corr = Float32.(sqrt.(acc_dq_corr_sq ./ max(n_prof[], 1))) .* 3600 .* 1000
-    abs_mean_dT = abs.(mean_dT_corr) .* 3600
-    abs_mean_dq = abs.(mean_dq_corr) .* 3600 .* 1000
-
-    fig_rms = Figure(size = (1000, 500))
-    ax_r1 = Axis(fig_rms[1, 1]; xlabel = "K/hr", ylabel = "Height (km)",
-                  title = "T correction: RMS vs |mean|")
-    lines!(ax_r1, rms_dT_corr, z_km; label = "RMS", linewidth = 2, color = :firebrick)
-    lines!(ax_r1, abs_mean_dT, z_km; label = "|Mean|", linewidth = 2, color = :firebrick,
-           linestyle = :dash)
-    axislegend(ax_r1; position = :rt)
-
-    ax_r2 = Axis(fig_rms[1, 2]; xlabel = "g/kg/hr", ylabel = "Height (km)",
-                  title = "q correction: RMS vs |mean|")
-    lines!(ax_r2, rms_dq_corr, z_km; label = "RMS", linewidth = 2, color = :steelblue)
-    lines!(ax_r2, abs_mean_dq, z_km; label = "|Mean|", linewidth = 2, color = :steelblue,
-           linestyle = :dash)
-    axislegend(ax_r2; position = :rt)
-    save(joinpath(out_dir, "08_rms_vs_mean_profiles.png"), fig_rms; px_per_unit = 2)
-    println("Wrote ", joinpath(out_dir, "08_rms_vs_mean_profiles.png"))
-
-    # ── Temporal evolution of mean correction ─────────────────────────────
-    n_ts = length(ts_dates)
-    if n_ts > 1
-        hours = Float64[(ts_dates[i] - ts_dates[1]).value / 3600_000 for i in 1:n_ts]
-        fig_ts = Figure(size = (1000, 450))
-        ax_t1 = Axis(fig_ts[1, 1]; xlabel = "Hours since start", ylabel = "K/hr",
-                      title = "Global-mean dT_corr vs time")
-        lines!(ax_t1, hours, ts_dT_corr_mean .* 3600; linewidth = 1.5, color = :firebrick)
-        hlines!(ax_t1, [0]; color = :gray, linestyle = :dot)
-
-        ax_t2 = Axis(fig_ts[1, 2]; xlabel = "Hours since start", ylabel = "g/kg/hr",
-                      title = "Global-mean dq_corr vs time")
-        lines!(ax_t2, hours, ts_dq_corr_mean .* 3600 .* 1000; linewidth = 1.5, color = :steelblue)
-        hlines!(ax_t2, [0]; color = :gray, linestyle = :dot)
-        save(joinpath(out_dir, "09_temporal_evolution.png"), fig_ts; px_per_unit = 2)
-        println("Wrote ", joinpath(out_dir, "09_temporal_evolution.png"))
-    end
-
-    # ── Histograms of correction at representative levels ─────────────────
-    n_hist = length(hist_levels)
-    fig_hist = Figure(size = (300 * min(n_hist, 5), 350))
-    Label(fig_hist[0, :], "Distribution of dT_corr (K/hr) by level"; fontsize = 13)
-    for (ip, k) in enumerate(hist_levels)
-        vals = hist_dT_data[k] .* 3600
-        ax = Axis(fig_hist[1, ip]; xlabel = "K/hr",
-                   ylabel = ip == 1 ? "Count" : "",
-                   title = @sprintf("z ≈ %.1f km", z_km[k]))
-        hist!(ax, vals; bins = 80, color = (:firebrick, 0.6))
-        vlines!(ax, [0]; color = :black, linestyle = :dot)
-    end
-    save(joinpath(out_dir, "10_histogram_dT_corr.png"), fig_hist; px_per_unit = 2)
-    println("Wrote ", joinpath(out_dir, "10_histogram_dT_corr.png"))
-
+    make_plots(r, out_dir)
     println("\nDone.")
 end
 

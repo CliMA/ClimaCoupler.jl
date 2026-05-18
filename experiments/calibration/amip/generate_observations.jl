@@ -5,15 +5,9 @@ import ClimaCoupler
 import ClimaCoupler: CalibrationTools
 import JLD2
 
-include(
-    joinpath(
-        pkgdir(ClimaCoupler),
-        "experiments",
-        "calibration",
-        "amip",
-        "run_calibration.jl",
-    ),
-)
+# Load configuration (TEST_CALIBRATION env var selects test vs. production config)
+include(joinpath(@__DIR__, "load_config.jl"))
+
 include(
     joinpath(
         pkgdir(ClimaCoupler),

@@ -12,6 +12,14 @@ Usage (CPU, multi-threaded — recommended):
     julia -t 24 --project=. train_flux_correction.jl
 Usage (GPU via SLURM):
     sbatch run_training.sbatch
+Usage (interactive GPU session):
+    see gpu_session.sh
+
+Dependency note:
+    WeightInitializers must be pinned to v1.0.5. Newer versions have a broken
+    CUDA extension (cuRAND.RNG removed in CUDA.jl v6). After any Pkg.add or
+    Pkg.update, re-pin with:
+        Pkg.add(name="WeightInitializers", version="1.0.5")
 =#
 
 using NCDatasets
@@ -30,10 +38,12 @@ using CairoMakie
 
 # GPU support — set USE_GPU=true via environment variable to enable.
 # On SLURM GPU jobs, the sbatch script sets this before launching.
+# Note: we use LuxCUDA (which bundles cuDNN) and set local_toolkit=false in
+# LocalPreferences.toml so cuDNN is loaded from Julia artifacts, not /usr/local/cuda.
 const USE_GPU = get(ENV, "USE_GPU", "false") == "true" && let
     local gpu_avail = false
     try
-        @eval using CUDA
+        @eval using LuxCUDA
         gpu_avail = CUDA.functional()
     catch e
         @warn "CUDA loading failed, falling back to CPU" exception=e
@@ -42,7 +52,7 @@ const USE_GPU = get(ENV, "USE_GPU", "false") == "true" && let
 end
 
 if USE_GPU
-    println("GPU detected: ", CUDA.device())
+    println("GPU: ", CUDA.device(), " — ", CUDA.name(CUDA.device()))
     const DEV = gpu_device()
 else
     println("Running on CPU")

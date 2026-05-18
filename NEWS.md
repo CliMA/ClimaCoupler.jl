@@ -4,6 +4,12 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Update SST, SIC at monthly frequency PR[#1926](https://github.com/CliMA/ClimaCoupler.jl/pull/1926)
+For prescribed ocean and sea ice models, read in SST and SIC
+data monthly instead of at the model timestep. These data have
+monthly averages, so it doesn't make sense to interpolate them
+to more than daily.
+
 #### Remove perfect model calibration experiment PR[#1835](https://github.com/CliMA/ClimaCoupler.jl/pull/1835)
 Remove some GPU jobs from CI to reduce impact of long wait times.
 Also deletes the perfect model calibration altogether, which is

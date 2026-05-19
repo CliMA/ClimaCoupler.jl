@@ -539,11 +539,6 @@ function FluxCalculator.ocean_seaice_fluxes!(
     ρτxio = ice_sim.ocean_ice_interface.fluxes.x_momentum # sea_ice - ocean zonal momentum flux
     ρτyio = ice_sim.ocean_ice_interface.fluxes.y_momentum # sea_ice - ocean meridional momentum flux
 
-    # mask out the poles
-    polar_mask = ocean_sim.remapping.polar_mask
-    @. ρτxio = polar_mask * ρτxio
-    @. ρτyio = polar_mask * ρτyio
-
     # Update the momentum flux contributions from ocean/sea ice fluxes
     arch = OC.Architectures.architecture(grid)
     OC.Utils.launch!(
@@ -565,15 +560,11 @@ function FluxCalculator.ocean_seaice_fluxes!(
     oc_flux_T = surface_flux(ocean_sim.ocean.model.tracers.T)
     heat_flux = OC.interior(ocean_sim.remapping.scratch_cc1, :, :, 1)
     heat_flux .= OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
-    # mask out the poles
-    @. heat_flux = polar_mask * heat_flux
     OC.interior(oc_flux_T, :, :, 1) .+= heat_flux
 
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
     salt_contrib = OC.interior(ocean_sim.remapping.scratch_cc2, :, :, 1)
     salt_contrib .= OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
-    # mask out the poles
-    @. salt_contrib = polar_mask * salt_contrib
     OC.interior(oc_flux_S, :, :, 1) .+= salt_contrib
 
     return nothing

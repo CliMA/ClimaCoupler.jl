@@ -2,7 +2,7 @@
 
 julia_version = "1.11.9"
 manifest_format = "2.0"
-project_hash = "d3655dc3b849cb42ad1f3976bb67445240646efd"
+project_hash = "ffb8414753aaed439d19e599e119e4e795b9030a"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -2372,9 +2372,9 @@ version = "0.5.5"
 
 [[deps.Oceananigans]]
 deps = ["Adapt", "Crayons", "CubedSphere", "Dates", "Distances", "DocStringExtensions", "FFTW", "GPUArraysCore", "Glob", "InteractiveUtils", "JLD2", "KernelAbstractions", "Krylov", "LinearAlgebra", "Logging", "MPI", "MuladdMacro", "OffsetArrays", "OrderedCollections", "Pkg", "Printf", "ReactantCore", "Rotations", "SeawaterPolynomials", "SparseArrays", "StaticArrays", "Statistics", "StructArrays"]
-git-tree-sha1 = "b91e5bea8b0f2bf735f3c9b1a1a9ed64a22df8bf"
+git-tree-sha1 = "ccdb005c9c13ba360512415d627a764ac5296e66"
 uuid = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
-version = "0.107.6"
+version = "0.107.7"
 
     [deps.Oceananigans.extensions]
     OceananigansAMDGPUExt = ["AMDGPU", "AbstractFFTs"]
@@ -2385,7 +2385,6 @@ version = "0.107.6"
     OceananigansNCDatasetsExt = "NCDatasets"
     OceananigansOneAPIExt = "oneAPI"
     OceananigansReactantExt = ["Reactant", "KernelAbstractions", "ConstructionBase", "AbstractFFTs"]
-    OceananigansXESMFExt = ["XESMF"]
 
     [deps.Oceananigans.weakdeps]
     AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
@@ -2398,7 +2397,6 @@ version = "0.107.6"
     Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
     NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
     Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
-    XESMF = "2e0b0046-e7a1-486f-88de-807ee8ffabe5"
     oneAPI = "8f75cd03-7ff8-4ecb-9b8f-daf728133b1b"
 
 [[deps.OffsetArrays]]

@@ -62,31 +62,51 @@ end
 # ─────────────────────────────────────────────────────────────────────────────
 # Configuration
 # ─────────────────────────────────────────────────────────────────────────────
-# const MODEL_DIR = "/home/cchristo/clima/ClimaCoupler.jl/output/wxquest_progedmf/output_0004/clima_atmos"
-const MODEL_DIR = "/net/sampo/data1/cchristo/coupler_runs/copies/wxquest_progedmf/output_0008/clima_atmos"
-const ERA5_DIR  = "/net/sampo/data1/wxquest_data/hourly_stats/ml_correct_v1"
+# ── Data source ───────────────────────────────────────────────────────────────
+# :daily_era5  — pre-computed daily-mean ERA5 files + model 1d_average output (default)
+# :hourly_era5 — hourly ERA5 snapshots + model 1h_inst output (legacy)
+const DATA_SOURCE = :daily_era5
+# const DATA_SOURCE = :hourly_era5
 
-const DT = 3600.0f0  # hourly data
+# Paths for :hourly_era5 mode
+const MODEL_DIR_HOURLY = "/net/sampo/data1/cchristo/coupler_runs/copies/wxquest_progedmf/output_0008/clima_atmos"
+const ERA5_DIR_HOURLY  = "/net/sampo/data1/wxquest_data/hourly_stats/ml_correct_v1"
 
-const Z_MAX = 20_000.0f0  # only train on levels below this height (m)
+# Paths for :daily_era5 mode
+const MODEL_DIR_DAILY  = "/net/sampo/data1/cchristo/coupler_runs/wxquest_progedmf/wxquest_progedmf/output_0005/clima_atmos"
+const ERA5_DIR_DAILY   = "/net/sampo/data1/wxquest_data/daily_weekly_stats/daily_weekly_stats_v0.2_pres_levels"
 
-const N_EPOCHS       = 100
+# Active directories (set by DATA_SOURCE)
+const MODEL_DIR = DATA_SOURCE == :daily_era5 ? MODEL_DIR_DAILY : MODEL_DIR_HOURLY
+const ERA5_DIR  = DATA_SOURCE == :daily_era5 ? ERA5_DIR_DAILY  : ERA5_DIR_HOURLY
+
+const DT = DATA_SOURCE == :daily_era5 ? 86400.0f0 : 3600.0f0
+
+const Z_MAX = 15_000.0f0  # only train on levels below this height (m)
+
+const N_EPOCHS       = 500
+# const N_EPOCHS       = 10
 const BATCH_SIZE     = 1024
 const LEARNING_RATE  = 1f-3
 const LR_MIN         = 1f-5    # cosine annealing floor
 const TRAIN_FRACTION = 0.8
-const HIDDEN_DIM     = 128
+# const HIDDEN_DIM     = 128
+# const HIDDEN_DIM     = 256
+const HIDDEN_DIM     = 512
 const PATIENCE       = 15     # early stopping: stop after this many epochs without improvement
-const DROPOUT_RATE   = 0.1f0  # spatial dropout between conv layers
+const DROPOUT_RATE   = 0.15f0  # spatial dropout between conv layers
 
 # const WEIGHT_DECAY       = 1f-3  # AdamW L2 regularisation
-const WEIGHT_DECAY       = 3f-4  # AdamW L2 regularisation
-const FLUX_SMOOTH_WEIGHT = 1f-4  # light penalty on flux curvature
+# const WEIGHT_DECAY       = 3f-4  # AdamW L2 regularisation
+const WEIGHT_DECAY       = 1f-4  # AdamW L2 regularisation
+const FLUX_SMOOTH_WEIGHT = 1f-2  # light penalty on flux curvature
 
 const ARCHITECTURE       = :cnn    # :unet, :mlp, or :cnn
-const TEMPORAL_AVERAGING = :daily  # :hourly or :daily
+const TEMPORAL_AVERAGING = :daily  # :hourly or :daily (only used for :hourly_era5 mode)
 const PREDICT_MODE       = :direct # :flux (predict fluxes, loss on -dF/dz) or :direct (predict tendencies)
-const TARGET_VARS        = :T      # :both, :T (temperature only), or :q (moisture only)
+# const TARGET_VARS        = :T      # :both, :T (temperature only), or :q (moisture only)
+const TARGET_VARS        = :both
+# const TARGET_VARS        = :q
 
 # ── Input features ───────────────────────────────────────────────────────────
 # Each entry is (netcdf_varname, transform) where transform is applied per-element
@@ -108,11 +128,13 @@ n_target_vars() = TARGET_VARS == :both ? 2 : 1
 # Time window: only use model timesteps within this day range (1-indexed from
 # the start of the run). Set to (1, Inf) to use all available timesteps.
 const TIME_DAY_START = 3       # skip first 2 days (spinup)
-const TIME_DAY_END   = 8      # through end of day 8
+# const TIME_DAY_END   = DATA_SOURCE == :daily_era5 ? 14 : 8
+# const TIME_DAY_END   = DATA_SOURCE == :daily_era5 ? 30 : 8
+const TIME_DAY_END   = 8     # for quick testing
 
 # Spatial subsampling: randomly keep this fraction of columns per timestep.
 # Set to 1.0 to use all columns (no subsampling).
-const COLUMN_SUBSAMPLE_FRACTION = 0.10   # 20% of 192×96 ≈ 3686 columns per step
+const COLUMN_SUBSAMPLE_FRACTION = 0.50   # 20% of 192×96 ≈ 3686 columns per step
 
 const DATASET_CACHE_DIR = joinpath(@__DIR__, "cached_datasets")
 const RUNS_DIR = joinpath(@__DIR__, "runs")
@@ -145,6 +167,7 @@ end
 
 function dataset_cache_key()
     parts = string(
+        DATA_SOURCE, "|",
         MODEL_DIR, "|", ERA5_DIR, "|",
         Z_MAX, "|", TIME_DAY_START, "-", TIME_DAY_END, "|",
         COLUMN_SUBSAMPLE_FRACTION, "|",
@@ -177,17 +200,19 @@ end
 # Data loading helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-"""Load a 4D model variable (time, lon, lat, z) from the hourly-instantaneous file."""
+"""Load a 4D model variable (time, lon, lat, z) from the model output file."""
 function load_model_var(varname::String; dir = MODEL_DIR)
-    path = joinpath(dir, "$(varname)_1h_inst.nc")
+    suffix = DATA_SOURCE == :daily_era5 ? "_1d_average" : "_1h_inst"
+    path = joinpath(dir, "$(varname)$(suffix).nc")
     NCDataset(path) do ds
-        Float32.(Array(ds[varname]))  # (time, lon, lat, z)
+        Float32.(Array(ds[varname]))  # (time, lon, lat, z) in both modes
     end
 end
 
-"""Load model grid info: lon, lat, z_reference, z_physical."""
+"""Load model grid info: lon, lat, z_reference, z_physical, dates."""
 function load_model_grid(; dir = MODEL_DIR)
-    NCDataset(joinpath(dir, "ta_1h_inst.nc")) do ds
+    suffix = DATA_SOURCE == :daily_era5 ? "_1d_average" : "_1h_inst"
+    NCDataset(joinpath(dir, "ta$(suffix).nc")) do ds
         lon = Float64.(Array(ds["lon"]))
         lat = Float64.(Array(ds["lat"]))
         z_ref = Float64.(Array(ds["z_reference"]))
@@ -198,7 +223,7 @@ function load_model_grid(; dir = MODEL_DIR)
 end
 
 """
-Load one ERA5 pressure-level file matching a DateTime.
+Load one ERA5 pressure-level file matching a DateTime (hourly mode).
 Returns (t, q, z_geopot, pressure_levels, era5_lon, era5_lat).
 """
 function load_era5_pressure(dt::DateTime; dir = ERA5_DIR)
@@ -217,6 +242,51 @@ function load_era5_pressure(dt::DateTime; dir = ERA5_DIR)
         elat = Float64.(nomissing(Array(ds["latitude"])))
         return (; t, q, z, plev, lon = elon, lat = elat)
     end
+end
+
+"""
+Load one day of ERA5 daily-mean data (t, q, z) from separate per-variable files.
+Returns the same named-tuple format as load_era5_pressure.
+"""
+function load_era5_daily(date::Date; dir = ERA5_DIR)
+    datestr = Dates.format(date, "yyyymmdd")
+    t_path = joinpath(dir, "temperature_daily-mean_$(datestr)_$(datestr).nc")
+    q_path = joinpath(dir, "specific_humidity_daily-mean_$(datestr)_$(datestr).nc")
+    z_path = joinpath(dir, "geopotential_daily-mean_$(datestr)_$(datestr).nc")
+
+    for p in (t_path, q_path, z_path)
+        if !isfile(p)
+            @warn "Missing ERA5 daily file: $p"
+            return nothing
+        end
+    end
+
+    # NetCDF dims are (valid_time, pressure_level, latitude, longitude)
+    # Julia reads column-major → array is (longitude, latitude, pressure_level, valid_time)
+    # Index [:, :, :, 1] to select the single time step → (lon, lat, plev)
+    t = NCDataset(t_path) do ds
+        Float32.(nomissing(Array(ds["t"][:, :, :, 1]), NaN32))  # (lon, lat, plev)
+    end
+    q = NCDataset(q_path) do ds
+        Float32.(nomissing(Array(ds["q"][:, :, :, 1]), NaN32))
+    end
+    z = NCDataset(z_path) do ds
+        Float32.(nomissing(Array(ds["z"][:, :, :, 1]), NaN32))  # geopotential m²/s²
+    end
+
+    plev, elon, elat = NCDataset(t_path) do ds
+        plev = Float64.(nomissing(Array(ds["pressure_level"])))
+        elon = Float64.(nomissing(Array(ds["longitude"])))
+        elat = Float64.(nomissing(Array(ds["latitude"])))
+        (plev, elon, elat)
+    end
+
+    # Already (lon, lat, plev) — matches hourly format
+    t_out = t
+    q_out = q
+    z_out = z
+
+    return (; t = t_out, q = q_out, z = z_out, plev, lon = elon, lat = elat)
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -322,11 +392,192 @@ end
 # ─────────────────────────────────────────────────────────────────────────────
 
 function build_dataset()
-    if TEMPORAL_AVERAGING == :daily
+    if DATA_SOURCE == :daily_era5
+        return build_dataset_daily_era5()
+    elseif TEMPORAL_AVERAGING == :daily
         return build_dataset_daily_mean()
     else
         return build_dataset_hourly()
     end
+end
+
+"""
+Build training dataset from pre-computed daily-mean ERA5 and model daily averages.
+
+Each consecutive day pair (day_i, day_{i+1}) produces one set of tendency targets:
+  correction = (ERA5[day+1] - ERA5[day])/DT - (model[day+1] - model[day])/DT
+
+ERA5 daily-mean files are one file per variable per day. Model data comes from
+the `*_1d_average.nc` files with all 30 days in a single file.
+
+Returns: (X, Y, dz, nz) — same format as the hourly builder.
+"""
+function build_dataset_daily_era5()
+    rng_data = Random.MersenneTwister(123)
+
+    println("Loading model grid (daily)...")
+    grid = load_model_grid()
+    nlon = length(grid.lon)
+    nlat = length(grid.lat)
+    nz_full = length(grid.z_ref)
+    model_dates = grid.dates
+    nt = length(model_dates)
+
+    z_mask = grid.z_ref .<= Z_MAX
+    z_idx  = findall(z_mask)
+    nz     = length(z_idx)
+
+    # Model dates are DateTime; derive the start date for ERA5 filename mapping
+    t0 = model_dates[1]
+    start_date = Date(t0)
+
+    # Time subsetting: day indices into model time axis
+    ti_start = max(1, TIME_DAY_START)
+    ti_end   = min(nt, TIME_DAY_END == Inf ? nt : Int(TIME_DAY_END))
+    # Need ti+1 for differencing, so last usable index is ti_end-1
+    ti_end = min(ti_end, nt) - 1
+
+    println("  Grid: $(nlon) lon × $(nlat) lat × $(nz_full) z ($(nz) below $(Z_MAX)m), $(nt) days")
+    println("  Model start date: $start_date")
+    println("  Day subset: indices $(ti_start)-$(ti_end) ($(nt-1) pairs possible)")
+
+    col_subsample = max(COLUMN_SUBSAMPLE_FRACTION, 0.25)
+    println("  Column subsample: $(col_subsample * 100)% of $(nlon * nlat) = ~$(round(Int, col_subsample * nlon * nlat)) columns/day")
+
+    feat_names = [f[1] for f in INPUT_FEATURES]
+
+    println("Loading model variables...")
+    println("  Input features: ", join(feat_names, ", "), " ($N_FEATURES total)")
+
+    vars_needed = unique(vcat(feat_names, ["ta", "hus"]))
+    feat_data = Dict{String, Array{Float32, 4}}()
+    for name in vars_needed
+        println("    loading $name ...")
+        feat_data[name] = load_model_var(name)
+    end
+    ta_model  = feat_data["ta"]
+    hus_model = feat_data["hus"]
+
+    all_col_ij = [(i, j) for j in 1:nlat for i in 1:nlon]
+    ncols_total = length(all_col_ij)
+    ncols_sample = max(1, round(Int, col_subsample * ncols_total))
+
+    n_valid_pairs = 0
+    all_X = Vector{Matrix{Float32}}()
+    all_Y = Vector{Matrix{Float32}}()
+    all_dz = Vector{Matrix{Float32}}()
+
+    # Pre-load ERA5 for the first day (will shift in the loop)
+    era5_cache = Dict{Date, Any}()
+
+    for ti in ti_start:ti_end
+        date_now  = start_date + Day(ti - 1)
+        date_next = start_date + Day(ti)
+
+        println("  Processing pair $ti: $date_now → $date_next")
+        flush(stdout)
+
+        # Load ERA5 daily means (cache to avoid reloading)
+        era5_now  = get!(era5_cache, date_now)  do; load_era5_daily(date_now);  end
+        era5_next = get!(era5_cache, date_next) do; load_era5_daily(date_next); end
+
+        if era5_now === nothing || era5_next === nothing
+            continue
+        end
+
+        # Horizontal regrid ERA5 → model grid
+        t_now  = regrid_horizontal(era5_now.t,  era5_now.lon, era5_now.lat, grid.lon, grid.lat)
+        t_next = regrid_horizontal(era5_next.t, era5_next.lon, era5_next.lat, grid.lon, grid.lat)
+        q_now  = regrid_horizontal(era5_now.q,  era5_now.lon, era5_now.lat, grid.lon, grid.lat)
+        q_next = regrid_horizontal(era5_next.q, era5_next.lon, era5_next.lat, grid.lon, grid.lat)
+        z_now  = regrid_horizontal(era5_now.z,  era5_now.lon, era5_now.lat, grid.lon, grid.lat)
+
+        # Vertical interpolation ERA5 pressure levels → model height levels
+        t_era5_now  = interp_vertical_3d(t_now,  z_now, grid.z_phys)
+        t_era5_next = interp_vertical_3d(t_next, z_now, grid.z_phys)
+        q_era5_now  = interp_vertical_3d(q_now,  z_now, grid.z_phys)
+        q_era5_next = interp_vertical_3d(q_next, z_now, grid.z_phys)
+
+        # ERA5 tendencies on model levels below Z_MAX
+        dT_era5 = (t_era5_next[:, :, z_idx] .- t_era5_now[:, :, z_idx]) ./ DT
+        dq_era5 = (q_era5_next[:, :, z_idx] .- q_era5_now[:, :, z_idx]) ./ DT
+
+        # Model tendencies
+        ta_now_z   = ta_model[ti, :, :, z_idx]
+        ta_next_z  = ta_model[ti + 1, :, :, z_idx]
+        hus_now_z  = hus_model[ti, :, :, z_idx]
+        hus_next_z = hus_model[ti + 1, :, :, z_idx]
+
+        dT_model = (ta_next_z .- ta_now_z) ./ DT
+        dq_model = (hus_next_z .- hus_now_z) ./ DT
+
+        dT_corr = dT_era5 .- dT_model
+        dq_corr = dq_era5 .- dq_model
+
+        # Subsample columns
+        col_sample = if col_subsample >= 1.0
+            all_col_ij
+        else
+            all_col_ij[randperm(rng_data, ncols_total)[1:ncols_sample]]
+        end
+        nc = length(col_sample)
+
+        nv = n_target_vars()
+        X_step = zeros(Float32, N_FEATURES * nz, nc)
+        Y_step = zeros(Float32, nv * nz, nc)
+        dz_step = zeros(Float32, nz, nc)
+
+        Threads.@threads for col in 1:nc
+            i, j = col_sample[col]
+            z_col = grid.z_phys[i, j, z_idx]
+
+            for k in 1:nz
+                if k < nz
+                    dz_step[k, col] = z_col[k + 1] - z_col[k]
+                else
+                    dz_step[k, col] = dz_step[k - 1, col]
+                end
+            end
+
+            for (fi, (name, transform)) in enumerate(INPUT_FEATURES)
+                offset = (fi - 1) * nz
+                raw = feat_data[name][ti, i, j, z_idx]
+                X_step[offset+1:offset+nz, col] = transform.(raw)
+            end
+
+            if TARGET_VARS == :T || TARGET_VARS == :both
+                Y_step[1:nz, col] = dT_corr[i, j, :]
+            end
+            if TARGET_VARS == :q
+                Y_step[1:nz, col] = dq_corr[i, j, :]
+            elseif TARGET_VARS == :both
+                Y_step[nz+1:2*nz, col] = dq_corr[i, j, :]
+            end
+        end
+
+        push!(all_X, X_step)
+        push!(all_Y, Y_step)
+        push!(all_dz, dz_step)
+        n_valid_pairs += 1
+
+        # Drop old ERA5 from cache to save memory
+        delete!(era5_cache, date_now)
+    end
+
+    println("  Built $n_valid_pairs valid day pairs, total columns: $(sum(size.(all_X, 2)))")
+
+    X = hcat(all_X...)
+    Y = hcat(all_Y...)
+    dz = hcat(all_dz...)
+
+    nan_cols = vec(any(isnan.(X), dims = 1) .| any(isnan.(Y), dims = 1))
+    good = .!nan_cols
+    X = X[:, good]
+    Y = Y[:, good]
+    dz = dz[:, good]
+    println("  After NaN filtering: $(size(X, 2)) columns remain")
+
+    return X, Y, dz, nz
 end
 
 """
@@ -792,16 +1043,17 @@ function build_cnn_model(input_dim::Int, nz::Int; predict_mode = PREDICT_MODE)
     direct = predict_mode == :direct
 
     dilations = [1, 1, 2, 4, 1, 1]
+    ks = 5
 
     model = @compact(
-        conv1 = Conv((3,), n_feat => ch, gelu; pad = 1 * dilations[1], dilation = dilations[1]),
-        conv2 = Conv((3,), ch => ch, gelu; pad = 1 * dilations[2], dilation = dilations[2]),
+        conv1 = Conv((ks,), n_feat => ch, gelu; pad = (ks÷2) * dilations[1], dilation = dilations[1]),
+        conv2 = Conv((ks,), ch => ch, gelu; pad = (ks÷2) * dilations[2], dilation = dilations[2]),
         drop1 = Dropout(DROPOUT_RATE),
-        conv3 = Conv((3,), ch => 2ch, gelu; pad = 1 * dilations[3], dilation = dilations[3]),
-        conv4 = Conv((3,), 2ch => 2ch, gelu; pad = 1 * dilations[4], dilation = dilations[4]),
+        conv3 = Conv((ks,), ch => 2ch, gelu; pad = (ks÷2) * dilations[3], dilation = dilations[3]),
+        conv4 = Conv((ks,), 2ch => 2ch, gelu; pad = (ks÷2) * dilations[4], dilation = dilations[4]),
         drop2 = Dropout(DROPOUT_RATE),
-        conv5 = Conv((3,), 2ch => ch, gelu; pad = 1 * dilations[5], dilation = dilations[5]),
-        conv6 = Conv((3,), ch => ch, gelu; pad = 1 * dilations[6], dilation = dilations[6]),
+        conv5 = Conv((ks,), 2ch => ch, gelu; pad = (ks÷2) * dilations[5], dilation = dilations[5]),
+        conv6 = Conv((ks,), ch => ch, gelu; pad = (ks÷2) * dilations[6], dilation = dilations[6]),
         out_conv = Conv((1,), ch => nv),
     ) do x
         B = size(x, 2)
@@ -1216,11 +1468,13 @@ function train()
     temporal_averaging = TEMPORAL_AVERAGING
     predict_mode = PREDICT_MODE
     target_vars = TARGET_VARS
-    BSON.@save save_path ps=best_ps_cpu st=st_cpu X_norm_stats Y_norm_stats nz input_dim arch temporal_averaging predict_mode target_vars
+    data_source = DATA_SOURCE
+    BSON.@save save_path ps=best_ps_cpu st=st_cpu X_norm_stats Y_norm_stats nz input_dim arch temporal_averaging predict_mode target_vars data_source
     println("Model saved to $save_path")
 
     # Write a human-readable summary
     open(joinpath(run_dir, "config.txt"), "w") do io
+        @printf(io, "data_source   = %s\n", DATA_SOURCE)
         @printf(io, "architecture  = %s\n", ARCHITECTURE)
         @printf(io, "temporal_avg  = %s\n", TEMPORAL_AVERAGING)
         @printf(io, "predict_mode  = %s\n", PREDICT_MODE)

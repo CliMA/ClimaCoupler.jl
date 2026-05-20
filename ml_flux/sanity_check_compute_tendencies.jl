@@ -41,6 +41,12 @@ using Printf
 using Random
 
 function time_indices(model_dates, nt)
+    if DATA_SOURCE == :daily_era5
+        ti_start = max(1, TIME_DAY_START)
+        ti_end   = min(nt, TIME_DAY_END == Inf ? nt : Int(TIME_DAY_END))
+        ti_end   = min(ti_end, nt) - 1
+        return ti_start, ti_end
+    end
     t0 = model_dates[1]
     ti_start = max(
         1,
@@ -580,6 +586,133 @@ function make_plots(r::SanityResults, out_dir::String)
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Daily-ERA5 processing loop (pre-computed daily-mean ERA5 + model 1d_average)
+# ─────────────────────────────────────────────────────────────────────────────
+function process_daily_era5(grid, ta_model, hus_model, z_idx, nz, ti_start, ti_end, model_dates)
+    nlon, nlat = length(grid.lon), length(grid.lat)
+    rng = MersenneTwister(42)
+
+    start_date = Date(model_dates[1])
+
+    acc_dT_era5 = zeros(Float64, nz);  acc_dT_model = zeros(Float64, nz);  acc_dT_corr = zeros(Float64, nz)
+    acc_dq_era5 = zeros(Float64, nz);  acc_dq_model = zeros(Float64, nz);  acc_dq_corr = zeros(Float64, nz)
+    n_prof = 0;  n_valid = 0;  n_skipped = 0
+
+    acc_dT_corr_zonal = zeros(Float64, nlat, nz)
+    acc_dq_corr_zonal = zeros(Float64, nlat, nz)
+    acc_dT_corr_sq = zeros(Float64, nz)
+    acc_dq_corr_sq = zeros(Float64, nz)
+
+    ts_dT = Float64[];  ts_dq = Float64[];  ts_dt = DateTime[]
+
+    hist_levels = level_indices_for_maps(nz)
+    hist_dT = Dict{Int, Vector{Float32}}(k => Float32[] for k in hist_levels)
+
+    n_samples_wanted = 12
+    s_era5 = Vector{Vector{Float32}}();  s_mod = Vector{Vector{Float32}}()
+    s_corr = Vector{Vector{Float32}}();  s_meta = Vector{String}()
+
+    ti_mid = (ti_start + ti_end) ÷ 2
+    dT_snap = zeros(Float32, nlon, nlat, nz)
+    dq_snap = zeros(Float32, nlon, nlat, nz)
+    snap_label = ""
+
+    era5_cache = Dict{Date, Any}()
+
+    for ti in ti_start:ti_end
+        date_now  = start_date + Day(ti - 1)
+        date_next = start_date + Day(ti)
+
+        era5_now  = get!(era5_cache, date_now)  do; load_era5_daily(date_now);  end
+        era5_next = get!(era5_cache, date_next) do; load_era5_daily(date_next); end
+
+        if era5_now === nothing || era5_next === nothing
+            n_skipped += 1;  continue
+        end
+        n_valid += 1
+
+        @printf("  [daily_era5] pair %d: %s → %s\n", ti, date_now, date_next);  flush(stdout)
+
+        t_now_z, q_now_z = regrid_era5_to_model_z(era5_now, grid, z_idx)
+        t_next_z, q_next_z = regrid_era5_to_model_z(era5_next, grid, z_idx)
+
+        ta_now_z  = ta_model[ti, :, :, z_idx];     ta_next_z  = ta_model[ti+1, :, :, z_idx]
+        hus_now_z = hus_model[ti, :, :, z_idx];     hus_next_z = hus_model[ti+1, :, :, z_idx]
+
+        dT_era5  = (t_next_z  .- t_now_z)  ./ DT
+        dq_era5  = (q_next_z  .- q_now_z)  ./ DT
+        dT_model = (ta_next_z .- ta_now_z) ./ DT
+        dq_model = (hus_next_z .- hus_now_z) ./ DT
+        dT_corr  = dT_era5 .- dT_model
+        dq_corr  = dq_era5 .- dq_model
+
+        n_prof += nlon * nlat
+        for k in 1:nz
+            acc_dT_era5[k]  += sum(Float64, @view dT_era5[:, :, k])
+            acc_dT_model[k] += sum(Float64, @view dT_model[:, :, k])
+            acc_dT_corr[k]  += sum(Float64, @view dT_corr[:, :, k])
+            acc_dq_era5[k]  += sum(Float64, @view dq_era5[:, :, k])
+            acc_dq_model[k] += sum(Float64, @view dq_model[:, :, k])
+            acc_dq_corr[k]  += sum(Float64, @view dq_corr[:, :, k])
+        end
+        for k in 1:nz, j in 1:nlat
+            acc_dT_corr_zonal[j, k] += sum(Float64, @view dT_corr[:, j, k])
+            acc_dq_corr_zonal[j, k] += sum(Float64, @view dq_corr[:, j, k])
+        end
+        for k in 1:nz
+            acc_dT_corr_sq[k] += mapreduce(x -> Float64(x)^2, +, @view dT_corr[:, :, k])
+            acc_dq_corr_sq[k] += mapreduce(x -> Float64(x)^2, +, @view dq_corr[:, :, k])
+        end
+
+        push!(ts_dT, Float64(mean(dT_corr)));  push!(ts_dq, Float64(mean(dq_corr)))
+        push!(ts_dt, DateTime(date_now))
+
+        for k in hist_levels
+            slab = @view dT_corr[:, :, k]
+            stride = max(1, length(slab) ÷ 500)
+            append!(hist_dT[k], slab[1:stride:end])
+        end
+
+        if ti == ti_mid
+            dT_snap .= dT_corr;  dq_snap .= dq_corr
+            snap_label = "daily-era5 $date_now → $date_next"
+        end
+
+        if length(s_corr) < n_samples_wanted
+            for _ in 1:min(2, n_samples_wanted - length(s_corr))
+                i, j = rand(rng, 1:nlon), rand(rng, 1:nlat)
+                push!(s_era5, collect(Float32, dT_era5[i, j, :]))
+                push!(s_mod,  collect(Float32, dT_model[i, j, :]))
+                push!(s_corr, collect(Float32, dT_corr[i, j, :]))
+                push!(s_meta, @sprintf("%s i=%d j=%d", date_now, i, j))
+            end
+        end
+
+        delete!(era5_cache, date_now)
+    end
+
+    n_valid > 0 || error("No valid day pairs — check ERA5_DIR_DAILY and dates.")
+    z_km = Float32.(grid.z_ref[z_idx] ./ 1000.0)
+    inv_n = 1.0 / max(n_prof, 1)
+    mn(a) = Float32.(a .* inv_n)
+
+    return SanityResults(
+        z_km, nlon, nlat, nz, grid.lon, grid.lat,
+        mn(acc_dT_era5), mn(acc_dT_model), mn(acc_dT_corr),
+        mn(acc_dq_era5), mn(acc_dq_model), mn(acc_dq_corr),
+        Float64[], Float64[], 0.0, 0.0,
+        n_valid, n_skipped, false,
+        acc_dT_corr_zonal, acc_dq_corr_zonal,
+        acc_dT_corr_sq, acc_dq_corr_sq, n_prof,
+        s_era5, s_mod, s_corr, s_meta,
+        dT_snap, dq_snap, snap_label,
+        ts_dT, ts_dq, ts_dt,
+        hist_levels, hist_dT,
+        "daily-era5",
+    )
+end
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
 function next_sanity_index(base_dir)
@@ -593,8 +726,9 @@ end
 function make_sanity_dir()
     base = joinpath(@__DIR__, "sanity_tendency_plots")
     idx = next_sanity_index(base)
-    tavg = TEMPORAL_AVERAGING == :daily ? "daily" : "hourly"
-    name = @sprintf("%03d_%s_d%d-%d", idx, tavg, TIME_DAY_START, TIME_DAY_END)
+    src = DATA_SOURCE == :daily_era5 ? "daily_era5" :
+          TEMPORAL_AVERAGING == :daily ? "daily" : "hourly"
+    name = @sprintf("%03d_%s_d%d-%d", idx, src, TIME_DAY_START, Int(min(TIME_DAY_END, 999)))
     path = joinpath(base, name)
     mkpath(path)
     return path
@@ -604,6 +738,7 @@ function main()
     out_dir = length(ARGS) >= 1 ? ARGS[1] : make_sanity_dir()
     mkpath(out_dir)
     println("Output directory: ", out_dir)
+    println("Data source:      ", DATA_SOURCE)
     println("Temporal mode:    ", TEMPORAL_AVERAGING)
 
     println("Loading model grid...")
@@ -625,7 +760,9 @@ function main()
     ta_mod = load_model_var("ta")
     hus_mod = load_model_var("hus")
 
-    r = if TEMPORAL_AVERAGING == :daily
+    r = if DATA_SOURCE == :daily_era5
+        process_daily_era5(grid, ta_mod, hus_mod, z_idx, nz, ti_start, ti_end, model_dates)
+    elseif TEMPORAL_AVERAGING == :daily
         process_daily(grid, ta_mod, hus_mod, z_idx, nz, ti_start, ti_end, model_dates)
     else
         process_hourly(grid, ta_mod, hus_mod, z_idx, nz, ti_start, ti_end, model_dates)

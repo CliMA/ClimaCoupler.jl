@@ -253,18 +253,6 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 20GB
 
-      - label: "AMIP - Float64 + hourly checkpoint"
-        key: "amip"
-        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_ft64_hourly_checkpoints.yml --job_id amip_coarse_ft64_hourly_checkpoints"
-        retry: *retry_policy
-        artifact_paths: "output/amip_coarse_ft64_hourly_checkpoints/artifacts/*"
-        env:
-          FLAME_PLOT: ""
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_ntasks: 1
-          slurm_mem: 20GB
-
       - label: "AMIP - Component dts test"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_component_dts.yml --job_id target_amip_component_dts"
         retry: *retry_policy
@@ -283,17 +271,6 @@ steps:
         agents:
           slurm_ntasks: 4
           slurm_mem_per_cpu: 12GB
-
-      # short high-res performance test
-      - label: "Unthreaded AMIP FINE" # also reported by longruns with a flame graph
-        key: "unthreaded_amip_fine"
-        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_n1_shortrun.yml --job_id target_amip_n1_shortrun"
-        retry: *retry_policy
-        artifact_paths: "output/target_amip_n1_shortrun/artifacts/*"
-        env:
-          BUILD_HISTORY_HANDLE: ""
-        agents:
-          slurm_mem: 20GB
 
   - group: "GPU integration tests"
     steps:

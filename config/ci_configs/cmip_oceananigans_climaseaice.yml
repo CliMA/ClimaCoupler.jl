@@ -1,6 +1,8 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
+coupler_diagnostics_period: "1hours"
+coupler_diagnostics_reduction: "instantaneous"
 coupler_toml: ["toml/amip_edonly.toml"]
 dt_atmos: "120secs" # 2 minutes
 dt_cpl: "360secs" # 6 minutes
@@ -11,18 +13,24 @@ dz_bottom: 100.0
 energy_check: false
 h_elem: 8
 ice_model: "clima_seaice"
+land_diagnostics_period: "1hours"
+land_diagnostics_reduction: "instantaneous"
 land_model: "integrated"
 land_spun_up_ic: false
 mode_name: "cmip"
 netcdf_output_at_levels: true
+ocean_diagnostic_interval: "1hours"
+ocean_diagnostic_mode: "instantaneous"
 ocean_model: "oceananigans"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 rayleigh_sponge: true
+seaice_diagnostic_interval: "1hours"
+seaice_diagnostic_mode: "instantaneous"
 simple_ocean: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "12hours"
+t_end: "3hours"
 topo_smoothing: true
 topography: "Earth"
 viscous_sponge: true

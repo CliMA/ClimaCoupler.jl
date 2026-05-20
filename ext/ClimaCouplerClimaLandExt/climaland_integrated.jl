@@ -77,6 +77,8 @@ function ClimaLandSimulation(
     atmos_h,
     land_temperature_anomaly::String = "amip",
     use_land_diagnostics::Bool = true,
+    land_diagnostics_period::Symbol = :monthly,
+    land_diagnostics_reduction::Symbol = :average,
     coupled_param_dict = CP.create_toml_dict(FT),
     land_ic_path::Union{Nothing, String} = nothing,
     lai_source::String = "modis_monthly",
@@ -186,9 +188,12 @@ function ClimaLandSimulation(
         diagnostics = CL.default_diagnostics(
             model,
             start_date,
+            output_dir;
             output_writer = output_writer,
             output_vars = :short,
-            reduction_period = :monthly,
+            reduction_period = land_diagnostics_period,
+            reduction_type = land_diagnostics_reduction,
+            dt = float(dt),
         )
     else
         output_writer = nothing

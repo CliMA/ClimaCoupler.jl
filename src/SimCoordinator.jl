@@ -225,7 +225,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         restart_cache,
         save_cache,
         use_land_diagnostics,
-        diagnostics_dt,
+        land_diagnostics_period,
+        land_diagnostics_reduction,
         evolving_ocean,
         land_model,
         land_temperature_anomaly,
@@ -234,6 +235,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         bucket_albedo_type,
         energy_check,
         use_coupler_diagnostics,
+        coupler_diagnostics_period,
+        coupler_diagnostics_reduction,
         output_dir_root,
         parameter_files,
         era5_filepaths,
@@ -342,6 +345,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         atmos_h,
         land_temperature_anomaly,
         use_land_diagnostics,
+        land_diagnostics_period,
+        land_diagnostics_reduction,
         coupled_param_dict,
         albedo_type = bucket_albedo_type,
         bucket_initial_condition,
@@ -460,8 +465,9 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
             dir_paths.coupler_output_dir,
             start_date,
             tspan[1],
-            diagnostics_dt,
-            Δt_cpl,
+            coupler_diagnostics_period,
+            Δt_cpl;
+            reduction = coupler_diagnostics_reduction,
         )
     else
         diags_handler = nothing

@@ -3,7 +3,9 @@ using Documenter, Literate
 # Import packages needed to load plotting extensions
 import CairoMakie, ClimaCoreMakie, GeoMakie, Makie, Poppler_jll, Printf, Oceananigans
 # Import packages for ClimaCouplerCMIPExt
-import Adapt, ClimaOcean, ClimaSeaIce, ConservativeRegridding, KernelAbstractions
+import ClimaOcean, ClimaSeaIce, KernelAbstractions, ConservativeRegridding, Adapt
+# Import packages for intersection grid flux documentation
+import SurfaceFluxes, Thermodynamics, ClimaParams
 # Import packages for ClimaCouplerClimaLandExt
 import ClimaLand
 # Import packages for ClimaCouplerClimaAtmosExt
@@ -44,6 +46,7 @@ interface_pages = [
     "timemanager.md",
     "fieldexchanger.md",
     "fluxcalculator.md",
+    "intersection_grid_flux.md",
     "checkpointer.md",
     "conservation.md",
     "utilities.md",

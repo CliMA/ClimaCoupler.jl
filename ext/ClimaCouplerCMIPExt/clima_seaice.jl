@@ -85,16 +85,9 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
 
     advection = ocean.ocean.model.advection.T
-    ice = CO.SeaIces.sea_ice_simulation(
-        grid,
-        ocean.ocean;
-        clock = deepcopy(ocean.ocean.model.clock),
-        Δt = float(dt),
-        advection,
-    )
+    ice = CO.SeaIces.sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection)
 
-    ocean_ice_flux_formulation =
-        CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)
+    ocean_ice_flux_formulation = CO.InterfaceComputations.ThreeEquationHeatFlux(ice)
     interface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     interface_salinity = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
@@ -187,7 +180,7 @@ function ClimaSeaIceSimulation(
     )
 
     # Ensure ocean temperature is above freezing where there is sea ice
-    CO.OceanSeaIceModels.above_freezing_ocean_temperature!(ocean.ocean, grid, ice)
+    CO.EarthSystemModels.above_freezing_ocean_temperature!(ocean.ocean, grid, ice)
     return sim
 end
 
@@ -376,8 +369,6 @@ and ClimaSeaIce represents moisture moving from atmosphere to ocean as a positiv
 so a sign change is needed when we convert from moisture to salinity flux.
 """
 function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fields)
-    # Only LatitudeLongitudeGrid are supported because otherwise we have to rotate the vectors
-
     (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
     grid = sim.ice.model.grid
     ice_concentration = sim.ice.model.ice_concentration
@@ -509,7 +500,7 @@ function FluxCalculator.ocean_seaice_fluxes!(
     ocean_sim.ice_concentration .= ice_concentration
 
     # Compute the fluxes and store them in the both simulations
-    CO.OceanSeaIceModels.InterfaceComputations.compute_sea_ice_ocean_fluxes!(
+    CO.InterfaceComputations.compute_sea_ice_ocean_fluxes!(
         ice_sim.ocean_ice_interface,
         ocean_sim.ocean,
         ice_sim.ice,
@@ -615,3 +606,26 @@ These plots are not polished, and are intended for debugging.
 """
 Plotting.debug_plot_fields(sim::ClimaSeaIceSimulation) =
     (:area_fraction, :surface_temperature, :ice_concentration, :ice_thickness, :u, :v)
+
+# Extend Interfacer.get_field to allow automatic remapping to the target space
+# (defined here so `OceananigansSimulation` and `ClimaSeaIceSimulation` exist.)
+function Interfacer.get_field!(
+    target_field,
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    quantity,
+)
+    Interfacer.remap!(target_field, Interfacer.get_field(sim, quantity), sim.remapping)
+    return nothing
+end
+# TODO see if we can remove this allocating version
+function Interfacer.get_field(
+    target_space::CC.Spaces.AbstractSpace,
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    quantity,
+)
+    return Interfacer.remap(
+        target_space,
+        Interfacer.get_field(sim, quantity),
+        sim.remapping,
+    )
+end

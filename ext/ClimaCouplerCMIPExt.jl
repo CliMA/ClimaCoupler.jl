@@ -40,6 +40,9 @@ import SparseArrays # for converting Regridder element types
 get_ConservativeRegriddingCCExt() =
     Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
 
+# Include intersection grid data structures (used by flux calculations)
+include("ClimaCouplerCMIPExt/intersection_grid.jl")
+
 # Include the model files first so their types are available to climaocean_helpers.jl
 include("ClimaCouplerCMIPExt/oceananigans.jl")
 include("ClimaCouplerCMIPExt/clima_seaice.jl")

@@ -8,6 +8,7 @@ import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
 import Dates
 import ClimaUtilities.TimeManager: ITime, date, counter, period
+import ClimaUtilities.ClimaArtifacts: @clima_artifact
 using StaticArrays
 
 # Rename ECCO password env variable to match ClimaOcean.jl
@@ -102,15 +103,28 @@ function ClimaSeaIceSimulation(
 
     # Initialize nonzero sea ice if start date provided
     if !isnothing(start_date)
+        # set up the `dir` keyword argument for `Metadatum`
+        if start_date == Dates.Date(2010, 1, 1)
+            # we have a ClimaArtifact saved for January 1, 2010 (so that CI can always run)
+            dir_kw = (; dir = @clima_artifact("ecco4_SIarea_SIheff_2010_01"))
+            @info "Using $(dir_kw.dir) ClimaArtifact for sea ice initialization on $(start_date)"
+        else
+            # otherwise, download the data
+            # (or load from scratchspace; ClimaOcean will automatically handle this)
+            dir_kw = (;)
+        end
+
         sic_metadata = CO.DataWrangling.Metadatum(
             :sea_ice_concentration,
             dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
-            date = start_date,
+            date = start_date;
+            dir_kw...,
         )
         h_metadata = CO.DataWrangling.Metadatum(
             :sea_ice_thickness,
             dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
-            date = start_date,
+            date = start_date;
+            dir_kw...,
         )
 
         OC.set!(ice.model.ice_concentration, sic_metadata)

@@ -74,3 +74,7 @@ git-tree-sha1 = "c1c0a16127bd547124cdf7288140002d74846efe"
 
 [wxquest_initial_conditions]
 git-tree-sha1 = "85b1e3654fb88f19a715ea6c235e1d66f254d2e6"
+
+[ecco4_SIarea_SIheff_2010_01]
+git-tree-sha1 = "889d7209b1a3b066e2dd5b0dbf7a674e32e4a589"
+

@@ -91,9 +91,9 @@ steps:
           slurm_gpus: 1
           slurm_mem: 24GB
 
-  - group: "Experiment tests"
+  - group: "Experiment unit tests"
     steps:
-      - label: "AMIP runtests"
+      - label: "Experiments runtests"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/test/runtests.jl"
         retry: *retry_policy
         agents:

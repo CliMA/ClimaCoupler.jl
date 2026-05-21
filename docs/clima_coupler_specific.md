@@ -22,7 +22,7 @@ Mapped to the architectural layers in
 
 | Layer | Directory / File | Description |
 |:---|:---|:---|
-| Coupler Core | `src/Interfacer.jl` | Component-model interface definitions (`SurfaceModelSimulation`, `AtmosModelSimulation`, `CoupledSimulation`) |
+| Coupler Core | `src/Interfacer.jl` | Component-model interface definitions (`AbstractSurfaceSimulation`, `AbstractAtmosSimulation`, `CoupledSimulation`) |
 | Coupler Core | `src/FieldExchanger.jl` | Import/export field mapping between component models |
 | Coupler Core | `src/FluxCalculator.jl` | Turbulent surface-flux computation at the atmosphere–surface boundary |
 | Coupler Core | `src/SimCoordinator.jl` | Top-level time-stepping loop and component orchestration |
@@ -33,13 +33,14 @@ Mapped to the architectural layers in
 | Coupler Core | `src/Utilities.jl` | Shared utility functions (regridding, masking, etc.) |
 | Coupler Core | `src/CalibrationTools.jl` | EKI/EnsembleKalmanProcesses helpers |
 | Simple Models | `src/Models/` | Built-in stub component models (slab ocean, prescribed ocean/sea ice) |
-| Simple Models | `src/surface_stub.jl` | Minimal surface stub for testing |
-| Output | `src/SimOutput/` | Diagnostics output helpers |
-| Output | `src/Plotting.jl` | Makie-based post-processing plots (loaded via weak dep) |
+| Simple Models | `src/surface_stub.jl` | Minimal surface stub for testing (included inside `Interfacer.jl`) |
+| Output | `src/SimOutput/` | Diagnostics, benchmarks, RMSE checks, and sim-obs comparison helpers |
+| Output | `src/Plotting.jl` | Post-processing plot stubs; heavy Makie rendering lives in `ext/ClimaCouplerMakieExt/` |
 | Component Extensions | `ext/ClimaCouplerClimaAtmosExt.jl` | ClimaAtmos component-model integration |
 | Component Extensions | `ext/ClimaCouplerClimaLandExt/` | ClimaLand component-model integration |
 | Component Extensions | `ext/ClimaCouplerCMIPExt/` | CMIP-mode (Oceananigans + ClimaSeaIce) integration |
-| Component Extensions | `ext/ClimaCouplerMakieExt/` | Visualization extensions |
+| Component Extensions | `ext/ClimaCouplerCMIPMakieExt.jl` | Oceananigans-specific Makie visualization (heatmaps, extrema printing) |
+| Component Extensions | `ext/ClimaCouplerMakieExt/` | General visualization extensions (debug plots, diagnostics plots, leaderboard) |
 | Driver Scripts | `experiments/AMIP/` | AMIP run scripts and configuration |
 | Driver Scripts | `experiments/CMIP/` | CMIP run scripts and configuration |
 | Driver Scripts | `experiments/calibration/` | EKI calibration experiment drivers |
@@ -49,7 +50,7 @@ Mapped to the architectural layers in
 
 ## Key abstractions
 
-1. **`AbstractSurfaceSimulation` / `AbstractAtmosSimulation`** (`src/Interfacer.jl`) — abstract types that component models subtype to participate in coupling. Implement the interface methods (e.g., `get_field`, `update_field!`, `step!`) to plug a new component in. Surface types further specialize into `AbstractOceanSimulation`, `AbstractLandSimulation`, and `AbstractSeaIceSimulation`.
+1. **`AbstractSurfaceSimulation` / `AbstractAtmosSimulation`** (`src/Interfacer.jl`) — abstract types (both subtypes of `AbstractComponentSimulation`) that component models subtype to participate in coupling. Implement the interface methods (e.g., `get_field`, `update_field!`, `step!`) to plug a new component in. Surface types further specialize into `AbstractOceanSimulation`, `AbstractLandSimulation`, `AbstractSeaIceSimulation`, and `AbstractImplicitFluxSimulation` (for models computing fluxes inside their own `step!`).
 
 2. **`CoupledSimulation`** (`src/Interfacer.jl`) — the top-level container holding all component simulations, shared fields, and the ClimaComms context.
 
@@ -115,14 +116,16 @@ julia --project=test test/runtests.jl
 | `models/prescr_seaice_tests.jl` | Prescribed sea-ice built-in model |
 | `calibration_tools_tests.jl` | EKI/calibration helpers |
 | `mpi_tests/` | MPI-parallel coupling tests (run separately via Buildkite) |
+| `checkpointer_tests.jl` | JLD2 checkpoint save/load (exists in `test/` but **not** in `runtests.jl`) |
+| `cess_climate_sensitivity.jl` | Cess climate sensitivity analysis (exists in `test/` but **not** in `runtests.jl`) |
 
-CI is managed by Buildkite. The GitHub Actions matrix (`.github/workflows/ci.yml`) runs Julia 1.10 and 1.12 on CPU.
+CI is managed by Buildkite. The GitHub Actions matrix (`.github/workflows/ci.yml`) runs Julia 1.10 and 1.12 on Ubuntu, Windows, and macOS (macOS only on push to `main`).
 
 ## Repo-specific conventions
 
 - **Configuration-driven experiments**: All experiment parameters live in YAML files under `config/`. Prefer adding a new config file over hard-coding values in driver scripts.
-- **Weak dependencies for heavy visualisation**: `Makie`, `CairoMakie`, `GeoMakie`, `Oceananigans`, etc. are `[weakdeps]`. Extensions in `ext/` are loaded only when the user explicitly imports those packages. Keep the core coupler free of heavy visualization or ocean-model imports.
-- **No component model state inside the coupler core**: `src/` must remain agnostic to the internals of ClimaAtmos, ClimaLand, etc. Component-specific logic belongs in the corresponding `ext/` extension.
+- **Weak dependencies for heavy visualisation**: `Makie`, `CairoMakie`, `GeoMakie`, `Oceananigans`, `ClimaOcean`, `ClimaSeaIce`, `ClimaLand`, etc. are `[weakdeps]`. Extensions in `ext/` are loaded only when the user explicitly imports those packages. Keep the core coupler free of heavy visualization or ocean-model imports.
+- **No component model state inside the coupler core**: `src/` should remain agnostic to the internals of ClimaLand, Oceananigans, etc. Component-specific logic belongs in the corresponding `ext/` extension. **Note:** `ClimaAtmos` is currently a hard dependency (`[deps]`) and is imported in `Input.jl`, `SimCoordinator.jl`, and `Models/prescr_ocean.jl` for config merging and albedo calculations. Moving it to a weak dependency is a known future goal.
 - **ClimaComms device/context agnosticism**: All coupler code must run on CPU (SINGLETON), CPU+MPI, and GPU (CUDA). Use `ClimaComms.context`, `ClimaComms.device`, and `ClimaComms.iamroot` rather than device-specific intrinsics.
 - **News entries**: Breaking changes and notable features must be recorded in `NEWS.md` following the format in [changelogs_and_versions.md](dev-guides/code-quality/changelogs_and_versions.md).
 

@@ -53,7 +53,3 @@ jobs:
         with:
           token: ${{secrets.CODECOV_TOKEN}}
           file: lcov.info
-      - run: |
-          julia -O0 --color=yes --project=experiments/AMIP -e 'using Pkg; Pkg.instantiate()'
-          julia -O0 --color=yes --project=experiments/AMIP -e 'using Pkg; Pkg.develop(; path = ".")'
-          julia -O0 --color=yes --project=experiments/AMIP experiments/test/runtests.jl

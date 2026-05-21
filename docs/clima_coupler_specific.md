@@ -62,13 +62,11 @@ Mapped to the architectural layers in
 
 ## Running experiments
 
-### AMIP (standard)
+### AMIP
 ```bash
 julia --project=experiments/AMIP -E "using Pkg; Pkg.instantiate()"
 julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl \
     --config_file config/ci_configs/amip_default.yml --job_id amip_default
-```
-Output lands in `output/<job_id>/`. Default run takes ~10 min on a single CPU.
 
 ### Slabplanet (conservation testing)
 ```bash

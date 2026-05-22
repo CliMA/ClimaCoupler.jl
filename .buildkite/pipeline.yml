@@ -29,10 +29,12 @@ steps:
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 
-      - echo "--- Instantiate CMIP experiments env"
-      - "julia -O0 --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia -O0 --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia -O0 --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
+      # Precompile CMIP with strict bounds checking to avoid precompilation in individual
+      # runs that use strict bounds checking.
+      - echo "--- Instantiate CMIP experiments env with strict bounds checking"
+      - "julia -O0 --check-bounds=yes --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia -O0 --check-bounds=yes --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia -O0 --check-bounds=yes --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate test env"
       - "julia -O0 --project=test/ -e 'using Pkg; Pkg.develop(path=\".\")'"
@@ -323,7 +325,6 @@ steps:
 
   - group: "CMIP"
     steps:
-      # Enforce strict bounds checking to avoid silent out of bounds errors
       - label: "GPU CMIP: ClimaAtmos + bucket land + Oceananigans + ClimaSeaIce"
         key: "gpu_cmip_oceananigans_climaseaice_bucket"
         command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice_bucket.yml --job_id gpu_cmip_oceananigans_climaseaice_bucket"
@@ -337,7 +338,7 @@ steps:
 
       - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce"
         key: "gpu_cmip_oceananigans_climaseaice"
-        command: "julia -O0 --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice.yml --job_id gpu_cmip_oceananigans_climaseaice"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice.yml --job_id gpu_cmip_oceananigans_climaseaice"
         artifact_paths: "output/gpu_cmip_oceananigans_climaseaice/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"

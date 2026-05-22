@@ -4,6 +4,19 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Configurable land and coupler diagnostics output frequency and reduction
+Adds new config options to control the period and reduction type of land and
+coupler diagnostics, matching the existing options for ocean and sea-ice:
+- `land_diagnostics_period` (default `"monthly"`) and
+  `land_diagnostics_reduction` (default `"average"`)
+- `coupler_diagnostics_period` (default `nothing`, falls back to the
+  auto-derived `get_diag_period`) and `coupler_diagnostics_reduction`
+  (default `"average"`)
+
+Also fixes the calls to `ClimaLand.default_diagnostics` in the ClimaLand
+extension to pass `outdir` positionally, so the dispatched method actually
+produces land diagnostics instead of falling through to the no-op fallback.
+
 #### Update SST, SIC at monthly frequency PR[#1926](https://github.com/CliMA/ClimaCoupler.jl/pull/1926)
 For prescribed ocean and sea ice models, read in SST and SIC
 data monthly instead of at the model timestep. These data have

@@ -28,6 +28,11 @@ multiple configuration files can be used together:
 - **Atmos config file** (`--atmos_config_file`): Optional ClimaAtmos-specific configuration
 - **TOML parameter files** (`--coupler_toml`): One or more TOML files containing model parameters
 
+Sometimes, the coupler config file includes options that are not defined in ClimaCoupler.jl,
+but affect only the atmosphere model. For example `output_default_diagnostics` controls
+only the atmosphere diagnostics, despite its generic name. The full set of options used by
+the atmosphere model can be found in the [ClimaAtmos.jl docs](https://clima.github.io/ClimaAtmos.jl/stable/config/).
+
 When multiple config files are specified, values in the coupler config file will take
 precedence over those in the atmosphere config file. This is explained in more detail
 in the [Precendence of Config Files and CLI Arguments](#precendence-of-config-files-and-cli-arguments)
@@ -135,6 +140,8 @@ specific timesteps should be specified, rather than only `dt`.
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
 | `--use_coupler_diagnostics` | Bool | `true` | `true`, `false` | Whether to compute and output coupler diagnostics |
+| `--coupler_diagnostics_period` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"` | Time interval between coupler diagnostic outputs. If unset, the period is auto-derived from the simulation duration. |
+| `--coupler_diagnostics_reduction` | String | `"average"` | `average`, `instantaneous`, `max`, `min` | Reduction mode for coupler diagnostic outputs |
 | `--coupler_output_dir` | String | `"output"` | Any valid directory path | Directory to save output files |
 
 
@@ -164,6 +171,8 @@ specific timesteps should be specified, rather than only `dt`.
 | `--land_model` | String | `"bucket"` | `bucket`, `integrated` | Land model to use |
 | `--land_temperature_anomaly` | String | `"aquaplanet"` | `amip`, `aquaplanet`, `nothing` | Type of temperature anomaly for land model |
 | `--use_land_diagnostics` | Bool | `true` | `true`, `false` | Whether to compute and output land model diagnostics |
+| `--land_diagnostics_period` | String | `"1months"` | `"30mins"`, `"1hours"`, `"1days"`, `"10days"`, `"1months"` | Time interval between land diagnostic outputs. ClimaLand's diagnostics API only accepts a fixed set of periods, so the values listed here are the only supported options. |
+| `--land_diagnostics_reduction` | String | `"average"` | `average`, `instantaneous`, `max`, `min` | Reduction type for land diagnostic outputs |
 | `--land_spun_up_ic` | Bool | `false` | `true`, `false` | Whether to use integrated land initial conditions from spun up state |
 | `--lai_source` | String | `"modis_monthly"` | `modis_monthly`, `modis_monthly_climatology` | Source for leaf area index data. `modis_monthly` uses full MODIS monthly data, `modis_monthly_climatology` uses MODIS monthly climatology with periodic calendar |
 | `--bucket_albedo_type` | String | `"map_static"` | `map_static`, `function`, `map_temporal`, `era5` | Access bucket surface albedo information from data file. Use `era5` for ERA5-derived processed albedo files (requires `era5_initial_condition_dir`) |

@@ -2,6 +2,8 @@ FLOAT_TYPE: "Float64"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "1months"
+coupler_diagnostics_period: "1days"
+coupler_diagnostics_reduction: "instantaneous"
 dt_atmos: "120secs" # 2 minutes
 dt_cloud_fraction: "1hours"
 dt_cpl: "360secs" # 6 minutes
@@ -12,12 +14,15 @@ dt_seaice: "360secs" # 6 minutes
 energy_check: false
 ice_model: "clima_seaice"
 insolation: "timevarying"
+land_diagnostics_period: "1days"
+land_diagnostics_reduction: "instantaneous"
 mode_name: "cmip"
 ocean_model: "oceananigans"
 ocean_diagnostic_interval: "1days"
-ocean_diagnostic_mode: "averaged"
+ocean_diagnostic_mode: "instantaneous"
+output_default_diagnostics: false
 seaice_diagnostic_interval: "1days"
-seaice_diagnostic_mode: "averaged"
+seaice_diagnostic_mode: "instantaneous"
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
@@ -26,7 +31,7 @@ topo_smoothing: true
 topography: "Earth"
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]
-    period: 1months
-    reduction_time: average
+    period: 1days
+    reduction_time: inst
     pressure_coordinates: true
-    compute_every: 6hours
+    compute_every: 1days

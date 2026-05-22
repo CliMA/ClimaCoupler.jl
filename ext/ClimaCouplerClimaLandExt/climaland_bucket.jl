@@ -49,6 +49,8 @@ function BucketSimulation(
     atmos_h,
     land_temperature_anomaly::String = "amip",
     use_land_diagnostics::Bool = true,
+    land_diagnostics_period::Symbol = :monthly,
+    land_diagnostics_reduction::Symbol = :average,
     albedo_type::String = "map_static",
     bucket_initial_condition::String = "",
     era5_albedo_file_path::Union{Nothing, String} = nothing,
@@ -185,8 +187,11 @@ function BucketSimulation(
         diagnostics = CL.default_diagnostics(
             model,
             start_date,
+            output_dir;
             output_writer = output_writer,
-            reduction_period = :monthly,
+            reduction_period = land_diagnostics_period,
+            reduction_type = land_diagnostics_reduction,
+            dt = float(dt),
         )
     else
         diagnostics = nothing

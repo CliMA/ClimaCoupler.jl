@@ -96,8 +96,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
             directives = [
                 # Options include "premium", "regular", "economy", "preempt"
                 :job_priority => "regular",
-                # 720 minutes is 12 hours
-                :time => 720,
+                :time => 360,
                 :ntasks => 1,
                 :cpus_per_task => 12,
                 :gpus_per_task => 1,

@@ -96,12 +96,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
             directives = [
                 # Options include "premium", "regular", "economy", "preempt"
                 :job_priority => "regular",
-                :time => 360,
+                :time => 720,
                 :ntasks => 1,
                 :cpus_per_task => 12,
                 :gpus_per_task => 1,
             ],
-            modules,
+            modules = ["climacommon/2025_02_25"],
             env_vars,
         )
     elseif ClimaCalibrate.get_backend() == ClimaCalibrate.GCPBackend

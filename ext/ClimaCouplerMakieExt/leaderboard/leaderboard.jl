@@ -79,6 +79,12 @@ function Plotting.compute_leaderboard(
         )
     end
 
+    # If there is no monthly data available, skip the leaderboard
+    if isempty(sim_obs_comparsion_dict)
+        @warn "No monthly data available. Leaderboard will not be made."
+        return nothing
+    end
+
     # Filter seasons to remove seasons with no dates
     _, var = first(sim_obs_comparsion_dict)
     filter!(season -> !ClimaAnalysis.isempty(var[season][1]), seasons)

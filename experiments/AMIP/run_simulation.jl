@@ -44,7 +44,14 @@ config_file = Input.parse_commandline(Input.argparse_settings())["config_file"]
 
 # Set up and run the coupled simulation
 cs = CoupledSimulation(config_file)
-run!(cs)
+using CUDA
+for i in 1:800
+    if i % 100 == 0
+        @show CUDA.@profile step!(cs)
+    else
+        step!(cs)
+    end
+end
 
 # Postprocessing
 conservation_softfail = Input.get_coupler_config_dict(config_file)["conservation_softfail"]

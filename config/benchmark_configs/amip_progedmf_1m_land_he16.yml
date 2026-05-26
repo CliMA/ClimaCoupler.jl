@@ -5,7 +5,7 @@ checkpoint_dt: "366days"
 coupler_toml: ["toml/amip_progedmf_1m.toml"]
 dt: "30secs"
 dt_cpl: "30secs"
-dt_rad: "600secs"
+dt_rad: "120000secs"
 energy_check: false
 h_elem: 16
 land_model: "integrated"
@@ -13,6 +13,6 @@ mode_name: "amip"
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "12000secs"
+t_end: "120000secs"
 topo_smoothing: true
 topography: "Earth"

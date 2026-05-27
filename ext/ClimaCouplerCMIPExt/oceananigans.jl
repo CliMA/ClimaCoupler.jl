@@ -267,32 +267,47 @@ function OceananigansSimulation(
 end
 
 """
-    convert_regridder_eltype(::Type{FT}, regridder) where {FT}
+    convert_regridder_eltype(::Type{FT}, regridder::CR.SEtoFVRegridder) where {FT}
 
-Convert the element type of a ConservativeRegridding.Regridder's internal arrays
-to the specified float type `FT`. 
+Convert the element type of a ConservativeRegridding.SEtoFVRegridder's internal arrays
+to the specified float type `FT`.
 """
-function convert_regridder_eltype(::Type{FT}, regridder) where {FT}
-    intersections = regridder.intersections
-    dst_areas = regridder.dst_areas
-    src_areas = regridder.src_areas
-    dst_temp = regridder.dst_temp
-    src_temp = regridder.src_temp
-
-    new_intersections = SparseArrays.SparseMatrixCSC(
-        intersections.m,
-        intersections.n,
-        intersections.colptr,
-        intersections.rowval,
-        FT.(intersections.nzval),
+function convert_regridder_eltype(::Type{FT}, regridder::CR.SEtoFVRegridder) where {FT}
+    weight_matrix = regridder.weight_matrix
+    new_weight_matrix = SparseArrays.SparseMatrixCSC(
+        weight_matrix.m,
+        weight_matrix.n,
+        weight_matrix.colptr,
+        weight_matrix.rowval,
+        FT.(weight_matrix.nzval),
     )
+    return CR.SEtoFVRegridder(
+        new_weight_matrix,
+        FT.(regridder.dst_areas),
+        FT.(regridder.dst_temp),
+        FT.(regridder.src_temp),
+    )
+end
 
-    return CR.Regridder(
-        new_intersections,
-        FT.(dst_areas),
-        FT.(src_areas),
-        FT.(dst_temp),
-        FT.(src_temp),
+"""
+    convert_regridder_eltype(::Type{FT}, regridder::CR.FVtoSERegridder) where {FT}
+
+Convert the element type of a ConservativeRegridding.FVtoSERegridder's internal arrays
+to the specified float type `FT`.
+"""
+function convert_regridder_eltype(::Type{FT}, regridder::CR.FVtoSERegridder) where {FT}
+    weight_matrix = regridder.weight_matrix
+    new_weight_matrix = SparseArrays.SparseMatrixCSC(
+        weight_matrix.m,
+        weight_matrix.n,
+        weight_matrix.colptr,
+        weight_matrix.rowval,
+        FT.(weight_matrix.nzval),
+    )
+    return CR.FVtoSERegridder(
+        new_weight_matrix,
+        FT.(regridder.dst_temp),
+        FT.(regridder.src_temp),
     )
 end
 
@@ -302,9 +317,13 @@ end
 Given an Oceananigans grid and a ClimaCore boundary space, construct the
 remappers needed to remap between the two grids in both directions.
 
-Returns a remapper from the Oceananigans grid to the ClimaCore boundary space.
-For low-level use: `CR.regrid!(dst, remapper_oc_to_cc, src)` and
-transpose for the reverse map.
+Returns a NamedTuple with:
+- `remapper_cc_to_oc`: SEtoFVRegridder for ClimaCore (SE) → Oceananigans (FV)
+- `remapper_oc_to_cc`: FVtoSERegridder for Oceananigans (FV) → ClimaCore (SE)
+
+For low-level use:
+- `CR.regrid!(dst_fv_vec, remapper_cc_to_oc, src_cc_field)`
+- `CR.regrid!(dst_cc_field, remapper_oc_to_cc, src_fv_vec)`
 """
 function construct_remapper(grid_oc, boundary_space)
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), grid_oc.underlying_grid)
@@ -314,36 +333,37 @@ function construct_remapper(grid_oc, boundary_space)
     R = CC.Spaces.topology(boundary_space_cpu).mesh.domain.radius
     manifold = CR.Spherical(; radius = FT_cc(R))
 
+    # Create SE → FV regridder (ClimaCore → Oceananigans)
+    remapper_cc_to_oc = CR.Regridder(
+        manifold,
+        grid_oc_underlying_cpu,
+        boundary_space_cpu;
+        threaded = false,
+    )
+
+    # Create FV → SE regridder (Oceananigans → ClimaCore)
     remapper_oc_to_cc = CR.Regridder(
         manifold,
         boundary_space_cpu,
         grid_oc_underlying_cpu;
-        normalize = false,
         threaded = false,
     )
 
-    # Convert sparse matrix element type to match the simulation's float type.
+    # Convert sparse matrix element types to match the simulation's float type.
+    remapper_cc_to_oc = convert_regridder_eltype(FT_cc, remapper_cc_to_oc)
     remapper_oc_to_cc = convert_regridder_eltype(FT_cc, remapper_oc_to_cc)
 
-    # Move remapper to GPU if needed
-    remapper_oc_to_cc =
-        OC.Architectures.on_architecture(OC.architecture(grid_oc), remapper_oc_to_cc)
-
-    # Allocate a scratch field of ones for the element-value extraction
-    field_ones_cc = CC.Fields.ones(boundary_space)
-
-    # Allocate a vector with length equal to the number of elements in the target space
-    # to be used as a temp field for remapping
-    FT = CC.Spaces.undertype(boundary_space)
-    ArrayType = ClimaComms.array_type(boundary_space)
-    value_per_element_cc =
-        ArrayType(zeros(FT, CC.Meshes.nelements(boundary_space.grid.topology.mesh)))
+    # Move remappers to GPU if needed
+    arch = OC.architecture(grid_oc)
+    remapper_cc_to_oc = OC.Architectures.on_architecture(arch, remapper_cc_to_oc)
+    remapper_oc_to_cc = OC.Architectures.on_architecture(arch, remapper_oc_to_cc)
 
     # Construct two 2D Oceananigans Center/Center fields to use as scratch space while remapping
     scratch_field_oc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
     scratch_field_oc2 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
 
     # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
+    FT = CC.Spaces.undertype(boundary_space)
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
     # Construct the polar exclusion flux masks
@@ -354,9 +374,8 @@ function construct_remapper(grid_oc, boundary_space)
     ) = construct_polar_mask(grid_oc)
 
     return (;
+        remapper_cc_to_oc,
         remapper_oc_to_cc,
-        field_ones_cc,
-        value_per_element_cc,
         scratch_field_oc1,
         scratch_field_oc2,
         temp_uv_vec,

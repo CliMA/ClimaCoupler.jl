@@ -116,24 +116,17 @@ function unit_basis_vector_data(::Type{V}, local_geometry) where {V}
 end
 
 # These methods are used by `OceananigansSimulation` / `ClimaSeaIceSimulation` when the
-# ocean `remapping` NamedTuple includes `remapper_oc_to_cc` from `construct_remapper`.
+# ocean `remapping` NamedTuple includes `remapper_cc_to_oc` and `remapper_oc_to_cc`
+# from `construct_remapper`.
 
-# Non-allocating ClimaCore -> Oceananigans remap
+# Non-allocating ClimaCore -> Oceananigans remap (SE → FV)
 function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
-    # Get the value per element of the ClimaCore field
-    get_ConservativeRegriddingCCExt().get_value_per_element!(
-        remapping.value_per_element_cc,
-        source_field,
-        remapping.field_ones_cc,
-    )
-
     # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
     z = size(target_field, 3)
     dst = vec(OC.interior(target_field, :, :, z))
-    src = remapping.value_per_element_cc
 
-    # Regrid the source (ClimaCore) field to the target (Oceananigans) field
-    CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
+    # Regrid directly from ClimaCore field to Oceananigans vector using SEtoFVRegridder
+    CR.regrid!(dst, remapping.remapper_cc_to_oc, source_field)
     return nothing
 end
 
@@ -152,18 +145,14 @@ function Interfacer.remap(
     return target_field
 end
 
-# Non-allocating Oceananigans Field -> ClimaCore remap
+# Non-allocating Oceananigans Field -> ClimaCore remap (FV → SE)
 function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field, remapping)
     # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
     z = size(source_field, 3)
     src = vec(OC.interior(source_field, :, :, z))
-    dst = remapping.value_per_element_cc
 
-    # Regrid the source (Oceananigans) field to the target (ClimaCore) field
-    CR.regrid!(dst, remapping.remapper_oc_to_cc, src)
-
-    # Convert the vector of remapped values to a ClimaCore Field with one value per element
-    get_ConservativeRegriddingCCExt().set_value_per_element!(target_field, dst)
+    # Regrid directly from Oceananigans vector to ClimaCore field using FVtoSERegridder
+    CR.regrid!(target_field, remapping.remapper_oc_to_cc, src)
     return nothing
 end
 

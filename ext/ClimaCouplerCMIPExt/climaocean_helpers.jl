@@ -120,18 +120,19 @@ end
 
 # Non-allocating ClimaCore -> Oceananigans remap
 function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
-    # Get the value per element of the ClimaCore field using the new extension API
-    # The new API uses se_field_to_vec for nodal data extraction
-    CCExt = get_ConservativeRegriddingCCExt()
-    src = remapping.value_per_element_cc
-    src .= CCExt.se_field_to_vec(source_field)
+    # Get the value per element of the ClimaCore field
+    get_ConservativeRegriddingCCExt().get_value_per_element!(
+        remapping.value_per_element_cc,
+        source_field,
+        remapping.field_ones_cc,
+    )
 
     # Get the index of the top level (surface); 1 for 2D fields, Nz for 3D fields
     z = size(target_field, 3)
     dst = vec(OC.interior(target_field, :, :, z))
+    src = remapping.value_per_element_cc
 
     # Regrid the source (ClimaCore) field to the target (Oceananigans) field
-    # Note: transpose(regridder) reverses the direction (CC -> OC instead of OC -> CC)
     CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
     return nothing
 end
@@ -161,11 +162,8 @@ function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field
     # Regrid the source (Oceananigans) field to the target (ClimaCore) field
     CR.regrid!(dst, remapping.remapper_oc_to_cc, src)
 
-    # Convert the vector of remapped values to a ClimaCore Field using the new extension API
-    # The new API uses vec_to_se_field! and weighted_dss! for spectral element fields
-    CCExt = get_ConservativeRegriddingCCExt()
-    CCExt.vec_to_se_field!(target_field, dst)
-    CC.Spaces.weighted_dss!(target_field)
+    # Convert the vector of remapped values to a ClimaCore Field with one value per element
+    get_ConservativeRegriddingCCExt().set_value_per_element!(target_field, dst)
     return nothing
 end
 

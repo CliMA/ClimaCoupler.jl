@@ -329,14 +329,13 @@ function construct_remapper(grid_oc, boundary_space)
     remapper_oc_to_cc =
         OC.Architectures.on_architecture(OC.architecture(grid_oc), remapper_oc_to_cc)
 
-    field_ones_cc = CC.Fields.ones(boundary_space)
-
-    # Allocate a vector with length equal to the number of elements in the target space
-    # To be used as a temp field for remapping
+    # Allocate a vector with length equal to the number of nodal values in the SE space
+    # to be used as a temp field for remapping (the new CR extension uses nodal values)
     FT = CC.Spaces.undertype(boundary_space)
     ArrayType = ClimaComms.array_type(boundary_space)
-    value_per_element_cc =
-        ArrayType(zeros(FT, CC.Meshes.nelements(boundary_space.grid.topology.mesh)))
+    Nq = CC.Quadratures.degrees_of_freedom(CC.Spaces.quadrature_style(boundary_space))
+    Nh = CC.Meshes.nelements(boundary_space.grid.topology.mesh)
+    value_per_element_cc = ArrayType(zeros(FT, Nq^2 * Nh))
 
     # Construct two 2D Oceananigans Center/Center fields to use as scratch space while remapping
     scratch_field_oc1 = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
@@ -354,7 +353,6 @@ function construct_remapper(grid_oc, boundary_space)
 
     return (;
         remapper_oc_to_cc,
-        field_ones_cc,
         value_per_element_cc,
         scratch_field_oc1,
         scratch_field_oc2,

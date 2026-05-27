@@ -267,45 +267,31 @@ function OceananigansSimulation(
 end
 
 """
-    convert_regridder_eltype(::Type{FT}, regridder::CR.SEtoFVRegridder) where {FT}
+    convert_regridder_eltype(::Type{FT}, regridder::CR.Regridder) where {FT}
 
-Convert the element type of a ConservativeRegridding.SEtoFVRegridder's internal arrays
+Convert the element type of a ConservativeRegridding.Regridder's internal arrays
 to the specified float type `FT`.
+
+The `Regridder` struct has five fields:
+- `intersections`: sparse matrix of intersection areas
+- `dst_areas`: areas of destination grid cells
+- `src_areas`: areas of source grid cells
+- `dst_temp`: work array for destination field
+- `src_temp`: work array for source field
 """
-function convert_regridder_eltype(::Type{FT}, regridder::CR.SEtoFVRegridder) where {FT}
-    weight_matrix = regridder.weight_matrix
-    new_weight_matrix = SparseArrays.SparseMatrixCSC(
-        weight_matrix.m,
-        weight_matrix.n,
-        weight_matrix.colptr,
-        weight_matrix.rowval,
-        FT.(weight_matrix.nzval),
+function convert_regridder_eltype(::Type{FT}, regridder::CR.Regridder) where {FT}
+    intersections = regridder.intersections
+    new_intersections = SparseArrays.SparseMatrixCSC(
+        intersections.m,
+        intersections.n,
+        intersections.colptr,
+        intersections.rowval,
+        FT.(intersections.nzval),
     )
-    return CR.SEtoFVRegridder(
-        new_weight_matrix,
+    return CR.Regridder(
+        new_intersections,
         FT.(regridder.dst_areas),
-        FT.(regridder.dst_temp),
-        FT.(regridder.src_temp),
-    )
-end
-
-"""
-    convert_regridder_eltype(::Type{FT}, regridder::CR.FVtoSERegridder) where {FT}
-
-Convert the element type of a ConservativeRegridding.FVtoSERegridder's internal arrays
-to the specified float type `FT`.
-"""
-function convert_regridder_eltype(::Type{FT}, regridder::CR.FVtoSERegridder) where {FT}
-    weight_matrix = regridder.weight_matrix
-    new_weight_matrix = SparseArrays.SparseMatrixCSC(
-        weight_matrix.m,
-        weight_matrix.n,
-        weight_matrix.colptr,
-        weight_matrix.rowval,
-        FT.(weight_matrix.nzval),
-    )
-    return CR.FVtoSERegridder(
-        new_weight_matrix,
+        FT.(regridder.src_areas),
         FT.(regridder.dst_temp),
         FT.(regridder.src_temp),
     )
@@ -315,11 +301,15 @@ end
     construct_remapper(grid_oc, boundary_space)
 
 Given an Oceananigans grid and a ClimaCore boundary space, construct the
-remappers needed to remap between the two grids in both directions.
+regridders needed to remap between the two grids in both directions.
+
+Uses the unified `Regridder` type from ConservativeRegridding.jl (PR #99),
+which implements SE-FV regridding using the "principled" methodology that
+integrates polynomial basis functions within intersection areas.
 
 Returns a NamedTuple with:
-- `remapper_cc_to_oc`: SEtoFVRegridder for ClimaCore (SE) → Oceananigans (FV)
-- `remapper_oc_to_cc`: FVtoSERegridder for Oceananigans (FV) → ClimaCore (SE)
+- `remapper_cc_to_oc`: Regridder for ClimaCore (SE) → Oceananigans (FV)
+- `remapper_oc_to_cc`: Regridder for Oceananigans (FV) → ClimaCore (SE)
 
 For low-level use:
 - `CR.regrid!(dst_fv_vec, remapper_cc_to_oc, src_cc_field)`

@@ -125,7 +125,7 @@ function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field
     z = size(target_field, 3)
     dst = vec(OC.interior(target_field, :, :, z))
 
-    # Regrid directly from ClimaCore field to Oceananigans vector using SEtoFVRegridder
+    # Regrid from ClimaCore field to Oceananigans vector using principled SE→FV regridding
     CR.regrid!(dst, remapping.remapper_cc_to_oc, source_field)
     return nothing
 end
@@ -151,7 +151,7 @@ function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field
     z = size(source_field, 3)
     src = vec(OC.interior(source_field, :, :, z))
 
-    # Regrid directly from Oceananigans vector to ClimaCore field using FVtoSERegridder
+    # Regrid from Oceananigans vector to ClimaCore field using principled FV→SE regridding
     CR.regrid!(target_field, remapping.remapper_oc_to_cc, src)
     return nothing
 end

@@ -77,7 +77,7 @@ function ClimaSeaIceSimulation(
     coupled_param_dict = CP.create_toml_dict(FT),
     dt = 5 * 60.0, # 5 minutes
     seaice_diagnostic_interval = "1days",
-    seaice_diagnostic_mode = :averaged,
+    seaice_diagnostic_mode = :average,
     extra_kwargs...,
 ) where {FT}
     # Initialize the sea ice with the same grid as the ocean

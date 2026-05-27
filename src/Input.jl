@@ -284,9 +284,9 @@ function argparse_settings()
         arg_type = String
         default = "1days"
         "--ocean_diagnostic_mode"
-        help = "Reduction mode for ocean diagnostic outputs. [`averaged` (default) uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval`]"
+        help = "Reduction mode for ocean diagnostic outputs. [`average` (default) uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval`]"
         arg_type = String
-        default = "averaged"
+        default = "average"
         # Ice model specific
         "--ice_model"
         help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`, `nothing`]"
@@ -297,9 +297,9 @@ function argparse_settings()
         arg_type = String
         default = "1days"
         "--seaice_diagnostic_mode"
-        help = "Reduction mode for sea-ice diagnostic outputs. [`averaged` (default) uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval`]"
+        help = "Reduction mode for sea-ice diagnostic outputs. [`average` (default) uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval`]"
         arg_type = String
-        default = "averaged"
+        default = "average"
         "--land_fraction_source"
         help = "Source for land fraction data. [`etopo` (default) uses ETOPO-derived landsea_mask artifact, `era5` uses ERA5 land fraction artifact]"
         arg_type = String

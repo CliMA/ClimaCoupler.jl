@@ -2,7 +2,7 @@
     add_seaice_diagnostics!(ice_sim::ClimaSeaIceSimulation;
                             output_dir = joinpath("output_active", "clima_seaice"),
                             interval = Dates.Day(1),
-                            mode = :averaged,
+                            mode = :average,
                             filename_prefix = "seaice",
                             file_splitting_interval = Dates.Day(15))
 
@@ -13,14 +13,14 @@ A single writer is added to `ice_sim.ice.output_writers`:
    surface temperature, sampled every `interval`.
 
 `mode` selects the reduction:
-- `:averaged` uses `Oceananigans.AveragedTimeInterval(interval)` (time-averaged fields).
+- `:average` uses `Oceananigans.AveragedTimeInterval(interval)` (time-averaged fields).
 - `:instantaneous` uses `Oceananigans.TimeInterval(interval)` (snapshots).
 """
 function add_seaice_diagnostics!(
     ice_sim::ClimaSeaIceSimulation;
     output_dir = joinpath("output_active", "clima_seaice"),
     interval = Dates.Day(1),
-    mode = :averaged,
+    mode = :average,
     filename_prefix = "seaice",
     file_splitting_interval = Dates.Day(15),
 )

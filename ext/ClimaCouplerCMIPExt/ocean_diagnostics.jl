@@ -4,20 +4,18 @@ import Dates
     diagnostic_schedule(mode, interval)
 
 Return an Oceananigans output schedule corresponding to `mode`:
-- `:averaged` → `OC.AveragedTimeInterval(interval)`
+- `:average` → `OC.AveragedTimeInterval(interval)`
 - `:instantaneous` → `OC.TimeInterval(interval)`
 
 Throws for any other value.
 """
 function diagnostic_schedule(mode::Symbol, interval)
-    if mode === :averaged
+    if mode === :average
         return OC.AveragedTimeInterval(interval)
     elseif mode === :instantaneous
         return OC.TimeInterval(interval)
     else
-        error(
-            "Unknown diagnostic mode `$(mode)`. Expected `:averaged` or `:instantaneous`.",
-        )
+        error("Unknown diagnostic mode `$(mode)`. Expected `:average` or `:instantaneous`.")
     end
 end
 
@@ -25,7 +23,7 @@ end
     add_ocean_diagnostics!(ocean_sim::OceananigansSimulation;
                            output_dir = joinpath("output_active", "clima_ocean"),
                            interval = Dates.Day(1),
-                           mode = :averaged,
+                           mode = :average,
                            filename_prefix = "ocean",
                            file_splitting_interval = Dates.Day(15))
 
@@ -37,7 +35,7 @@ Two writers are added to `ocean_sim.ocean.output_writers`, both with the same `i
 2. **3-D field diagnostics** (`<prefix>_fields.jld2`): full 3-D temperature, salinity, velocity (and TKE if a `:e` tracer is present).
 
 `mode` selects the reduction:
-- `:averaged` uses `Oceananigans.AveragedTimeInterval(interval)` (time-averaged fields).
+- `:average` uses `Oceananigans.AveragedTimeInterval(interval)` (time-averaged fields).
 - `:instantaneous` uses `Oceananigans.TimeInterval(interval)` (snapshots).
 
 !!! note
@@ -49,7 +47,7 @@ function add_ocean_diagnostics!(
     ocean_sim::OceananigansSimulation;
     output_dir = joinpath("output_active", "clima_ocean"),
     interval = Dates.Day(1),
-    mode = :averaged,
+    mode = :average,
     filename_prefix = "ocean",
     file_splitting_interval = Dates.Day(15),
 )

@@ -1,7 +1,7 @@
 name = "ClimaCoupler"
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
-authors = ["CliMA Contributors <clima-software@caltech.edu>"]
 version = "0.1.2"
+authors = ["CliMA Contributors <clima-software@caltech.edu>"]
 
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
@@ -74,7 +74,7 @@ Logging = "1"
 Makie = "0.24"
 NCDatasets = "0.14"
 NVTX = "1.0.3"
-Oceananigans = "0.107"
+Oceananigans = "0.107, 0.109"
 Poppler_jll = "24"
 Printf = "1"
 Random = "1"

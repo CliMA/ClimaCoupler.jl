@@ -331,6 +331,10 @@ function construct_remapper(grid_oc, boundary_space)
 
     field_ones_cc = CC.Fields.ones(boundary_space)
 
+    # Preallocated DSS buffer reused after every OC -> CC remap to reconcile
+    # shared spectral-element boundary DOFs in a mass-conserving way.
+    dss_buffer_cc = CC.Spaces.create_dss_buffer(field_ones_cc)
+
     # Allocate a vector with length equal to the number of elements in the target space
     # To be used as a temp field for remapping
     FT = CC.Spaces.undertype(boundary_space)
@@ -355,6 +359,7 @@ function construct_remapper(grid_oc, boundary_space)
     return (;
         remapper_oc_to_cc,
         field_ones_cc,
+        dss_buffer_cc,
         value_per_element_cc,
         scratch_field_oc1,
         scratch_field_oc2,

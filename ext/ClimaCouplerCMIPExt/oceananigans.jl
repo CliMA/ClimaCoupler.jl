@@ -114,7 +114,7 @@ function OceananigansSimulation(
     bottom_height = CO.regrid_bathymetry(
         underlying_grid;
         minimum_depth = 20,
-        interpolation_passes = 1, # TODO revert before merge
+        interpolation_passes = 20,
         major_basins = 1,
     )
 

@@ -24,7 +24,13 @@ abstractions), see [`docs/clima_coupler_specific.md`](https://github.com/CliMA/C
     the vendored copy here. The subtree is synced monthly via
     `.github/workflows/update_dev_guides.yml`.
 
-## Some useful tips
+## Modern Julia Workflows (general development advice)
+For tips on writing, sharing, and optimizing Julia packages — including development workflows,
+testing, documentation, and performance — see [Modern Julia Workflows](https://modernjuliaworkflows.org).
+The site includes general tips on everything from setting up your editor and managing environments,
+to registering your package and reducing compilation latency.
+
+## Other useful tips
 - When developing code it's best to work on a branch off of the most recent main.
 This can be done by running the following commands, where "initials" corresponds to the first and last initial of the person starting the branch.
 ```

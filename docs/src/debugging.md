@@ -179,6 +179,15 @@ The `Plotting.debug` function handles both field types automatically when the
 
 ## Software errors
 
+### Julia REPL help mode
+
+Type `?` at the REPL prompt to enter help mode, then type any function, type,
+macro, or other Julia object to display its documentation. This includes docstrings,
+which is another reason why writing clear, expressive docstrings is important.
+
+For more details about help mode and the other Julia REPL modes,
+please see the [Julia documentation](https://docs.julialang.org/en/v1/stdlib/REPL/#The-different-prompt-modes).
+
 ### Identifying which method is being dispatched
 
 A common source of subtle bugs is a function being called with an unexpected type,

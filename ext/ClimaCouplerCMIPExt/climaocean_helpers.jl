@@ -161,6 +161,11 @@ function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field
 
     # Convert the vector of remapped values to a ClimaCore Field with one value per element
     get_ConservativeRegriddingCCExt().set_value_per_element!(target_field, dst)
+
+    # `set_value_per_element!` writes a single scalar to every GLL node within
+    # each spectral element, leaving shared boundary DOFs disagreeing across
+    # neighbouring elements. 
+    CC.Spaces.weighted_dss!(target_field, remapping.dss_buffer_cc)
     return nothing
 end
 

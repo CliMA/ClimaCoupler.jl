@@ -44,6 +44,11 @@ config_file = Input.parse_commandline(Input.argparse_settings())["config_file"]
 
 # Set up and run the coupled simulation
 cs = CoupledSimulation(config_file)
+
+# Verify that surface albedos have been set correctly for radiation
+@assert !any(isnan.(Interfacer.get_field(atmos_sim, Val(:surface_direct_albedo))))
+@assert !any(isnan.(Interfacer.get_field(atmos_sim, Val(:surface_diffuse_albedo))))
+
 run!(cs)
 
 # Postprocessing

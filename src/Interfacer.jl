@@ -681,6 +681,16 @@ function remap!(target_field::CC.Fields.Field, source::Number)
     return nothing
 end
 
+# 3-argument versions that accept a remapping object but delegate to 2-argument versions.
+# Extensions can specialize these for specific remapping types (e.g., ConservativeRegridding).
+remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field, remapping) =
+    remap!(target_field, source_field)
+remap!(target_field::CC.Fields.Field, source::Number, remapping) =
+    remap!(target_field, source)
+remap(target_space::CC.Spaces.AbstractSpace, source_field::CC.Fields.Field, remapping) =
+    remap(target_space, source_field)
+remap(target_space::CC.Spaces.AbstractSpace, source::Number, remapping) =
+    remap(target_space, source)
 
 """
     set_cache!(sim::AbstractComponentSimulation, csf)

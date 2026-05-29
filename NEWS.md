@@ -4,6 +4,12 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Conservative regridding used with lat-long grids PR[#1919](https://github.com/CliMA/ClimaCoupler.jl/pull/1919)
+Enables conservative regridding in CMIP runs with lat-long grids. 
+This uses the FV `value-per-element` approximation, and is a precursor 
+to more consistent regridding methods to be introduced in future versions 
+of ConservativeRegridding.jl[PR#99](https://github.com/JuliaGeo/ConservativeRegridding.jl/pull/99)
+
 #### Configurable land and coupler diagnostics output frequency and reduction
 Adds new config options to control the period and reduction type of land and
 coupler diagnostics, matching the existing options for ocean and sea-ice:

@@ -26,6 +26,7 @@ steps:
 
       - echo "--- Instantiate AMIP experiments env"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaAtmos\", rev=\"js/coupleralbedo\"))'"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 
@@ -33,6 +34,7 @@ steps:
       # runs that use strict bounds checking.
       - echo "--- Instantiate CMIP experiments env with strict bounds checking"
       - "julia -O0 --check-bounds=yes --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia -O0 --check-bounds=yes --project=experiments/CMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaAtmos\", rev=\"js/coupleralbedo\"))'"
       - "julia -O0 --check-bounds=yes --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --check-bounds=yes --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
 

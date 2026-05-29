@@ -38,8 +38,11 @@ config_file = Input.parse_commandline(Input.argparse_settings())["config_file"]
 cs = CoupledSimulation(config_file)
 
 # Verify that surface albedos have been set correctly for radiation
-@assert !any(isnan.(Interfacer.get_field(atmos_sim, Val(:surface_direct_albedo))))
-@assert !any(isnan.(Interfacer.get_field(atmos_sim, Val(:surface_diffuse_albedo))))
+atmos_sim = cs.model_sims.atmos_sim
+if hasradiation(atmos_sim.integrator)
+    @assert !any(isnan.(atmos_sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo))
+    @assert !any(isnan.(atmos_sim.integrator.p.radiation.rrtmgp_model.diffuse_sw_surface_albedo))
+end
 
 run!(cs)
 

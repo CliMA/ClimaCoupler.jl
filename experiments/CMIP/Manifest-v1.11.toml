@@ -535,9 +535,9 @@ weakdeps = ["CUDA"]
 
 [[deps.ClimaLand]]
 deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "NCDatasets", "NVTX", "RootSolvers", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "079787e6f27954e6c3f6464d25ee2120c106242e"
+git-tree-sha1 = "012ae1dd506f0bc3900e8f048000b5d876501de5"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
-version = "1.8.2"
+version = "1.8.3"
 
     [deps.ClimaLand.extensions]
     ConstrainedNeuralModelExt = ["Adapt", "Flux", "JLD2", "InteractiveUtils"]
@@ -2013,9 +2013,9 @@ version = "1.2.0"
 
 [[deps.LoopVectorization]]
 deps = ["ArrayInterface", "CPUSummary", "CloseOpenIntervals", "DocStringExtensions", "HostCPUFeatures", "IfElse", "LayoutPointers", "LinearAlgebra", "OffsetArrays", "PolyesterWeave", "PrecompileTools", "SIMDTypes", "SLEEFPirates", "Static", "StaticArrayInterface", "ThreadingUtilities", "UnPack", "VectorizationBase"]
-git-tree-sha1 = "a9fc7883eb9b5f04f46efb9a540833d1fad974b3"
+git-tree-sha1 = "514e8475e33c6faf3155efee5f3c10d9e65a11ab"
 uuid = "bdcacae8-1622-11e9-2a5c-532679323890"
-version = "0.12.173"
+version = "0.12.174"
 weakdeps = ["ChainRulesCore", "ForwardDiff", "NNlib", "SpecialFunctions"]
 
     [deps.LoopVectorization.extensions]

@@ -79,7 +79,11 @@ end
         "restart_cache" => true,
         "save_cache" => true,
         "use_coupler_diagnostics" => true,
+        "coupler_diagnostics_period" => nothing,
+        "coupler_diagnostics_reduction" => "average",
         "use_land_diagnostics" => true,
+        "land_diagnostics_period" => "1months",
+        "land_diagnostics_reduction" => "average",
         "evolving_ocean" => true,
         "energy_check" => false,
         "conservation_softfail" => false,
@@ -94,9 +98,14 @@ end
         "coupler_toml" => [],
         "era5_initial_condition_dir" => nothing,
         "ocean_model" => "prescribed",
-        "ice_model" => "prescribed",
+        "ocean_diagnostic_interval" => "1days",
+        "ocean_diagnostic_mode" => "average",
+        "seaice_diagnostic_interval" => "1days",
+        "seaice_diagnostic_mode" => "average",
         "simple_ocean" => false,
         "sst_adjustment" => 2.0,
+        "ice_model" => "prescribed",
+        "ocean_progress_interval" => nothing,
         "land_fraction_source" => "etopo",
         "binary_area_fraction" => true,
         "domain_type" => "global",
@@ -183,6 +192,16 @@ end
     t_end = 1.0 * secs_per_day
     period, diagnostics_dt = Input.get_diag_period(t_start, t_end)
     @test period == "1days"
+end
+
+@testset "land_diagnostics_period_to_symbol" begin
+    @test Input.land_diagnostics_period_to_symbol("30mins") == :halfhourly
+    @test Input.land_diagnostics_period_to_symbol("1hours") == :hourly
+    @test Input.land_diagnostics_period_to_symbol("1days") == :daily
+    @test Input.land_diagnostics_period_to_symbol("10days") == :tendaily
+    @test Input.land_diagnostics_period_to_symbol("1months") == :monthly
+    @test_throws ErrorException Input.land_diagnostics_period_to_symbol("2hours")
+    @test_throws ErrorException Input.land_diagnostics_period_to_symbol("hourly")
 end
 
 @testset "parse_component_dts!" begin

@@ -14,3 +14,4 @@ vert_diff: "DecayWithHeightDiffusion"
 z_elem: 30
 z_max: 30000.0
 z_stretch: false
+check_nan_every: 1

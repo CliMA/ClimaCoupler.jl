@@ -6,12 +6,12 @@ strict_params: false
 mode_name: "subseasonal"
 era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
 initial_condition: "WeatherModel"
-checkpoint_dt: "7days"
-dt: "10secs"
-dt_cpl: "10secs"
-dt_seaice: "10secs"
+checkpoint_dt: "1000days"
+dt: "80secs"
+dt_cpl: "80secs"
+dt_seaice: "80secs"
 energy_check: false
-h_elem: 32
+h_elem: 16
 land_fraction_source: "era5"
 binary_area_fraction: false
 
@@ -31,10 +31,10 @@ start_date: "20100101"
 surface_setup: "PrescribedSurface"
 topo_smoothing: true
 topography: "Earth"
-t_end: "7days"
+t_end: "8days"
 netcdf_output_at_levels: true
 use_coupler_diagnostics: true
 extra_atmos_diagnostics:
-  - short_name: [zg, orog, tas, ta, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
+  - short_name: [zg, orog, tas, ta, thetaa, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
     period: 24hours
     reduction_time: average

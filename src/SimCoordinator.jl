@@ -225,7 +225,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         restart_cache,
         save_cache,
         use_land_diagnostics,
-        diagnostics_dt,
+        land_diagnostics_period,
+        land_diagnostics_reduction,
         evolving_ocean,
         land_model,
         land_temperature_anomaly,
@@ -234,13 +235,20 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         bucket_albedo_type,
         energy_check,
         use_coupler_diagnostics,
+        coupler_diagnostics_period,
+        coupler_diagnostics_reduction,
         output_dir_root,
         parameter_files,
         era5_filepaths,
         ocean_model,
         simple_ocean,
         sst_adjustment,
+        progress_interval,
+        ocean_diagnostic_interval,
+        ocean_diagnostic_mode,
         ice_model,
+        seaice_diagnostic_interval,
+        seaice_diagnostic_mode,
         land_fraction_source,
         binary_area_fraction,
         domain_type,
@@ -337,6 +345,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         atmos_h,
         land_temperature_anomaly,
         use_land_diagnostics,
+        land_diagnostics_period,
+        land_diagnostics_reduction,
         coupled_param_dict,
         albedo_type = bucket_albedo_type,
         bucket_initial_condition,
@@ -355,6 +365,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         coupled_param_dict,
         thermo_params,
         comms_ctx,
+        progress_interval,
         boundary_space,
         output_dir = dir_paths.ocean_output_dir,
         simple_ocean,
@@ -362,6 +373,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         sst_adjustment,
         saveat,
         evolving = evolving_ocean,
+        ocean_diagnostic_interval,
+        ocean_diagnostic_mode,
     )
 
     ice_sim = Interfacer.SeaIceSimulation(
@@ -381,6 +394,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         sic_path,
         binary_area_fraction,
         domain_type,
+        seaice_diagnostic_interval,
+        seaice_diagnostic_mode,
     )
 
     #=
@@ -390,6 +405,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     model_sims =
         NamedTuple{filter(key -> !isnothing(model_sims[key]), keys(model_sims))}(model_sims)
     @info "Component models initialized: $(keys(model_sims))"
+    @info "Component model types: $(nameof.(values(model_sims)))"
 
     coupler_field_names = Interfacer.default_coupler_fields()
     foreach(sim -> Interfacer.add_coupler_fields!(coupler_field_names, sim), model_sims)
@@ -449,8 +465,9 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
             dir_paths.coupler_output_dir,
             start_date,
             tspan[1],
-            diagnostics_dt,
-            Δt_cpl,
+            coupler_diagnostics_period,
+            Δt_cpl;
+            reduction = coupler_diagnostics_reduction,
         )
     else
         diags_handler = nothing

@@ -16,6 +16,7 @@ import ClimaCore as CC
 import ClimaCoupler
 import ..Checkpointer
 import ..Interfacer
+import ..TimeManager
 import ..Utilities
 
 export argparse_settings,
@@ -167,6 +168,14 @@ function argparse_settings()
         help = "Boolean flag indicating whether to compute and output coupler diagnostics [`true` (default), `false`]"
         arg_type = Bool
         default = true
+        "--coupler_diagnostics_period"
+        help = "Time interval between coupler diagnostic outputs. If not set, the period is derived from the simulation duration. [allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\"]"
+        arg_type = String
+        default = nothing
+        "--coupler_diagnostics_reduction"
+        help = "Reduction mode for coupler diagnostic outputs. [`average` (default), `instantaneous`, `max`, `min`]"
+        arg_type = String
+        default = "average"
         # Physical simulation information
         "--evolving_ocean"
         help = "Boolean flag indicating whether to use a dynamic slab ocean model, as opposed to constant surface temperatures [`true` (default), `false`]"
@@ -224,6 +233,14 @@ function argparse_settings()
         help = "Boolean flag indicating whether to compute and output land model diagnostics [`true` (default), `false`]"
         arg_type = Bool
         default = true
+        "--land_diagnostics_period"
+        help = "Time interval between land diagnostic outputs. ClimaLand only supports a fixed set of periods: [`1months` (default), `10days`, `1days`, `1hours`, `30mins`]"
+        arg_type = String
+        default = "1months"
+        "--land_diagnostics_reduction"
+        help = "Reduction type for land diagnostic outputs. [`average` (default), `instantaneous`, `max`, `min`]"
+        arg_type = String
+        default = "average"
         "--land_spun_up_ic"
         help = "Boolean flag to indicate whether to use integrated land initial conditions from spun up state [`true` (default), `false`]"
         arg_type = Bool
@@ -258,11 +275,31 @@ function argparse_settings()
         help = "Adjustment to add to prescribed SST after conversion to Kelvin (default: 0.0)"
         arg_type = Float64
         default = 0.0
+        "--ocean_progress_interval"
+        help = "Iteration interval for printing progress information [`nothing`, `<:Integer`] (default: nothing)"
+        arg_type = Integer
+        default = nothing
+        "--ocean_diagnostic_interval"
+        help = "Time interval between ocean diagnostic outputs [\"1days\" (default), allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\"]"
+        arg_type = String
+        default = "1days"
+        "--ocean_diagnostic_mode"
+        help = "Reduction mode for ocean diagnostic outputs. [`average` (default) uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval`]"
+        arg_type = String
+        default = "average"
         # Ice model specific
         "--ice_model"
         help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`, `nothing`]"
         arg_type = String
         default = "prescribed"
+        "--seaice_diagnostic_interval"
+        help = "Time interval between sea-ice diagnostic outputs [\"1days\" (default), allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\"]"
+        arg_type = String
+        default = "1days"
+        "--seaice_diagnostic_mode"
+        help = "Reduction mode for sea-ice diagnostic outputs. [`average` (default) uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval`]"
+        arg_type = String
+        default = "average"
         "--land_fraction_source"
         help = "Source for land fraction data. [`etopo` (default) uses ETOPO-derived landsea_mask artifact, `era5` uses ERA5 land fraction artifact]"
         arg_type = String
@@ -481,8 +518,14 @@ function get_coupler_args(config_dict::Dict)
 
     # Diagnostics information
     use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
-    use_land_diagnostics = config_dict["use_land_diagnostics"]
-    (_, diagnostics_dt) = get_diag_period(t_start, t_end)
+    coupler_diagnostics_reduction = Symbol(config_dict["coupler_diagnostics_reduction"])
+    # If no coupler diagnostics period is specified, auto-derive from the simulation duration
+    coupler_diagnostics_period = config_dict["coupler_diagnostics_period"]
+    if isnothing(coupler_diagnostics_period)
+        (_, coupler_diagnostics_period) = get_diag_period(t_start, t_end)
+    else
+        coupler_diagnostics_period = TimeManager.time_to_period(coupler_diagnostics_period)
+    end
 
     # Physical simulation information
     evolving_ocean = config_dict["evolving_ocean"]
@@ -503,6 +546,9 @@ function get_coupler_args(config_dict::Dict)
     lai_source = config_dict["lai_source"]
     bucket_albedo_type = config_dict["bucket_albedo_type"]
     bucket_initial_condition = config_dict["bucket_initial_condition"]
+    land_diagnostics_period =
+        land_diagnostics_period_to_symbol(config_dict["land_diagnostics_period"])
+    land_diagnostics_reduction = Symbol(config_dict["land_diagnostics_reduction"])
 
     # Initial condition setting
     era5_initial_condition_dir = config_dict["era5_initial_condition_dir"]
@@ -519,9 +565,14 @@ function get_coupler_args(config_dict::Dict)
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
     simple_ocean = config_dict["simple_ocean"]
     sst_adjustment = FT(config_dict["sst_adjustment"])
+    progress_interval = config_dict["ocean_progress_interval"]
+    ocean_diagnostic_interval = config_dict["ocean_diagnostic_interval"]
+    ocean_diagnostic_mode = Symbol(config_dict["ocean_diagnostic_mode"])
 
     # Ice model-specific information
     ice_model = Val(Symbol(config_dict["ice_model"]))
+    seaice_diagnostic_interval = config_dict["seaice_diagnostic_interval"]
+    seaice_diagnostic_mode = Symbol(config_dict["seaice_diagnostic_mode"])
 
     # SCM settings
     domain_type = config_dict["domain_type"]
@@ -580,7 +631,8 @@ function get_coupler_args(config_dict::Dict)
         restart_cache,
         save_cache,
         use_coupler_diagnostics,
-        diagnostics_dt,
+        coupler_diagnostics_period,
+        coupler_diagnostics_reduction,
         evolving_ocean,
         energy_check,
         conservation_softfail,
@@ -591,13 +643,20 @@ function get_coupler_args(config_dict::Dict)
         land_spun_up_ic,
         lai_source,
         use_land_diagnostics,
+        land_diagnostics_period,
+        land_diagnostics_reduction,
         bucket_albedo_type,
         parameter_files,
         era5_filepaths,
         ocean_model,
         simple_ocean,
         sst_adjustment,
+        progress_interval,
+        ocean_diagnostic_interval,
+        ocean_diagnostic_mode,
         ice_model,
+        seaice_diagnostic_interval,
+        seaice_diagnostic_mode,
         land_fraction_source,
         binary_area_fraction,
         domain_type,
@@ -649,6 +708,32 @@ function get_diag_period(t_start, t_end)
         diagnostics_dt = Dates.Hour(1)
     end
     return (period, diagnostics_dt)
+end
+
+"""
+    land_diagnostics_period_to_symbol(period_str)
+
+Translate the user-facing `land_diagnostics_period` time-string (e.g. `"1hours"`)
+to the corresponding ClimaLand `reduction_period` symbol expected by
+`ClimaLand.default_diagnostics` (e.g. `:hourly`).
+
+ClimaLand's diagnostics API only accepts a fixed set of period symbols
+(see `ClimaLand.Diagnostics.get_period`), but the rest of the coupler uses
+human-readable time strings, so this helper bridges the two.
+"""
+const _LAND_DIAGNOSTICS_PERIOD_SYMBOLS = Dict(
+    "30mins" => :halfhourly,
+    "1hours" => :hourly,
+    "1days" => :daily,
+    "10days" => :tendaily,
+    "1months" => :monthly,
+)
+function land_diagnostics_period_to_symbol(period_str::AbstractString)
+    haskey(_LAND_DIAGNOSTICS_PERIOD_SYMBOLS, period_str) || error(
+        "Unsupported land_diagnostics_period: \"$period_str\". " *
+        "ClimaLand only supports: $(join(sort(collect(keys(_LAND_DIAGNOSTICS_PERIOD_SYMBOLS))), ", ")).",
+    )
+    return _LAND_DIAGNOSTICS_PERIOD_SYMBOLS[period_str]
 end
 
 """

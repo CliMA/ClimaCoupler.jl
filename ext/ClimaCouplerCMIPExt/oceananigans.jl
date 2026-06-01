@@ -1,4 +1,5 @@
 import ClimaComms
+import NVTX
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaOcean.EN4: download_dataset
@@ -58,6 +59,7 @@ dispatch in coupling.
 - `dt`: Time step (default: `nothing`)
 - `comms_ctx`: Communication context (default: `ClimaComms.context()`)
 - `coupled_param_dict`: Coupled parameter dictionary (default: created from `area_fraction`)
+- `progress_interval`: iteration interval for printing progress information (default: `nothing`)
 
 Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
@@ -72,13 +74,16 @@ function OceananigansSimulation(
     dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
+    progress_interval = nothing,
+    ocean_diagnostic_interval = "1days",
+    ocean_diagnostic_mode = :average,
     extra_kwargs...,
 ) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
     OC.Oceananigans.defaults.FloatType = FT
 
     # Compute stop_date for oceananigans (needed for EN4 data retrieval)
-    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
+    stop_date = start_date + Dates.Second(float(tspan[2]))
 
     # Use Float64 for the ocean to avoid precision issues
     FT_ocean = Float64
@@ -145,8 +150,6 @@ function OceananigansSimulation(
         # Simpler setup
         @info "Using simpler ocean setup; to be used for software testing only."
         free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
-        momentum_advection = OC.WENOVectorInvariant(order = 5)
-        horizontal_viscosity = OC.HorizontalScalarDiffusivity(ν = 1e4)
         tracer_advection = OC.WENO(order = 5)
         vertical_mixing = OC.ConvectiveAdjustmentVerticalDiffusivity(
             background_κz = 1e-5,
@@ -154,7 +157,8 @@ function OceananigansSimulation(
             background_νz = 1e-4,
             convective_νz = 0.1,
         )
-
+        momentum_advection = OC.WENOVectorInvariant(order = 5)
+        horizontal_viscosity = OC.HorizontalScalarDiffusivity(ν = 1e4)
         closure = (horizontal_viscosity, vertical_mixing)
     end
 
@@ -180,6 +184,42 @@ function OceananigansSimulation(
         free_surface,
         closure,
     )
+
+    wall_time = Ref(time_ns())
+
+    """
+        progress(sim)
+
+    Output the extrema of some prognostic variables, which can be useful for debugging.
+    The frequency with which this is output is determined by the interval passed to
+    `OC.add_callback!` below.
+    """
+    function progress(sim)
+        ocean = sim.model
+
+        (Tmax, Tmin) = extrema(ocean.tracers.T)
+        (Smax, Smin) = extrema(ocean.tracers.S)
+        (ηmax, ηmin) = extrema(ocean.free_surface.displacement)
+        umax = maximum(abs, ocean.velocities.u)
+        vmax = maximum(abs, ocean.velocities.v)
+        wmax = maximum(abs, ocean.velocities.w)
+        step_time = 1e-9 * (time_ns() - wall_time[])
+        @info "time: $(OC.Utils.prettytime(sim)), iteration: $(OC.iteration(sim)), Δt: $(OC.Utils.prettytime(sim.Δt)), " *
+              "extrema(η): ($(round(ηmin, sigdigits=2)), $(round(ηmax, sigdigits=2))) " *
+              "extrema(T, S): ($(round(Tmin, digits=2)), $(round(Tmax, digits=2))) ᵒC, " *
+              "($(round(Smin, digits=2)), $(round(Smax, digits=2))) psu " *
+              "maximum(u): ($(round(umax, sigdigits=2)), $(round(vmax, sigdigits=2)), $(round(wmax, sigdigits=2))) m/s, " *
+              "wall time: $(OC.Utils.prettytime(step_time))"
+
+        wall_time[] = time_ns()
+
+        return nothing
+    end
+
+    # Attaching a progress function to the ocean
+    if !isnothing(progress_interval)
+        OC.add_callback!(ocean, progress, OC.IterationInterval(progress_interval))
+    end
 
     # Set initial condition to EN4 state estimate at start_date
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
@@ -241,45 +281,6 @@ function OceananigansSimulation(
         coare3_roughness_params,
     )
 
-    # Before version 0.96.22, the NetCDFWriter was broken on GPU
-    if arch isa OC.CPU
-        # Save all tracers and velocities to a NetCDF file at daily frequency
-        outputs = merge(ocean.model.tracers, ocean.model.velocities)
-        surface_writer = OC.NetCDFWriter(
-            ocean.model,
-            outputs;
-            schedule = OC.TimeInterval(86400), # Daily output
-            filename = joinpath(output_dir, "ocean_diagnostics.nc"),
-            indices = (:, :, grid.Nz),
-            overwrite_existing = true,
-            array_type = Array{FT},
-        )
-        free_surface_writer = OC.NetCDFWriter(
-            ocean.model,
-            (; displacement = ocean.model.free_surface.displacement);
-            schedule = OC.TimeInterval(3600), # hourly snapshots
-            filename = joinpath(output_dir, "ocean_free_surface.nc"),
-            overwrite_existing = true,
-            array_type = Array{FT},
-        )
-        Tflux = ocean.model.tracers.T.boundary_conditions.top.condition
-        Sflux = ocean.model.tracers.S.boundary_conditions.top.condition
-        uflux = ocean.model.velocities.u.boundary_conditions.top.condition
-        vflux = ocean.model.velocities.v.boundary_conditions.top.condition
-        fluxes_writer = OC.NetCDFWriter(
-            ocean.model,
-            (; Tflux, Sflux, uflux, vflux);
-            schedule = OC.TimeInterval(3600), # hourly snapshots
-            filename = joinpath(output_dir, "ocean_fluxes.nc"),
-            overwrite_existing = true,
-            array_type = Array{FT},
-        )
-
-        ocean.output_writers[:surface] = surface_writer
-        ocean.output_writers[:free_surface] = free_surface_writer
-        ocean.output_writers[:fluxes] = fluxes_writer
-    end
-
     # Initialize with 0 ice concentration; this will be updated in `resolve_area_fractions!`
     # if the ocean is coupled to a non-prescribed sea ice model.
     ice_concentration = OC.Field{OC.Center, OC.Center, Nothing}(grid)
@@ -287,7 +288,7 @@ function OceananigansSimulation(
     # Create a dummy area fraction that will get overwritten in `update_surface_fractions!`
     area_fraction = ones(boundary_space)
 
-    return OceananigansSimulation(
+    sim = OceananigansSimulation(
         ocean,
         area_fraction,
         ocean_properties,
@@ -295,6 +296,15 @@ function OceananigansSimulation(
         ice_concentration,
         model_Δt,
     )
+
+    add_ocean_diagnostics!(
+        sim;
+        output_dir,
+        interval = TimeManager.time_to_period(ocean_diagnostic_interval),
+        mode = ocean_diagnostic_mode,
+    )
+
+    return sim
 end
 
 """
@@ -343,7 +353,7 @@ end
 ###############################################################################
 
 # Timestep the simulation forward to time `t`. This may not actually do anything.
-function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
+NVTX.@annotate function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
     # `round(Int, ...)` tolerates floating point drift less than `model_dt / 2`
     n_steps = round(Int, (t - sim.ocean.model.clock.time) / sim.model_Δt)
     for _ in 1:n_steps
@@ -352,7 +362,7 @@ function Interfacer.step!(sim::OceananigansSimulation, t::Float64)
     return nothing
 end
 
-function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
+NVTX.@annotate function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
     Δt_msec = date(t) - sim.ocean.model.clock.time
     model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
     n_steps = div(Δt_msec, model_Δt_msec) # integer division; exact for Millisecond periods
@@ -612,19 +622,6 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
         OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
         (remapped_P_liq .+ remapped_P_snow) ./ reference_density
     return nothing
-end
-
-"""
-    get_model_prog_state(sim::OceananigansSimulation)
-
-Returns the model state of a simulation as a `ClimaCore.FieldVector`.
-It's okay to leave this unimplemented for now, but we won't be able to use the
-restart system.
-
-TODO extend this for non-ClimaCore states.
-"""
-function Checkpointer.get_model_prog_state(sim::OceananigansSimulation)
-    @warn "get_model_prog_state not implemented for OceananigansSimulation"
 end
 
 # Additional OceananigansSimulation getter methods for plotting debug fields

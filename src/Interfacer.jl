@@ -5,12 +5,12 @@ This modules contains abstract types, interface templates and model stubs for co
 """
 module Interfacer
 
-import SciMLBase
 import ClimaComms
 import ClimaCore as CC
 import Dates
 import Thermodynamics as TD
-import SciMLBase: step!
+import NVTX
+import ClimaTimeSteppers: step!
 import ClimaUtilities.TimeManager: ITime, date
 import Statistics
 
@@ -387,7 +387,7 @@ Base.nameof(sim::AbstractComponentSimulation) = string(nameof(typeof(sim)))
 
 A function to update the simulation in-place with values calculate for time `t`.
 For the models we currently have implemented, this is a simple wrapper around
-the `step!` function implemented in SciMLBase.jl.
+the `step!` function implemented in ClimaTimeSteppers.jl.
 
 This must be extended for all component models - otherwise this default
 function will be called and an error will be raised.
@@ -398,15 +398,15 @@ step!(sim::AbstractComponentSimulation, t) = error("undefined step! for $(nameof
     step!(sim::AbstractComponentSimulation, t::Float64)
 
 Default step method for simulations using `Float64` as the time type.
-This method is suitable for simulations that use a SciMLBase-style integrator,
-but should be extended for other models.
+This method is suitable for simulations that use a ClimaTimeSteppers-style
+integrator, but should be extended for other models.
 
 This method computes the number of steps to take based on the difference
 between the simulation time (stored in the integrator) and the coupler time
 `t`, divided by the simulation timestep. This generically handles the cases where
 the simulation's timestep is shorter than, longer than, or equal to that of the coupler.
 """
-function step!(sim::AbstractComponentSimulation, t::Float64)
+NVTX.@annotate function step!(sim::AbstractComponentSimulation, t::Float64)
     model_dt = Float64(sim.integrator.dt)
     # `round(Int, ...)` tolerates floating point drift less than `model_dt / 2`
     n_steps = round(Int, (t - Float64(sim.integrator.t)) / model_dt)
@@ -419,15 +419,15 @@ end
     step!(sim::AbstractComponentSimulation, t::ITime)
 
 Default step method for simulations using `ITime` as the time type.
-This method is suitable for simulations that use a SciMLBase-style integrator,
-but should be extended for other models.
+This method is suitable for simulations that use a ClimaTimeSteppers-style
+integrator, but should be extended for other models.
 
 This method computes the number of steps to take based on the difference
 between the simulation time (stored in the integrator) and the coupler time
 `t`, divided by the simulation timestep. This generically handles the cases where
 the simulation's timestep is shorter than, longer than, or equal to that of the coupler.
 """
-function step!(sim::AbstractComponentSimulation, t::ITime)
+NVTX.@annotate function step!(sim::AbstractComponentSimulation, t::ITime)
     n_steps = div(t - sim.integrator.t, sim.integrator.dt) # integer division; exact for ITime
     for _ in 1:n_steps
         step!(sim.integrator)
@@ -547,7 +547,10 @@ Non-ClimaCore fields should provide a method to this function.
 """
 function remap end
 
-function remap(target_space::CC.Spaces.AbstractSpace, source_field::CC.Fields.Field)
+NVTX.@annotate function remap(
+    target_space::CC.Spaces.AbstractSpace,
+    source_field::CC.Fields.Field,
+)
     source_space = axes(source_field)
 
     # TODO: Handle remapping of Vectors correctly
@@ -594,7 +597,7 @@ Note that this method has a lot of allocations and is not efficient.
 """
 function remap! end
 
-function remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field)
+NVTX.@annotate function remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field)
     source_space = axes(source_field)
     target_space = axes(target_field)
     comms_ctx = ClimaComms.context(source_space)

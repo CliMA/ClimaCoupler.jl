@@ -38,7 +38,7 @@ function varies across component models.
 - `step!(::AbstractComponentSimulation, t)`: A function to update the
 simulation in-place with values calculate for time `t`. For the
 models we currently have implemented, this is a simple wrapper around
-the `step!` function implemented in SciMLBase.jl.
+the `step!` function implemented in ClimaTimeSteppers.jl.
 
 ### AbstractComponentSimulation - optional functions
 - `Checkpointer.get_model_prog_state(::AbstractComponentSimulation)`:
@@ -183,15 +183,6 @@ properties needed by a component model.
 | `surface_diffuse_albedo` | bulk diffuse surface albedo over the whole surface space |       |
 | `surface_temperature`    | temperature over the combined surface space              | K     |
 | `turbulent_fluxes`       | turbulent fluxes                                         | W m⁻² |
-
-ClimaAtmos should also add the following coupler fields for Monin-Obukhov similarity theory:
-
-| Coupler name    | Description       | Units  |
-|-----------------|-------------------|--------|
-| `ustar`         | friction velocity | m s⁻¹  |
-| `L_MO`          | Obukhov length    | m      |
-| `buoyancy_flux` | flux of buoyancy  | m⁻²s⁻³ |
-
 
 ### AbstractAtmosSimulation - required functions to run with the ClimaLandSimulation
 

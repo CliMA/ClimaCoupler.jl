@@ -98,7 +98,8 @@ update_field!(::AbstractSurfaceStub, ::Val{:turbulent_moisture_flux}, field) = n
 """
     step!(::AbstractSurfaceStub, t)
 
-The stub surface simulation is not updated by this function. Extends `SciMLBase.step!`.
+The stub surface simulation is not updated by this function.
+Extends `ClimaTimeSteppers.step!`.
 """
 step!(::AbstractSurfaceStub, ::Float64) = nothing
 step!(::AbstractSurfaceStub, ::ITime) = nothing

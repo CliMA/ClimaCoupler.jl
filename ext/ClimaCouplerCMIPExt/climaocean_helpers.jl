@@ -186,3 +186,76 @@ function unit_basis_vector_data(::Type{V}, local_geometry) where {V}
     FT = CC.Geometry.undertype(typeof(local_geometry))
     return FT(1) / CC.Geometry._norm(V(FT(1)), local_geometry)
 end
+
+
+"""
+    get_oc_sim(sim)
+
+Return the underlying `Oceananigans.Simulation` object for component models
+that use Oceananigans under the hood.
+"""
+get_oc_sim(sim::OceananigansSimulation) = sim.ocean
+get_oc_sim(sim::ClimaSeaIceSimulation) = sim.ice
+
+
+"""
+    Checkpointer.checkpoint_model_state(sim, comms_ctx, t, prev_checkpoint_t; output_dir)
+
+Save the state of an Oceananigans-backed simulation to a JLD2 file at time `t`
+(in seconds) using `Oceananigans.checkpoint`.
+
+If a previous checkpoint exists, it is removed to avoid accumulating files.
+A value of -1 for `prev_checkpoint_t` indicates there is no previous checkpoint.
+"""
+function Checkpointer.checkpoint_model_state(
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    comms_ctx::ClimaComms.AbstractCommsContext,
+    t::Int,
+    prev_checkpoint_t::Int;
+    output_dir = "output",
+)
+    day = floor(Int, t / (60 * 60 * 24))
+    sec = floor(Int, t % (60 * 60 * 24))
+    @info "Saving checkpoint $(nameof(sim)) model state to JLD2 on day $day second $sec"
+    output_file = joinpath(output_dir, "checkpoint_$(nameof(sim))_$t.jld2")
+    prev_checkpoint_file =
+        joinpath(output_dir, "checkpoint_$(nameof(sim))_$(prev_checkpoint_t).jld2")
+    Checkpointer.remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
+    OC.checkpoint(get_oc_sim(sim); filepath = output_file)
+    return nothing
+end
+
+"""
+    Checkpointer.restart_model_state!(sim, input_file, comms_ctx)
+
+Restore the state of an Oceananigans-backed simulation from a JLD2 checkpoint
+file using `Oceananigans.set!`.
+
+The coupler constructs `input_file` with a `.hdf5` extension; this method
+replaces it with `.jld2` to match the format written by `checkpoint_model_state`.
+"""
+function Checkpointer.restart_model_state!(
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    input_file,
+    comms_ctx,
+)
+    jld2_file = replace(input_file, ".hdf5" => ".jld2")
+    ispath(jld2_file) || error("Oceananigans checkpoint file not found: $jld2_file")
+    OC.set!(get_oc_sim(sim); checkpoint = jld2_file)
+    return nothing
+end
+
+"""
+    Checkpointer.restart_model_cache!(sim, input_file)
+
+No-op for Oceananigans-backed simulations. All necessary state is restored via
+`restart_model_state!`; there is no separate cache to restore.
+"""
+function Checkpointer.restart_model_cache!(
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    input_file,
+)
+    @warn "$(nameof(sim)) does not support restoring the model cache from a checkpoint. " *
+          "The simulation cache will not be restored."
+    return nothing
+end

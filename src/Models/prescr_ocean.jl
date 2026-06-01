@@ -13,7 +13,8 @@ import Dates
 import ClimaAtmos as CA # for albedo calculation
 import LinearAlgebra
 import ClimaComms
-import ..Checkpointer, ..FieldExchanger, ..Interfacer
+import ClimaDiagnostics as CD
+import ..Checkpointer, ..FieldExchanger, ..Interfacer, ..TimeManager
 
 """
     PrescribedOceanSimulation{C}
@@ -128,6 +129,13 @@ function PrescribedOceanSimulation(
     t_start = first(tspan)
     evaluate!(SST_init, SST_timevaryinginput, t_start)
 
+    # Create a schedule to update the SST daily. The data provides monthly
+    # averages, so it doesn't make sense to update the SST more frequently than daily.
+    SST_schedule = CD.Schedules.EveryCalendarDtSchedule(
+        TimeManager.time_to_period("1days");
+        start_date,
+    )
+
     # COARE3 roughness params (allocated once, reused each timestep)
     coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
     coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
@@ -143,9 +151,10 @@ function PrescribedOceanSimulation(
         v_int = zeros(boundary_space),
         area_fraction = ones(boundary_space),
         phase = TD.Liquid(),
-        thermo_params = thermo_params,
-        SST_timevaryinginput = SST_timevaryinginput,
-        start_date = start_date,
+        thermo_params,
+        SST_timevaryinginput,
+        SST_schedule,
+        start_date,
         t = Ref(t_start),
         coare3_roughness_params,
     )
@@ -184,14 +193,20 @@ end
     Interfacer.step!(sim::PrescribedOceanSimulation, t)
 
 Update the cached surface temperature field using the prescribed data
-at each timestep.
+at the frequency specified by the schedule (daily by default).
+Also updates the current time in the simulation cache.
+
+`EveryCalendarDtSchedule` expects an integrator-like object with a `.t` field
+so we wrap `t` in a NamedTuple.
 """
 function Interfacer.step!(sim::PrescribedOceanSimulation, t::Float64)
-    evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
+    sim.cache.SST_schedule((; t)) &&
+        evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
     sim.cache.t[] = t
 end
 function Interfacer.step!(sim::PrescribedOceanSimulation, t::ITime)
-    evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
+    sim.cache.SST_schedule((; t)) &&
+        evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
     sim.cache.t[] = t
 end
 

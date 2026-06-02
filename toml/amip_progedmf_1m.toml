@@ -25,7 +25,7 @@ value = 0.0001
 [min_area_limiter_power]
 value = 1
 
-[turb_detr_param_vec]
+[turb_entr_param_vec]
 value = [1e-4, 10]
 
 [entr_detr_limit_inv_tau]

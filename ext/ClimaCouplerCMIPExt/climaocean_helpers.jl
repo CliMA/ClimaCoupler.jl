@@ -116,21 +116,18 @@ function unit_basis_vector_data(::Type{V}, local_geometry) where {V}
 end
 
 # Non-allocating ClimaCore -> Oceananigans remap
+#
 function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
-    # Get the value per element of the ClimaCore field
-    get_ConservativeRegriddingCCExt().get_value_per_element!(
-        remapping.value_per_element_cc,
-        source_field,
-        remapping.field_ones_cc,
-    )
-
     # Get the index of the top level (surface); Nz=1 for 2D fields
     Nz = size(target_field, 3)
     dst = vec(OC.interior(target_field, :, :, Nz))
-    src = remapping.value_per_element_cc
 
-    # Regrid the source (ClimaCore) field to the target (Oceananigans) field
-    CR.regrid!(dst, transpose(remapping.remapper_oc_to_cc), src)
+    # The principled SE → FV regridder accepts a `CC.Fields.Field` source directly
+    # (ConservativeRegriddingClimaCoreExt overloads `extract_source_arraylike` /
+    # `initialize_regridding!`).
+    CR.regrid!(dst, remapping.remapper_cc_to_oc, source_field)
+
+    @. dst = ifelse(isfinite(dst), dst, zero(eltype(dst)))
     return nothing
 end
 
@@ -150,28 +147,98 @@ function Interfacer.remap(
 end
 
 # Non-allocating Oceananigans Field -> ClimaCore remap
-function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field, remapping)
+#
+# The per-element L2 projection used by `remapper_oc_to_cc` minimises
+# `||u_SE - u_FV||²` over each SE element and bakes the inverse element mass
+# matrix into its sparse matrix. It is mass-conservative but neither monotone
+# nor mask-aware: any value placed in a masked (dry) source cell is treated as
+# real FV data and is L2-projected along with the surrounding wet cells. For
+# the immersed land/ocean grids used here the FV source therefore needs to be
+# given a value to use in masked cells, and the choice of that value matters:
+#
+# * For an **intensive** field (e.g. T_sfc, T_int, ice_thickness, emissivity,
+#   albedo), the value in a land cell is physically undefined. If we fill it
+#   with 0, we manufacture a step discontinuity at every coastline (e.g. 273 K
+#   wet → 0 K dry for `:surface_temperature`). The L2 projection responds with
+#   Gibbs overshoots; at very thin SE elements straddling a coast (small wet
+#   area, near-singular element mass matrix) the overshoot can be amplified by
+#   `M⁻¹` by orders of magnitude, and the subsequent weighted DSS smears the
+#   overshoot to every element sharing a face or vertex. Concretely, the
+#   `update_T_sfc` iteration in `compute_surface_fluxes!` was being fed
+#   `T_sfc_guess` with sub-zero-Kelvin nodes from this pathway, and the
+#   non-linear (`T⁴`, `T³`) dependence on T_n then drove the iteration to
+#   non-physical fixed points well outside the iteration's step limiter.
+#
+# * For an **extensive** field (e.g. a turbulent or radiative flux, momentum)
+#   the dry-cell contribution must be exactly zero for mass conservation
+#   across the masked subdomain.
+#
+# We therefore expose a `fill_value` kwarg. The default
+# (`fill_value === nothing`) computes the wet-cell mean of the source on the
+# fly and uses that as the masked-cell value. For any field that is roughly
+# uniform over the wet domain this reduces the masked input to a (nearly)
+# constant FV field, which the L2 projection preserves exactly and DSS leaves
+# unchanged. Pass `fill_value = 0` (or any other constant) at the call site
+# when the zero/constant convention is required.
+function Interfacer.remap!(
+    target_field::CC.Fields.Field,
+    source_field::OC.Field,
+    remapping;
+    fill_value = nothing,
+)
     # Get the index of the top level (surface); Nz=1 for 2D fields
     Nz = size(source_field, 3)
-    src = vec(OC.interior(source_field, :, :, Nz))
-    dst = remapping.value_per_element_cc
+    src_view = vec(OC.interior(source_field, :, :, Nz))
 
-    # Regrid the source (Oceananigans) field to the target (ClimaCore) field
-    CR.regrid!(dst, remapping.remapper_oc_to_cc, src)
+    src = remapping.fv_src_buf
+    mask = remapping.fv_immersed_mask
 
-    # Convert the vector of remapped values to a ClimaCore Field with one value per element
-    get_ConservativeRegriddingCCExt().set_value_per_element!(target_field, dst)
+    FT = eltype(src)
+    fv = if fill_value === nothing
+        _wet_cell_mean(src_view, mask, FT)
+    else
+        FT(fill_value)
+    end
+
+    @. src = ifelse(mask | !isfinite(src_view), fv, src_view)
+
+    # The FV → SE regridder accepts a `CC.Fields.Field` destination directly.
+    # ConservativeRegriddingClimaCoreExt's `finalize_regridding!` writes the
+    # nodal vector into the SE field and applies weighted DSS internally to
+    # reconcile element-boundary DOFs in a mass-conserving way.
+    CR.regrid!(target_field, remapping.remapper_oc_to_cc, src)
     return nothing
+end
+
+# Wet-cell mean of `src_view`. A cell counts as "wet" if it is not immersed
+# (`!mask[i]`) and its source value is finite. Returns 0 if there are no wet
+# cells (shouldn't happen for our grids, but defensive).
+#
+# Implemented with two fused `sum(broadcast)` reductions rather than a single
+# `mapreduce` over (src, mask) because the multi-iterator form of `mapreduce`
+# is not uniformly supported on GPU back-ends, while broadcast + `sum` lower
+# to the standard KernelAbstractions reduction path. Each `sum` allocates one
+# transient temporary; the cost is negligible compared to the sparse L2
+# projection that follows.
+function _wet_cell_mean(
+    src_view::AbstractVector,
+    mask::AbstractVector{Bool},
+    ::Type{FT},
+) where {FT}
+    valid_sum = sum(@. ifelse(mask | !isfinite(src_view), zero(FT), FT(src_view)))
+    valid_count = sum(@. ifelse(mask | !isfinite(src_view), zero(FT), one(FT)))
+    return iszero(valid_count) ? zero(FT) : valid_sum / valid_count
 end
 
 # Allocating Oceananigans Field -> ClimaCore remap
 function Interfacer.remap(
     target_space::CC.Spaces.AbstractSpace,
     source_field::OC.Field,
-    remapping,
+    remapping;
+    fill_value = nothing,
 )
     target_field = CC.Fields.zeros(target_space)
-    Interfacer.remap!(target_field, source_field, remapping)
+    Interfacer.remap!(target_field, source_field, remapping; fill_value)
     return target_field
 end
 
@@ -179,11 +246,12 @@ end
 function Interfacer.remap!(
     target_field::CC.Fields.Field,
     operation::OC.AbstractOperations.AbstractOperation,
-    remapping,
+    remapping;
+    fill_value = nothing,
 )
     evaluated_field = OC.Field(operation)
     OC.compute!(evaluated_field)
-    Interfacer.remap!(target_field, evaluated_field, remapping)
+    Interfacer.remap!(target_field, evaluated_field, remapping; fill_value)
     return nothing
 end
 
@@ -191,10 +259,11 @@ end
 function Interfacer.remap(
     target_space::CC.Spaces.AbstractSpace,
     operation::OC.AbstractOperations.AbstractOperation,
-    remapping,
+    remapping;
+    fill_value = nothing,
 )
     target_field = CC.Fields.zeros(target_space)
-    Interfacer.remap!(target_field, operation, remapping)
+    Interfacer.remap!(target_field, operation, remapping; fill_value)
     return target_field
 end
 
@@ -202,9 +271,15 @@ end
 function Interfacer.get_field!(
     target_field,
     sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
-    quantity,
+    quantity;
+    fill_value = nothing,
 )
-    Interfacer.remap!(target_field, Interfacer.get_field(sim, quantity), sim.remapping)
+    Interfacer.remap!(
+        target_field,
+        Interfacer.get_field(sim, quantity),
+        sim.remapping;
+        fill_value,
+    )
     return nothing
 end
 # TODO see if we can remove this allocating version

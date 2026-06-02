@@ -462,14 +462,21 @@ function update_flux_fields!(
     (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture) = fluxes
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
-    # Zero out fluxes where the area fraction is zero
-    # Multiplying by `area_fraction` is not sufficient because the fluxes may
-    # be NaN where the area fraction is zero.
-    @. F_turb_ρτxz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτxz), F_turb_ρτxz)
-    @. F_turb_ρτyz = ifelse(area_fraction ≈ 0, zero(F_turb_ρτyz), F_turb_ρτyz)
-    @. F_sh = ifelse(area_fraction ≈ 0, zero(F_sh), F_sh)
-    @. F_lh = ifelse(area_fraction ≈ 0, zero(F_lh), F_lh)
-    @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(F_turb_moisture), F_turb_moisture)
+    # Zero out fluxes where the area fraction is zero OR where the per-model
+    # surface-flux computation produced a non-finite value. The `≈ 0` test
+    # alone is not enough: at coastal SE nodes where a conservative FV → SE
+    # remap deposits a tiny but nonzero `area_fraction`, a NaN F_* would
+    # otherwise be kept here, then accumulated into `csf.F_* += F_* * area_fraction`
+    # as NaN, contaminating the combined coupler field. The `isfinite` guard
+    # also covers the rarer case where `area_fraction` itself becomes NaN.
+    @. F_turb_ρτxz =
+        ifelse(area_fraction ≈ 0 || !isfinite(F_turb_ρτxz), zero(F_turb_ρτxz), F_turb_ρτxz)
+    @. F_turb_ρτyz =
+        ifelse(area_fraction ≈ 0 || !isfinite(F_turb_ρτyz), zero(F_turb_ρτyz), F_turb_ρτyz)
+    @. F_sh = ifelse(area_fraction ≈ 0 || !isfinite(F_sh), zero(F_sh), F_sh)
+    @. F_lh = ifelse(area_fraction ≈ 0 || !isfinite(F_lh), zero(F_lh), F_lh)
+    @. F_turb_moisture =
+        ifelse(area_fraction ≈ 0 || !isfinite(F_turb_moisture), zero(F_turb_moisture), F_turb_moisture)
 
     # update the fluxes, which are now area fraction-masked, of this surface model
     fields = (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)

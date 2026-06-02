@@ -33,12 +33,8 @@ import ClimaParams as CP
 using KernelAbstractions: @kernel, @index, @inbounds
 
 import Adapt # for ConservativeRegridding
-import ClimaCore as CC # for ConservativeRegriddingClimaCoreExt
 import ConservativeRegridding as CR
 import SparseArrays # for converting Regridder element types
-
-get_ConservativeRegriddingCCExt() =
-    Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
 
 # Include the model files first so their types are available to climaocean_helpers.jl
 include("ClimaCouplerCMIPExt/oceananigans.jl")

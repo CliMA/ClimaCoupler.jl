@@ -45,10 +45,26 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     # ice and ocean fractions are dynamic
     if haskey(cs.model_sims, :ice_sim)
         ice_sim = cs.model_sims.ice_sim
-        Interfacer.get_field!(cs.fields.scalar_temp2, ice_sim, Val(:ice_concentration))
+        # `fill_value = 0` matches the physical meaning of `ice_concentration`
+        # in immersed (land) cells: there is no sea ice over land. The FV → SE
+        # remap defined in `ext/ClimaCouplerCMIPExt/climaocean_helpers.jl`
+        # otherwise defaults to filling masked cells with the wet-cell mean,
+        # which is the right choice for intensive surface fields (T_sfc, T_int,
+        # …) but inflates `ice_fraction` over land slightly before the
+        # `max.(min.(ice_fraction, 1 - land_fraction), 0)` clamp below.
+        # `fv = 0` is consistent with the downstream clamp.
+        Interfacer.get_field!(
+            cs.fields.scalar_temp2,
+            ice_sim,
+            Val(:ice_concentration);
+            fill_value = 0,
+        )
         ice_concentration = cs.fields.scalar_temp2
 
-        # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
+        # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC).
+        # `ice_concentration` here is the output of a mask-aware FV → SE remap
+        # (see `Interfacer.remap!(::CC.Fields.Field, ::OC.Field, …)` in
+        # `ext/ClimaCouplerCMIPExt/climaocean_helpers.jl`).
         Interfacer.update_field!(
             ice_sim,
             Val(:area_fraction),
@@ -83,8 +99,19 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     cs.fields.ocean_area_fraction .= ocean_fraction
 
     # check that the sum of area fractions is 1
-    @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
-    @assert maximum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
+    fraction_sum = ice_fraction .+ land_fraction .+ ocean_fraction
+    sum_min, sum_max = extrema(fraction_sum)
+    if !(sum_min ≈ FT(1)) || !(sum_max ≈ FT(1))
+        @error(
+            "Surface area fractions do not sum to 1",
+            sum_extrema = (sum_min, sum_max),
+            ice_extrema = extrema(ice_fraction),
+            land_extrema = extrema(land_fraction),
+            ocean_extrema = extrema(ocean_fraction),
+        )
+    end
+    @assert sum_min ≈ FT(1)
+    @assert sum_max ≈ FT(1)
 end
 
 """

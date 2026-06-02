@@ -315,11 +315,20 @@ function get_field(target_space, sim, quantity)
 end
 
 """
-    get_field!(target_field, sim, quantity)
+    get_field!(target_field, sim, quantity; fill_value = nothing)
 
 Remap `quantity` in `sim` remapped onto the `target_field`.
+
+The `fill_value` kwarg is forwarded to the underlying `remap!` so that
+component-model extensions can override what value is used for masked cells on
+mask-aware remap paths (e.g. the FV → SE projection used by Oceananigans and
+ClimaSeaIce, where `fill_value = 0` preserves the "no field over land"
+convention for extensive/area-like quantities, and the default
+`fill_value = nothing` picks the wet-cell mean for intensive fields to avoid a
+manufactured land/ocean step discontinuity and the associated L2-projection
+ringing). The default base implementation ignores it.
 """
-function get_field!(target_field, sim, quantity)
+function get_field!(target_field, sim, quantity; fill_value = nothing)
     remap!(target_field, get_field(sim, quantity))
     return nothing
 end

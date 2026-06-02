@@ -93,10 +93,16 @@ function ClimaSeaIceSimulation(
         advection,
     )
 
+    fill!(parent(ice.model.ice_thermodynamics.top_surface_temperature), 0)
+
     ocean_ice_flux_formulation =
         CO.OceanSeaIceModels.InterfaceComputations.ThreeEquationHeatFlux(ice)
     interface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     interface_salinity = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    # Same precaution for the interface fields exposed via `:internal_temperature`
+    # (`sim.ocean_ice_interface.temperature + C_to_K`) and used by `compute_sea_ice_ocean_fluxes`.
+    fill!(parent(interface_temperature), 0)
+    fill!(parent(interface_salinity), 0)
 
     # Initialize model_Δt so that time stepping works properly
     model_Δt = dt
@@ -140,12 +146,19 @@ function ClimaSeaIceSimulation(
     # Since ocean and sea ice share the same grid, we can also share the remapping objects
     remapping = ocean.remapping
 
-    # Allocate space for the sea ice-ocean (io) fluxes
+    # Allocate space for the sea ice-ocean (io) fluxes. Zero the underlying
+    # arrays for the same reason as `top_surface_temperature` above: any
+    # uninitialized cell read by a downstream kernel (e.g. the io stress added
+    # in `_add_ocean_ice_stress!`) can silently inject NaN into the ocean
+    # state.
     io_bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     io_frazil_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     io_salt_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     x_momentum = OC.Field{OC.Face, OC.Center, Nothing}(grid)
     y_momentum = OC.Field{OC.Center, OC.Face, Nothing}(grid)
+    for f in (io_bottom_heat_flux, io_frazil_heat_flux, io_salt_flux, x_momentum, y_momentum)
+        fill!(parent(f), 0)
+    end
 
     ocean_ice_fluxes = (
         interface_heat = io_bottom_heat_flux,
@@ -166,9 +179,18 @@ function ClimaSeaIceSimulation(
 
     # Build the ocean - sea ice interface object
 
-    # Get the initial area fraction from the fractional ice concentration
+    # Get the initial area fraction from the fractional ice concentration. Use
+    # `fill_value = 0` for the FV → SE remap of `ice_concentration`: the
+    # natural off-grid value is "no ice over land", not the wet-cell mean. This
+    # keeps `area_fraction` an honest partition (land cells contribute 0,
+    # wet cells contribute the actual concentration) and is conservative.
     boundary_space = axes(ocean.area_fraction)
-    area_fraction = Interfacer.remap(boundary_space, ice.model.ice_concentration, remapping)
+    area_fraction = Interfacer.remap(
+        boundary_space,
+        ice.model.ice_concentration,
+        remapping;
+        fill_value = 0,
+    )
 
     sim = ClimaSeaIceSimulation(
         ice,
@@ -264,26 +286,49 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
 
     uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
 
-    # Sea ice parameters for `update_T_sfc_cb` (load into boundary-space scratch Fields first
-    # to avoid GPU scalar indexing when building the closure)
-    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:ice_thickness))
-    Interfacer.get_field!(csf.scalar_temp2, sim, Val(:internal_temperature))
-    Interfacer.get_field!(csf.scalar_temp3, sim, Val(:emissivity))
-    Interfacer.get_field!(csf.scalar_temp4, sim, Val(:surface_direct_albedo))
-    δ = csf.scalar_temp1
-    T_i = csf.scalar_temp2
-    ϵ = csf.scalar_temp3
-    α_albedo = csf.scalar_temp4
+    # Physical constants referenced by both the iteration and the defensive
+    # bounds applied to its FV → SE remapped inputs.
+    T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
+    σ = FT(sim.ice_properties.σ)
+    SW_d = csf.SW_d
+    LW_d = csf.LW_d
     internal_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
     κ = if hasfield(typeof(internal_heat_flux), :conductivity)
         FT.(internal_heat_flux.conductivity)
     else
         convert(FT, 2) # default conductivity [W m⁻¹ K⁻¹]
     end
-    σ = FT(sim.ice_properties.σ)
-    SW_d = csf.SW_d
-    LW_d = csf.LW_d
-    T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
+
+    # Sea ice parameters for `update_T_sfc_cb` (load into boundary-space scratch Fields first
+    # to avoid GPU scalar indexing when building the closure)
+    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:ice_thickness))
+    Interfacer.get_field!(csf.scalar_temp2, sim, Val(:internal_temperature))
+    Interfacer.get_field!(csf.scalar_temp3, sim, Val(:emissivity))
+    Interfacer.get_field!(csf.scalar_temp4, sim, Val(:surface_direct_albedo))
+
+    # Defensive post-FV→SE physical-bound clamps on the iteration inputs.
+    # The per-element L2 projection used on the FV → SE path is mass-conservative
+    # but not monotone, and at very thin SE elements straddling a coast (small
+    # wet area / near-singular element mass matrix) a localised Gibbs overshoot
+    # in the source can be amplified by `M⁻¹` to physically impossible values
+    # (`δ` to ±10³ m, `T_i` to negative absolute temperatures). The non-linear
+    # `T⁴`/`T³` terms in `update_T_sfc` then drive the iteration into a regime
+    # the step limiter cannot recover from. Clamping each input to a generous
+    # physical envelope here removes that failure mode while leaving the
+    # interior of the wet domain unchanged.
+    @. csf.scalar_temp1 = clamp(csf.scalar_temp1, FT(0), FT(20))            # ice thickness [m]
+    @. csf.scalar_temp2 = ifelse(
+        isfinite(csf.scalar_temp2),
+        clamp(csf.scalar_temp2, FT(200), FT(320)),
+        T_melt,
+    )                                                                       # T_i [K]
+    @. csf.scalar_temp3 = clamp(csf.scalar_temp3, FT(0), FT(1))             # emissivity [-]
+    @. csf.scalar_temp4 = clamp(csf.scalar_temp4, FT(0), FT(1))             # albedo [-]
+
+    δ = csf.scalar_temp1
+    T_i = csf.scalar_temp2
+    ϵ = csf.scalar_temp3
+    α_albedo = csf.scalar_temp4
 
     # Build element-wise `update_T_sfc_cb` closures (each closes over local ice parameters)
     update_T_sfc_cb =
@@ -291,6 +336,11 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
 
     # Surface temperature guess from last timestep
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
+    @. csf.scalar_temp1 = ifelse(
+        isfinite(csf.scalar_temp1),
+        clamp(csf.scalar_temp1, FT(200), FT(320)),
+        T_melt,
+    )                                                                       # T_sfc_guess [K]
     T_sfc = csf.scalar_temp1
 
     # Surface humidity

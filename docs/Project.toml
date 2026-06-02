@@ -21,3 +21,6 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 [compat]
 Documenter = "0.27"
 Poppler_jll = "24"
+
+[sources]
+ConservativeRegridding = {url = "https://github.com/JuliaGeo/ConservativeRegridding.jl", rev = "ss-js/update-spectral"}

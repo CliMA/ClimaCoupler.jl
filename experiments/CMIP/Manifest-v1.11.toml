@@ -772,9 +772,9 @@ version = "0.2.36"
 
 [[deps.ConservativeRegridding]]
 deps = ["ChunkSplitters", "DocStringExtensions", "Extents", "GeoInterface", "GeometryOps", "GeometryOpsCore", "LinearAlgebra", "ProgressMeter", "SciMLPublic", "SortTileRecursiveTree", "SparseArrays", "StableTasks", "StaticArrays"]
-git-tree-sha1 = "fe5597149321616eb59b98900cc1c701f311557a"
+git-tree-sha1 = "3395a993ac9089995bdb7f18e1d16872e24798e3"
 uuid = "8e50ac2c-eb48-49bc-a402-07c87b949343"
-version = "0.2.3"
+version = "0.2.4"
 
     [deps.ConservativeRegridding.extensions]
     ConservativeRegriddingClimaCoreExt = "ClimaCore"

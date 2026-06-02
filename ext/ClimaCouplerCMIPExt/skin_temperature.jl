@@ -13,6 +13,8 @@ where Jᵃ is the net upward surface flux and κ/δ·(Tₛ - Tᵢ) is the conduc
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 
+const MAX_ΔT_PER_ITERATION = 5.0 # K
+
 """
     update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
 
@@ -23,8 +25,6 @@ a semi-implicit linearization of the LW emission term:
 
 where Jᵃ = σϵTₛⁿ⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh  (positive upward).
 
-The result is capped at the melting temperature T_melt to prevent the surface
-temperature from exceeding the melting point under heating fluxes.
 
 # Arguments
 - `κ`: Thermal conductivity [W m⁻¹ K⁻¹]
@@ -92,7 +92,17 @@ function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
         denominator = 1 + 4 * δ * σ * ϵ * T_sfc_n^3 / κ
         T_sfc_new = numerator / denominator
 
-        # Cap surface temperature at melting temperature 
+        # Step limiter: cap |ΔT| in a single iteration. Prevents a stiff /
+        # diverging Newton step (e.g. at thin or coastal ice cells where the
+        # surface-layer iteration is poorly behaved) from blowing the iterate
+        # far below the physical regime in one step; see
+        # `MAX_ΔT_PER_ITERATION`. The fixed point of the iteration is
+        # unchanged because |T_sfc_new - T_sfc_n| → 0 at convergence.
+        FT = typeof(T_sfc_new)
+        ΔT_max = FT(MAX_ΔT_PER_ITERATION)
+        T_sfc_new = T_sfc_n + clamp(T_sfc_new - T_sfc_n, -ΔT_max, ΔT_max)
+
+        # Melting-point cap under net heating.
         T_sfc_new = min(T_sfc_new, T_melt)
 
         return T_sfc_new

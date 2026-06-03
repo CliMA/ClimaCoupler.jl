@@ -8,7 +8,6 @@ module Input
 import ArgParse
 import YAML
 import Dates
-import ClimaAtmos as CA
 import ClimaUtilities.TimeManager: ITime
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
@@ -22,6 +21,7 @@ import ..Utilities
 export argparse_settings,
     parse_commandline,
     get_coupler_config_dict,
+    atmos_default_config_dict,
     get_coupler_args,
     get_land_fraction,
     get_era5_filepaths
@@ -371,8 +371,10 @@ function get_coupler_config_dict(config_file)
     # Load the coupler config file into a dictionary
     coupler_config_dict = YAML.load_file(config_file)
 
-    # Get ClimaAtmos default configuration dictionary
-    atmos_default = CA.default_config_dict()
+    # Get ClimaAtmos default configuration dictionary. If ClimaCouplerClimaAtmosExt is
+    # not loaded or and the user has not defined `atmos_default_config_dict()`, an empty
+    # dictionary will be returned and a warning will be issued.
+    atmos_default = atmos_default_config_dict()
     atmos_config_file = merge(coupler_default_cli, coupler_config_dict)["atmos_config_file"]
     if isnothing(atmos_config_file)
         @info "Using Atmos default configuration"
@@ -400,6 +402,22 @@ function get_coupler_config_dict(config_file)
     update_t_start_for_restarts!(config_dict)
 
     return config_dict
+end
+
+"""
+    atmos_default_config_dict(...)
+
+Return a dictionary of default configuration options for the atmosphere model. The default
+method is only defined when the ClimaCouplerClimaAtmosExt extension is loaded. If the extension
+is not loaded, this fallback method throws a warning and returns an empty dictionary.
+"""
+function atmos_default_config_dict(_...)
+    # this method uses varagrs so when ClimaCouplerClimaAtmosExt is loaded,
+    # it will add a method that has no args, which is more specific that this method.
+    @warn "Using an empty default atmos config dict. ClimaAtmos.jl is required to be loaded
+    to use the default `atmos_default_config_dict()` method. Please make sure the extension
+    is correctly loaded, or define `atmos_default_config_dict()`."
+    return Dict()
 end
 
 """

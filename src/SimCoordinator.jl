@@ -18,7 +18,6 @@ module SimCoordinator
 import ClimaComms
 import ClimaDiagnostics as CD
 import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
-import ClimaAtmos as CA
 import ClimaCore as CC
 import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
@@ -69,10 +68,8 @@ function run!(
     =#
     @info "Starting coupling loop"
     walltime = ClimaComms.@elapsed ClimaComms.device(cs) begin
-        s = CA.@timed_str begin
-            while cs.t[] < cs.tspan[end]
-                step!(cs)
-            end
+        while cs.t[] < cs.tspan[end]
+            step!(cs)
         end
     end
     @info "Simulation took $(walltime) seconds"

@@ -93,6 +93,10 @@ update_field!(::AbstractSurfaceStub, ::Val{:snow_precipitation}, field) = nothin
 update_field!(::AbstractSurfaceStub, ::Val{:turbulent_energy_flux}, field) = nothing
 update_field!(::AbstractSurfaceStub, ::Val{:turbulent_moisture_flux}, field) = nothing
 
+set_albedos!(model::AbstractSurfaceStub, _...) =
+    @error "Interfacer.set_albedos! is not defined for $(typeof(model))"
+
+
 ## Extensions of FieldExchanger.jl functions
 
 """

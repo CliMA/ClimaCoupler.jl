@@ -96,7 +96,7 @@ function OceananigansSimulation(
     download_dataset(en4_temperature)
     download_dataset(en4_salinity)
 
-    # Set up ocean grid (0.5 degree)
+    # Set up ocean grid (1 degree)
     Nx = 360
     Ny = 180
     Nz = 80

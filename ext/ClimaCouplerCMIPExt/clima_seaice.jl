@@ -256,6 +256,7 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     sim::ClimaSeaIceSimulation,
     atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
+    accumulator = nothing,
 )
     boundary_space = axes(csf)
     FT = CC.Spaces.undertype(boundary_space)
@@ -331,7 +332,7 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
             update_T_sfc_cb,
         )
 
-    FluxCalculator.update_flux_fields!(csf, sim, fluxes)
+    FluxCalculator.update_flux_fields!(csf, sim, fluxes, accumulator)
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)

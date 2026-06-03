@@ -103,3 +103,18 @@ Extends `ClimaTimeSteppers.step!`.
 """
 step!(::AbstractSurfaceStub, ::Float64) = nothing
 step!(::AbstractSurfaceStub, ::ITime) = nothing
+
+"""
+    sim_dt(::AbstractSurfaceStub)
+
+Surface stubs (e.g. prescribed data) do not have an integrator timestep. We
+return 0.
+"""
+sim_dt(::AbstractSurfaceStub) = 0.0
+
+"""
+    will_step(::AbstractSurfaceStub, t)
+
+Surface stubs never step (`step!` is a no-op), so this always returns `false`.
+"""
+will_step(::AbstractSurfaceStub, t) = false

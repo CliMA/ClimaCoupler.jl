@@ -18,9 +18,19 @@ import ClimaCore.Geometry: ⊗
 import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
+import Insolation
+import Insolation.Parameters: InsolationParameters
+import LinearAlgebra
 import ClimaCoupler:
-    Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities, Plotting
-import ClimaUtilities.TimeManager: ITime
+    Checkpointer,
+    FieldExchanger,
+    FluxCalculator,
+    Interfacer,
+    Utilities,
+    Plotting,
+    Input,
+    Models
+import ClimaUtilities.TimeManager: ITime, date
 import ClimaComms
 
 ###
@@ -693,6 +703,13 @@ function get_atmos_config_dict(
 end
 
 """
+    Input.atmos_default_config_dict()
+
+Returns the default configuration dictionary for the ClimaAtmos model.
+"""
+Input.atmos_default_config_dict() = CA.default_config_dict()
+
+"""
     get_thermo_params(sim::ClimaAtmosSimulation)
 
 Returns the thermodynamic parameters from the atmospheric model simulation object.
@@ -765,5 +782,52 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrato
 Plotting.debug_plot_fields(sim::ClimaAtmosSimulation) =
     (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
 
+"""
+    Interfacer.set_albedos!(sim::Models.PrescribedOceanSimulation, t)
+
+Set the direct and diffuse albedos of the ocean based on the current date and
+the atmospheric wind. The albedos are calculated using the `surface_albedo_direct`
+and `surface_albedo_diffuse` functions from the `ClimaAtmos` module, so this
+is dependent on running with `ClimaAtmosSimulation` as the atmosphere simulation.
+"""
+function Interfacer.set_albedos!(sim::Models.PrescribedOceanSimulation, t)
+    p = sim.cache
+    FT = CC.Spaces.undertype(axes(sim.cache.T_sfc))
+
+    # Compute the current date
+    current_date = t isa ITime ? date(t) : p.start_date + Dates.Second(t)
+
+    insolation_params = InsolationParameters(FT)
+
+    # Get the atmospheric wind vector and the cosine of the zenith angle
+    surface_coords = CC.Fields.coordinate_field(axes(sim.cache.T_sfc))
+    insolation_tuple =
+        Insolation.insolation.(
+            current_date,
+            surface_coords.lat,
+            surface_coords.long,
+            insolation_params,
+        )
+    cos_zenith_angle = insolation_tuple.μ
+    wind_atmos = LinearAlgebra.norm.(CC.Geometry.Covariant12Vector.(p.u_int, p.v_int)) # wind vector from components
+    λ = FT(0) # spectral wavelength (not used for now)
+    # TODO: We shouldn't need this, but without this the fluxes_test fail.
+    cos_zenith = @. max(cos_zenith_angle, eps(FT))
+
+    # Use the albedo model from ClimaAtmos
+    α_model = CA.RegressionFunctionAlbedo{FT}()
+    Interfacer.update_field!(
+        sim,
+        Val(:surface_direct_albedo),
+        CA.surface_albedo_direct(α_model).(λ, cos_zenith, wind_atmos), # this allocates
+    )
+    Interfacer.update_field!(
+        sim,
+        Val(:surface_diffuse_albedo),
+        CA.surface_albedo_diffuse(α_model).(λ, cos_zenith, wind_atmos), # this allocates
+    )
+
+    return nothing
+end
 
 end

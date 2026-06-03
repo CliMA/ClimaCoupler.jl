@@ -200,6 +200,12 @@ properties needed by a component model.
 | `surface_temperature`    | temperature over the combined surface space              | K     |
 | `turbulent_fluxes`       | turbulent fluxes                                         | W m⁻² |
 
+- `atmos_default_config_dict()`:
+Return a dictionary of default configuration options for the atmosphere mode. The default
+method is only defined when the ClimaCouplerClimaAtmosExt extension is loaded, and returns
+the default configuration dictionary for ClimaAtmos. If `ClimaAtmos.jl` is not loaded, users
+must define this function themselves.
+
 ### AbstractAtmosSimulation - required functions to run with the ClimaLandSimulation
 
 Coupling with the integrated `ClimaLandSimulation` requires the following functions, in addition

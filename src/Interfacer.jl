@@ -717,14 +717,35 @@ end
 
 # 3-argument versions that accept a remapping object but delegate to 2-argument versions.
 # Extensions can specialize these for specific remapping types (e.g., ConservativeRegridding).
-remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field, remapping) =
-    remap!(target_field, source_field)
-remap!(target_field::CC.Fields.Field, source::Number, remapping) =
-    remap!(target_field, source)
-remap(target_space::CC.Spaces.AbstractSpace, source_field::CC.Fields.Field, remapping) =
-    remap(target_space, source_field)
-remap(target_space::CC.Spaces.AbstractSpace, source::Number, remapping) =
-    remap(target_space, source)
+#
+# `fill_value` is accepted (and ignored) here so callers can pass it uniformly. It is only
+# meaningful for masked-source remappings (e.g. the OC -> CC L2 projection in
+# ClimaCouplerCMIPExt, which uses it to fill dry/immersed cells before regridding); the
+# CC source and Number source paths have no masked-cell concept, so the kwarg is a no-op.
+remap!(
+    target_field::CC.Fields.Field,
+    source_field::CC.Fields.Field,
+    remapping;
+    fill_value = nothing,
+) = remap!(target_field, source_field)
+remap!(
+    target_field::CC.Fields.Field,
+    source::Number,
+    remapping;
+    fill_value = nothing,
+) = remap!(target_field, source)
+remap(
+    target_space::CC.Spaces.AbstractSpace,
+    source_field::CC.Fields.Field,
+    remapping;
+    fill_value = nothing,
+) = remap(target_space, source_field)
+remap(
+    target_space::CC.Spaces.AbstractSpace,
+    source::Number,
+    remapping;
+    fill_value = nothing,
+) = remap(target_space, source)
 
 """
     set_cache!(sim::AbstractComponentSimulation, csf)

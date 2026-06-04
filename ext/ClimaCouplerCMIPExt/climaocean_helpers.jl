@@ -117,7 +117,12 @@ end
 
 # Non-allocating ClimaCore -> Oceananigans remap
 #
-function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
+function Interfacer.remap!(
+    target_field::OC.Field,
+    source_field::CC.Fields.Field,
+    remapping;
+    fill_value = nothing,
+)
     # Get the index of the top level (surface); Nz=1 for 2D fields
     Nz = size(target_field, 3)
     dst = vec(OC.interior(target_field, :, :, Nz))
@@ -139,7 +144,8 @@ function Interfacer.remap(
         OC.LatitudeLongitudeGrid,
     },
     source_field::CC.Fields.Field,
-    remapping,
+    remapping;
+    fill_value = nothing,
 )
     target_field = OC.Field{OC.Center, OC.Center, Nothing}(target_space)
     Interfacer.remap!(target_field, source_field, remapping)

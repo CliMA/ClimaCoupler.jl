@@ -92,8 +92,8 @@ function OceananigansSimulation(
     # Retrieve EN4 data (monthly)
     # (It requires username and password)
     dates = range(start_date, step = Dates.Month(1), stop = stop_date)
-    en4_temperature = CO.Metadata(:temperature; dates, dataset = CO.EN4.EN4Monthly())
-    en4_salinity = CO.Metadata(:salinity; dates, dataset = CO.EN4.EN4Monthly())
+    en4_temperature = CO.Metadata(:temperature; dates, dataset = CO.EN4Monthly())
+    en4_salinity = CO.Metadata(:salinity; dates, dataset = CO.EN4Monthly())
     download_dataset(en4_temperature)
     download_dataset(en4_salinity)
 
@@ -127,39 +127,10 @@ function OceananigansSimulation(
     )
 
     # Create ocean simulation
-    if !simple_ocean
-        free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 150)
-        momentum_advection = OC.WENOVectorInvariant(order = 5)
-        tracer_advection = OC.WENO(order = 7)
-        eddy_closure = OC.TurbulenceClosures.IsopycnalSkewSymmetricDiffusivity(
-            κ_skew = 500,
-            κ_symmetric = 100,
-        )
-        @inline νhb(i, j, k, grid, ℓx, ℓy, ℓz, clock, fields, λ) =
-            OC.Operators.Az(i, j, k, grid, ℓx, ℓy, ℓz)^2 / λ
-
-        horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(
-            ν = νhb,
-            discrete_form = true,
-            parameters = 40 * 24 * 60 * 60, # 40 days
-        )
-        vertical_closure = OC.VerticalScalarDiffusivity(ν = 1e-5, κ = 2e-6)
-        catke_closure = CO.Oceans.default_ocean_closure()
-        closure = (catke_closure, eddy_closure, horizontal_viscosity, vertical_closure)
+    closure = if !simple_ocean
+        CO.simple_ocean_closure()
     else
-        # Simpler setup
-        @info "Using simpler ocean setup; to be used for software testing only."
-        free_surface = OC.SplitExplicitFreeSurface(grid; substeps = 70)
-        tracer_advection = OC.WENO(order = 5)
-        vertical_mixing = OC.ConvectiveAdjustmentVerticalDiffusivity(
-            background_κz = 1e-5,
-            convective_κz = 0.1,
-            background_νz = 1e-4,
-            convective_νz = 0.1,
-        )
-        momentum_advection = OC.WENOVectorInvariant(order = 5)
-        horizontal_viscosity = OC.HorizontalScalarDiffusivity(ν = 1e4)
-        closure = (horizontal_viscosity, vertical_mixing)
+        CO.default_one_degree_closure()
     end
 
     if tspan[1] isa ITime
@@ -172,18 +143,10 @@ function OceananigansSimulation(
     else
         error("Unsupported time type: $(typeof(tspan[1]))")
     end
-    model_Δt = dt
-    ocean = CO.ocean_simulation(
-        grid;
-        clock = model_clock,
-        stop_time,
-        Δt = float(model_Δt),
-        timestepper = :SplitRungeKutta3,
-        momentum_advection,
-        tracer_advection,
-        free_surface,
-        closure,
-    )
+
+    ocean = CO.latitude_longitude_ocean(arch; model_clock)
+    ocean.stop_time = stop_time
+    ocean.Δt = Δt
 
     wall_time = Ref(time_ns())
 

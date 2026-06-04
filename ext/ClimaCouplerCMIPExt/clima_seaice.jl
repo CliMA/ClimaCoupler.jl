@@ -93,8 +93,7 @@ function ClimaSeaIceSimulation(
         advection,
     )
 
-    ocean_ice_flux_formulation =
-        CO.InterfaceComputations.ThreeEquationHeatFlux(ice)
+    ocean_ice_flux_formulation = CO.InterfaceComputations.ThreeEquationHeatFlux(ice)
     interface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     interface_salinity = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 

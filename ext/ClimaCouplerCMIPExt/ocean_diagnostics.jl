@@ -18,8 +18,7 @@ This lets callers always pass human-readable `Dates.Period` values (e.g.
 `Dates.Day(1)`) and have the correct type resolved at runtime based on the
 model clock.
 """
-to_clock_interval(interval::Dates.FixedPeriod, ::Float64) =
-    Dates.toms(interval) / 1000.0
+to_clock_interval(interval::Dates.FixedPeriod, ::Float64) = Dates.toms(interval) / 1000.0
 to_clock_interval(interval::Dates.Period, ::Float64) = error(
     "Cannot convert a $(typeof(interval)) to Float64 seconds: month and year " *
     "lengths are variable. Use a fixed period (Day, Hour, Minute, Second) " *

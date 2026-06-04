@@ -228,6 +228,7 @@ for FT in (Float32, Float64)
             nothing, # thermo_params
             nothing, # diags_handler
             true, # save_cache
+            (;), # flux_accumulators
         )
 
         FieldExchanger.update_surface_fractions!(cs)
@@ -533,6 +534,7 @@ for FT in (Float32, Float64)
             thermo_params, # thermo_params
             nothing, # diags_handler
             true, # save_cache
+            (;), # flux_accumulators
         )
 
         # perform the exchange

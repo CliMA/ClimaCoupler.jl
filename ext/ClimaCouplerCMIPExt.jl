@@ -5,7 +5,9 @@ Module containing CMIP component models (Oceananigans and ClimaSeaIce models)
 which extend the ClimaCoupler.jl simulation interface.
 
 This extension is loaded when Oceananigans, ClimaOcean, ClimaSeaIce,
-and KernelAbstractions are loaded with either `import` or `using`.
+KernelAbstractions, ConservativeRegridding, and Adapt are loaded with
+either `import` or `using`.
+
 
 For more information about the CMIP component models, please see the
 "Available component models" section of the ClimaCoupler documentation,
@@ -30,13 +32,21 @@ import ClimaCore as CC
 import ClimaParams as CP
 using KernelAbstractions: @kernel, @index, @inbounds
 
-# Include skin temperature utilities
-include("ClimaCouplerCMIPExt/skin_temperature.jl")
+import Adapt # for ConservativeRegridding
+import ClimaCore as CC # for ConservativeRegriddingClimaCoreExt
+import ConservativeRegridding as CR
+import SparseArrays # for converting Regridder element types
+
+get_ConservativeRegriddingCCExt() =
+    Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
 
 # Include the model files first so their types are available to climaocean_helpers.jl
 include("ClimaCouplerCMIPExt/oceananigans.jl")
 include("ClimaCouplerCMIPExt/clima_seaice.jl")
 include("ClimaCouplerCMIPExt/climaocean_helpers.jl")
+
+# Include skin temperature utilities
+include("ClimaCouplerCMIPExt/skin_temperature.jl")
 
 include("ClimaCouplerCMIPExt/ocean_diagnostics.jl")
 include("ClimaCouplerCMIPExt/seaice_diagnostics.jl")

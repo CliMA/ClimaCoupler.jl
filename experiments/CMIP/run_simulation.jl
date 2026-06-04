@@ -36,6 +36,18 @@ config_file = Input.parse_commandline(Input.argparse_settings())["config_file"]
 
 # Set up and run the coupled simulation
 cs = CoupledSimulation(config_file)
+
+# Verify that surface albedos have been set correctly for radiation
+atmos_sim = cs.model_sims.atmos_sim
+if !isnothing(atmos_sim.integrator.p.atmos.radiation_mode)
+    @assert !any(
+        isnan.(atmos_sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo),
+    )
+    @assert !any(
+        isnan.(atmos_sim.integrator.p.radiation.rrtmgp_model.diffuse_sw_surface_albedo),
+    )
+end
+
 run!(cs)
 
 # Postprocessing

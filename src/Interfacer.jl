@@ -315,20 +315,11 @@ function get_field(target_space, sim, quantity)
 end
 
 """
-    get_field!(target_field, sim, quantity; fill_value = nothing)
+    get_field!(target_field, sim, quantity)
 
-Remap `quantity` in `sim` remapped onto the `target_field`.
-
-The `fill_value` kwarg is forwarded to the underlying `remap!` so that
-component-model extensions can override what value is used for masked cells on
-mask-aware remap paths (e.g. the FV → SE projection used by Oceananigans and
-ClimaSeaIce, where `fill_value = 0` preserves the "no field over land"
-convention for extensive/area-like quantities, and the default
-`fill_value = nothing` picks the wet-cell mean for intensive fields to avoid a
-manufactured land/ocean step discontinuity and the associated L2-projection
-ringing). The default base implementation ignores it.
+Remap `quantity` in `sim` onto the `target_field`.
 """
-function get_field!(target_field, sim, quantity; fill_value = nothing)
+function get_field!(target_field, sim, quantity)
     remap!(target_field, get_field(sim, quantity))
     return nothing
 end
@@ -716,36 +707,22 @@ function remap!(target_field::CC.Fields.Field, source::Number)
 end
 
 # 3-argument versions that accept a remapping object but delegate to 2-argument versions.
-# Extensions can specialize these for specific remapping types (e.g., ConservativeRegridding).
-#
-# `fill_value` is accepted (and ignored) here so callers can pass it uniformly. It is only
-# meaningful for masked-source remappings (e.g. the OC -> CC L2 projection in
-# ClimaCouplerCMIPExt, which uses it to fill dry/immersed cells before regridding); the
-# CC source and Number source paths have no masked-cell concept, so the kwarg is a no-op.
+# Extensions specialise these for specific remapping types (e.g., the
+# ConservativeRegridding-backed FV ↔ SE paths in `ClimaCouplerCMIPExt`).
 remap!(
     target_field::CC.Fields.Field,
     source_field::CC.Fields.Field,
-    remapping;
-    fill_value = nothing,
+    remapping,
 ) = remap!(target_field, source_field)
-remap!(
-    target_field::CC.Fields.Field,
-    source::Number,
-    remapping;
-    fill_value = nothing,
-) = remap!(target_field, source)
+remap!(target_field::CC.Fields.Field, source::Number, remapping) =
+    remap!(target_field, source)
 remap(
     target_space::CC.Spaces.AbstractSpace,
     source_field::CC.Fields.Field,
-    remapping;
-    fill_value = nothing,
+    remapping,
 ) = remap(target_space, source_field)
-remap(
-    target_space::CC.Spaces.AbstractSpace,
-    source::Number,
-    remapping;
-    fill_value = nothing,
-) = remap(target_space, source)
+remap(target_space::CC.Spaces.AbstractSpace, source::Number, remapping) =
+    remap(target_space, source)
 
 """
     set_cache!(sim::AbstractComponentSimulation, csf)

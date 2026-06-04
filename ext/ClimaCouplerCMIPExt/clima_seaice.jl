@@ -177,20 +177,9 @@ function ClimaSeaIceSimulation(
         salinity = interface_salinity,
     )
 
-    # Build the ocean - sea ice interface object
-
-    # Get the initial area fraction from the fractional ice concentration. Use
-    # `fill_value = 0` for the FV → SE remap of `ice_concentration`: the
-    # natural off-grid value is "no ice over land", not the wet-cell mean. This
-    # keeps `area_fraction` an honest partition (land cells contribute 0,
-    # wet cells contribute the actual concentration) and is conservative.
     boundary_space = axes(ocean.area_fraction)
-    area_fraction = Interfacer.remap(
-        boundary_space,
-        ice.model.ice_concentration,
-        remapping;
-        fill_value = 0,
-    )
+    area_fraction =
+        Interfacer.remap(boundary_space, ice.model.ice_concentration, remapping)
 
     sim = ClimaSeaIceSimulation(
         ice,
@@ -426,7 +415,9 @@ and ClimaSeaIce represents moisture moving from atmosphere to ocean as a positiv
 so a sign change is needed when we convert from moisture to salinity flux.
 """
 function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fields)
-    # Only LatitudeLongitudeGrid are supported because otherwise we have to rotate the vectors
+    # Momentum components are rotated onto the intrinsic ocean/sea-ice grid
+    # by `set_from_extrinsic_vector!`, which works for any
+    # `OrthogonalSphericalShellGrid` (including the production `TripolarGrid`).
 
     (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
     grid = sim.ice.model.grid

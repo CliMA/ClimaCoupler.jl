@@ -27,8 +27,8 @@ It contains the following objects:
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ocean_ice_interface::NT`: A NamedTuple containing fluxes between the ocean and sea ice, computed at each coupling step,
                              the interfacial temperature and salinity, and the flux formulation used to compute the fluxes.
-- `ice_properties::IP`: A NamedTuple of sea ice properties, including melting speed, Stefan-Boltzmann constant,
-    and the Celsius to Kelvin conversion constant.
+- `ice_properties::IP`: A NamedTuple of sea ice properties: Stefan–Boltzmann constant `σ`
+    and Celsius offset `C_to_K` (water freezing point in K).
 """
 struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, MDT} <:
        Interfacer.AbstractSeaIceSimulation
@@ -59,8 +59,8 @@ If a start date is provided, we initialize the sea ice concentration and thickne
 using the ECCO4Monthly dataset. If no start date is provided, we initialize with zero sea ice.
 
 The top heat boundary condition is `PrescribedTemperature`: the coupler iteratively
-diagnoses T_sfc via the `update_T_sfc` callback and writes it back to the ice model
-after each flux computation (see `compute_surface_fluxes!`).
+diagnoses T_sfc via the `update_T_sfc_cb` closure passed to `FluxCalculator.get_surface_fluxes!`
+and writes it back to the ice model after each flux computation (see `compute_surface_fluxes!`).
 
 # Arguments
 - `ocean`: [OceananigansSimulation] the ocean simulation to couple with.
@@ -168,7 +168,7 @@ function ClimaSeaIceSimulation(
 
     # Get the initial area fraction from the fractional ice concentration
     boundary_space = axes(ocean.area_fraction)
-    area_fraction = Interfacer.remap(boundary_space, ice.model.ice_concentration)
+    area_fraction = Interfacer.remap(boundary_space, ice.model.ice_concentration, remapping)
 
     sim = ClimaSeaIceSimulation(
         ice,
@@ -245,7 +245,8 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
     FluxCalculator.compute_surface_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim, thermo_params)
 
 Compute surface fluxes for `ClimaSeaIceSimulation`, iteratively diagnosing T_sfc
-via the `update_T_sfc` callback to satisfy the skin-temperature flux balance.
+via the per-column `update_T_sfc_cb` closure (from `ClimaCouplerCMIPExt.update_T_sfc`) to satisfy
+the skin-temperature flux balance.
 
 The diagnosed T_sfc is written back to ClimaSeaIce's `top_surface_temperature`
 (used by `PrescribedTemperature`) so the ice thermodynamics stays consistent.
@@ -255,6 +256,7 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     sim::ClimaSeaIceSimulation,
     atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
+    accumulator = nothing,
 )
     boundary_space = axes(csf)
     FT = CC.Spaces.undertype(boundary_space)
@@ -262,8 +264,8 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
 
     uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
 
-    # Sea ice parameters for the update_T_sfc callback (load into boundary-space scratch
-    # Fields first to avoid GPU scalar indexing when building the callback)
+    # Sea ice parameters for `update_T_sfc_cb` (load into boundary-space scratch Fields first
+    # to avoid GPU scalar indexing when building the closure)
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:ice_thickness))
     Interfacer.get_field!(csf.scalar_temp2, sim, Val(:internal_temperature))
     Interfacer.get_field!(csf.scalar_temp3, sim, Val(:emissivity))
@@ -283,8 +285,8 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     LW_d = csf.LW_d
     T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
 
-    # Build element-wise update_T_sfc callbacks (each closes over local ice parameters)
-    update_T_sfc_callback =
+    # Build element-wise `update_T_sfc_cb` closures (each closes over local ice parameters)
+    update_T_sfc_cb =
         ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
 
     # Surface temperature guess from last timestep
@@ -327,10 +329,10 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
             csf.height_sfc,
             FT(0),
             config,
-            update_T_sfc_callback,
+            update_T_sfc_cb,
         )
 
-    FluxCalculator.update_flux_fields!(csf, sim, fluxes)
+    FluxCalculator.update_flux_fields!(csf, sim, fluxes, accumulator)
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
@@ -340,17 +342,15 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
             zero(FT),
             fluxes.T_sfc_new .- FT(sim.ice_properties.C_to_K),
         )
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        csf.scalar_temp2,
-    )
+    Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.scalar_temp2, sim.remapping)
+    remapped_T_sfc = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
+
     ice_concentration = sim.ice.model.ice_concentration
     top_sfc_T = sim.ice.model.ice_thermodynamics.top_surface_temperature
     OC.interior(top_sfc_T, :, :, 1) .=
         ifelse.(
             OC.interior(ice_concentration, :, :, 1) .> 0,
-            sim.remapping.scratch_arr1,
+            remapped_T_sfc,
             OC.interior(top_sfc_T, :, :, 1),
         )
 
@@ -389,23 +389,13 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
         F_turb_ρτxz_uv = sim.remapping.temp_uv_vec.components.data.:1
         F_turb_ρτyz_uv = sim.remapping.temp_uv_vec.components.data.:2
 
-        # Remap momentum fluxes onto reduced 2D Center, Center fields using scratch arrays and fields
-        CC.Remapping.interpolate!(
-            sim.remapping.scratch_arr1,
-            sim.remapping.remapper_cc,
-            F_turb_ρτxz_uv,
-        )
-        OC.set!(sim.remapping.scratch_cc1, sim.remapping.scratch_arr1) # zonal momentum flux
-        CC.Remapping.interpolate!(
-            sim.remapping.scratch_arr2,
-            sim.remapping.remapper_cc,
-            F_turb_ρτyz_uv,
-        )
-        OC.set!(sim.remapping.scratch_cc2, sim.remapping.scratch_arr2) # meridional momentum flux
+        # Remap momentum fluxes onto reduced 2D Center, Center Oceananigans scratch fields
+        Interfacer.remap!(sim.remapping.scratch_field_oc1, F_turb_ρτxz_uv, sim.remapping) # zonal momentum flux
+        Interfacer.remap!(sim.remapping.scratch_field_oc2, F_turb_ρτyz_uv, sim.remapping) # meridional momentum flux
 
         # Rename for clarity; these are now Center, Center Oceananigans fields
-        F_turb_ρτxz_cell = sim.remapping.scratch_cc1
-        F_turb_ρτyz_cell = sim.remapping.scratch_cc2
+        F_turb_ρτxz_cell = sim.remapping.scratch_field_oc1
+        F_turb_ρτyz_cell = sim.remapping.scratch_field_oc2
 
         # Set the momentum flux BCs at the correct locations using the remapped scratch fields
         # Note that this requires the sea ice model to always be run with dynamics turned on
@@ -419,13 +409,13 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
         )
     end
 
-    # Remap the latent and sensible heat fluxes using scratch arrays
-    CC.Remapping.interpolate!(sim.remapping.scratch_arr1, sim.remapping.remapper_cc, F_lh) # latent heat flux
-    CC.Remapping.interpolate!(sim.remapping.scratch_arr2, sim.remapping.remapper_cc, F_sh) # sensible heat flux
+    # Remap the latent and sensible heat fluxes using scratch fields
+    Interfacer.remap!(sim.remapping.scratch_field_oc1, F_lh, sim.remapping) # latent heat flux
+    Interfacer.remap!(sim.remapping.scratch_field_oc2, F_sh, sim.remapping) # sensible heat flux
 
-    # Rename for clarity; recall F_turb_energy = F_lh + F_sh
-    remapped_F_lh = sim.remapping.scratch_arr1
-    remapped_F_sh = sim.remapping.scratch_arr2
+    # Rename for clarity; recall F_turb_energy = F_lh + F_sh (interiors match main's scratch-array sum)
+    remapped_F_lh = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
+    remapped_F_sh = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
 
     # Update the sea ice heat flux only where the concentration is greater than zero.
     # With PrescribedTemperature the top heat flux is a FluxFunction, not a Field;
@@ -467,20 +457,12 @@ so a sign change is needed when we convert from precipitation to salinity flux.
 function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
     ice_concentration = sim.ice.model.ice_concentration
 
-    # Remap radiative flux onto scratch array; rename for clarity
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr1,
-        sim.remapping.remapper_cc,
-        csf.SW_d,
-    )
-    remapped_SW_d = sim.remapping.scratch_arr1
+    # Remap radiative fluxes onto scratch fields (separate buffers so SW is not overwritten by LW)
+    Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.SW_d, sim.remapping) # shortwave radiation
+    remapped_SW_d = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
 
-    CC.Remapping.interpolate!(
-        sim.remapping.scratch_arr2,
-        sim.remapping.remapper_cc,
-        csf.LW_d,
-    )
-    remapped_LW_d = sim.remapping.scratch_arr2
+    Interfacer.remap!(sim.remapping.scratch_field_oc2, csf.LW_d, sim.remapping) # longwave radiation
+    remapped_LW_d = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
 
     # Update only the part due to radiative fluxes. For the full update, the component due
     # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
@@ -572,12 +554,12 @@ function FluxCalculator.ocean_seaice_fluxes!(
     # The heat and salt fluxes already include the SIC masking, so we don't need to
     # multiply by SIC here.
     oc_flux_T = surface_flux(ocean_sim.ocean.model.tracers.T)
-    heat_flux = OC.interior(ocean_sim.remapping.scratch_cc1, :, :, 1)
+    heat_flux = OC.interior(ocean_sim.remapping.scratch_field_oc1, :, :, 1)
     heat_flux .= OC.interior(Qi, :, :, 1) .* ρₒ⁻¹ ./ cₒ
     OC.interior(oc_flux_T, :, :, 1) .+= heat_flux
 
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
-    salt_contrib = OC.interior(ocean_sim.remapping.scratch_cc2, :, :, 1)
+    salt_contrib = OC.interior(ocean_sim.remapping.scratch_field_oc2, :, :, 1)
     salt_contrib .= OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
     OC.interior(oc_flux_S, :, :, 1) .+= salt_contrib
 

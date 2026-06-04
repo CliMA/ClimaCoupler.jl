@@ -1,6 +1,38 @@
 import Dates
 
 """
+    to_clock_interval(interval, clock_time)
+
+Convert `interval` to a type compatible with the model clock's time representation.
+
+- If `clock_time` is a `Float64` (seconds-based clock) and `interval` is a
+  `Dates.FixedPeriod`, the interval is converted to seconds (`Float64`).
+- If `clock_time` is a `Dates.DateTime` and `interval` is a `Dates.Period`,
+  the interval is returned unchanged.
+- If `clock_time` is a `Float64` and `interval` is already a `Real`, it is
+  returned as `Float64`.
+- Variable-length periods (`Dates.Month`, `Dates.Year`) cannot be converted to
+  seconds and will throw an error when `clock_time` is a `Float64`.
+
+This lets callers always pass human-readable `Dates.Period` values (e.g.
+`Dates.Day(1)`) and have the correct type resolved at runtime based on the
+model clock.
+"""
+to_clock_interval(interval::Dates.FixedPeriod, ::Float64) =
+    Dates.toms(interval) / 1000.0
+to_clock_interval(interval::Dates.Period, ::Float64) = error(
+    "Cannot convert a $(typeof(interval)) to Float64 seconds: month and year " *
+    "lengths are variable. Use a fixed period (Day, Hour, Minute, Second) " *
+    "or pass the interval directly in seconds.",
+)
+to_clock_interval(interval::Dates.Period, ::Dates.DateTime) = interval
+to_clock_interval(interval::Real, ::Float64) = Float64(interval)
+to_clock_interval(interval::Real, ::Dates.DateTime) = error(
+    "Cannot use a numeric (seconds) interval with a DateTime clock. " *
+    "Pass a Dates.Period instead.",
+)
+
+"""
     diagnostic_schedule(mode, interval)
 
 Return an Oceananigans output schedule corresponding to `mode`:
@@ -38,6 +70,10 @@ Two writers are added to `ocean_sim.ocean.output_writers`, both with the same `i
 - `:average` uses `Oceananigans.AveragedTimeInterval(interval)` (time-averaged fields).
 - `:instantaneous` uses `Oceananigans.TimeInterval(interval)` (snapshots).
 
+`interval` and `file_splitting_interval` accept either a `Dates.Period` or a `Real` number of seconds.
+The value is automatically converted to match the model clock's time type via [`to_clock_interval`](@ref):
+a `Dates.Period` is converted to seconds for Float64 clocks, or kept as-is for DateTime clocks.
+
 !!! note
     `tauuo`, `tauvo`, `hfds`, and `wfo` here are the *combined* surface fluxes on the ocean (atmosphere + sea-ice contributions),
     not the atmosphere-only contribution. Sensible/latent heat (`hfss`/`hfls`) are not stored as standalone fields in CMIP —
@@ -53,7 +89,9 @@ function add_ocean_diagnostics!(
 )
     ocean = ocean_sim.ocean
     Nz = size(ocean.model.grid, 3)
-    file_splitting = OC.TimeInterval(file_splitting_interval)
+    clock_time = ocean.model.clock.time
+    resolved_interval = to_clock_interval(interval, clock_time)
+    file_splitting = OC.TimeInterval(to_clock_interval(file_splitting_interval, clock_time))
 
     T, S = ocean.model.tracers.T, ocean.model.tracers.S
     u, v, w = ocean.model.velocities
@@ -93,7 +131,7 @@ function add_ocean_diagnostics!(
         :surface_salinity_flux => Js,
     )
 
-    schedule = diagnostic_schedule(mode, interval)
+    schedule = diagnostic_schedule(mode, resolved_interval)
 
     ocean.output_writers[:surface_diagnostics] = OC.JLD2Writer(
         ocean.model,

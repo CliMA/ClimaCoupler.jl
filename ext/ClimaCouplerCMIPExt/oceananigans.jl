@@ -94,43 +94,12 @@ function OceananigansSimulation(
     dates = range(start_date, step = Dates.Month(1), stop = stop_date)
     en4_temperature = CO.Metadata(:temperature; dates, dataset = CO.EN4Monthly())
     en4_salinity = CO.Metadata(:salinity; dates, dataset = CO.EN4Monthly())
-    download_dataset(en4_temperature)
-    download_dataset(en4_salinity)
-
-    # Set up ocean grid (1 degree)
-    resolution_points = (360, 160, 32)
-    Nz = last(resolution_points)
-    depth = 4000 # meters
-    z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 0.85 * depth)
-
-    # Regular LatLong because we know how to do interpolation there
-    underlying_grid = OC.LatitudeLongitudeGrid(
-        arch;
-        size = resolution_points,
-        longitude = (-180, 180),
-        latitude = (-80, 80),   # NOTE: Don't go too high up when using LatLongGrid, or the cells will be too small
-        z,
-        halo = (7, 7, 7),
-    )
-
-    bottom_height = CO.regrid_bathymetry(
-        underlying_grid;
-        minimum_depth = 30,
-        interpolation_passes = 20,
-        major_basins = 1,
-    )
-
-    grid = OC.ImmersedBoundaryGrid(
-        underlying_grid,
-        OC.GridFittedBottom(bottom_height);
-        active_cells_map = true,
-    )
 
     # Create ocean simulation
-    closure = if !simple_ocean
-        CO.simple_ocean_closure()
+    closure = if simple_ocean
+        CO.OceanConfigurations.simplified_ocean_closure()
     else
-        CO.default_one_degree_closure()
+        CO.OceanConfigurations.default_one_degree_closure()
     end
 
     if tspan[1] isa ITime
@@ -144,9 +113,10 @@ function OceananigansSimulation(
         error("Unsupported time type: $(typeof(tspan[1]))")
     end
 
-    ocean = CO.latitude_longitude_ocean(arch; model_clock)
+    # TODO how can we provide model clock?
+    ocean = CO.OceanConfigurations.latitude_longitude_ocean(arch; depth = 4000)#; model_clock)
     ocean.stop_time = stop_time
-    ocean.Δt = Δt
+    ocean.Δt = dt
 
     wall_time = Ref(time_ns())
 
@@ -188,6 +158,7 @@ function OceananigansSimulation(
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
 
     # Construct the remapper object and allocate scratch space
+    grid = ocean.model.grid
     remapping = construct_remapper(grid, boundary_space)
 
     # COARE3 roughness params (allocated once, reused each timestep)
@@ -216,7 +187,7 @@ function OceananigansSimulation(
         ocean_properties,
         remapping,
         ice_concentration,
-        model_Δt,
+        ocean.Δt,
     )
 
     add_ocean_diagnostics!(
@@ -233,7 +204,7 @@ end
     convert_regridder_eltype(::Type{FT}, regridder) where {FT}
 
 Convert the element type of a ConservativeRegridding.Regridder's internal arrays
-to the specified float type `FT`. 
+to the specified float type `FT`.
 """
 function convert_regridder_eltype(::Type{FT}, regridder) where {FT}
     intersections = regridder.intersections
@@ -266,7 +237,7 @@ Given an Oceananigans grid and a ClimaCore boundary space, construct the
 remappers needed to remap between the two grids in both directions.
 
 Returns a remapper from the Oceananigans grid to the ClimaCore boundary space.
-For low-level use: `CR.regrid!(dst, remapper_oc_to_cc, src)` and 
+For low-level use: `CR.regrid!(dst, remapper_oc_to_cc, src)` and
 `CR.regrid!(dst, transpose(remapper_oc_to_cc), src)` for the reverse map.
 """
 function construct_remapper(grid_oc, boundary_space)
@@ -289,6 +260,7 @@ function construct_remapper(grid_oc, boundary_space)
     remapper_oc_to_cc = convert_regridder_eltype(FT_cc, remapper_oc_to_cc)
 
     # Move remapper to GPU if needed
+    # TODO scalar indexing here
     remapper_oc_to_cc =
         OC.Architectures.on_architecture(OC.architecture(grid_oc), remapper_oc_to_cc)
 

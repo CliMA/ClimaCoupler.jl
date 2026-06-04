@@ -8,4 +8,5 @@ rad: "allskywithclear"
 microphysics_model: "0M"
 t_end: "800secs"
 time_varying_trace_gases: ["CO2"]
-vert_diff: "true"
+vert_diff: VerticalDiffusion
+check_nan_every: 1

@@ -5,12 +5,12 @@ This modules contains abstract types, interface templates and model stubs for co
 """
 module Interfacer
 
-import SciMLBase
 import ClimaComms
 import ClimaCore as CC
 import Dates
 import Thermodynamics as TD
-import SciMLBase: step!
+import NVTX
+import ClimaTimeSteppers: step!
 import ClimaUtilities.TimeManager: ITime, date
 import Statistics
 
@@ -30,6 +30,8 @@ export CoupledSimulation,
     AbstractSurfaceStub,
     SurfaceStub,
     step!,
+    sim_dt,
+    will_step,
     set_cache!,
     remap,
     remap!,
@@ -67,6 +69,7 @@ struct CoupledSimulation{
     TP,
     DH,
     SC <: Bool,
+    NTFA <: NamedTuple,
 }
     start_date::D
     fields::FV
@@ -81,6 +84,7 @@ struct CoupledSimulation{
     thermo_params::TP
     diags_handler::DH
     save_cache::SC
+    flux_accumulators::NTFA
 end
 
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args)...}(args...)
@@ -387,7 +391,7 @@ Base.nameof(sim::AbstractComponentSimulation) = string(nameof(typeof(sim)))
 
 A function to update the simulation in-place with values calculate for time `t`.
 For the models we currently have implemented, this is a simple wrapper around
-the `step!` function implemented in SciMLBase.jl.
+the `step!` function implemented in ClimaTimeSteppers.jl.
 
 This must be extended for all component models - otherwise this default
 function will be called and an error will be raised.
@@ -398,15 +402,15 @@ step!(sim::AbstractComponentSimulation, t) = error("undefined step! for $(nameof
     step!(sim::AbstractComponentSimulation, t::Float64)
 
 Default step method for simulations using `Float64` as the time type.
-This method is suitable for simulations that use a SciMLBase-style integrator,
-but should be extended for other models.
+This method is suitable for simulations that use a ClimaTimeSteppers-style
+integrator, but should be extended for other models.
 
 This method computes the number of steps to take based on the difference
 between the simulation time (stored in the integrator) and the coupler time
 `t`, divided by the simulation timestep. This generically handles the cases where
 the simulation's timestep is shorter than, longer than, or equal to that of the coupler.
 """
-function step!(sim::AbstractComponentSimulation, t::Float64)
+NVTX.@annotate function step!(sim::AbstractComponentSimulation, t::Float64)
     model_dt = Float64(sim.integrator.dt)
     # `round(Int, ...)` tolerates floating point drift less than `model_dt / 2`
     n_steps = round(Int, (t - Float64(sim.integrator.t)) / model_dt)
@@ -419,20 +423,41 @@ end
     step!(sim::AbstractComponentSimulation, t::ITime)
 
 Default step method for simulations using `ITime` as the time type.
-This method is suitable for simulations that use a SciMLBase-style integrator,
-but should be extended for other models.
+This method is suitable for simulations that use a ClimaTimeSteppers-style
+integrator, but should be extended for other models.
 
 This method computes the number of steps to take based on the difference
 between the simulation time (stored in the integrator) and the coupler time
 `t`, divided by the simulation timestep. This generically handles the cases where
 the simulation's timestep is shorter than, longer than, or equal to that of the coupler.
 """
-function step!(sim::AbstractComponentSimulation, t::ITime)
+NVTX.@annotate function step!(sim::AbstractComponentSimulation, t::ITime)
     n_steps = div(t - sim.integrator.t, sim.integrator.dt) # integer division; exact for ITime
     for _ in 1:n_steps
         step!(sim.integrator)
     end
     return nothing
+end
+
+"""
+    sim_dt(sim::AbstractComponentSimulation)
+
+Return the component model's timestep in seconds as a `Float64`.
+
+This default accesses `sim.integrator.dt`, which is appropriate for models
+which use a ClimaTimeSteppers-style integrator.
+"""
+sim_dt(sim::AbstractComponentSimulation) = Float64(float(sim.integrator.dt))
+
+"""
+    will_step(sim::AbstractComponentSimulation, t)
+
+Return `true` if calling `Interfacer.step!(sim, t)` would take at least one
+step, i.e. if `t` has advanced by at least one of the component's
+timestep since the component last stepped.
+"""
+function will_step(sim::AbstractComponentSimulation, t)
+    return (Float64(float(t)) - Float64(float(sim.integrator.t))) >= sim_dt(sim)
 end
 
 """
@@ -535,24 +560,23 @@ abstract type SlabplanetTerraMode <: AbstractSlabplanetSimulationMode end
     remap(target_space, source_field)
 
 Remap the given `source_field` onto the `target_space`. Note that if the field is already
-on the target space or a compatible one (e.g. another instance of the same space),
-it is returned unchanged. Users should use caution in modifying the returned field
-in this case.
+on the target space it is returned unchanged; users should use caution in modifying the
+returned field in this case. If it is a compatible one (e.g. another instance of the
+same space), the field is copied to the target space.
 
 This is a convenience wrapper around `remap!` that allocates the output field.
+Note that we could call `remap!` directly without checking `spaces_are_compatible`
+here, but then we would allocate a new field even if the spaces are the same.
 
 Non-ClimaCore fields should provide a method to this function.
 """
 function remap end
 
-function remap(target_space::CC.Spaces.AbstractSpace, source_field::CC.Fields.Field)
+NVTX.@annotate function remap(
+    target_space::CC.Spaces.AbstractSpace,
+    source_field::CC.Fields.Field,
+)
     source_space = axes(source_field)
-
-    # Check if the source and target spaces are compatible
-    spaces_are_compatible =
-        source_space == target_space ||
-        CC.Spaces.issubspace(source_space, target_space) ||
-        CC.Spaces.issubspace(target_space, source_space)
 
     # TODO: Handle remapping of Vectors correctly
     if hasproperty(source_field, :components)
@@ -560,8 +584,18 @@ function remap(target_space::CC.Spaces.AbstractSpace, source_field::CC.Fields.Fi
         source_field = source_field.components.data.:1
     end
 
-    # If the spaces are the same or one is a subspace of the other, we can just return the input field
-    spaces_are_compatible && return source_field
+    # Check if the source and target spaces are compatible
+    spaces_are_compatible =
+        source_space == target_space ||
+        CC.Spaces.issubspace(source_space, target_space) ||
+        CC.Spaces.issubspace(target_space, source_space)
+
+    # If the spaces are the same or one is a subspace of the other, we can just copy the
+    # source field to the target space. Note this is a dangerous operation because it accesses
+    # the underlying array of the source field directly, which is not a reliable pattern.
+    if spaces_are_compatible
+        return CC.Fields.Field(CC.Fields.field_values(source_field), target_space)
+    end
 
     # Allocate target field and call remap!
     target_field = CC.Fields.zeros(target_space)
@@ -588,7 +622,7 @@ Note that this method has a lot of allocations and is not efficient.
 """
 function remap! end
 
-function remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field)
+NVTX.@annotate function remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field)
     source_space = axes(source_field)
     target_space = axes(target_field)
     comms_ctx = ClimaComms.context(source_space)
@@ -672,6 +706,16 @@ function remap!(target_field::CC.Fields.Field, source::Number)
     return nothing
 end
 
+# 3-argument versions that accept a remapping object but delegate to 2-argument versions.
+# Extensions can specialize these for specific remapping types (e.g., ConservativeRegridding).
+remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field, remapping) =
+    remap!(target_field, source_field)
+remap!(target_field::CC.Fields.Field, source::Number, remapping) =
+    remap!(target_field, source)
+remap(target_space::CC.Spaces.AbstractSpace, source_field::CC.Fields.Field, remapping) =
+    remap(target_space, source_field)
+remap(target_space::CC.Spaces.AbstractSpace, source::Number, remapping) =
+    remap(target_space, source)
 
 """
     set_cache!(sim::AbstractComponentSimulation, csf)
@@ -771,27 +815,26 @@ end
     get_atmos_height_delta(height_int, height_sfc)
 
 Return a Field of the height delta between the atmosphere bottom cell center
-and bottom face, defined on the boundary space.
+and the surface, defined on the boundary space.
 This is used to compute turbulent fluxes.
 
-Since the atmospheric height is defined on centers, we need to copy the values onto
-the boundary space to be able to subtract the surface elevation.
-This pattern is not reliable and should not be reused.
+Both `height_int` and `height_sfc` must already be defined on the same space
+(the boundary space). Use `get_field!` to remap the atmosphere height onto
+the boundary space before calling this function.
 
 Note this function allocates a new field, and the atmosphere heights won't change
 during a simulation, so it should only be called at initialization.
 
 # Arguments
-- `csf`: [NamedTuple] containing coupler fields.
+- `height_int`: [CC.Fields.Field] defined on the boundary space, containing the
+  atmosphere bottom cell center height.
+- `height_sfc`: [CC.Fields.Field] defined on the boundary space.
 
 # Returns
 - [CC.Fields.Field] defined on the boundary space containing the height delta.
 """
 function get_atmos_height_delta(height_int, height_sfc)
-    return CC.Fields.Field(
-        CC.Fields.field_values(height_int),
-        axes(height_sfc), # boundary space
-    ) .- height_sfc
+    return height_int .- height_sfc
 end
 
 end # module

@@ -2,6 +2,14 @@ using Test
 import ClimaCoupler: SimOutput
 import ArgParse
 
+@testset "get_reduction" begin
+    @test isnothing(SimOutput.get_reduction(Val(:instantaneous)))
+    @test SimOutput.get_reduction(Val(:average)) == (+)
+    @test SimOutput.get_reduction(Val(:max)) == max
+    @test SimOutput.get_reduction(Val(:min)) == min
+    @test_throws ErrorException SimOutput.get_reduction(Val(:not_a_reduction))
+end
+
 @testset "get_benchmark_args" begin
     # Test with empty ARGS (should use defaults)
     # We need to temporarily set ARGS

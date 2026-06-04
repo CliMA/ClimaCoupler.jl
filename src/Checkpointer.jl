@@ -42,7 +42,13 @@ get_model_cache(sim::Interfacer.AbstractComponentSimulation) = nothing
         prev_checkpoint_t::Int;
         output_dir = "output")
 
-Checkpoint the model state of a simulation to a HDF5 file at a given time, t (in seconds).
+Checkpoint the model state of a simulation at time `t` (in seconds).
+
+The default implementation uses `get_model_prog_state(sim)` to obtain a
+`ClimaCore.FieldVector` and writes it to an HDF5 file via `ClimaCore.InputOutput`.
+If `get_model_prog_state` returns `nothing`, this function does nothing.
+
+Component models that do not use ClimaCore can override this method to use their own checkpointing.
 
 If a previous checkpoint exists, it is removed. This is to avoid accumulating
 many checkpoint files in the output directory. A value of -1 for `prev_checkpoint_t`
@@ -56,6 +62,7 @@ function checkpoint_model_state(
     output_dir = "output",
 )
     Y = get_model_prog_state(sim)
+    isnothing(Y) && return nothing
     day = floor(Int, t / (60 * 60 * 24))
     sec = floor(Int, t % (60 * 60 * 24))
     @info "Saving checkpoint $(nameof(sim)) model state to HDF5 on day $day second $sec"
@@ -83,6 +90,12 @@ end
 Checkpoint the model cache to N JLD2 files at a given time, t (in seconds),
 where N is the number of MPI ranks.
 
+The default implementation uses `get_model_cache(sim)` to obtain the cache.
+If `get_model_cache` returns `nothing`, this function does nothing.
+
+Component models that do not use ClimaCore can override this method
+to use their own checkpointing.
+
 Objects are saved to JLD2 files because caches are generally not ClimaCore
 objects (and ClimaCore.InputOutput can only save `Field`s or `FieldVector`s).
 
@@ -97,7 +110,7 @@ function checkpoint_model_cache(
     prev_checkpoint_t::Int;
     output_dir = "output",
 )
-    # Move p to CPU (because we cannot save CUArrays)
+    isnothing(get_model_cache(sim)) && return nothing
     p = get_model_cache_to_checkpoint(sim)
     day = floor(Int, t / (60 * 60 * 24))
     sec = floor(Int, t % (60 * 60 * 24))
@@ -226,16 +239,14 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
     comms_ctx = ClimaComms.context(cs)
 
     for sim in cs.model_sims
-        if !isnothing(Checkpointer.get_model_prog_state(sim))
-            Checkpointer.checkpoint_model_state(
-                sim,
-                comms_ctx,
-                time,
-                prev_checkpoint_t;
-                output_dir,
-            )
-        end
-        if !isnothing(Checkpointer.get_model_cache(sim)) && cs.save_cache
+        Checkpointer.checkpoint_model_state(
+            sim,
+            comms_ctx,
+            time,
+            prev_checkpoint_t;
+            output_dir,
+        )
+        if cs.save_cache
             Checkpointer.checkpoint_model_cache(
                 sim,
                 comms_ctx,
@@ -258,8 +269,46 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
         joinpath(output_dir, "checkpoint_coupler_fields_$(pid)_$(prev_checkpoint_t).jld2")
     remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
 
+    # Checkpoint flux accumulators if present. Without this, a restart in the middle of a
+    # slow-surface dt window would lose the partial sum and the next push to that surface
+    # would average a different number of contributions than the original run.
+    if !isempty(cs.flux_accumulators)
+        @info "Saving coupler flux accumulators to JLD2 on day $day second $sec"
+        acc_output_file =
+            joinpath(output_dir, "checkpoint_flux_accumulators_$(pid)_$time.jld2")
+        # Move the `FluxAccumulator` to CPU
+        accs_cpu = NamedTuple{keys(cs.flux_accumulators)}(
+            map(_accumulator_to_cpu_nt, values(cs.flux_accumulators)),
+        )
+        JLD2.jldsave(acc_output_file, flux_accumulators = accs_cpu)
+
+        prev_acc_file = joinpath(
+            output_dir,
+            "checkpoint_flux_accumulators_$(pid)_$(prev_checkpoint_t).jld2",
+        )
+        remove_checkpoint(prev_acc_file, prev_checkpoint_t, comms_ctx)
+    end
+
     # Update previous checkpoint time stored in the coupled simulation
     cs.prev_checkpoint_t[] = time
+end
+
+"""
+    _accumulator_to_cpu_nt(acc)
+
+Move a `FluxCalculator.FluxAccumulator` to CPU for JLD2 serialization.
+Fields are moved to host arrays via `CC.Adapt.adapt`; `n_steps` is unwrapped
+from the `Base.RefValue` so the value, not the reference, is written.
+"""
+function _accumulator_to_cpu_nt(acc)
+    return (;
+        F_lh = CC.Adapt.adapt(Array, acc.F_lh),
+        F_sh = CC.Adapt.adapt(Array, acc.F_sh),
+        F_turb_moisture = CC.Adapt.adapt(Array, acc.F_turb_moisture),
+        F_turb_ρτxz = CC.Adapt.adapt(Array, acc.F_turb_ρτxz),
+        F_turb_ρτyz = CC.Adapt.adapt(Array, acc.F_turb_ρτyz),
+        n_steps = acc.n_steps[],
+    )
 end
 
 """
@@ -276,15 +325,10 @@ function restart!(cs, checkpoint_dir, checkpoint_t, restart_cache)
     @info "Restarting from time $(checkpoint_t) and directory $(checkpoint_dir)"
     pid = ClimaComms.mypid(ClimaComms.context(cs))
     for sim in cs.model_sims
-        if !isnothing(Checkpointer.get_model_prog_state(sim))
-            input_file_state =
-                output_file = joinpath(
-                    checkpoint_dir,
-                    "checkpoint_$(nameof(sim))_$(checkpoint_t).hdf5",
-                )
-            restart_model_state!(sim, input_file_state, ClimaComms.context(cs))
-        end
-        if !isnothing(Checkpointer.get_model_cache(sim)) && restart_cache
+        input_file_state =
+            joinpath(checkpoint_dir, "checkpoint_$(nameof(sim))_$(checkpoint_t).hdf5")
+        restart_model_state!(sim, input_file_state, ClimaComms.context(cs))
+        if restart_cache
             input_file_cache = joinpath(
                 checkpoint_dir,
                 "checkpoint_cache_$(pid)_$(nameof(sim))_$(checkpoint_t).jld2",
@@ -295,20 +339,33 @@ function restart!(cs, checkpoint_dir, checkpoint_t, restart_cache)
     input_file_coupler_fields =
         joinpath(checkpoint_dir, "checkpoint_coupler_fields_$(pid)_$(checkpoint_t).jld2")
     restart_coupler_fields!(cs, input_file_coupler_fields)
+
+    # Restore flux accumulators if present
+    if !isempty(cs.flux_accumulators)
+        input_file_accs = joinpath(
+            checkpoint_dir,
+            "checkpoint_flux_accumulators_$(pid)_$(checkpoint_t).jld2",
+        )
+        restart_flux_accumulators!(cs, input_file_accs)
+    end
     return true
 end
 
 """
     restart_model_cache!(sim, input_file)
 
-Overwrite the content of `sim` with the cache from the `input_file`.
+Restore the cache of `sim` from `input_file`.
+
+The default implementation uses `get_model_cache(sim)` to check whether the
+simulation has a cache. If `get_model_cache` returns `nothing`, this function
+does nothing.
 
 It relies on `restore_cache!(sim, old_cache)`, which has to be implemented by
 the component models that have a cache.
 """
 function restart_model_cache!(sim, input_file)
+    isnothing(get_model_cache(sim)) && return nothing
     ispath(input_file) || error("File $(input_file) not found")
-    # Component models are responsible for defining a method for this
     JLD2.jldopen(input_file) do file
         restore_cache!(sim, file["cache"])
     end
@@ -317,12 +374,18 @@ end
 """
     restart_model_state!(sim, input_file, comms_ctx)
 
-Overwrite the content of `sim` with the state from the `input_file`.
+Restore the prognostic state of `sim` from `input_file`.
+
+The default implementation reads a `ClimaCore.FieldVector` from an HDF5 file
+written by the default `checkpoint_model_state`. If `get_model_prog_state`
+returns `nothing`, this function does nothing.
+
+Component models that do not use ClimaCore can override this method to use their own checkpointing.
 """
 function restart_model_state!(sim, input_file, comms_ctx)
-    ispath(input_file) || error("File $(input_file) not found")
     Y = get_model_prog_state(sim)
-    # open file and read
+    isnothing(Y) && return nothing
+    ispath(input_file) || error("File $(input_file) not found")
     CC.InputOutput.HDF5Reader(input_file, comms_ctx) do restart_reader
         Y_new = CC.InputOutput.read_field(restart_reader, "model_state")
         # set new state
@@ -347,6 +410,34 @@ function restart_coupler_fields!(cs, input_file)
                 ArrayType(parent(getproperty(fields_read, name)))
         end
     end
+end
+
+"""
+    restart_flux_accumulators!(cs, input_file)
+
+Overwrite the flux accumulator state in `cs` with values read from
+`input_file`. The file is the JLD2 written by `checkpoint_sims` and contains a
+NamedTuple keyed by surface simulation name; each value is a NamedTuple of
+five host-arrayed fields plus the integer `n_steps`.
+"""
+function restart_flux_accumulators!(cs, input_file)
+    ispath(input_file) || error("File $(input_file) not found")
+    ArrayType = ClimaComms.array_type(ClimaComms.device(cs))
+    JLD2.jldopen(input_file) do file
+        accs_read = file["flux_accumulators"]
+        for name in keys(cs.flux_accumulators)
+            haskey(accs_read, name) ||
+                error("Flux accumulator for $(name) missing from checkpoint")
+            saved = accs_read[name]
+            live = cs.flux_accumulators[name]
+            for field_name in (:F_lh, :F_sh, :F_turb_moisture, :F_turb_ρτxz, :F_turb_ρτyz)
+                parent(getproperty(live, field_name)) .=
+                    ArrayType(parent(getproperty(saved, field_name)))
+            end
+            live.n_steps[] = saved.n_steps
+        end
+    end
+    return nothing
 end
 
 """

@@ -1,13 +1,10 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
-atmos_config_file: "config/atmos_configs/climaatmos_diagedmf.yml"
-bucket_albedo_type: "map_temporal"
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
 checkpoint_dt: "1months"
-coupler_toml: ["toml/amip_diagedmf.toml"]
+coupler_toml: ["toml/amip_progedmf.toml"]
 dt: "120secs"
-dt_cloud_fraction: "1hours"
 dt_cpl: "120secs"
-dt_rad: "1hours"
 energy_check: false
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]
@@ -15,13 +12,11 @@ extra_atmos_diagnostics:
     reduction_time: average
     pressure_coordinates: true
     compute_every: 6hours
-initial_condition: "AMIPFromERA5"
 land_model: "integrated"
 mode_name: "amip"
 netcdf_output_at_levels: true
-ode_algo: "ARS343"
 output_default_diagnostics: true
-rmse_check: true
+radiation_reset_rng_seed: true
 sst_adjustment: 2.0
 start_date: "20100101"
 surface_setup: "PrescribedSurface"

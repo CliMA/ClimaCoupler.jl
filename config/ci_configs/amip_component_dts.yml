@@ -1,10 +1,10 @@
 apply_limiter: false
-dt_atmos: "150secs"
-dt_cpl: "150secs"
-dt_land: "50secs"
-dt_ocean: "30secs"
+dt_atmos: "30secs"
+dt_cpl: "30secs"
+dt_land: "60secs"
+dt_ocean: "150secs"
 dt_rad: "1hours"
-dt_seaice: "37.5secs"
+dt_seaice: "90secs"
 dz_bottom: 30
 energy_check: false
 h_elem: 16
@@ -12,8 +12,9 @@ mode_name: "amip"
 rad: "gray"
 microphysics_model: "0M"
 rayleigh_sponge: true
-t_end: "600secs"
+t_end: "300secs"
 time_varying_trace_gases: ["CO2"]
-vert_diff: "true"
+vert_diff: VerticalDiffusion
 z_elem: 50
 z_stretch: false
+check_nan_every: 1

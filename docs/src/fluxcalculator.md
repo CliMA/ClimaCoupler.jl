@@ -34,10 +34,6 @@ fluxes and the CoupledSimulation object's fluxes fields.
 - the flux of energy due to latent heat, `F_lh`;
 - the flux of energy due to sensible heat, `F_sh`;
 - the flux of moisture, `F_turb_moisture`;
-- the Obukhov length, `L_MO`;
-- the buoyancy flux, `buoyancy_flux`;
-- the roughness lengths for momentum and buoyancy, `z0m` and `z0b`;
-- the frictional velocity `ustar`.
 
 !!! note
 
@@ -46,6 +42,33 @@ fluxes and the CoupledSimulation object's fluxes fields.
 Note also that [`FluxCalculator.turbulent_fluxes!`](@ref) only
 computes turbulent fluxes, not radiative fluxes. Currently, these are computed
 within the atmospheric model.
+
+## Turbulent flux accumulation for slow surfaces
+
+When a surface model's own timestep is larger than the coupling timestep
+(e.g. `dt_ocean > Δt_cpl`), pushing a fresh flux to it every coupling step is wasteful:
+the surface only consumes its boundary fluxes when it steps, and the intermediate writes
+are typically overwritten by the next coupling step exchange. For correctness and
+conservation, it is also better to feed the surface a time-average of the per-coupling-step
+fluxes rather than a single instantaneous snapshot.
+
+To support this, the coupler allocates a [`FluxCalculator.FluxAccumulator`](@ref)
+for each slow explicit surface (see [`Interfacer.sim_dt`](@ref),
+[`Interfacer.will_step`](@ref)), and:
+
+- Each coupling step, [`FluxCalculator.turbulent_fluxes!`](@ref) calls
+  [`FluxCalculator.accumulate!`](@ref) on the accumulator instead of writing the
+  flux directly to the surface via `update_turbulent_fluxes!`. The area-weighted
+  combined fields in the CoupledSimulation `fields` NamedTuple, which get sent to the
+  atmosphere, are still updated every call.
+- [`FluxCalculator.turbulent_fluxes!`](@ref) also calls
+  [`FluxCalculator.push_ready_accumulators!`](@ref), which checks if the surface is
+  about to step and if so, divides the accumulator by `n_steps`, writes the time-averaged
+  flux to the surface boundary conditions, and zeros the accumulator.
+
+Accumulators are not allocated for fast surfaces (`sim_dt ≤ Δt_cpl`),
+`AbstractSurfaceStub`s, or `AbstractImplicitFluxSimulation`s (which compute
+their own fluxes inside `step!`).
 
 ## FluxCalculator API
 
@@ -56,4 +79,9 @@ within the atmospheric model.
     FluxCalculator.update_turbulent_fluxes!
     FluxCalculator.update_flux_fields!
     FluxCalculator.get_roughness_params
+    FluxCalculator.FluxAccumulator
+    FluxCalculator.accumulate!
+    FluxCalculator.push_and_reset!
+    FluxCalculator.push_ready_accumulators!
+    FluxCalculator.reset!
 ```

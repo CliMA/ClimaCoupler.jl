@@ -74,3 +74,10 @@ git-tree-sha1 = "c1c0a16127bd547124cdf7288140002d74846efe"
 
 [wxquest_initial_conditions]
 git-tree-sha1 = "85b1e3654fb88f19a715ea6c235e1d66f254d2e6"
+
+[ecco4_SIarea_SIheff_2010_01]
+git-tree-sha1 = "131153e848325a03139ca7966a1857ac3316b564"
+
+    [[ecco4_SIarea_SIheff_2010_01.download]]
+    sha256 = "dfcc6f930fd0d182f1076a4fdd81047aafc522eb433b2c6d5b75446307963044"
+    url = "https://caltech.box.com/shared/static/84s5osmyjcpvil5iv4v2qbmyi6i172w2.gz"

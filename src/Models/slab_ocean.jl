@@ -1,4 +1,3 @@
-import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
 import ClimaUtilities
@@ -176,9 +175,8 @@ function SlabOceanSimulation(
         tspan = Float64.(tspan)
         saveat = Float64.(saveat)
     end
-    problem = SciMLBase.ODEProblem(ode_function, Y, tspan, cache)
-    integrator =
-        SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
+    problem = CTS.ODEProblem(ode_function, Y, tspan, cache)
+    integrator = CTS.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
 
     sim = SlabOceanSimulation(params, integrator)
 

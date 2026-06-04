@@ -7,13 +7,11 @@ import ClimaCoupler: Checkpointer, FieldExchanger, Interfacer
 import ClimaCore as CC
 import SurfaceFluxes as SF
 import Insolation
-import Insolation.Parameters.InsolationParameters
 import StaticArrays as SA
 import Dates
-import ClimaAtmos as CA # for albedo calculation
-import LinearAlgebra
 import ClimaComms
-import ..Checkpointer, ..FieldExchanger, ..Interfacer
+import ClimaDiagnostics as CD
+import ..Checkpointer, ..FieldExchanger, ..Interfacer, ..TimeManager
 
 """
     PrescribedOceanSimulation{C}
@@ -128,6 +126,13 @@ function PrescribedOceanSimulation(
     t_start = first(tspan)
     evaluate!(SST_init, SST_timevaryinginput, t_start)
 
+    # Create a schedule to update the SST daily. The data provides monthly
+    # averages, so it doesn't make sense to update the SST more frequently than daily.
+    SST_schedule = CD.Schedules.EveryCalendarDtSchedule(
+        TimeManager.time_to_period("1days");
+        start_date,
+    )
+
     # COARE3 roughness params (allocated once, reused each timestep)
     coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
     coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
@@ -143,9 +148,10 @@ function PrescribedOceanSimulation(
         v_int = zeros(boundary_space),
         area_fraction = ones(boundary_space),
         phase = TD.Liquid(),
-        thermo_params = thermo_params,
-        SST_timevaryinginput = SST_timevaryinginput,
-        start_date = start_date,
+        thermo_params,
+        SST_timevaryinginput,
+        SST_schedule,
+        start_date,
         t = Ref(t_start),
         coare3_roughness_params,
     )
@@ -184,14 +190,20 @@ end
     Interfacer.step!(sim::PrescribedOceanSimulation, t)
 
 Update the cached surface temperature field using the prescribed data
-at each timestep.
+at the frequency specified by the schedule (daily by default).
+Also updates the current time in the simulation cache.
+
+`EveryCalendarDtSchedule` expects an integrator-like object with a `.t` field
+so we wrap `t` in a NamedTuple.
 """
 function Interfacer.step!(sim::PrescribedOceanSimulation, t::Float64)
-    evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
+    sim.cache.SST_schedule((; t)) &&
+        evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
     sim.cache.t[] = t
 end
 function Interfacer.step!(sim::PrescribedOceanSimulation, t::ITime)
-    evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
+    sim.cache.SST_schedule((; t)) &&
+        evaluate!(sim.cache.T_sfc, sim.cache.SST_timevaryinginput, t)
     sim.cache.t[] = t
 end
 
@@ -233,7 +245,7 @@ function FieldExchanger.update_sim!(sim::PrescribedOceanSimulation, csf)
     Interfacer.update_field!(sim, Val(:v_int), csf.v_int)
 
     # Update the direct and diffuse albedos with the new atmospheric wind
-    set_albedos!(sim, sim.cache.t[])
+    Interfacer.set_albedos!(sim, sim.cache.t[])
 end
 
 """
@@ -246,51 +258,7 @@ function FieldExchanger.import_atmos_fields!(csf, sim::PrescribedOceanSimulation
     Interfacer.get_field!(csf.v_int, atmos_sim, Val(:v_int))
 end
 
-"""
-    function set_albedos!(sim::PrescribedOceanSimulation, t)
-
-Set the direct and diffuse albedos of the ocean based on the current date and
-the atmospheric wind. The albedos are calculated using the `surface_albedo_direct`
-and `surface_albedo_diffuse` functions from the `ClimaAtmos` module, so this
-is dependent on running with `ClimaAtmosSimulation` as the atmosphere simulation.
-"""
-function set_albedos!(sim::PrescribedOceanSimulation, t)
-    p = sim.cache
-    FT = CC.Spaces.undertype(axes(sim.cache.T_sfc))
-
-    # Compute the current date
-    current_date =
-        t isa ClimaUtilities.TimeManager.ITime ? date(t) : p.start_date + Dates.Second(t)
-
-    insolation_params = InsolationParameters(FT)
-
-    # Get the atmospheric wind vector and the cosine of the zenith angle
-    surface_coords = CC.Fields.coordinate_field(axes(sim.cache.T_sfc))
-    insolation_tuple =
-        Insolation.insolation.(
-            current_date,
-            surface_coords.lat,
-            surface_coords.long,
-            insolation_params,
-        )
-    cos_zenith_angle = insolation_tuple.μ
-    wind_atmos = LinearAlgebra.norm.(CC.Geometry.Covariant12Vector.(p.u_int, p.v_int)) # wind vector from components
-    λ = FT(0) # spectral wavelength (not used for now)
-    # TODO: We shouldn't need this, but without this the fluxes_test fail.
-    cos_zenith = @. max(cos_zenith_angle, eps(FT))
-
-    # Use the albedo model from ClimaAtmos
-    α_model = CA.RegressionFunctionAlbedo{FT}()
-    Interfacer.update_field!(
-        sim,
-        Val(:surface_direct_albedo),
-        CA.surface_albedo_direct(α_model).(λ, cos_zenith, wind_atmos),
-    )
-    Interfacer.update_field!(
-        sim,
-        Val(:surface_diffuse_albedo),
-        CA.surface_albedo_diffuse(α_model).(λ, cos_zenith, wind_atmos),
-    )
-
-    return nothing
-end
+# this method uses varagrs so when ClimaCouplerClimaAtmosExt is loaded,
+# it will add a method that has more specific arguments. This prevents method overwriting
+Interfacer.set_albedos!(model::PrescribedOceanSimulation, _...) =
+    @error "The default `Interfacer.set_albedos!` for PrescribedOceanSimulation requires ClimaAtmos.jl to be loaded. Please make sure the extension is correctly loaded, or define `set_albedos!`"

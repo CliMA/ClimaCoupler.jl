@@ -12,65 +12,202 @@ import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 import ClimaCore as CC
+import NVTX
 import ..Interfacer, ..Utilities
 
 export turbulent_fluxes!,
     get_surface_params,
     update_turbulent_fluxes!,
     compute_surface_fluxes!,
-    ocean_seaice_fluxes!
+    ocean_seaice_fluxes!,
+    FluxAccumulator,
+    accumulate!,
+    push_and_reset!,
+    push_ready_accumulators!,
+    reset!
 
 function turbulent_fluxes!(cs::Interfacer.CoupledSimulation)
-    return turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params)
+    turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params, cs.flux_accumulators)
+    push_ready_accumulators!(cs.model_sims, cs.flux_accumulators, cs.t[] + cs.Δt_cpl)
+    return nothing
 end
 
 """
     turbulent_fluxes!(cs::CoupledSimulation)
-    turbulent_fluxes!(fields, model_sims, thermo_params)
+    turbulent_fluxes!(fields, model_sims, thermo_params, flux_accumulators = (;))
 
 Compute turbulent fluxes and associated quantities. Store the results in `fields` as
 area-weighted sums.
 
 This function uses `SurfaceFluxes.jl` under the hood.
 
+For any surface present in `flux_accumulators`, the per-surface flux is added to
+that surface's `FluxAccumulator` instead of being pushed directly to the surface
+via `update_turbulent_fluxes!`. The area-weighted combined `cs.fields.F_*` fields
+(which the atmosphere reads) are updated every call regardless.
+
 Args:
 - `csf`: [Field of NamedTuple] containing coupler fields.
 - `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
 - `thermo_params`: [TD.Parameters.ThermodynamicsParameters] the thermodynamic parameters.
-
-TODO:
-- generalize interface for regridding and take land state out of atmos's integrator.p
-- add flux accumulation
-- add flux bounds
+- `flux_accumulators`: [NamedTuple] of `FluxAccumulator`s keyed by surface
+    simulation name (the same keys as `model_sims`). Entries are only present
+    for slow explicit surfaces; the default empty NamedTuple disables
+    accumulation entirely.
 
 (NB: Radiation surface fluxes are calculated by the atmosphere.)
 """
-function turbulent_fluxes!(csf, model_sims, thermo_params)
+function turbulent_fluxes!(csf, model_sims, thermo_params, flux_accumulators = (;))
     boundary_space = axes(csf)
     atmos_sim = model_sims.atmos_sim
     FT = CC.Spaces.undertype(boundary_space)
 
     # Reset the coupler fields will compute. We need to do this because we will compute
     # area-weighted averages
-    for p in (
-        :F_turb_ρτxz,
-        :F_turb_ρτyz,
-        :F_lh,
-        :F_sh,
-        :F_turb_moisture,
-        :L_MO,
-        :ustar,
-        :buoyancy_flux,
-    )
+    for p in (:F_turb_ρτxz, :F_turb_ρτyz, :F_lh, :F_sh, :F_turb_moisture)
         fill!(getproperty(csf, p), 0)
     end
 
-    # Compute the surface fluxes for each surface model and add them to `csf`
-    for sim in model_sims
+    # Compute the surface fluxes for each surface model and add them to `csf`.
+    for (name, sim) in pairs(model_sims)
         # If the simulation is an implicit flux simulation, the fluxes are computed in the
         # component model's `step!` function, so we don't need to compute them here.
-        sim isa Interfacer.AbstractImplicitFluxSimulation ||
-            compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params)
+        sim isa Interfacer.AbstractImplicitFluxSimulation && continue
+        # `accumulator` is `nothing` for fast surfaces (and for atmos, which is
+        # also iterated but whose `compute_surface_fluxes!` is a no-op).
+        accumulator = get(flux_accumulators, name, nothing)
+        compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params, accumulator)
+    end
+    return nothing
+end
+
+"""
+    FluxAccumulator{F}
+
+Time-accumulator for the five turbulent flux fields between a surface model and the atmosphere,
+used for slow surfaces (having `dt > Δt_cpl`) whose fluxes are computed explicitly.
+The fields hold the running sum of per-surface (not area-weighted) turbulent fluxes
+computed at each coupling step, and `n_steps` counts the number of contributions
+added since the last reset.
+
+Used by `turbulent_fluxes!` to push the time-averaged flux to a
+slow surface just before it steps. Allocated only for slow explicit
+surfaces; fast surfaces and implicit-flux surfaces do not have an accumulator.
+"""
+struct FluxAccumulator{F <: CC.Fields.Field}
+    F_lh::F
+    F_sh::F
+    F_turb_moisture::F
+    F_turb_ρτxz::F
+    F_turb_ρτyz::F
+    n_steps::Base.RefValue{Int}
+end
+
+"""
+    FluxAccumulator(boundary_space)
+
+Construct a zero-initialized `FluxAccumulator` whose fields live on the coupler
+boundary space (no regridding is needed during accumulation).
+"""
+function FluxAccumulator(boundary_space)
+    return FluxAccumulator(
+        CC.Fields.zeros(boundary_space),
+        CC.Fields.zeros(boundary_space),
+        CC.Fields.zeros(boundary_space),
+        CC.Fields.zeros(boundary_space),
+        CC.Fields.zeros(boundary_space),
+        Ref(0),
+    )
+end
+
+"""
+    accumulate!(acc::FluxAccumulator, fields)
+
+Add the per-surface turbulent fluxes in the NamedTuple `fields` (`F_lh`,
+`F_sh`, `F_turb_moisture`, `F_turb_ρτxz`, `F_turb_ρτyz`) into the accumulator
+and increment `n_steps`. Called once per coupling step from
+`update_flux_fields!` for each slow surface, in place of the direct
+`update_turbulent_fluxes!` push.
+"""
+function accumulate!(acc::FluxAccumulator, fields)
+    @. acc.F_lh += fields.F_lh
+    @. acc.F_sh += fields.F_sh
+    @. acc.F_turb_moisture += fields.F_turb_moisture
+    @. acc.F_turb_ρτxz += fields.F_turb_ρτxz
+    @. acc.F_turb_ρτyz += fields.F_turb_ρτyz
+    acc.n_steps[] += 1
+    return nothing
+end
+
+"""
+    push_and_reset!(sim, acc::FluxAccumulator)
+
+Compute the time-averaged flux (dividing the accumulator fields in-place by
+`n_steps`), push it to the surface via `update_turbulent_fluxes!(sim, ...)`,
+then zero the accumulator. A no-op if `n_steps` is zero.
+"""
+function push_and_reset!(sim, acc::FluxAccumulator)
+    n = acc.n_steps[]
+    iszero(n) && return nothing
+    # In-place division avoids allocating
+    @. acc.F_lh /= n
+    @. acc.F_sh /= n
+    @. acc.F_turb_moisture /= n
+    @. acc.F_turb_ρτxz /= n
+    @. acc.F_turb_ρτyz /= n
+    fields = (;
+        F_lh = acc.F_lh,
+        F_sh = acc.F_sh,
+        F_turb_moisture = acc.F_turb_moisture,
+        F_turb_ρτxz = acc.F_turb_ρτxz,
+        F_turb_ρτyz = acc.F_turb_ρτyz,
+    )
+    update_turbulent_fluxes!(sim, fields)
+    reset!(acc)
+    return nothing
+end
+
+"""
+    reset!(acc::FluxAccumulator)
+
+Zero all accumulator fields and reset the step counter. Called by
+`push_and_reset!` after pushing the averaged flux to the surface.
+"""
+function reset!(acc::FluxAccumulator)
+    fill!(acc.F_lh, 0)
+    fill!(acc.F_sh, 0)
+    fill!(acc.F_turb_moisture, 0)
+    fill!(acc.F_turb_ρτxz, 0)
+    fill!(acc.F_turb_ρτyz, 0)
+    acc.n_steps[] = 0
+    return nothing
+end
+
+"""
+    push_ready_accumulators!(model_sims, flux_accumulators, t_next; force = false)
+
+For each surface model present in `flux_accumulators`, check
+whether the surface will step at time `t_next`. If so, compute the
+time-averaged flux from the accumulator and write it to the surface boundary
+conditions via `push_and_reset!`.
+
+Called by `turbulent_fluxes!(cs)` with `t_next = cs.t[] + cs.Δt_cpl`
+immediately after accumulation.
+
+Pass `force = true` to skip the `will_step` check and unconditionally push
+every non-empty accumulator to its surface. This is used during initialization
+to populate slow-surface BCs before the simulation starts.
+"""
+function push_ready_accumulators!(
+    model_sims,
+    flux_accumulators,
+    t_next;
+    force::Bool = false,
+)
+    for name in keys(flux_accumulators)
+        if force || Interfacer.will_step(model_sims[name], t_next)
+            push_and_reset!(model_sims[name], flux_accumulators[name])
+        end
     end
     return nothing
 end
@@ -135,19 +272,7 @@ function get_surface_fluxes(
         update_q_vap_sfc,
     )
 
-    (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc, L_MO, ustar) = outputs
-
-    buoyancy_flux = SF.buoyancy_flux(
-        surface_fluxes_params,
-        shf,
-        lhf,
-        T_sfc,
-        ρ_int,
-        q_vap_sfc,
-        q_liq_int,
-        q_ice_int,
-        SF.MoistModel(),
-    )
+    (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc) = outputs
 
     return (;
         F_turb_ρτxz = ρτxz,
@@ -155,9 +280,6 @@ function get_surface_fluxes(
         F_sh = shf,
         F_lh = lhf,
         F_turb_moisture = evaporation,
-        L_MO,
-        ustar,
-        buoyancy_flux,
         T_sfc_new = T_sfc,
     )
 end
@@ -225,6 +347,7 @@ function compute_surface_fluxes!(
     sim::Interfacer.AbstractAtmosSimulation,
     atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
+    accumulator = nothing,
 )
     # do nothing for atmos model
     return nothing
@@ -235,16 +358,18 @@ function compute_surface_fluxes!(
     sim::Interfacer.AbstractImplicitFluxSimulation,
     atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
+    accumulator = nothing,
 )
     # do nothing for implicit flux surface model
     return nothing
 end
 
-function compute_surface_fluxes!(
+NVTX.@annotate function compute_surface_fluxes!(
     csf,
     sim::Interfacer.AbstractSurfaceSimulation,
     atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
+    accumulator = nothing,
 )
     boundary_space = axes(csf)
     FT = CC.Spaces.undertype(boundary_space)
@@ -303,26 +428,38 @@ function compute_surface_fluxes!(
         )
 
     # Update the coupler fields and surface simulation with the fluxes
-    update_flux_fields!(csf, sim, fluxes)
+    update_flux_fields!(csf, sim, fluxes, accumulator)
     return nothing
 end
 
 """
-    update_flux_fields!(csf, sim::Interfacer.AbstractSurfaceSimulation, fluxes)
+    update_flux_fields!(csf, sim::Interfacer.AbstractSurfaceSimulation, fluxes, accumulator = nothing)
 
-Update the surface simulation `sim` with the values stored in `fluxes,
+Update the surface simulation `sim` with the values stored in `fluxes`,
 without any area-weighting. Then, update the coupler fields `csf` with
 the area-weighted fluxes.
+
+If `accumulator` is a `FluxAccumulator` (i.e. `sim` is a slow surface), the
+per-surface fluxes are added to the accumulator instead of being pushed
+directly to the surface's boundary conditions. The
+area-weighted contribution to `csf.F_*` (which the atmosphere reads each
+coupling step) is updated unconditionally.
 
 # Arguments
 - `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields:
     `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
 - `sim`: [Interfacer.AbstractComponentSimulation] the surface simulation to update.
 - `fluxes`: [NamedTuple] containing the fluxes to update the surface simulation with.
+- `accumulator`: optional `FluxAccumulator` for slow surfaces; `nothing` (default)
+    updates the surface immediately.
 """
-function update_flux_fields!(csf, sim::Interfacer.AbstractSurfaceSimulation, fluxes)
-    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, L_MO, ustar, buoyancy_flux) =
-        fluxes
+function update_flux_fields!(
+    csf,
+    sim::Interfacer.AbstractSurfaceSimulation,
+    fluxes,
+    accumulator = nothing,
+)
+    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture) = fluxes
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     # Zero out fluxes where the area fraction is zero
@@ -333,13 +470,15 @@ function update_flux_fields!(csf, sim::Interfacer.AbstractSurfaceSimulation, flu
     @. F_sh = ifelse(area_fraction ≈ 0, zero(F_sh), F_sh)
     @. F_lh = ifelse(area_fraction ≈ 0, zero(F_lh), F_lh)
     @. F_turb_moisture = ifelse(area_fraction ≈ 0, zero(F_turb_moisture), F_turb_moisture)
-    @. L_MO = ifelse(area_fraction ≈ 0, zero(L_MO), L_MO)
-    @. ustar = ifelse(area_fraction ≈ 0, zero(ustar), ustar)
-    @. buoyancy_flux = ifelse(area_fraction ≈ 0, zero(buoyancy_flux), buoyancy_flux)
 
     # update the fluxes, which are now area fraction-masked, of this surface model
     fields = (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
-    FluxCalculator.update_turbulent_fluxes!(sim, fields)
+
+    if isnothing(accumulator)
+        FluxCalculator.update_turbulent_fluxes!(sim, fields)
+    else
+        accumulate!(accumulator, fields)
+    end
 
     # update fluxes in the coupler fields
     # add the flux contributing from this surface to the coupler field
@@ -350,14 +489,6 @@ function update_flux_fields!(csf, sim::Interfacer.AbstractSurfaceSimulation, flu
     @. csf.F_sh += F_sh * area_fraction
     @. csf.F_turb_moisture += F_turb_moisture * area_fraction
 
-    # NOTE: This is still an area weighted contribution, which maybe doesn't make
-    # too much sense for these quantities...
-
-    # L_MO can be Inf. We don't want to multiply Inf * 0, so we can handle this
-    # separately.
-    @. csf.L_MO += ifelse(isinf(L_MO), L_MO, L_MO * area_fraction)
-    @. csf.ustar += ustar * area_fraction
-    @. csf.buoyancy_flux += buoyancy_flux * area_fraction
     return nothing
 end
 

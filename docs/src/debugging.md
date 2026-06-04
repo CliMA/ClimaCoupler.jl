@@ -82,6 +82,10 @@ end
 Look for: negative temperatures, extremely large or small fluxes, NaN
 values in any field, or values that are zero where they shouldn't be.
 
+!!! note
+    Sometimes NaNs can occur without fully breaking the simulation.
+    One way to ensure that NaNs are caught quickly is by setting the `check_nan_every` config option as part of the ClimaAtmos model (see [the ClimaAtmos docs](https://clima.github.io/ClimaAtmos.jl/dev/config/#Default-Configuration) for details).
+
 ### Plotting ClimaCore fields
 
 The built-in `Plotting.debug` function produces a grid of heatmaps of all coupler and
@@ -174,6 +178,15 @@ The `Plotting.debug` function handles both field types automatically when the
 `ClimaCouplerCMIPMakieExt` extension is loaded.
 
 ## Software errors
+
+### Julia REPL help mode
+
+Type `?` at the REPL prompt to enter help mode, then type any function, type,
+macro, or other Julia object to display its documentation. This includes docstrings,
+which is another reason why writing clear, expressive docstrings is important.
+
+For more details about help mode and the other Julia REPL modes,
+please see the [Julia documentation](https://docs.julialang.org/en/v1/stdlib/REPL/#The-different-prompt-modes).
 
 ### Identifying which method is being dispatched
 

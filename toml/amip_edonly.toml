@@ -37,7 +37,3 @@ type = "float"
 [precipitation_timescale]
 value = 1200
 type = "float"
-
-[Tq_correlation_coefficient]
-value = -1
-type = "float"

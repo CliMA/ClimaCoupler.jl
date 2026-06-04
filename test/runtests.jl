@@ -15,6 +15,11 @@ end
 @safetestset "Aqua tests" begin
     include("aqua.jl")
 end
+
+@safetestset "Default methods extended in ClimaCouplerClimaAtmosExt tests" begin
+    include("defaults_from_ext.jl")
+end
+
 @safetestset "Interfacer tests" begin
     include("interfacer_tests.jl")
 end

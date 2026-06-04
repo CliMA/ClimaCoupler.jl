@@ -38,7 +38,7 @@ end
         depth::FT = FT(15),
         dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
         shared_surface_space = nothing,
-        land_spun_up_ic::Bool = true,
+        land_spun_up_ic::Bool = false,
         surface_elevation = nothing,
         atmos_h,
         land_temperature_anomaly::String = "amip",
@@ -72,11 +72,13 @@ function ClimaLandSimulation(
     depth::FT = FT(15),
     dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
     shared_surface_space = nothing,
-    land_spun_up_ic::Bool = true,
+    land_spun_up_ic::Bool = false,
     surface_elevation = nothing,
     atmos_h,
     land_temperature_anomaly::String = "amip",
     use_land_diagnostics::Bool = true,
+    land_diagnostics_period::Symbol = :monthly,
+    land_diagnostics_reduction::Symbol = :average,
     coupled_param_dict = CP.create_toml_dict(FT),
     land_ic_path::Union{Nothing, String} = nothing,
     lai_source::String = "modis_monthly",
@@ -113,11 +115,15 @@ function ClimaLandSimulation(
     #  since that's where we compute fluxes for this land model
     atmos_h = Interfacer.remap(surface_space, atmos_h)
 
+    # `tspan` can contain non-zero values (e.g. (720.0, 900.0)) when restarting
+    sim_start_date = start_date + Dates.Second(float(tspan[1]))
+    sim_stop_date = start_date + Dates.Second(float(tspan[2]))
+
     # Set up atmosphere and radiation forcing
     forcing = (;
         atmos = CL.CoupledAtmosphere{FT, typeof(atmos_h)}(atmos_h, gustiness),
         radiation = CL.CoupledRadiativeFluxes{FT}(
-            start_date;
+            sim_start_date;
             latitude = CC.Fields.coordinate_field(domain.space.surface).lat,
             longitude = CC.Fields.coordinate_field(domain.space.surface).long,
             toml_dict,
@@ -125,13 +131,12 @@ function ClimaLandSimulation(
     )
 
     # Set up leaf area index (LAI)
-    stop_date = start_date + Dates.Second(float(tspan[2] - tspan[1]))
     if lai_source == "modis_monthly"
         # Full monthly MODIS LAI data
         LAI = CL.prescribed_lai_modis(
             surface_space,
-            start_date,
-            stop_date;
+            sim_start_date,
+            sim_stop_date;
             time_interpolation_method = LinearInterpolation(),
         )
     elseif lai_source == "modis_monthly_climatology"
@@ -142,8 +147,8 @@ function ClimaLandSimulation(
         )
         LAI = CL.prescribed_lai_modis(
             surface_space,
-            start_date,
-            stop_date;
+            sim_start_date,
+            sim_stop_date;
             modis_lai_ncdata_path = modis_lai_clim_path,
             time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
         )
@@ -152,47 +157,21 @@ function ClimaLandSimulation(
             "Unknown lai_source: $lai_source. Must be \"modis_monthly\" or \"modis_monthly_climatology\"",
         )
     end
-
     ground = CL.PrognosticGroundConditions{FT}()
     canopy_forcing = (; forcing.atmos, forcing.radiation, ground)
     prognostic_land_components = (:canopy, :snow, :soil, :soilco2)
     surface_domain = CL.Domains.obtain_surface_domain(domain)
-    biomass = CL.Canopy.PrescribedBiomassModel{FT}(
-        domain,
-        LAI,
-        toml_dict;
-        height = CL.Canopy.clm_canopy_height(
-            domain.space.surface;
-            max_height = minimum(atmos_h) * FT(0.9),
-        ),
-    )
+    photosynthesis = CL.Canopy.FarquharModel{FT}(surface_domain, toml_dict)
+    conductance = CL.Canopy.MedlynConductanceModel{FT}(surface_domain, toml_dict)
     canopy = CL.Canopy.CanopyModel{FT}(
         surface_domain,
         canopy_forcing,
         LAI,
         toml_dict;
         prognostic_land_components,
-        biomass,
+        photosynthesis,
+        conductance,
     )
-
-    # Snow model setup
-    # Set β = 0 in order to regain model without density dependence
-    α_snow = CL.Snow.ZenithAngleAlbedoModel(toml_dict)
-    horz_degree_res =
-        domain isa CL.Domains.Column ? FT(1) :
-        FT(sum(CL.Domains.average_horizontal_resolution_degrees(domain)) / 2)
-    scf = CL.Snow.WuWuSnowCoverFractionModel(toml_dict, horz_degree_res)
-    snow = CL.Snow.SnowModel(
-        FT,
-        surface_domain,
-        forcing,
-        toml_dict,
-        dt;
-        prognostic_land_components,
-        α_snow,
-        scf,
-    )
-
     model = CL.LandModel{FT}(
         forcing,
         LAI,
@@ -200,7 +179,6 @@ function ClimaLandSimulation(
         domain,
         dt;
         prognostic_land_components,
-        snow,
         canopy,
     )
 
@@ -210,9 +188,12 @@ function ClimaLandSimulation(
         diagnostics = CL.default_diagnostics(
             model,
             start_date,
+            output_dir;
             output_writer = output_writer,
             output_vars = :short,
-            reduction_period = :monthly,
+            reduction_period = land_diagnostics_period,
+            reduction_type = land_diagnostics_reduction,
+            dt = float(dt),
         )
     else
         output_writer = nothing
@@ -280,11 +261,11 @@ function ClimaLandSimulation(
     # Convert start_date and stop_date to ITime if using ITime
     if dt isa ITime
         start_date = tspan[1]
-        stop_date = tspan[2]
+        sim_stop_date = tspan[2]
     end
     simulation = CL.Simulations.LandSimulation(
         start_date,
-        stop_date,
+        sim_stop_date,
         dt,
         model;
         outdir = output_dir,
@@ -471,7 +452,7 @@ end
 
 ## Extend functions for land-specific flux calculation
 """
-    compute_surface_fluxes!(csf, sim::ClimaLandSimulation, atmos_sim, thermo_params)
+    compute_surface_fluxes!(csf, sim::ClimaLandSimulation, atmos_sim, thermo_params, accumulator = nothing)
 
 This function computes surface fluxes between the integrated land model
 simulation and the atmosphere.
@@ -483,8 +464,8 @@ models to get the total fluxes. Fluxes where the area fraction is zero are set t
 The integrated land model requires fluxes to be computed implicitly, so they are
 computed in the land model's internal `step!` function, where they can be solved for
 at the same time as canopy temperature. As a result, this function does not actually compute
-the fluxes. However, it does access them from the land cache, combine them to get the
-total fluxes for the integrated land model, and update the coupler fields in-place.
+the fluxes, and some inputs are unused. However, it does access them from the land cache, combine
+them to get the total fluxes for the integrated land model, and update the coupler fields in-place.
 
 Because the integrated land model is composed of multiple sub-components, the
 fluxes are computed for each sub-component and then combined here to get the total for this model.
@@ -501,6 +482,7 @@ function FluxCalculator.compute_surface_fluxes!(
     sim::ClimaLandSimulation,
     atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
+    accumulator = nothing,
 )
     boundary_space = axes(csf)
     FT = CC.Spaces.undertype(boundary_space)
@@ -576,37 +558,6 @@ function FluxCalculator.compute_surface_fluxes!(
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
     @. csf.F_turb_ρτyz += csf.scalar_temp1 * area_fraction
 
-    # Combine the buoyancy flux from each component of the land model
-    # Note that we exclude the canopy component here for now, since ClimaLand doesn't
-    #  include its extra resistance term in the buoyancy flux calculation.
-    Interfacer.remap!(
-        csf.scalar_temp1,
-        soil_dest.buoyancy_flux .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.buoyancy_flux,
-    )
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    @. csf.buoyancy_flux += csf.scalar_temp1 * area_fraction
-
-    # Compute ustar from the momentum fluxes and surface air density
-    #  ustar = sqrt(ρτ / ρ)
-    @. csf.scalar_temp1 = sqrt(sqrt(csf.F_turb_ρτxz^2 + csf.F_turb_ρτyz^2) / csf.ρ_atmos)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    # If ustar is zero, set it to eps to avoid division by zero in the atmosphere
-    @. csf.ustar += max(csf.scalar_temp1 * area_fraction, eps(FT))
-
-    # Compute the Monin-Obukhov length from ustar and the buoyancy flux
-    #  L_MO = -u^3 / (k * buoyancy_flux)
-    surface_params = LP.surface_fluxes_parameters(sim.model.soil.parameters.earth_param_set)
-    @. csf.scalar_temp1 =
-        -csf.ustar^3 / SFP.von_karman_const(surface_params) / SF.non_zero(csf.buoyancy_flux)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    # When L_MO is infinite, avoid multiplication by zero to prevent NaN
-    @. csf.L_MO +=
-        ifelse(isinf(csf.scalar_temp1), csf.scalar_temp1, csf.scalar_temp1 * area_fraction)
-
     return nothing
 end
 
@@ -642,7 +593,7 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_energy}) =
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_temp}) =
     sim.integrator.u.canopy.energy.T
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:canopy_water}) =
-    sim.integrator.u.canopy.hydraulics.ϑ_l.:1
+    sim.integrator.u.canopy.hydraulics.ϑ_l
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_energy}) =
     sim.integrator.u.snow.U
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_water_equiv}) =

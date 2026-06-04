@@ -2,7 +2,25 @@ import ClimaDiagnostics as CD
 import ClimaCoupler: Interfacer
 import Dates
 
-export diagnostics_setup
+export diagnostics_setup, get_reduction
+
+"""
+    get_reduction(::Val{:instantaneous}) = nothing
+    get_reduction(::Val{:average}) = (+)
+    get_reduction(::Val{:max}) = max
+    get_reduction(::Val{:min}) = min
+
+Helper that maps a reduction-type symbol to the `reduction_time_func` expected by
+`ClimaDiagnostics.ScheduledDiagnostic`.
+"""
+get_reduction(::Val{:instantaneous}) = nothing
+get_reduction(::Val{:average}) = (+)
+get_reduction(::Val{:max}) = max
+get_reduction(::Val{:min}) = min
+get_reduction(val) = error(
+    "Diagnostic reduction $val not supported. " *
+    "Supported reductions are: `:instantaneous`, `:average`, `:max`, `:min`.",
+)
 
 #### Custom Schedule for diagnostics that only get output once at the beginning of the simulation
 
@@ -35,12 +53,22 @@ function CD.orchestrate_diagnostics(cs::Interfacer.CoupledSimulation)
 end
 
 """
-    diagnostics_setup(fields, output_dir, start_date, t_start, diagnostics_dt)
+    diagnostics_setup(fields, output_dir, start_date, t_start,
+                      coupler_diagnostics_period, coupled_dt;
+                      reduction = :average)
 
 Set up the default diagnostics for an AMIP simulation, using ClimaDiagnostics.
 The diagnostics are saved to NetCDF files. Currently, this just includes a
 diagnostic for turbulent energy fluxes and diagnostics for each of the land, ocean,
 and sea-ice area fractions.
+
+`coupler_diagnostics_period` is a `Dates.Period` controlling the output cadence
+of the turbulent energy flux and ocean/ice fraction diagnostics.
+
+`reduction` controls the temporal reduction applied to the turbulent energy
+flux diagnostic. Supported values are `:average` (default), `:instantaneous`,
+`:max`, and `:min` (see `get_reduction`). Area fraction diagnostics are always
+output instantaneously.
 
 Return a DiagnosticsHandler object to coordinate the diagnostics.
 """
@@ -49,15 +77,16 @@ function diagnostics_setup(
     output_dir,
     start_date,
     t_start,
-    diagnostics_dt,
-    coupled_dt,
+    coupler_diagnostics_period,
+    coupled_dt;
+    reduction::Symbol = :average,
 )
     # Create a list to hold the scheduled diagnostics
     scheduled_diags = []
 
     # Create output writer (shared across all diagnostics since they all live on the boundary space)
     boundary_space = axes(fields.F_lh)
-    netcdf_writer = CD.Writers.NetCDFWriter(boundary_space, output_dir)
+    netcdf_writer = CD.Writers.NetCDFWriter(boundary_space, output_dir; start_date)
 
     #### Turbulent energy fluxes diagnostic
 
@@ -78,16 +107,21 @@ function diagnostics_setup(
         end,
     )
 
-    # Schedule the turbulent energy fluxes to save at every step and output at the frequency calculated above
+    # Schedule the turbulent energy fluxes to save at every step and output at the configured period
     compute_sched = CD.Schedules.EveryStepSchedule()  # Note that these are stateful, so we create new ones for each diagnostic
-    output_sched = CD.Schedules.EveryCalendarDtSchedule(diagnostics_dt; start_date)
+    output_sched =
+        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
+    reduction_time_func = get_reduction(Val(reduction))
+    # `pre_output_hook!` is only needed to finalize the running mean for `:average`;
+    # all other reductions don't require post-processing.
+    pre_output_hook! = reduction == :average ? CD.average_pre_output_hook! : nothing
     F_turb_energy_diag_sched = CD.ScheduledDiagnostic(
         variable = F_turb_energy_diag,
         output_writer = netcdf_writer,
-        reduction_time_func = (+),
+        reduction_time_func = reduction_time_func,
         compute_schedule_func = compute_sched,
         output_schedule_func = output_sched,
-        pre_output_hook! = CD.average_pre_output_hook!,
+        pre_output_hook! = pre_output_hook!,
     )
 
     push!(scheduled_diags, F_turb_energy_diag_sched)
@@ -140,10 +174,12 @@ function diagnostics_setup(
         end,
     )
 
-    # Schedule the ocean fraction to save and output at diagnostic frequency 
+    # Schedule the ocean fraction to save and output at diagnostic frequency
     # since it can change in time with evolving sea ice
-    compute_sched = CD.Schedules.EveryCalendarDtSchedule(diagnostics_dt; start_date)
-    output_sched = CD.Schedules.EveryCalendarDtSchedule(diagnostics_dt; start_date)
+    compute_sched =
+        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
+    output_sched =
+        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
     ocean_fraction_diag_sched = CD.ScheduledDiagnostic(
         variable = ocean_fraction_diag,
         output_writer = netcdf_writer,
@@ -171,9 +207,11 @@ function diagnostics_setup(
         end,
     )
 
-    # Schedule the ice fraction to save and output at diagnostic frequency 
-    compute_sched = CD.Schedules.EveryCalendarDtSchedule(diagnostics_dt; start_date)
-    output_sched = CD.Schedules.EveryCalendarDtSchedule(diagnostics_dt; start_date)
+    # Schedule the ice fraction to save and output at diagnostic frequency
+    compute_sched =
+        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
+    output_sched =
+        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
     ice_fraction_diag_sched = CD.ScheduledDiagnostic(
         variable = ice_fraction_diag,
         output_writer = netcdf_writer,

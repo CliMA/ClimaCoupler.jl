@@ -16,10 +16,21 @@ import ClimaParams as CP
 import ClimaCore as CC
 import ClimaCore.Geometry: ⊗
 import SurfaceFluxes as SF
+import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
+import Insolation
+import Insolation.Parameters: InsolationParameters
+import LinearAlgebra
 import ClimaCoupler:
-    Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities, Plotting
-import ClimaUtilities.TimeManager: ITime
+    Checkpointer,
+    FieldExchanger,
+    FluxCalculator,
+    Interfacer,
+    Utilities,
+    Plotting,
+    Input,
+    Models
+import ClimaUtilities.TimeManager: ITime, date
 import ClimaComms
 
 ###
@@ -463,6 +474,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
     temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
 
     Y = sim.integrator.u
+    FT = eltype(sim.integrator.p.params)
     surface_local_geometry =
         CC.Fields.level(CC.Fields.local_geometry_field(Y.f), CC.Utilities.half)
     surface_normal = @. CA.C3(CA.unit_basis_vector_data(CA.C3, surface_local_geometry))
@@ -499,15 +511,40 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
     sim.integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot .=
         temp_field_surface .* surface_normal # (evap)
 
-    Interfacer.remap!(
-        sim.integrator.p.precomputed.sfc_conditions.obukhov_length,
-        fields.L_MO,
+    # Compute buoyancy flux, ustar, and L_MO using combined coupler fields
+    surface_fluxes_params = FluxCalculator.get_surface_params(sim)
+    (; T_sfc, ρ_atmos, q_tot_atmos, q_liq_atmos, q_ice_atmos, scalar_temp1, scalar_temp2) =
+        fields
+    # Note: It isn't clear that q_vap_sfc should come from q_vap_int like this, but this is
+    # easy and not too wrong (see https://github.com/CliMA/ClimaCoupler.jl/issues/1817)
+    @. scalar_temp1 = q_tot_atmos - q_liq_atmos - q_ice_atmos
+    q_vap_atmos = scalar_temp1 # rename for clarity
+    @. scalar_temp2 = SF.buoyancy_flux(
+        surface_fluxes_params,
+        F_sh,
+        F_lh,
+        T_sfc, # Same note here as the one above for q_vap_sfc
+        ρ_atmos,
+        q_vap_atmos,
+        q_liq_atmos,
+        q_ice_atmos,
+        SF.MoistModel(),
     )
-    Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.ustar, fields.ustar)
+    buoyancy_flux = scalar_temp2 # rename for clarity
     Interfacer.remap!(
         sim.integrator.p.precomputed.sfc_conditions.buoyancy_flux,
-        fields.buoyancy_flux,
+        buoyancy_flux,
     )
+
+    # ustar needs to be non-zero for EDMF boundary conditions
+    @. scalar_temp1 = max(eps(FT), sqrt(sqrt(F_turb_ρτxz^2 + F_turb_ρτyz^2) / ρ_atmos)) # reuse (q_vap_atmos no longer needed)
+    ustar = scalar_temp1 # rename for clarity
+    Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.ustar, ustar)
+
+    @. scalar_temp1 =
+        -ustar^3 / SFP.von_karman_const(surface_fluxes_params) / SF.non_zero(buoyancy_flux) # reuse (ustar no longer needed)
+    L_MO = scalar_temp1 # rename for clarity
+    Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.obukhov_length, L_MO)
 
     return nothing
 end
@@ -518,14 +555,12 @@ Extend Interfacer.add_coupler_fields! to add the fields required for ClimaAtmosS
 The fields added are:
 - `:surface_direct_albedo` (for radiation)
 - `:surface_diffuse_albedo` (for radiation)
-- `:ustar`, `:L_MO`, `:buoyancy_flux` (for EDMF boundary conditions)
 """
 function Interfacer.add_coupler_fields!(
     coupler_field_names,
     atmos_sim::ClimaAtmosSimulation,
 )
-    atmos_coupler_fields =
-        [:surface_direct_albedo, :surface_diffuse_albedo, :ustar, :L_MO, :buoyancy_flux]
+    atmos_coupler_fields = [:surface_direct_albedo, :surface_diffuse_albedo]
     push!(coupler_field_names, atmos_coupler_fields...)
 end
 
@@ -668,6 +703,13 @@ function get_atmos_config_dict(
 end
 
 """
+    Input.atmos_default_config_dict()
+
+Returns the default configuration dictionary for the ClimaAtmos model.
+"""
+Input.atmos_default_config_dict() = CA.default_config_dict()
+
+"""
     get_thermo_params(sim::ClimaAtmosSimulation)
 
 Returns the thermodynamic parameters from the atmospheric model simulation object.
@@ -740,5 +782,52 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrato
 Plotting.debug_plot_fields(sim::ClimaAtmosSimulation) =
     (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
 
+"""
+    Interfacer.set_albedos!(sim::Models.PrescribedOceanSimulation, t)
+
+Set the direct and diffuse albedos of the ocean based on the current date and
+the atmospheric wind. The albedos are calculated using the `surface_albedo_direct`
+and `surface_albedo_diffuse` functions from the `ClimaAtmos` module, so this
+is dependent on running with `ClimaAtmosSimulation` as the atmosphere simulation.
+"""
+function Interfacer.set_albedos!(sim::Models.PrescribedOceanSimulation, t)
+    p = sim.cache
+    FT = CC.Spaces.undertype(axes(sim.cache.T_sfc))
+
+    # Compute the current date
+    current_date = t isa ITime ? date(t) : p.start_date + Dates.Second(t)
+
+    insolation_params = InsolationParameters(FT)
+
+    # Get the atmospheric wind vector and the cosine of the zenith angle
+    surface_coords = CC.Fields.coordinate_field(axes(sim.cache.T_sfc))
+    insolation_tuple =
+        Insolation.insolation.(
+            current_date,
+            surface_coords.lat,
+            surface_coords.long,
+            insolation_params,
+        )
+    cos_zenith_angle = insolation_tuple.μ
+    wind_atmos = LinearAlgebra.norm.(CC.Geometry.Covariant12Vector.(p.u_int, p.v_int)) # wind vector from components
+    λ = FT(0) # spectral wavelength (not used for now)
+    # TODO: We shouldn't need this, but without this the fluxes_test fail.
+    cos_zenith = @. max(cos_zenith_angle, eps(FT))
+
+    # Use the albedo model from ClimaAtmos
+    α_model = CA.RegressionFunctionAlbedo{FT}()
+    Interfacer.update_field!(
+        sim,
+        Val(:surface_direct_albedo),
+        CA.surface_albedo_direct(α_model).(λ, cos_zenith, wind_atmos), # this allocates
+    )
+    Interfacer.update_field!(
+        sim,
+        Val(:surface_diffuse_albedo),
+        CA.surface_albedo_diffuse(α_model).(λ, cos_zenith, wind_atmos), # this allocates
+    )
+
+    return nothing
+end
 
 end

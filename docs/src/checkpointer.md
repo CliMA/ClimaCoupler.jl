@@ -108,11 +108,46 @@ forward, but there are still several challenges that need to be solved:
 Point 3. adds significant amount of code and requires component models to
 specify how their cache has to be restored.
 
-If you are adding a component model, you have to extend the methods.
+### Turbulent flux accumulators
+
+The `CoupledSimulation` object stores `flux_accumulators` to handle explicit surfaces
+with timesteps larger than `Δt_cpl`. This field is a `NamedTuple` of partial turbulent
+flux sums (see [Turbulent flux accumulation for slow surfaces](@ref)). These
+partial sums are part of the simulation state, and are required for properly restarting
+in the middle of a slow-surface window. `Checkpointer.checkpoint_sims` writes the
+accumulators to a per-rank JLD2 file whenever they are non-empty, and
+[`Checkpointer.restart!`](@ref) calls
+[`Checkpointer.restart_flux_accumulators!`](@ref) on the matching file during
+a restart. Configurations without slow surfaces leave `flux_accumulators`
+empty and no accumulator file is written.
+
+### Adding checkpointing to a new component model
+
+There are two ways to add checkpoint/restart support for a new component model:
+
+**Path A (ClimaCore-based models):** extend `get_model_prog_state` to return the
+prognostic state as a `ClimaCore.FieldVector`. The default
+`checkpoint_model_state` and `restart_model_state!` implementations will handle
+HDF5 I/O via `ClimaCore.InputOutput` automatically. This path is intended for
+models whose prognostic state is a `ClimaCore.FieldVector`; models that do not
+use ClimaCore should use Path B instead.
+
 ```
 Checkpointer.get_model_prog_state
 Checkpointer.get_model_cache
 Checkpointer.restore_cache!
+```
+
+**Path B (custom checkpoint format):** override `checkpoint_model_state` and
+`restart_model_state!` directly for full control over the checkpoint format. This
+is the approach used by `OceananigansSimulation`, which writes JLD2 checkpoints
+via Oceananigans' native `checkpoint` and restores them with `Oceananigans.set!`.
+
+```
+Checkpointer.checkpoint_model_state
+Checkpointer.checkpoint_model_cache  # optional; no-op if cache checkpointing is not supported
+Checkpointer.restart_model_state!
+Checkpointer.restart_model_cache!    # optional; warn or no-op if cache restore is not supported
 ```
 
 `ClimaCoupler` moves objects to the CPU with `Adapt(Array, x)`. `Adapt`
@@ -159,7 +194,12 @@ This approach allows for a signficant reducation in the file size of the cache.
     Checkpointer.get_model_prog_state
     Checkpointer.get_model_cache
     Checkpointer.get_model_cache_to_checkpoint
+    Checkpointer.checkpoint_model_state
+    Checkpointer.checkpoint_model_cache
     Checkpointer.restart!
+    Checkpointer.restart_model_state!
+    Checkpointer.restart_model_cache!
+    Checkpointer.restart_flux_accumulators!
     Checkpointer.checkpoint_sims
     Checkpointer.t_start_from_checkpoint
     Checkpointer.restore!

@@ -1,5 +1,5 @@
 FLOAT_TYPE: "Float32"
-atmos_config_file: "config/benchmark_configs/climaatmos_diagedmf_io.yml"
+atmos_config_file: "config/benchmark_configs/climaatmos_progedmf.yml"
 dt: "120secs"
 dt_cpl: "120secs"
 energy_check: false
@@ -9,4 +9,4 @@ monthly_checkpoint: false
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "12hours"
-use_coupler_diagnostics: true
+use_coupler_diagnostics: false

@@ -12,12 +12,10 @@ extra_atmos_diagnostics:
     reduction_time: average
     pressure_coordinates: true
     compute_every: 6hours
-implicit_microphysics: false
 land_model: "integrated"
 microphysics_model: "1M"
 mode_name: "amip"
 netcdf_output_at_levels: true
-ode_algo: "ARS222"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 start_date: "20100101"
@@ -25,4 +23,3 @@ surface_setup: "PrescribedSurface"
 t_end: "186days"
 topo_smoothing: true
 topography: "Earth"
-use_sgs_quadrature: false

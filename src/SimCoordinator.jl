@@ -18,7 +18,6 @@ module SimCoordinator
 import ClimaComms
 import ClimaDiagnostics as CD
 import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
-import ClimaAtmos as CA
 import ClimaCore as CC
 import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
@@ -69,10 +68,8 @@ function run!(
     =#
     @info "Starting coupling loop"
     walltime = ClimaComms.@elapsed ClimaComms.device(cs) begin
-        s = CA.@timed_str begin
-            while cs.t[] < cs.tspan[end]
-                step!(cs)
-            end
+        while cs.t[] < cs.tspan[end]
+            step!(cs)
         end
     end
     @info "Simulation took $(walltime) seconds"
@@ -215,8 +212,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         Δt_cpl,
         component_dt_dict,
         share_surface_space,
-        nh_poly,
-        h_elem,
+        nh_poly_coupler,
+        h_elem_coupler,
         saveat,
         checkpoint_dt,
         detect_restart_files,
@@ -225,7 +222,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         restart_cache,
         save_cache,
         use_land_diagnostics,
-        diagnostics_dt,
+        land_diagnostics_period,
+        land_diagnostics_reduction,
         evolving_ocean,
         land_model,
         land_temperature_anomaly,
@@ -234,13 +232,20 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         bucket_albedo_type,
         energy_check,
         use_coupler_diagnostics,
+        coupler_diagnostics_period,
+        coupler_diagnostics_reduction,
         output_dir_root,
         parameter_files,
         era5_filepaths,
         ocean_model,
         simple_ocean,
         sst_adjustment,
+        progress_interval,
+        ocean_diagnostic_interval,
+        ocean_diagnostic_mode,
         ice_model,
+        seaice_diagnostic_interval,
+        seaice_diagnostic_mode,
         land_fraction_source,
         binary_area_fraction,
         domain_type,
@@ -291,16 +296,16 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         share_surface_space,
         comms_ctx;
         column_latlon,
-        nh_poly,
-        h_elem,
+        nh_poly_coupler,
+        h_elem_coupler,
         coupled_param_dict,
     )
 
     surface_elevation = Interfacer.get_field(boundary_space, atmos_sim, Val(:height_sfc))
-    atmos_h = Interfacer.get_atmos_height_delta(
-        Interfacer.get_field(atmos_sim, Val(:height_int)),
-        surface_elevation,
-    )
+    atmos_bottom_center_height =
+        Interfacer.get_field(boundary_space, atmos_sim, Val(:height_int))
+    atmos_h =
+        Interfacer.get_atmos_height_delta(atmos_bottom_center_height, surface_elevation)
 
     land_fraction = Input.get_land_fraction(
         boundary_space,
@@ -337,6 +342,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         atmos_h,
         land_temperature_anomaly,
         use_land_diagnostics,
+        land_diagnostics_period,
+        land_diagnostics_reduction,
         coupled_param_dict,
         albedo_type = bucket_albedo_type,
         bucket_initial_condition,
@@ -355,6 +362,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         coupled_param_dict,
         thermo_params,
         comms_ctx,
+        progress_interval,
         boundary_space,
         output_dir = dir_paths.ocean_output_dir,
         simple_ocean,
@@ -362,6 +370,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         sst_adjustment,
         saveat,
         evolving = evolving_ocean,
+        ocean_diagnostic_interval,
+        ocean_diagnostic_mode,
     )
 
     ice_sim = Interfacer.SeaIceSimulation(
@@ -381,6 +391,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         sic_path,
         binary_area_fraction,
         domain_type,
+        seaice_diagnostic_interval,
+        seaice_diagnostic_mode,
     )
 
     #=
@@ -390,6 +402,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     model_sims =
         NamedTuple{filter(key -> !isnothing(model_sims[key]), keys(model_sims))}(model_sims)
     @info "Component models initialized: $(keys(model_sims))"
+    @info "Component model types: $(nameof.(values(model_sims)))"
 
     coupler_field_names = Interfacer.default_coupler_fields()
     foreach(sim -> Interfacer.add_coupler_fields!(coupler_field_names, sim), model_sims)
@@ -398,10 +411,36 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
 
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 
-    # set initial area fractions
-    coupler_fields.land_area_fraction .= land_fraction
-    coupler_fields.ice_area_fraction .= 0  # initialized as 0 since we start with no sea ice, but will evolve in time
-    coupler_fields.ocean_area_fraction .= 1 .- land_fraction  # no sea ice
+    # Allocate a FluxAccumulator per slow explicit surface (one whose timestep is
+    # strictly greater than Δt_cpl). Other surfaces avoid this and receive turbulent
+    # fluxes directly via `update_turbulent_fluxes!` each coupling step.
+    Δt_cpl_secs = Float64(float(Δt_cpl))
+    slow_surface_keys = Tuple(
+        name for (name, sim) in pairs(model_sims) if
+        sim isa Interfacer.AbstractSurfaceSimulation &&
+        !(sim isa Interfacer.AbstractImplicitFluxSimulation) &&
+        !(sim isa Interfacer.AbstractSurfaceStub) &&
+        Interfacer.sim_dt(sim) > Δt_cpl_secs
+    )
+    flux_accumulators = NamedTuple{slow_surface_keys}(
+        Tuple(FluxCalculator.FluxAccumulator(boundary_space) for _ in slow_surface_keys),
+    )
+    isempty(slow_surface_keys) ||
+        @info "Allocated flux accumulators for slow surfaces: $(slow_surface_keys)"
+
+    # set initial area fractions (remain set to 0 if model does not exist)
+    if haskey(model_sims, :land_sim)
+        coupler_fields.land_area_fraction .=
+            Interfacer.get_field(model_sims.land_sim, Val(:area_fraction))
+    end
+    if haskey(model_sims, :ice_sim)
+        coupler_fields.ice_area_fraction .=
+            Interfacer.get_field(model_sims.ice_sim, Val(:area_fraction))
+    end
+    if haskey(model_sims, :ocean_sim)
+        coupler_fields.ocean_area_fraction .=
+            Interfacer.get_field(model_sims.ocean_sim, Val(:area_fraction))
+    end
 
     ## Conservation checks (only applicable to global slabplanet mode)
     conservation_checks = nothing
@@ -440,8 +479,9 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
             dir_paths.coupler_output_dir,
             start_date,
             tspan[1],
-            diagnostics_dt,
-            Δt_cpl,
+            coupler_diagnostics_period,
+            Δt_cpl;
+            reduction = coupler_diagnostics_reduction,
         )
     else
         diags_handler = nothing
@@ -463,6 +503,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         thermo_params,
         diags_handler,
         save_cache,
+        flux_accumulators,
     )
 
     ## Restart component model states if specified
@@ -483,6 +524,15 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         FieldExchanger.set_caches!(cs)
         FluxCalculator.turbulent_fluxes!(cs)
         FluxCalculator.ocean_seaice_fluxes!(cs)
+
+        # The initial `turbulent_fluxes!` above fills the flux accumulators.
+        # Push the accumulated flux to each slow surface here.
+        FluxCalculator.push_ready_accumulators!(
+            cs.model_sims,
+            cs.flux_accumulators,
+            cs.t[];
+            force = true,
+        )
     end
     Utilities.show_memory_usage()
     return cs

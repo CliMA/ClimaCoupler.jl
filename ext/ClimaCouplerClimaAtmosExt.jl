@@ -671,8 +671,7 @@ function get_atmos_config_dict(
     # Honor the coupler's output_dir_style if set (e.g. "activelink" so atmos
     # can auto-detect a restart file across runs); otherwise default to
     # RemovePreexisting.
-    atmos_config["output_dir_style"] =
-        get(coupler_config, "output_dir_style", "RemovePreexisting")
+    get!(atmos_config, "output_dir_style", "RemovePreexisting")
     atmos_config["output_dir"] = atmos_output_dir
 
     # Add all extra atmos diagnostic entries into the vector of atmos diagnostics

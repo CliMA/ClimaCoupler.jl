@@ -1,29 +1,14 @@
 agents:
   queue: derecho
   modules: climacommon/2025_02_25
-  pbs_l_select: "1:ncpus=1"
+  pbs_l_select: "1:ncpus=1:ngpus=1"
 
 steps:
   - label: "init"
     key: "init_env"
     command:
-      - "echo $$JULIA_DEPOT_PATH"
-
       - echo "--- Instantiate AMIP env"
-      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'
-
-      # For this pipeline, use the main branches of certain upstream packages
-      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaAtmos", rev="main"))'
-      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaCore", rev="main"))'
-      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaTimeSteppers", rev="main"))'
-      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="Thermodynamics", rev="main"))'
-      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="SurfaceFluxes", rev="main"))'
-      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="RRTMGP", rev="main"))'
-      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaCalibrate", rev="ne/fix"))'
-      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.resolve()'
-
-      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'
-      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'
+      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true); Pkg.status()'
 
     env:
       JULIA_NUM_PRECOMPILE_TASKS: 8

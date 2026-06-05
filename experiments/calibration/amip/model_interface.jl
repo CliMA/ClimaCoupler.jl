@@ -49,7 +49,7 @@ function ClimaCalibrate.forward_model(interface::CouplerModelInterface, iter, me
     # Ensure the simulation restarts automatically
     config_dict["detect_restart_file"] = true
     config_dict["output_dir_style"] = "activelink"
-    config_dict["checkpoint_dt"] = "1days"
+    config_dict["checkpoint_dt"] = "10days"
 
     @info "Simulation dates" start_date end_date
 

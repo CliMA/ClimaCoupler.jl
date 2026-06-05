@@ -137,8 +137,6 @@ function Interfacer.remap!(
     # directly (ConservativeRegriddingClimaCoreExt overloads
     # `extract_source_arraylike` / `initialize_regridding!`).
     CR.regrid!(dst, remapping.remapper_cc_to_oc, source_field)
-
-    @. dst = ifelse(isfinite(dst), dst, zero(eltype(dst)))
     return nothing
 end
 

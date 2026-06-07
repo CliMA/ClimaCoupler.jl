@@ -125,6 +125,10 @@ function step!(cs::Interfacer.CoupledSimulation)
 
     # Compute and save coupler diagnostics
     CD.orchestrate_diagnostics(cs)
+
+    flush(stdout)
+    flush(stderr)
+
     return nothing
 end
 
@@ -535,6 +539,10 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         )
     end
     Utilities.show_memory_usage()
+
+    flush(stdout)
+    flush(stderr)
+
     return cs
 end
 

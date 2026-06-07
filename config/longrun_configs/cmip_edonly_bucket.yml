@@ -4,13 +4,13 @@ bucket_albedo_type: "map_temporal"
 checkpoint_dt: "1months"
 coupler_diagnostics_period: "1months"
 coupler_diagnostics_reduction: "average"
-dt_atmos: "120secs" # 2 minutes
+dt_atmos:  "120secs"
+dt_cpl:    "480secs"
+dt_land:   "120secs"
+dt_ocean:  "480secs"
+dt_seaice: "480secs"
+dt_rad:    "1hours"
 dt_cloud_fraction: "1hours"
-dt_cpl: "120secs" # 2 minutes
-dt_land: "120secs" # 2 minutes
-dt_ocean: "120secs" # 2 minutes
-dt_rad: "1hours"
-dt_seaice: "120secs" # 2 minutes
 energy_check: false
 ice_model: "clima_seaice"
 insolation: "timevarying"
@@ -26,7 +26,7 @@ seaice_diagnostic_mode: "average"
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "30years"
+t_end: "3650days"
 topo_smoothing: true
 topography: "Earth"
 extra_atmos_diagnostics:

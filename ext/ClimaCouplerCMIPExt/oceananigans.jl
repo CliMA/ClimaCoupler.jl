@@ -71,7 +71,7 @@ function OceananigansSimulation(
     tspan,
     output_dir,
     simple_ocean = false,
-    dt = 180.0, # 3 minutes
+    dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
     progress_interval = nothing,
@@ -97,8 +97,9 @@ function OceananigansSimulation(
     download_dataset(en4_temperature)
     download_dataset(en4_salinity)
 
-    # Set up ocean grid (1/8th degree)
-    resolution_points = (360*8, 160*8, 100)
+    # Set up ocean grid
+    # resolution_points = (360*8, 160*8, 100)
+    resolution_points = (360, 160, 20)
     Nz = last(resolution_points)
     depth = 4000 # meters
     z = OC.ExponentialDiscretization(Nz, -depth, 0; scale = 0.85 * depth)

@@ -66,6 +66,11 @@ These simulation types are designed for atmospheric model evaluation and
 prediction, where realistic SSTs are needed but ocean dynamics are not the
 focus.
 
+This model requires the `ClimaCouplerClimaAtmosExt` extension to be loaded in order to use
+the wind-dependent albedo calculation, which relies on the `surface_albedo_direct` and `surface_albedo_diffuse`
+functions from the `ClimaAtmos` module.
+If the extension is not loaded, users must define their own `set_albedos!` function for the `PrescribedOceanSimulation`.
+
 ## Prescribed Sea Ice Model
 
 The prescribed sea ice model (`PrescribedIceSimulation`) uses observed sea ice

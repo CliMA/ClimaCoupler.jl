@@ -269,8 +269,46 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
         joinpath(output_dir, "checkpoint_coupler_fields_$(pid)_$(prev_checkpoint_t).jld2")
     remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
 
+    # Checkpoint flux accumulators if present. Without this, a restart in the middle of a
+    # slow-surface dt window would lose the partial sum and the next push to that surface
+    # would average a different number of contributions than the original run.
+    if !isempty(cs.flux_accumulators)
+        @info "Saving coupler flux accumulators to JLD2 on day $day second $sec"
+        acc_output_file =
+            joinpath(output_dir, "checkpoint_flux_accumulators_$(pid)_$time.jld2")
+        # Move the `FluxAccumulator` to CPU
+        accs_cpu = NamedTuple{keys(cs.flux_accumulators)}(
+            map(_accumulator_to_cpu_nt, values(cs.flux_accumulators)),
+        )
+        JLD2.jldsave(acc_output_file, flux_accumulators = accs_cpu)
+
+        prev_acc_file = joinpath(
+            output_dir,
+            "checkpoint_flux_accumulators_$(pid)_$(prev_checkpoint_t).jld2",
+        )
+        remove_checkpoint(prev_acc_file, prev_checkpoint_t, comms_ctx)
+    end
+
     # Update previous checkpoint time stored in the coupled simulation
     cs.prev_checkpoint_t[] = time
+end
+
+"""
+    _accumulator_to_cpu_nt(acc)
+
+Move a `FluxCalculator.FluxAccumulator` to CPU for JLD2 serialization.
+Fields are moved to host arrays via `CC.Adapt.adapt`; `n_steps` is unwrapped
+from the `Base.RefValue` so the value, not the reference, is written.
+"""
+function _accumulator_to_cpu_nt(acc)
+    return (;
+        F_lh = CC.Adapt.adapt(Array, acc.F_lh),
+        F_sh = CC.Adapt.adapt(Array, acc.F_sh),
+        F_turb_moisture = CC.Adapt.adapt(Array, acc.F_turb_moisture),
+        F_turb_ρτxz = CC.Adapt.adapt(Array, acc.F_turb_ρτxz),
+        F_turb_ρτyz = CC.Adapt.adapt(Array, acc.F_turb_ρτyz),
+        n_steps = acc.n_steps[],
+    )
 end
 
 """
@@ -301,6 +339,15 @@ function restart!(cs, checkpoint_dir, checkpoint_t, restart_cache)
     input_file_coupler_fields =
         joinpath(checkpoint_dir, "checkpoint_coupler_fields_$(pid)_$(checkpoint_t).jld2")
     restart_coupler_fields!(cs, input_file_coupler_fields)
+
+    # Restore flux accumulators if present
+    if !isempty(cs.flux_accumulators)
+        input_file_accs = joinpath(
+            checkpoint_dir,
+            "checkpoint_flux_accumulators_$(pid)_$(checkpoint_t).jld2",
+        )
+        restart_flux_accumulators!(cs, input_file_accs)
+    end
     return true
 end
 
@@ -363,6 +410,34 @@ function restart_coupler_fields!(cs, input_file)
                 ArrayType(parent(getproperty(fields_read, name)))
         end
     end
+end
+
+"""
+    restart_flux_accumulators!(cs, input_file)
+
+Overwrite the flux accumulator state in `cs` with values read from
+`input_file`. The file is the JLD2 written by `checkpoint_sims` and contains a
+NamedTuple keyed by surface simulation name; each value is a NamedTuple of
+five host-arrayed fields plus the integer `n_steps`.
+"""
+function restart_flux_accumulators!(cs, input_file)
+    ispath(input_file) || error("File $(input_file) not found")
+    ArrayType = ClimaComms.array_type(ClimaComms.device(cs))
+    JLD2.jldopen(input_file) do file
+        accs_read = file["flux_accumulators"]
+        for name in keys(cs.flux_accumulators)
+            haskey(accs_read, name) ||
+                error("Flux accumulator for $(name) missing from checkpoint")
+            saved = accs_read[name]
+            live = cs.flux_accumulators[name]
+            for field_name in (:F_lh, :F_sh, :F_turb_moisture, :F_turb_ρτxz, :F_turb_ρτyz)
+                parent(getproperty(live, field_name)) .=
+                    ArrayType(parent(getproperty(saved, field_name)))
+            end
+            live.n_steps[] = saved.n_steps
+        end
+    end
+    return nothing
 end
 
 """

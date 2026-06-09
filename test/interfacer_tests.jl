@@ -6,6 +6,7 @@ ClimaComms.@import_required_backends
 import Dates
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
+import ClimaCoupler
 import ClimaCoupler: Interfacer
 import ClimaUtilities.TimeManager: ITime
 
@@ -61,6 +62,7 @@ for FT in (Float32, Float64)
             nothing, # thermo_params
             nothing, # diags_handler
             true, # save_cache
+            (;), # flux_accumulators
         )
         @test CC.Spaces.undertype(Interfacer.boundary_space(cs)) == FT
     end

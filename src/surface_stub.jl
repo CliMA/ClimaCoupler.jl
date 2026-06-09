@@ -93,6 +93,10 @@ update_field!(::AbstractSurfaceStub, ::Val{:snow_precipitation}, field) = nothin
 update_field!(::AbstractSurfaceStub, ::Val{:turbulent_energy_flux}, field) = nothing
 update_field!(::AbstractSurfaceStub, ::Val{:turbulent_moisture_flux}, field) = nothing
 
+set_albedos!(model::AbstractSurfaceStub, _...) =
+    @error "Interfacer.set_albedos! is not defined for $(typeof(model))"
+
+
 ## Extensions of FieldExchanger.jl functions
 
 """
@@ -103,3 +107,18 @@ Extends `ClimaTimeSteppers.step!`.
 """
 step!(::AbstractSurfaceStub, ::Float64) = nothing
 step!(::AbstractSurfaceStub, ::ITime) = nothing
+
+"""
+    sim_dt(::AbstractSurfaceStub)
+
+Surface stubs (e.g. prescribed data) do not have an integrator timestep. We
+return 0.
+"""
+sim_dt(::AbstractSurfaceStub) = 0.0
+
+"""
+    will_step(::AbstractSurfaceStub, t)
+
+Surface stubs never step (`step!` is a no-op), so this always returns `false`.
+"""
+will_step(::AbstractSurfaceStub, t) = false

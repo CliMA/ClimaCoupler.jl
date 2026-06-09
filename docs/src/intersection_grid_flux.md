@@ -35,17 +35,19 @@ context = ClimaComms.context()
 ClimaComms.init(context)
 arch = OC.CPU()
 
-# Create a small cubed-sphere boundary space (atmosphere grid)
+# Create a small cubed-sphere boundary space (atmosphere grid).
+# `n_quad_points = 4` puts `Npoly = 3` (cubic GLL) inside each element, with
+# `h_elem = 8` elements along each cube-face edge.
 boundary_space = CC.CommonSpaces.CubedSphereSpace(
     FT;
     radius = FT(6.371e6),
     n_quad_points = 4,
-    h_elem = 16,  # 6 elements per cube face edge
+    h_elem = 8,
     context,
 )
 
 # Create Oceananigans lat-lon grid (ocean grid)
-Nx, Ny, Nz = 360, 180, 1
+Nx, Ny, Nz = 90, 45, 1
 underlying_grid = OC.LatitudeLongitudeGrid(
     arch;
     size = (Nx, Ny, Nz),
@@ -338,10 +340,59 @@ for idx in 1:ig.n_cc
     end
 end
 
+# Spectral-element GLL sub-grid: for each element we draw the (Nq-1)² little
+# quads whose corners are the GLL collocation nodes (Npoly + 1 along each
+# direction).  We reuse `_process_ring` for pole / antimeridian handling, so
+# the result lives in the same `(lon°, lat°)` rendering space as the
+# intersection polygons.
+function spectral_element_node_rings(boundary_space)
+    coords = CC.Fields.coordinate_field(boundary_space)
+    lon_parent = parent(coords.long)
+    lat_parent = parent(coords.lat)
+    Nq = size(lon_parent, 1)
+    Nh = size(lon_parent)[end]
+    lons = reshape(lon_parent, Nq, Nq, Nh)
+    lats = reshape(lat_parent, Nq, Nq, Nh)
+
+    rings = Vector{Vector{Tuple{Float64,Float64}}}()
+    for h in 1:Nh, j in 1:(Nq - 1), i in 1:(Nq - 1)
+        ring = [
+            (Float64(lons[i,     j,     h]), Float64(lats[i,     j,     h])),
+            (Float64(lons[i + 1, j,     h]), Float64(lats[i + 1, j,     h])),
+            (Float64(lons[i + 1, j + 1, h]), Float64(lats[i + 1, j + 1, h])),
+            (Float64(lons[i,     j + 1, h]), Float64(lats[i,     j + 1, h])),
+        ]
+        for branch in _process_ring(ring)
+            length(branch) >= 3 && push!(rings, branch)
+        end
+    end
+    return rings
+end
+se_node_rings = spectral_element_node_rings(boundary_space)
+let Nq = size(parent(CC.Fields.coordinate_field(boundary_space).long), 1)
+    println("Spectral-element sub-grid: $(length(se_node_rings)) GLL sub-cells " *
+            "(Npoly = $(Nq - 1)).")
+end
+
+# Helper that builds a `GeoMakie.GeoAxis` with the lat/lon graticule turned
+# off, so the only horizontal grid the reader sees is the SE node grid we
+# overlay below.
+function bare_geo_axis(parent_layout; kwargs...)
+    return GeoMakie.GeoAxis(parent_layout;
+        dest = "+proj=eqearth",
+        xgridvisible = false,
+        ygridvisible = false,
+        xticksvisible = false,
+        yticksvisible = false,
+        xticklabelsvisible = false,
+        yticklabelsvisible = false,
+        kwargs...,
+    )
+end
+
 fig_poly = Figure(size = (1300, 700))
-ax_poly = GeoMakie.GeoAxis(fig_poly[1, 1];
-    title  = "Intersection polygons (n = $(length(rings))), colored by area [m²]",
-    dest   = "+proj=eqearth",
+ax_poly = bare_geo_axis(fig_poly[1, 1];
+    title = "Intersection polygons (n = $(length(rings))), colored by area [m²]",
 )
 GeoMakie.lines!(ax_poly, GeoMakie.coastlines();
     color = :black, linewidth = 0.5,
@@ -353,6 +404,15 @@ pl = poly!(ax_poly,
     strokewidth = 0.2,
     strokecolor = (:black, 0.5),
 )
+# Thin grey lines through every GLL node within each CC element.
+poly!(ax_poly,
+    [Point2f.(r) for r in se_node_rings];
+    color       = (:white, 0.0),
+    strokewidth = 0.25,
+    strokecolor = (:black, 0.35),
+)
+# Heavier outlines for the CC elements themselves so the SE topology is easy
+# to see on top of the GLL sub-grid.
 poly!(ax_poly,
     [Point2f.(r) for r in cc_outline_rings];
     color       = (:white, 0.0),
@@ -483,10 +543,9 @@ comparable:
 
 ```@example intersection_flux
 fig_tp = Figure(size = (1300, 700))
-ax_tp = GeoMakie.GeoAxis(fig_tp[1, 1];
+ax_tp = bare_geo_axis(fig_tp[1, 1];
     title = "Intersection polygons — CC ↔ TripolarGrid " *
             "(n = $(length(rings_tp)))",
-    dest  = "+proj=eqearth",
 )
 GeoMakie.lines!(ax_tp, GeoMakie.coastlines();
     color = :black, linewidth = 0.5,
@@ -498,7 +557,13 @@ pl_tp = poly!(ax_tp,
     strokewidth = 0.2,
     strokecolor = (:black, 0.5),
 )
-# Overlay the same CC element outlines as in the lat-lon plot for context.
+# SE GLL sub-grid + element outlines, same recipe as the lat-long plot above.
+poly!(ax_tp,
+    [Point2f.(r) for r in se_node_rings];
+    color       = (:white, 0.0),
+    strokewidth = 0.25,
+    strokecolor = (:black, 0.35),
+)
 poly!(ax_tp,
     [Point2f.(r) for r in cc_outline_rings];
     color       = (:white, 0.0),
@@ -634,10 +699,9 @@ context:
 
 ```@example intersection_flux
 fig_land = Figure(size = (1300, 700))
-ax_land = GeoMakie.GeoAxis(fig_land[1, 1];
+ax_land = bare_geo_axis(fig_land[1, 1];
     title = "Intersection polygons over ImmersedBoundaryGrid: " *
             "$(length(ocean_rings)) ocean, $(length(land_rings)) land",
-    dest = "+proj=eqearth",
 )
 # Land first, so ocean polygons stroke over the boundary.
 poly!(ax_land,
@@ -658,6 +722,13 @@ pl_ocean = poly!(ax_land,
 GeoMakie.lines!(ax_land, GeoMakie.coastlines();
     color = (:black, 0.45), linewidth = 0.5,
 )
+# SE GLL sub-grid + element outlines, matching the figures above.
+poly!(ax_land,
+    [Point2f.(r) for r in se_node_rings];
+    color       = (:white, 0.0),
+    strokewidth = 0.25,
+    strokecolor = (:black, 0.35),
+)
 poly!(ax_land,
     [Point2f.(r) for r in cc_outline_rings];
     color       = (:white, 0.0),
@@ -674,7 +745,7 @@ A few things worth noting from this plot:
   `ClimaOcean.regrid_bathymetry` interpolates onto the OC grid, then encoded
   as the immersed boundary of an `ImmersedBoundaryGrid`.  Coastlines follow
   the OC cell edges at the resolution of the underlying lat-lon grid — so at
-  `Nx × Ny = 36 × 20`, large continents like Eurasia and South America are
+  `Nx × Ny = 90 × 45`, large continents like Eurasia and South America are
   well resolved while small islands and narrow channels are merged into the
   surrounding land or ocean. Increasing `Nx`, `Ny` would give finer
   coastlines.
@@ -788,10 +859,9 @@ cubed-sphere elements are easy to spot:
 
 ```@example intersection_flux
 fig_land_tp = Figure(size = (1300, 700))
-ax_land_tp = GeoMakie.GeoAxis(fig_land_tp[1, 1];
+ax_land_tp = bare_geo_axis(fig_land_tp[1, 1];
     title = "Tripolar intersection polygons over ImmersedBoundaryGrid: " *
             "$(length(ocean_rings_tp)) ocean, $(length(land_rings_tp)) land",
-    dest  = "+proj=eqearth",
 )
 # Land first, so ocean polygons stroke over the boundary.
 poly!(ax_land_tp,
@@ -811,6 +881,13 @@ pl_ocean_tp = poly!(ax_land_tp,
 )
 GeoMakie.lines!(ax_land_tp, GeoMakie.coastlines();
     color = (:black, 0.45), linewidth = 0.5,
+)
+# SE GLL sub-grid + element outlines, matching the figures above.
+poly!(ax_land_tp,
+    [Point2f.(r) for r in se_node_rings];
+    color       = (:white, 0.0),
+    strokewidth = 0.25,
+    strokecolor = (:black, 0.35),
 )
 poly!(ax_land_tp,
     [Point2f.(r) for r in cc_outline_rings];

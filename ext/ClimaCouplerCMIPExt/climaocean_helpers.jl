@@ -212,6 +212,36 @@ that use Oceananigans under the hood.
 get_oc_sim(sim::OceananigansSimulation) = sim.ocean
 get_oc_sim(sim::ClimaSeaIceSimulation) = sim.ice
 
+"""
+    Interfacer.sim_dt(sim::Union{OceananigansSimulation, ClimaSeaIceSimulation})
+
+Return the simulation's timestep in seconds as a `Float64`.
+"""
+Interfacer.sim_dt(sim::Union{OceananigansSimulation, ClimaSeaIceSimulation}) =
+    Float64(float(sim.model_Δt))
+
+"""
+    Interfacer.will_step(sim::Union{OceananigansSimulation, ClimaSeaIceSimulation}, t)
+
+Return `true` if `Interfacer.step!(sim, t)` would take at least one step.
+"""
+function Interfacer.will_step(
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    t::Float64,
+)
+    oc_sim = get_oc_sim(sim)
+    return (t - oc_sim.model.clock.time) >= Float64(sim.model_Δt)
+end
+
+function Interfacer.will_step(
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    t::ITime,
+)
+    oc_sim = get_oc_sim(sim)
+    Δt_msec = date(t) - oc_sim.model.clock.time
+    model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
+    return Δt_msec >= model_Δt_msec
+end
 
 """
     Checkpointer.checkpoint_model_state(sim, comms_ctx, t, prev_checkpoint_t; output_dir)

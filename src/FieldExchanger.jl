@@ -283,6 +283,8 @@ Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 # Arguments
 - `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
 - `t`: [AbstractFloat or ITime] denoting the simulation time.
+- `coupler_fields`: [Field of NamedTuple] containing the coupler exchange fields.
+- `thermo_params`: thermodynamic parameters.
 """
 function step_model_sims!(model_sims, t, coupler_fields, thermo_params)
     # Step all surface models (the ordering doesn't matter here)

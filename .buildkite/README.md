@@ -40,13 +40,14 @@ manually triggered to reset the depot.
 - Runs on Caltech Clima node (3 GPUs)
 - Configuration file location: `config/nightly_configs/`
 
-This pipeline runs nightly on Monday - Thursday (4x per week), and uses 3 atmospheric
-configurations of interest:
-- diagnostic EDMF
+This pipeline runs nightly on Monday - Thursday (4x per week), and exercises coarse AMIP
+simulations with prognostic EDMF (0M and 1M microphysics, integrated land). The main
+supported atmosphere configurations in ClimaCoupler are:
 - prognostic EDMF
 - ED only (no convection)
-All configurations use 0-moment microphysics and bucket land.
-They run for 15 months, 6 months, and 27 months, respectively.
+
+ED only runs are tested in the longruns pipeline; this nightly pipeline currently focuses
+on prognostic EDMF configurations.
 These simulation lengths are chosen with the goal of each simulation finishing
 within 14 hours of wallclock time, so they can successfully run overnight.
 
@@ -64,10 +65,10 @@ in a smaller test case before running higher resolution global AMIP runs.
 - Configuration file location: `config/benchmarks_configs/`
 
 This pipeline includes the following runs, each on both CPU and GPU:
-- ClimaAtmos without diagnostic EDMF
-- ClimaAtmos with diagnostic EDMF
-- Coupled AMIP with diagnostic EDMF
-- Coupled AMIP with diagnostic EDMF and IO
+- ClimaAtmos without EDMF
+- ClimaAtmos with prognostic EDMF
+- Coupled AMIP with prognostic EDMF
+- Coupled AMIP with prognostic EDMF and IO
 
 Each of the runs has a simulation length of 12 hours, and a resolution of 30
 elements in the horizontal and 63 in the vertical with a 55km atmosphere top.
@@ -91,7 +92,7 @@ For more information, see [.buildkite/benchmarks/README.md](benchmarks/README.md
 This pipeline runs the target AMIP configuration that we're currently working to stabilize.
 The simulation runs for 3 years and has a resolution of 16
 elements in the horizontal and 63 in the vertical
-and includes diagnostic EDMF in the atmosphere. It is run on 1 GPU.
+and includes prognostic EDMF in the atmosphere. It is run on 1 GPU.
 
 # [ClimaCoupler-LongRuns](https://buildkite.com/clima/climacoupler-longruns)
 - Scheduled weekly Sunday at 12am PST (8am UTC)
@@ -107,13 +108,13 @@ comparison to runs in ClimaAtmos.jl), an aquaplanet run (atmosphere and slab oce
 and a couple more complex runs.
 
 We also have a set of AMIP mode simulations, which run the atmosphere, slab ocean,
-prescribed sea ice, and either bucket or integrated land model. Unless stated otherwise,
-they are using the bucket land model. They also test a various complexities in the
-atmosphere configuration, which affects the stability and SYPD of the simulations, among
-other things.
+prescribed sea ice, and integrated land. Atmosphere configurations include:
+- ED only (no convection)
+- prognostic EDMF (0M and 1M microphysics)
 
 Next we have a set of CMIP simulations. These are similar to the AMIP simulations, but
-use the Oceananigans.jl ocean model instead of a slab ocean.
+use the Oceananigans.jl ocean model instead of a slab ocean. CMIP runs use ED only or
+prognostic EDMF atmosphere configurations.
 
 Finally, we have a calibration longrun experiment, which exercises the calibration
 pipeline for the coupled system.

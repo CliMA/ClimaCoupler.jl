@@ -15,46 +15,46 @@ can monitor the various metrics after specific changes made to the code.
 - Horizontal resolution: 30 spectral elements (~110km)
 - Vertical resolution: 63 levels
 - Config setup duplicated from ClimaAtmos.jl v0.23.0
-[gpu_aquaplanet_diagedmf.yml](https://github.com/CliMA/ClimaAtmos.jl/blob/v0.23.0/config/gpu_configs/gpu_aquaplanet_diagedmf.yml),
+[gpu_aquaplanet_progedmf.yml](https://github.com/CliMA/ClimaAtmos.jl/blob/v0.23.0/config/gpu_configs/gpu_aquaplanet_progedmf.yml),
 with minor tweaks
 
-#### CPU ClimaAtmos without diagnostic EDMF
+#### CPU ClimaAtmos without EDMF
 - Atmosphere-only simulation
 - Run on 64 CPU threads
 - Frierson diffusion model
 
-#### CPU ClimaAtmos with diagnostic EDMF
+#### CPU ClimaAtmos with prognostic EDMF
 - Atmosphere-only simulation
 - Run on 64 CPU threads
-- Diagnostic EDMF parameterization
+- Prognostic EDMF parameterization
 
-#### CPU AMIP with diagnostic EDMF
+#### CPU AMIP with prognostic EDMF
 - ClimaAtmos coupled to ClimaLand bucket model, with prescribed sea surface
 temperature and sea ice
 - Run on 64 CPU threads
 
-#### CPU AMIP with diagnostic EDMF and IO
+#### CPU AMIP with prognostic EDMF and IO
 - ClimaAtmos coupled to ClimaLand bucket model, with prescribed sea surface
 temperature and sea ice
 - Run on 64 CPU threads
 - Includes diagnostics output every 10 hours
 
-#### GPU ClimaAtmos without diagnostic EDMF
+#### GPU ClimaAtmos without EDMF
 - Atmosphere-only simulation
 - Run on 4 A100 GPUs sharing 1 node
 - Frierson diffusion model
 
-#### GPU ClimaAtmos with diagnostic EDMF
+#### GPU ClimaAtmos with prognostic EDMF
 - Atmosphere-only simulation
 - Run on 4 A100 GPUs sharing 1 node
-- Diagnostic EDMF parameterization
+- Prognostic EDMF parameterization
 
-#### GPU AMIP with diagnostic EDMF
+#### GPU AMIP with prognostic EDMF
 - ClimaAtmos coupled to ClimaLand bucket model, with prescribed sea surface
 temperature and sea ice
 - Run on 4 A100 GPUs sharing 1 node
 
-#### GPU AMIP with diagnostic EDMF and IO
+#### GPU AMIP with prognostic EDMF and IO
 - ClimaAtmos coupled to ClimaLand bucket model, with prescribed sea surface
 temperature and sea ice
 - Run on 4 A100 GPUs sharing 1 node

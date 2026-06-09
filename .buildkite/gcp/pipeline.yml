@@ -27,7 +27,7 @@ steps:
 
     steps:
 
-      - label: "Current AMIP: diagedmf + 0M + bucket land"
+      - label: "Current AMIP: progedmf + 0M + bucket land"
         key: "amip"
         command:
           - echo "--- Run simulation"
@@ -47,7 +47,7 @@ steps:
           slurm_mem: 0GB
           slurm_time: "120:00:00"
 
-      - label: "Current AMIP: diagedmf + 0M + integrated land"
+      - label: "Current AMIP: progedmf + 0M + integrated land"
         key: "amip_land"
         command:
           - echo "--- Run simulation"

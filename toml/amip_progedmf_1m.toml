@@ -72,3 +72,6 @@ value = 1800
 
 [snow_autoconversion_timescale]
 value = 1800
+
+[cloud_liquid_water_specific_humidity_autoconversion_threshold]
+value = 0

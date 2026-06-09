@@ -66,5 +66,7 @@ open(joinpath(table_output_dir, "table.txt"), "w") do f
         table_format = PrettyTables.TextTableFormat(
             horizontal_lines_at_data_rows = [2, 4, 6, 8, 10, 12, 14],
         ),
+        fit_table_in_display_horizontally = false,
+        fit_table_in_display_vertically = false,
     )
 end

@@ -93,6 +93,7 @@ Plotting.debug_plot_fields(sim::Interfacer.SurfaceStub) = (:stub_field,)
         nothing, # thermo_params
         nothing, # diags_handler
         true, # save_cache
+        (;), # flux_accumulators
     )
 
     output_plots = "test_debug"

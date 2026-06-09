@@ -135,6 +135,7 @@ end
         thermo_params, # thermo_params
         nothing, # diags_handler
         true, # save_cache
+        (;), # flux_accumulators
     )
 
     # Step the atmosphere once to get non-zero wind and humidity so the fluxes are non-zero

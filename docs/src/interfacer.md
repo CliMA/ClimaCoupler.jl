@@ -139,6 +139,22 @@ This is necessary, for example, when component models have cache
 interdependencies that must be handled in a specific order.
 Cache variables that are computed as part of the tendencies do not need to be set here.
 
+- `sim_dt(sim::AbstractComponentSimulation)`: Returns the component model's own
+timestep in seconds as a `Float64`. Used by the coupler to detect slow surfaces
+(those with `sim_dt > Δt_cpl`) and allocate `FluxCalculator.FluxAccumulator`s
+for them. The default implementation returns `Float64(float(sim.integrator.dt))`,
+which is correct for ClimaTimeSteppers-style integrators. Components that
+store their timestep elsewhere (e.g. `OceananigansSimulation`,
+`ClimaSeaIceSimulation`) extend this method.
+
+- `will_step(sim::AbstractComponentSimulation, t)`: Returns `true` when calling
+`Interfacer.step!(sim, t)` would advance the component by at least one of its
+own steps. The default implementation compares `t` against
+`sim.integrator.t` using `sim_dt`. Used by
+[`FluxCalculator.push_ready_accumulators!`](@ref) to write the time-averaged
+flux to a slow surface before it steps. Component models that need different
+step-boundary detection logic can override this method.
+
 ### AbstractAtmosSimulation - required functions
 In addition to the functions required for a general
 `AbstractComponentSimulation`, an `AbstractAtmosSimulation` requires the
@@ -183,6 +199,12 @@ properties needed by a component model.
 | `surface_diffuse_albedo` | bulk diffuse surface albedo over the whole surface space |       |
 | `surface_temperature`    | temperature over the combined surface space              | K     |
 | `turbulent_fluxes`       | turbulent fluxes                                         | W m⁻² |
+
+- `atmos_default_config_dict()`:
+Return a dictionary of default configuration options for the atmosphere mode. The default
+method is only defined when the ClimaCouplerClimaAtmosExt extension is loaded, and returns
+the default configuration dictionary for ClimaAtmos. If `ClimaAtmos.jl` is not loaded, users
+must define this function themselves.
 
 ### AbstractAtmosSimulation - required functions to run with the ClimaLandSimulation
 

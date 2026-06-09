@@ -108,6 +108,19 @@ forward, but there are still several challenges that need to be solved:
 Point 3. adds significant amount of code and requires component models to
 specify how their cache has to be restored.
 
+### Turbulent flux accumulators
+
+The `CoupledSimulation` object stores `flux_accumulators` to handle explicit surfaces
+with timesteps larger than `Δt_cpl`. This field is a `NamedTuple` of partial turbulent
+flux sums (see [Turbulent flux accumulation for slow surfaces](@ref)). These
+partial sums are part of the simulation state, and are required for properly restarting
+in the middle of a slow-surface window. `Checkpointer.checkpoint_sims` writes the
+accumulators to a per-rank JLD2 file whenever they are non-empty, and
+[`Checkpointer.restart!`](@ref) calls
+[`Checkpointer.restart_flux_accumulators!`](@ref) on the matching file during
+a restart. Configurations without slow surfaces leave `flux_accumulators`
+empty and no accumulator file is written.
+
 ### Adding checkpointing to a new component model
 
 There are two ways to add checkpoint/restart support for a new component model:
@@ -186,6 +199,7 @@ This approach allows for a signficant reducation in the file size of the cache.
     Checkpointer.restart!
     Checkpointer.restart_model_state!
     Checkpointer.restart_model_cache!
+    Checkpointer.restart_flux_accumulators!
     Checkpointer.checkpoint_sims
     Checkpointer.t_start_from_checkpoint
     Checkpointer.restore!

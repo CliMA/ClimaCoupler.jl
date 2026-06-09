@@ -17,6 +17,8 @@ import ClimaCore as CC
 
 include(joinpath("..", "AMIP", "code_loading.jl"))
 
+import ClimaCoupler: FluxCalculator
+
 @testset "surface radiative flux consistency (AMIP + bucket land)" begin
     # Build AMIP configuration used in CI by default
     config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/amip_default.yml")
@@ -135,4 +137,79 @@ include(joinpath("..", "AMIP", "code_loading.jl"))
     err_fluxes = atmos_flux .+ combined_fluxes
     @show "Combined fluxes error: $(maximum(abs.(err_fluxes)))"
     @test maximum(abs.(err_fluxes)) < 10
+end
+
+# End-to-end test for the FluxAccumulator setup, exercising both the slow slab
+# ocean and the slow bucket land in one CoupledSimulation. `slabplanet` mode
+# allocates both a SlabOceanSimulation and a BucketSimulation, so a single
+# (expensive-to-construct) `CoupledSimulation` covers both accumulator paths.
+# We override timesteps so both surfaces are slow (dt_ocean = dt_land = 3 *
+# dt_cpl) and verify that:
+#   1) FluxAccumulators are allocated for both surfaces (and only those),
+#   2) each surface's turbulent-flux BC is set by the initial
+#      `push_ready_accumulators!` call (so neither surface sees zero fluxes
+#      at t=0),
+#   3) the accumulators collect contributions across coupling steps and are
+#      averaged and pushed only when the slow surface is about to step.
+@testset "flux accumulation: slow slab ocean and slow bucket land" begin
+    config_file = joinpath(pkgdir(ClimaCoupler), "config/ci_configs/slabplanet_default.yml")
+    config_dict = Input.get_coupler_config_dict(config_file)
+
+    # Override timesteps so the ocean and land are "slow"
+    config_dict["dt_cpl"] = "200secs"
+    config_dict["dt_atmos"] = config_dict["dt_seaice"] = config_dict["dt_cpl"]
+    config_dict["dt_ocean"] = config_dict["dt_land"] = "600secs"
+    haskey(config_dict, "dt") && delete!(config_dict, "dt")
+    # Call `parse_component_dts!` to populate `config_dict["component_dt_dict"]`
+    Input.parse_component_dts!(config_dict)
+    # Two slow-surface steps within the test window:
+    config_dict["t_end"] = "1200secs"
+
+    cs = CoupledSimulation(config_dict)
+
+    # 1) Accumulators allocated for both slow surfaces, and only those.
+    @test Set(keys(cs.flux_accumulators)) == Set([:ocean_sim, :land_sim])
+    @test Interfacer.sim_dt(cs.model_sims.ocean_sim) > Float64(cs.Δt_cpl)
+    @test Interfacer.sim_dt(cs.model_sims.land_sim) > Float64(cs.Δt_cpl)
+
+    # 2) After initialization, each slow surface's turbulent-flux BC should be
+    # nonzero: the constructor calls `push_ready_accumulators!(...; force = true)`
+    # to populate all slow-surface BCs before the run loop.
+    F_turb_ocean_after_init =
+        copy(parent(cs.model_sims.ocean_sim.integrator.p.F_turb_energy))
+    F_lh_bucket_after_init =
+        copy(parent(cs.model_sims.land_sim.integrator.p.bucket.turbulent_fluxes.lhf))
+    @test any(F_turb_ocean_after_init .!= 0)
+    @test any(F_lh_bucket_after_init .!= 0)
+    # And both accumulators were reset after the init push.
+    @test cs.flux_accumulators.ocean_sim.n_steps[] == 0
+    @test cs.flux_accumulators.land_sim.n_steps[] == 0
+
+    # 3) Take coupling steps and check accumulator / surface-BC behavior.
+    # After step 1 (t = 200): turbulent_fluxes! adds one contribution to each
+    # accumulator. The next coupling time is t=400, and will_step(_, 400) is
+    # false for both (slow dt=600 > 400-0), so no push yet.
+    step!(cs)
+    @test cs.flux_accumulators.ocean_sim.n_steps[] == 1
+    @test cs.flux_accumulators.land_sim.n_steps[] == 1
+    @test parent(cs.model_sims.ocean_sim.integrator.p.F_turb_energy) ≈
+          F_turb_ocean_after_init
+    @test parent(cs.model_sims.land_sim.integrator.p.bucket.turbulent_fluxes.lhf) ≈
+          F_lh_bucket_after_init
+
+    # After step 2 (t = 400): turbulent_fluxes! adds a second contribution to
+    # each accumulator, then checks will_step(_, 600). Since 600 - 0 >= 600
+    # for both surfaces, each accumulator averages the two contributions,
+    # pushes them to its surface's BC, and resets.
+    step!(cs)
+    @test cs.flux_accumulators.ocean_sim.n_steps[] == 0
+    @test cs.flux_accumulators.land_sim.n_steps[] == 0
+
+    # After step 3 (t = 600): step_model_sims! advances the slow surfaces (their
+    # BCs already hold the 2-step average from the end of step 2). Then
+    # turbulent_fluxes! adds one new contribution to each accumulator and
+    # checks will_step(_, 800): 800 - 600 < 600, so no push yet.
+    step!(cs)
+    @test cs.flux_accumulators.ocean_sim.n_steps[] == 1
+    @test cs.flux_accumulators.land_sim.n_steps[] == 1
 end

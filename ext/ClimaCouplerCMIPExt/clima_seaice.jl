@@ -1,7 +1,6 @@
 using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions:
     IceWaterThermalEquilibrium, PrescribedTemperature, get_tracer
 import ClimaComms
-import ClimaOcean.EN4: download_dataset
 import NVTX
 import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters as SFP

@@ -2,7 +2,6 @@ import ClimaComms
 import NVTX
 import SurfaceFluxes as SF
 import Thermodynamics as TD
-import ClimaOcean.EN4: download_dataset
 import ClimaUtilities.TimeManager: ITime, date, counter, period
 import Dates
 
@@ -94,8 +93,8 @@ function OceananigansSimulation(
     dates = range(start_date, step = Dates.Month(1), stop = stop_date)
     en4_temperature = CO.Metadata(:temperature; dates, dataset = CO.EN4Monthly())
     en4_salinity = CO.Metadata(:salinity; dates, dataset = CO.EN4Monthly())
-    download_dataset(en4_temperature)
-    download_dataset(en4_salinity)
+    CO.download_with_fallback(en4_temperature)
+    CO.download_with_fallback(en4_salinity)
 
     # Create ocean simulation
     closure = if simple_ocean
@@ -104,20 +103,26 @@ function OceananigansSimulation(
         CO.OceanConfigurations.default_one_degree_closure()
     end
 
+    # TODO: once NumericalEarth.Oceans.hydrostatic_ocean_simulation accepts a
+    # `clock` kwarg upstream, restore the per-time-type clock construction so
+    # the ocean and coupler share an absolute time origin (needed for the
+    # ITime branch of `Interfacer.step!`, which subtracts the model clock
+    # from a `DateTime`).
     if tspan[1] isa ITime
-        # create a model clock that uses DateTime, for compatibility with ITime.
-        model_clock = OC.TimeSteppers.Clock(time = start_date)
         stop_time = Dates.DateTime(tspan[2])
     elseif tspan[1] isa Float64
-        model_clock = OC.TimeSteppers.Clock{Float64}(time = tspan[1])
         stop_time = tspan[2]
     else
         error("Unsupported time type: $(typeof(tspan[1]))")
     end
 
-    ocean = CO.OceanConfigurations.latitude_longitude_ocean(arch; model_clock)
+    # `depth` must not exceed the EN4 vertical extent (5500 m) by more than ~1%
+    # (see NumericalEarth.DataWrangling.set!(::Field, ::Metadatum) check), since
+    # EN4 provides the initial temperature/salinity below. The default 6000 m
+    # would trip that check at `OC.set!(ocean.model, ...)` below.
+    ocean = CO.OceanConfigurations.latitude_longitude_ocean(arch; depth = 5500)
     ocean.stop_time = stop_time
-    ocean.Δt = Δt
+    ocean.Δt = float(dt)
 
     wall_time = Ref(time_ns())
 

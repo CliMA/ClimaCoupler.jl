@@ -49,6 +49,35 @@ function Interfacer.SeaIceSimulation(::Type{FT}, ::Val{:clima_seaice}; kwargs...
 end
 
 """
+    _stage_readonly_artifact(artifact_dir, output_dir, subdir)
+
+Expose the contents of a read-only `artifact_dir` (e.g. a `ClimaArtifacts` cache
+on a shared filesystem) inside a writable directory created at
+`joinpath(output_dir, subdir)`.
+
+NumericalEarth's `Downloads.download(metadata::ECCOMetadata)` unconditionally
+calls `mktempdir(metadata.dir)` to stage a `.netrc` file, even when the
+requested NetCDF files are already present. When `metadata.dir` points at a
+read-only artifact cache, that `mktempdir` call fails with `EACCES`.
+
+Symlinks (created on rank 0 in MPI runs, with a barrier afterwards) are used
+to avoid duplicating potentially-large NetCDF data while still giving
+NumericalEarth a writable directory it can `mktempdir` inside.
+"""
+function _stage_readonly_artifact(artifact_dir, output_dir, subdir)
+    staged_dir = joinpath(output_dir, subdir)
+    OC.DistributedComputations.@root begin
+        mkpath(staged_dir)
+        for fname in readdir(artifact_dir)
+            src = joinpath(artifact_dir, fname)
+            dst = joinpath(staged_dir, fname)
+            ispath(dst) || islink(dst) || symlink(src, dst)
+        end
+    end
+    return staged_dir
+end
+
+"""
     ClimaSeaIceSimulation()
 
 Creates a ClimaSeaIceSimulation object containing a model, an integrator, and
@@ -103,9 +132,15 @@ function ClimaSeaIceSimulation(
     if !isnothing(start_date)
         # set up the `dir` keyword argument for `Metadatum`
         if start_date == Dates.Date(2010, 1, 1)
-            # we have a ClimaArtifact saved for January 1, 2010 (so that CI can always run)
-            dir_kw = (; dir = @clima_artifact("ecco4_SIarea_SIheff_2010_01"))
-            @info "Using $(dir_kw.dir) ClimaArtifact for sea ice initialization on $(start_date)"
+            # we have a ClimaArtifact saved for January 1, 2010 (so that CI can always run).
+            # `NumericalEarth.DataWrangling.ECCO.Downloads.download` unconditionally calls
+            # `mktempdir(metadata.dir)` to stage a `.netrc` file, so when the artifact lives
+            # on a read-only shared filesystem (e.g. `/net/sampo/data1/ClimaArtifacts`) we
+            # have to expose its NetCDF files via a writable scratch directory.
+            artifact_dir = @clima_artifact("ecco4_SIarea_SIheff_2010_01")
+            seaice_init_dir = _stage_readonly_artifact(artifact_dir, output_dir, "seaice_init_artifact")
+            dir_kw = (; dir = seaice_init_dir)
+            @info "Using $(artifact_dir) ClimaArtifact for sea ice initialization on $(start_date) (staged at $(seaice_init_dir))"
         else
             # otherwise, download the data
             # (or load from scratchspace; ClimaOcean will automatically handle this)

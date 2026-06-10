@@ -82,9 +82,9 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     cs.fields.ice_area_fraction .= ice_fraction
     cs.fields.ocean_area_fraction .= ocean_fraction
 
-    # check that the sum of area fractions is 1
-    @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
-    @assert maximum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
+    # Check that the sum of area fractions is 1. 
+    @assert minimum(sum_frac) ≈ FT(1) "minimum(ice+land+ocean) = $(minimum(sum_frac)); fractions do not sum to 1"
+    @assert maximum(sum_frac) ≈ FT(1) "maximum(ice+land+ocean) = $(maximum(sum_frac)); fractions do not sum to 1"
 end
 
 """

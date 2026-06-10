@@ -329,8 +329,9 @@ function FieldExchanger.resolve_area_fractions!(
         boundary_space = axes(ocean_fraction)
         FT = CC.Spaces.undertype(boundary_space)
         lat = CC.Fields.coordinate_field(boundary_space).lat
+        cutoff_deg = FT(polar_mask_cutoff_deg(ocean_sim.ocean.model.grid))
         polar_mask = CC.Fields.zeros(boundary_space)
-        polar_mask .= abs.(lat) .< FT(78)
+        polar_mask .= abs.(lat) .< cutoff_deg
 
         # Set land fraction to 1 and ice/ocean fraction to 0 where polar_mask is 0
         @. land_fraction = polar_mask * land_fraction + (1 - polar_mask)
@@ -392,20 +393,41 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
     sim.ocean.model.tracers.T + sim.ocean_properties.C_to_K # convert from Celsius to Kelvin
 
 """
+    polar_mask_cutoff_deg(grid; buffer_deg = 2.0)
+
+Return the latitude (in degrees) at which both the ocean-grid polar mask
+([`ocean_polar_mask`](@ref)) and the CC-side polar mask used in
+[`FieldExchanger.resolve_area_fractions!`](@ref) are placed.
+
+The cutoff is derived from the grid's actual meridional extent so that the
+mask is always strictly inside the OC grid by `buffer_deg` degrees. This is
+required because the CC ↔ OC conservative remap has `normalize = false` and produces
+zero source-weight (or partial coverage) in cells outside the OC grid.
+"""
+function polar_mask_cutoff_deg(grid; buffer_deg = 2.0)
+    underlying = hasproperty(grid, :underlying_grid) ? grid.underlying_grid : grid
+    φ = OC.φnodes(underlying, OC.Center(), OC.Center(), OC.Center())
+    φ_max = max(abs(minimum(φ)), abs(maximum(φ)))
+    return max(φ_max - buffer_deg, 0.0)
+end
+
+"""
     ocean_polar_mask(grid; location)
 
 Build the ocean polar mask once at setup.
-Currently we define ocean between 80°S to 80°N with 2 degree overlap in the coupler mask.
-Returns a 2D mask (1.0 where |lat| < 78°, 0.0 elsewhere). This mask is on the ocean grid
-(unlike the polar mask which is defined on the boundary_space)
+Returns a 2D mask (1.0 where |lat| < [`polar_mask_cutoff_deg`](@ref)`(grid)`,
+0.0 elsewhere). This mask is on the ocean grid (unlike the polar mask used in
+`resolve_area_fractions!`, which is defined on the boundary_space). The
+cutoff is derived from the grid extent (see [`polar_mask_cutoff_deg`](@ref))
+so it always sits a few degrees inside the OC grid.
 """
 function ocean_polar_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
-    polar_flux_lat_deg = 78.0  # zero fluxes where |lat| ≥ this (same band as polar_mask for atmosphere)
+    polar_flux_lat_deg = polar_mask_cutoff_deg(grid)
 
     # latitude nodes: a StepRangeLen of size grid.Ny *in degrees*
     φ = OC.φnodes(grid, location[1], location[2], location[3])
 
-    # compute mask (1.0 where |lat| < 78°, 0.0 elsewhere)
+    # compute mask (1.0 where |lat| < cutoff, 0.0 elsewhere)
     mask = ifelse.(abs.(φ) .< polar_flux_lat_deg, 1.0, 0.0)  # Vector of size grid.Ny
     mask = reshape(mask, 1, :)  # make mask a row vector (1 × grid.Ny)
     mask = repeat(mask, grid.Nx, 1)  # repeat across longitude to get a grid.Nx × grid.Ny Matrix

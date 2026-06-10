@@ -9,6 +9,7 @@ import Dates
 import ClimaUtilities.TimeManager: ITime, date, counter, period
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 using StaticArrays
+using Oceananigans.DistributedComputations: @root
 
 # Rename ECCO password env variable to match ClimaOcean.jl
 haskey(ENV, "ECCO_PASSWORD") && (ENV["ECCO_WEBDAV_PASSWORD"] = ENV["ECCO_PASSWORD"])

@@ -111,6 +111,11 @@ function step!(cs::Interfacer.CoupledSimulation)
     # Update the surface fractions for surface models
     FieldExchanger.update_surface_fractions!(cs)
 
+    # Zero any internally-accumulated surface flux tendencies on each component model
+    # before this coupler step starts adding new contributions in `exchange!`,
+    # `turbulent_fluxes!`, and `ocean_seaice_fluxes!`.
+    FluxCalculator.reset_fluxes!(cs)
+
     # Exchange all non-turbulent flux fields between models, including radiative and precipitation fluxes
     FieldExchanger.exchange!(cs)
 

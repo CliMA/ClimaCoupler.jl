@@ -17,6 +17,7 @@ import ..Interfacer, ..Utilities
 
 export turbulent_fluxes!,
     get_surface_params,
+    reset_fluxes!,
     update_turbulent_fluxes!,
     compute_surface_fluxes!,
     ocean_seaice_fluxes!,
@@ -25,6 +26,32 @@ export turbulent_fluxes!,
     push_and_reset!,
     push_ready_accumulators!,
     reset!
+
+"""
+    reset_fluxes!(cs::Interfacer.CoupledSimulation)
+    reset_fluxes!(sim::Interfacer.AbstractComponentSimulation)
+
+Reset any internally accumulated surface flux tendencies on each component model in `cs`
+(or on a single `sim`) at the start of a coupler timestep, before flux contributions are
+added in `FieldExchanger.exchange!`/`FieldExchanger.update_sim!`,
+[`FluxCalculator.update_turbulent_fluxes!`](@ref), and/or
+[`FluxCalculator.ocean_seaice_fluxes!`](@ref).
+
+The `CoupledSimulation` method is intended to be called explicitly from the top-level
+coupler loop (`SimCoordinator.step!`) between `update_surface_fractions!` and `exchange!`,
+so the reset ordering is visible at the call site rather than hidden inside the exchange.
+
+By default, the per-`sim` method is a no-op. Component models that accumulate fluxes across
+multiple coupler updates should extend that method.
+"""
+function reset_fluxes!(cs::Interfacer.CoupledSimulation)
+    for sim in cs.model_sims
+        reset_fluxes!(sim)
+    end
+    return nothing
+end
+
+reset_fluxes!(sim::Interfacer.AbstractComponentSimulation) = nothing
 
 function turbulent_fluxes!(cs::Interfacer.CoupledSimulation)
     turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params, cs.flux_accumulators)

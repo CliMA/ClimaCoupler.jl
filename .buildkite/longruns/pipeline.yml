@@ -177,18 +177,6 @@ steps:
           slurm_mem: 32GB
           slurm_gpus: 1
 
-      - label: "GPU CMIP: diag. EDMF + integrated land"
-        key: "cmip_diagedmf_land"
-        command:
-            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_diagedmf_land.yml --job_id cmip_diagedmf_land"
-        artifact_paths: "output/cmip_diagedmf_land/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          queue: clima
-          slurm_mem: 32GB
-          slurm_gpus: 1
-
       - label: "GPU CMIP: prog. EDMF + integrated land"
         key: "cmip_progedmf_land"
         command:

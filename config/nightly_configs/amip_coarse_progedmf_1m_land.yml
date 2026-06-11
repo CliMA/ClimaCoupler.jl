@@ -19,7 +19,7 @@ land_temperature_anomaly: "nothing"
 land_fraction_source: "era5"
 start_date: "20100924"
 t_end: "39days"
-snow_autoconversion: NoSupersaturation
+# snow_autoconversion: NoSupersaturation
 # sgs_distribution: "lognormal"
 
 extra_atmos_diagnostics:

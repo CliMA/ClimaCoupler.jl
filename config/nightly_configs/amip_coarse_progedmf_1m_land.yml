@@ -25,3 +25,5 @@ t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
 z_elem: 39
+microphysics_n_substeps: 4
+microphysics_n_substeps_quadrature: 4

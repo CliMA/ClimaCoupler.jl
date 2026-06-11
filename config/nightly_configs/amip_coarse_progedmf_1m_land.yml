@@ -20,6 +20,7 @@ land_fraction_source: "era5"
 start_date: "20100924"
 t_end: "39days"
 snow_autoconversion: NoSupersaturation
+cloud_ice_melt: ~
 # sgs_distribution: "lognormal"
 
 extra_atmos_diagnostics:
@@ -28,18 +29,18 @@ extra_atmos_diagnostics:
     reduction_time: average
     pressure_coordinates: true
     compute_every: 6hours
-  # - short_name: [ua, va, wa, ta, hus, hur, waup, taup, husup, hurup, tke, lmix, clw, cli, husra, hussn, clwup, cliup, husraup, hussnup, cl]
-  #   period: 1days
-  #   reduction_time: average
-  #   compute_every: 1hours
+  - short_name: [ua, va, wa, ta, hus, hur, waup, taup, husup, hurup, tke, lmix, clw, cli, husra, hussn, clwup, cliup, husraup, hussnup, cl]
+    period: 1days
+    #reduction_time: average
+    compute_every: 1hours
   - short_name: [ua, va, wa, ta, hus, hur, waup, taup, husup, hurup, tke, lmix, clw, cli, husra, hussn, clwup, cliup, husraup, hussnup, cl]
     period: monthly
     reduction_time: average
     compute_every: 1hours
-  # - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, rwp, swp, clwvi, clivi, clt]
-  #   period: 1days
-  #   reduction_time: average
-  #   compute_every: 1hours
+  - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, rwp, swp, clwvi, clivi, clt]
+    period: 1days
+    #reduction_time: average
+    compute_every: 1hours
   - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, rwp, swp, clwvi, clivi, clt]
     period: monthly
     reduction_time: average

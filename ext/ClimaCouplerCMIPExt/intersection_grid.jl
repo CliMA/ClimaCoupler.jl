@@ -26,9 +26,13 @@ on one grid and remapping.
 - `n_intersections`: Number of intersection polygons
 
 # Usage
-The intersection grid is extracted from a `CR.Regridder` via `extract_intersection_grid`.
-Values can be gathered from CC/OC grids to the intersection grid, flux calculations
-performed, and results scattered back to component grids with proper area weighting.
+The intersection grid is constructed from a boundary space + Oceananigans
+grid pair via [`extract_intersection_grid`](@ref), which builds the
+element-level intersection matrix through `ConservativeRegridding`'s
+tree-level dual-DFS (fold-aware on `TripolarGrid` via CR's Oceananigans
+extension). Values can then be gathered from CC/OC grids to the
+intersection grid, flux calculations performed, and results scattered
+back to component grids with proper area weighting.
 """
 struct IntersectionGrid{FT, IT, VFT <: AbstractVector{FT}, VIT <: AbstractVector{IT}}
     cc_indices::VIT
@@ -46,38 +50,67 @@ function Base.show(io::IO, ig::IntersectionGrid{FT}) where {FT}
 end
 
 """
-    extract_intersection_grid(regridder::CR.Regridder)
+    extract_intersection_grid(boundary_space, grid_oc)
 
-Extract an `IntersectionGrid` from a ConservativeRegridding.jl `Regridder`.
+Build an `IntersectionGrid` directly from a ClimaCore boundary space and an
+Oceananigans grid by computing the CC-element × OC-cell intersection matrix
+via the tree-level `ConservativeRegridding.intersection_areas` call.
 
-The regridder's sparse intersection matrix has:
-- rows = destination (CC) element indices
-- columns = source (OC) cell indices
-- values = intersection areas in m²
+This is the correct constructor for CC ↔ OC regridding because:
+
+* The matrix it produces is indexed by SE *elements* on the CC side and
+  by FV *cells* on the OC side — exactly what the gather/scatter and
+  flux-on-intersection routines expect. The matrix exposed by the
+  `CR.Regridder` built in `construct_remapper`, by contrast, is
+  SE-*node*-indexed (`Nq² · Nh`), because `ConservativeRegriddingClimaCoreExt`
+  bakes the L2 / principled SE operators into a node-level sparse matrix
+  for direct use in `CR.regrid!`. Using that node-level matrix as if it
+  were element-level would walk off the cubed-sphere tree.
+* On a `TripolarGrid`, `CR.Trees.treeify(manifold, grid_oc_cpu)` routes
+  through CR's Oceananigans extension and returns a fold-aware
+  `PaddedTreeWrapper`, so the fold row is handled correctly without any
+  caller-side bookkeeping.
+
+This constructor accepts the geometric grid either bare or wrapped in an
+`ImmersedBoundaryGrid` — the immersed mask is not consulted at this
+stage; intersection geometry is computed against the underlying grid.
 
 # Arguments
-- `regridder`: A `CR.Regridder` constructed for CC ↔ OC regridding
+- `boundary_space::CC.Spaces.AbstractSpace`: ClimaCore cubed-sphere boundary space.
+- `grid_oc`: Oceananigans grid (`TripolarGrid`, `LatitudeLongitudeGrid`,
+  `OrthogonalSphericalShellGrid`, or any of these wrapped in an
+  `ImmersedBoundaryGrid`).
 
 # Returns
-- `IntersectionGrid` containing the sparse intersection structure
+- `IntersectionGrid` containing the CC-element × OC-cell sparse intersection.
 """
-function extract_intersection_grid(regridder::CR.Regridder)
-    intersections = regridder.intersections
-    cc_areas = regridder.dst_areas
-    oc_areas = regridder.src_areas
+function extract_intersection_grid(boundary_space, grid_oc)
+    boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
+    # `underlying_grid` peels an `ImmersedBoundaryGrid` if present.
+    grid_oc_cpu = OC.on_architecture(OC.CPU(), underlying_grid(grid_oc))
 
-    n_cc, n_oc = size(intersections)
+    FT = CC.Spaces.undertype(boundary_space_cpu)
+    R = CC.Spaces.topology(boundary_space_cpu).mesh.domain.radius
+    manifold = CR.Spherical(; radius = FT(R))
+
+    dst_tree = CR.Trees.treeify(manifold, boundary_space_cpu)
+    src_tree = CR.Trees.treeify(manifold, grid_oc_cpu)
+
+    intersections = CR.intersection_areas(manifold, CR.False(), dst_tree, src_tree)
 
     cc_indices, oc_indices, areas = SparseArrays.findnz(intersections)
+    cc_areas_vec = vec(sum(intersections, dims = 2))
+    oc_areas_vec = vec(sum(intersections, dims = 1))
 
+    n_cc, n_oc = size(intersections)
     n_intersections = length(areas)
 
     return IntersectionGrid(
         cc_indices,
         oc_indices,
-        areas,
-        cc_areas,
-        oc_areas,
+        FT.(areas),
+        FT.(cc_areas_vec),
+        FT.(oc_areas_vec),
         n_cc,
         n_oc,
         n_intersections,
@@ -85,13 +118,13 @@ function extract_intersection_grid(regridder::CR.Regridder)
 end
 
 """
-    extract_intersection_grid(regridder::CR.Regridder, ArrayType)
+    extract_intersection_grid(boundary_space, grid_oc, ArrayType)
 
-Extract an `IntersectionGrid` and convert arrays to the specified `ArrayType`
-(e.g., `CuArray` for GPU computation).
+Build an `IntersectionGrid` (see the two-argument method) and convert its
+backing arrays to `ArrayType` (e.g. `CuArray` for GPU computation).
 """
-function extract_intersection_grid(regridder::CR.Regridder, ArrayType)
-    ig_cpu = extract_intersection_grid(regridder)
+function extract_intersection_grid(boundary_space, grid_oc, ArrayType)
+    ig_cpu = extract_intersection_grid(boundary_space, grid_oc)
 
     return IntersectionGrid(
         ArrayType(ig_cpu.cc_indices),

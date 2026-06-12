@@ -2,24 +2,8 @@
 
 This page demonstrates how flux exchange works on the intersection grid between
 the ClimaCore cubed-sphere (CC) atmosphere grid and the Oceananigans ocean /
-sea-ice grid. The production CMIP path uses Oceananigans' `TripolarGrid`
-wrapped in an `ImmersedBoundaryGrid`; that is the configuration this page
-takes as the canonical example. The `LatitudeLongitudeGrid` is retained as a
-secondary example near the end because it is convenient for plotting against
-the lon/lat graticule, but it requires an artificial polar truncation that
-the tripolar grid eliminates.
-
-## Why a tripolar OC grid removes the polar mask
-
-The `TripolarGrid` removes the need for masking high-latitudes in the ocean model:
-
-* It covers the full sphere by displacing the two northern-hemisphere
-  coordinate singularities into two displaced "north poles" placed over
-  Greenland and Eurasia, where the bathymetry mask of the wrapping
-  `ImmersedBoundaryGrid` marks them as land (dry, immersed cells).
-* Every ocean cell — including those directly adjacent to a displaced pole
-  — has a finite, well-defined area, so there is no degenerate band to
-  exclude.
+sea-ice grid. We focus on the CMIP configuration that uses Oceananigans' `TripolarGrid`
+wrapped in an `ImmersedBoundaryGrid` (default).
 
 ## Motivation: Why Intersection-Grid Fluxes?
 
@@ -86,9 +70,18 @@ grid = OC.ImmersedBoundaryGrid(
     active_cells_map = false,
 )
 
-# Construct remapper and extract intersection grid
+# Construct the SE ↔ FV regridders that the coupler uses at runtime.
 remapping = CMIPExt.construct_remapper(grid, boundary_space)
-ig = remapping.intersection_grid
+
+# Build the CC-element × OC-cell intersection grid directly via
+# `CR.intersection_areas` (used through CMIPExt's tree-level constructor).
+# This is *not* derived from `remapping.remapper_*` because the regridders
+# bake the SE quadrature into a node-level sparse matrix
+# (`Nq² · Nh × N_FV`), whereas the gather/scatter and intersection-grid
+# flux routines all reason in element × cell space. The constructor goes
+# through `CR.Trees.treeify`, which on a `TripolarGrid` dispatches to a
+# fold-aware `PaddedTreeWrapper` automatically.
+ig = CMIPExt.extract_intersection_grid(boundary_space, grid)
 
 println("Grid Statistics:")
 println("  CC elements: ", ig.n_cc)
@@ -108,9 +101,39 @@ coords = CC.Fields.coordinate_field(boundary_space)
 lats_cc = parent(coords.lat)
 lons_cc = parent(coords.long)
 
-# Get OC cell center coordinates
-lons_oc = collect(OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center()))
-lats_oc = collect(OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center()))
+# Get OC cell center coordinates as 2D `(Nx, Ny)` arrays in the signed
+# `[-180°, 180°]` longitude convention used everywhere else on this page.
+#
+# Two shape conventions to normalize:
+#
+#  * On a `TripolarGrid` (curvilinear) `λnodes` and `φnodes` already
+#    return a 2D coordinate field — each `(i, j)` cell has its own λ and
+#    φ — and we just materialize the view with `Array(...)`.
+#  * On a `LatitudeLongitudeGrid` (separable) they return 1D vectors and
+#    we broadcast them out into the same `(Nx, Ny)` shape so all
+#    downstream code paths see the same shape.
+#
+# And one longitude convention to normalize: Oceananigans' `TripolarGrid`
+# uses `λ ∈ [first_pole_longitude, first_pole_longitude + 360°]` (so for
+# the default `first_pole_longitude = 70°` the raw `λᶜᶜᵃ` values run
+# `[70°, 430°]`), while the CC cubed-sphere coords on this page use the
+# signed `[-180°, 180°]` convention. We fold the OC longitudes into
+# `[-180°, 180°]` so both grids share an axis cleanly.
+_wrap_lon_pm180(λ) = mod(λ + 180, 360) - 180
+function oc_cell_center_coords(grid)
+    λ_raw = OC.λnodes(grid, OC.Center(), OC.Center(), OC.Center())
+    φ_raw = OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center())
+    if ndims(λ_raw) == 2
+        lons_2d = _wrap_lon_pm180.(Array(λ_raw))
+        lats_2d = Array(φ_raw)
+    else
+        Nx, Ny = length(λ_raw), length(φ_raw)
+        lons_2d = _wrap_lon_pm180.(repeat(reshape(Array(λ_raw), :, 1), 1, Ny))
+        lats_2d = repeat(reshape(Array(φ_raw), 1, :), Nx, 1)
+    end
+    return lons_2d, lats_2d
+end
+lons_oc, lats_oc = oc_cell_center_coords(grid)
 
 fig = Figure(size = (1000, 500))
 
@@ -119,9 +142,9 @@ ax1 = Axis(fig[1, 1];
     xlabel = "Longitude (°)",
     ylabel = "Latitude (°)",
 )
-scatter!(ax1, vec(lons_cc), vec(lats_cc); 
-    markersize = 3, 
-    color = :blue, 
+scatter!(ax1, vec(lons_cc), vec(lats_cc);
+    markersize = 3,
+    color = :blue,
     alpha = 0.6,
     label = "CC element centers"
 )
@@ -129,14 +152,16 @@ xlims!(ax1, -180, 180)
 ylims!(ax1, -90, 90)
 
 ax2 = Axis(fig[1, 2];
-    title = "OC Cells (LatLon Grid)",
+    title = "OC Cells (TripolarGrid)",
     xlabel = "Longitude (°)",
     ylabel = "Latitude (°)",
 )
-# Create grid of OC cell centers
-oc_lon_grid = repeat(lons_oc, 1, length(lats_oc))
-oc_lat_grid = repeat(lats_oc', length(lons_oc), 1)
-scatter!(ax2, vec(oc_lon_grid), vec(oc_lat_grid);
+# On a curvilinear OC grid `(lons_oc, lats_oc)` are already 2D coordinate
+# fields, one entry per cell — we just `vec` and scatter. Note the
+# Northern Hemisphere "fans" of cells spiralling around the two displaced
+# tripolar poles over Greenland and Eurasia; that is the tripolar fold,
+# not a plotting artefact.
+scatter!(ax2, vec(lons_oc), vec(lats_oc);
     markersize = 4,
     color = :red,
     alpha = 0.6,
@@ -152,7 +177,7 @@ fig
 
 So far we've only looked at where CC elements and OC cells *live*. We can also
 draw the intersection polygons themselves — one for each row of `(cc_indices,
-oc_indices, areas)` in `remapping.intersection_grid` — by re-using the
+oc_indices, areas)` in `ig` — by re-using the
 [`ConservativeRegridding`](https://github.com/CliMA/ConservativeRegridding.jl)
 trees that the regridder builds internally, then clipping each pair with
 `GeometryOps`.
@@ -309,11 +334,16 @@ function _process_ring(ring)
     return _cut_at_antimeridians(pts)
 end
 
-function intersection_polygons_lonlat(remapping, boundary_space, grid)
-    ig = remapping.intersection_grid
-
+function intersection_polygons_lonlat(ig, boundary_space, grid)
+    # `ig.cc_indices` / `ig.oc_indices` index into the same CR trees that
+    # produced the intersection matrix in `extract_intersection_grid`. We
+    # rebuild those trees here against a CPU copy of the boundary space
+    # and underlying OC grid so that `Trees.getcell` returns the polygon
+    # geometry we can clip with GeometryOps.
     boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
-    grid_underlying_cpu = OC.on_architecture(OC.CPU(), grid.underlying_grid)
+    grid_underlying =
+        grid isa OC.ImmersedBoundaryGrid ? grid.underlying_grid : grid
+    grid_underlying_cpu = OC.on_architecture(OC.CPU(), grid_underlying)
 
     FT_cc = CC.Spaces.undertype(boundary_space_cpu)
     R = CC.Spaces.topology(boundary_space_cpu).mesh.domain.radius
@@ -345,7 +375,7 @@ function intersection_polygons_lonlat(remapping, boundary_space, grid)
     return rings, areas, dst_tree
 end
 
-rings, poly_areas, dst_tree = intersection_polygons_lonlat(remapping, boundary_space, grid)
+rings, poly_areas, dst_tree = intersection_polygons_lonlat(ig, boundary_space, grid)
 println("Reconstructed $(length(rings)) map-safe intersection polygons.")
 ```
 
@@ -447,7 +477,7 @@ Colorbar(fig_poly[1, 2], pl; label = "intersection area [m²]")
 fig_poly
 ```
 
-Each colored polygon is one row of `remapping.intersection_grid`; together they
+Each colored polygon is one row of `ig`; together they
 tile the globe.  Polygons near the poles look larger in the equal-earth
 projection because the spherical-cap geometry — but the colorbar shows that
 their actual area is similar to (or smaller than) the tropical polygons,
@@ -661,7 +691,7 @@ continent_grid = OC.ImmersedBoundaryGrid(
     active_cells_map = false,
 )
 continent_remapping = CMIPExt.construct_remapper(continent_grid, boundary_space)
-continent_ig = continent_remapping.intersection_grid
+continent_ig = CMIPExt.extract_intersection_grid(boundary_space, continent_grid)
 
 # Per-OC-cell wet/dry status, read straight from the ocean model's grid.
 # `immersed_cell(i, j, k, grid)` returns `true` for cells the model skips.
@@ -1015,16 +1045,17 @@ cc_atmos_state = (
     h = fill(FT(10), ig.n_cc),        # 10 m reference height
 )
 
-# Create surface state (per OC cell) - latitude-varying SST
-# Warm tropics, cold high latitudes
+# Create surface state (per OC cell) - latitude-varying SST.
+# `lats_oc` is the 2D `(Nx, Ny)` cell-centre latitude field from
+# `oc_cell_center_coords`, so each cell uses its own physical latitude —
+# this is essential on a `TripolarGrid` where rows are not constant in
+# latitude (a single `j` spans a range of latitudes around the fold).
 sst_by_cell = zeros(FT, ig.n_oc)
-for j in 1:Ny
-    for i in 1:Nx
-        cell_idx = (j-1) * Nx + i
-        lat = lats_oc[j]
-        # SST pattern: warm tropics (303K), cold poles (273K)
-        sst_by_cell[cell_idx] = 288.0 + 15.0 * cos(deg2rad(lat))
-    end
+for j in 1:Ny, i in 1:Nx
+    cell_idx = (j - 1) * Nx + i
+    lat = lats_oc[i, j]
+    # SST pattern: warm tropics (303 K), cold poles (273 K).
+    sst_by_cell[cell_idx] = 288.0 + 15.0 * cos(deg2rad(lat))
 end
 
 oc_surface_state = (
@@ -1073,6 +1104,16 @@ println("  OC grid SH flux: min=$(round(minimum(oc_flux_sh), digits=1)), max=$(r
 
 ## Visualizing the Flux Pattern
 
+`Makie.heatmap!` expects a separable rectangular grid (1D `x` and `y`
+axes), which a `TripolarGrid` does not have — rows of constant `j`
+sweep across a range of latitudes near the fold and the cells are not
+axis-aligned in `(lon, lat)` space. The robust visualization on a
+curvilinear mesh is a colored scatter at each cell centre, which uses
+the 2D `(Nx, Ny)` coordinate fields directly. (On a
+`LatitudeLongitudeGrid` the same call still works because
+`oc_cell_center_coords` broadcasts the separable 1D coordinates out into
+the same 2D shape.)
+
 ```@example intersection_flux
 
 sst_matrix     = reshape(sst_by_cell, Nx, Ny)
@@ -1085,22 +1126,28 @@ ax1 = Axis(fig2[1, 1];
     xlabel = "Longitude (°)",
     ylabel = "Latitude (°)",
 )
-hm1 = heatmap!(ax1, lons_oc, lats_oc, sst_matrix;
+sc1 = scatter!(ax1, vec(lons_oc), vec(lats_oc);
+    color = vec(sst_matrix),
     colormap = :thermal,
     colorrange = (273, 303),
+    markersize = 4,
 )
-Colorbar(fig2[1, 2], hm1; label = "SST (K)")
+xlims!(ax1, -180, 180); ylims!(ax1, -90, 90)
+Colorbar(fig2[1, 2], sc1; label = "SST (K)")
 
 ax2 = Axis(fig2[1, 3];
     title = "Sensible Heat Flux (Output)",
     xlabel = "Longitude (°)",
     ylabel = "Latitude (°)",
 )
-hm2 = heatmap!(ax2, lons_oc, lats_oc, oc_flux_matrix;
+sc2 = scatter!(ax2, vec(lons_oc), vec(lats_oc);
+    color = vec(oc_flux_matrix),
     colormap = :RdBu,
     colorrange = (-100, 100),
+    markersize = 4,
 )
-Colorbar(fig2[1, 4], hm2; label = "SH Flux (W/m²)")
+xlims!(ax2, -180, 180); ylims!(ax2, -90, 90)
+Colorbar(fig2[1, 4], sc2; label = "SH Flux (W/m²)")
 
 fig2
 ```

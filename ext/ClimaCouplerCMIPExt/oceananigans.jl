@@ -252,6 +252,25 @@ For low-level use: `CR.regrid!(dst, remapper_oc_to_cc, src)` and
 `climaocean_helpers.jl` accept `CC.Fields.Field` directly as source or
 destination and route through `ConservativeRegriddingClimaCoreExt`'s nodal
 extract / finalize overrides — no per-element scratch buffer is required.
+
+In addition to the two regridders this function also allocates the
+intersection-grid flux pipeline used by `compute_intersection_grid_fluxes!`:
+
+* `intersection_grid::IntersectionGrid` — CC-element × OC-cell sparse
+  intersection (constructed via [`extract_intersection_grid`](@ref), which
+  uses CR's tree-level `intersection_areas`). On a `TripolarGrid` the fold
+  row is handled by CR's `PaddedTreeWrapper` automatically.
+* `intersection_flux_state::IntersectionFluxState` — per-polygon scratch
+  for atmosphere/surface state at the polygon centroid plus the five
+  computed fluxes (`flux_sh`, `flux_lh`, `flux_τx`, `flux_τy`, `flux_evap`).
+* `cc_atmos_temp::NamedTuple` — per-CC-element scratch written by
+  `extract_cc_atmos_state!` from the coupler fields.
+* `oc_surface_temp::NamedTuple` — per-OC-cell scratch written by
+  `extract_oc_surface_state!` from the live ocean state.
+
+All four are allocated on the architecture of `grid_oc` so they can be
+written in place from device-resident `OC.interior(...)` views and
+participate in GPU kernels without a host bounce.
 """
 function construct_remapper(grid_oc, boundary_space)
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), underlying_grid(grid_oc))
@@ -298,6 +317,68 @@ function construct_remapper(grid_oc, boundary_space)
     # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
+    # ----- Intersection-grid flux pipeline -----
+    #
+    # Build the CC-element × OC-cell intersection grid + scratch buffers
+    # used by `compute_intersection_grid_fluxes!`. The intersection matrix
+    # is computed once here via the tree-level `CR.intersection_areas`
+    # (correctly element-indexed on CC and cell-indexed on FV — distinct
+    # from `remapper_*` whose sparse matrices are SE-*node*-indexed), and
+    # on a `TripolarGrid` the tree builder dispatches to CR's
+    # `PaddedTreeWrapper` so the fold row is handled implicitly. The
+    # backing arrays live on the OC architecture so `extract_oc_surface_state!`
+    # can do an in-place `vec(OC.interior(T_oc))`-style copy.
+    intersection_grid = extract_intersection_grid(boundary_space, grid_oc)
+    if !(arch isa OC.CPU)
+        AT = arr -> OC.on_architecture(arch, arr)
+        intersection_grid = IntersectionGrid(
+            AT(intersection_grid.cc_indices),
+            AT(intersection_grid.oc_indices),
+            AT(intersection_grid.areas),
+            AT(intersection_grid.cc_areas),
+            AT(intersection_grid.oc_areas),
+            intersection_grid.n_cc,
+            intersection_grid.n_oc,
+            intersection_grid.n_intersections,
+        )
+    end
+
+    _alloc(n) = OC.on_architecture(arch, zeros(FT, n))
+    n_cc = intersection_grid.n_cc
+    n_oc = intersection_grid.n_oc
+    n_int = intersection_grid.n_intersections
+
+    intersection_flux_state = IntersectionFluxState(
+        _alloc(n_int), _alloc(n_int), _alloc(n_int), _alloc(n_int),
+        _alloc(n_int), _alloc(n_int), _alloc(n_int), _alloc(n_int),
+        _alloc(n_int), _alloc(n_int), _alloc(n_int), _alloc(n_int),
+        _alloc(n_int), _alloc(n_int), _alloc(n_int), _alloc(n_int),
+        _alloc(n_int), _alloc(n_int),
+    )
+
+    # Per-CC-element scratch for atmosphere state. `extract_cc_atmos_state!`
+    # writes the nine fields below via `CRExt.get_value_per_element!`.
+    cc_atmos_temp = (
+        T     = _alloc(n_cc),
+        q_tot = _alloc(n_cc),
+        q_liq = _alloc(n_cc),
+        q_ice = _alloc(n_cc),
+        ρ     = _alloc(n_cc),
+        u     = _alloc(n_cc),
+        v     = _alloc(n_cc),
+        h     = _alloc(n_cc),
+        h_sfc = _alloc(n_cc),
+    )
+
+    # Per-OC-cell scratch for ocean surface state. `extract_oc_surface_state!`
+    # writes the four fields below from `OC.interior(sim.ocean.model.tracers.T)`.
+    oc_surface_temp = (
+        T   = _alloc(n_oc),
+        z0m = _alloc(n_oc),
+        z0b = _alloc(n_oc),
+        h   = _alloc(n_oc),
+    )
+
     # `TripolarGrid` covers the full sphere by construction, so no polar
     # masking is needed on either the OC or CC side. The FV → SE projection
     # has no structural-zero "no-data" nodes to repair, and `weighted_dss!`
@@ -309,6 +390,10 @@ function construct_remapper(grid_oc, boundary_space)
         scratch_field_oc2,
         scratch_field_oc3,
         temp_uv_vec,
+        intersection_grid,
+        intersection_flux_state,
+        cc_atmos_temp,
+        oc_surface_temp,
     )
 end
 

@@ -50,7 +50,8 @@ function Base.show(io::IO, ig::IntersectionGrid{FT}) where {FT}
 end
 
 """
-    extract_intersection_grid(boundary_space, grid_oc)
+    extract_intersection_grid(boundary_space, grid_oc;
+                              respect_immersed_mask = true)
 
 Build an `IntersectionGrid` directly from a ClimaCore boundary space and an
 Oceananigans grid by computing the CC-element × OC-cell intersection matrix
@@ -71,9 +72,14 @@ This is the correct constructor for CC ↔ OC regridding because:
   `PaddedTreeWrapper`, so the fold row is handled correctly without any
   caller-side bookkeeping.
 
-This constructor accepts the geometric grid either bare or wrapped in an
-`ImmersedBoundaryGrid` — the immersed mask is not consulted at this
-stage; intersection geometry is computed against the underlying grid.
+The intersection grid is constructed against the underlying geometric grid -
+the immersed boundary information is not used at this stage. Thus, the intersection
+grid needs information about the dry/wet condition of the cell to correctly
+compute ocean fluxes. Land fluxes are computed afterwards with the appropriate area-weighting.
+
+Set `respect_immersed_mask = false` to keep every polygon, including
+those that geometrically overlap immersed cells — useful for plotting
+the raw CC↔OC geometry without coupling semantics layered on top.
 
 # Arguments
 - `boundary_space::CC.Spaces.AbstractSpace`: ClimaCore cubed-sphere boundary space.
@@ -81,12 +87,20 @@ stage; intersection geometry is computed against the underlying grid.
   `OrthogonalSphericalShellGrid`, or any of these wrapped in an
   `ImmersedBoundaryGrid`).
 
+# Keyword arguments
+- `respect_immersed_mask::Bool`: drop polygons whose parent OC cell is
+  immersed. Defaults to `true`; no-op for non-`ImmersedBoundaryGrid`
+  inputs.
+
 # Returns
 - `IntersectionGrid` containing the CC-element × OC-cell sparse intersection.
 """
-function extract_intersection_grid(boundary_space, grid_oc)
+function extract_intersection_grid(
+    boundary_space,
+    grid_oc;
+    respect_immersed_mask::Bool = true,
+)
     boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
-    # `underlying_grid` peels an `ImmersedBoundaryGrid` if present.
     grid_oc_cpu = OC.on_architecture(OC.CPU(), underlying_grid(grid_oc))
 
     FT = CC.Spaces.undertype(boundary_space_cpu)
@@ -99,18 +113,45 @@ function extract_intersection_grid(boundary_space, grid_oc)
     intersections = CR.intersection_areas(manifold, CR.False(), dst_tree, src_tree)
 
     cc_indices, oc_indices, areas = SparseArrays.findnz(intersections)
-    cc_areas_vec = vec(sum(intersections, dims = 2))
-    oc_areas_vec = vec(sum(intersections, dims = 1))
 
+    # Optionally drop polygons whose parent OC cell is immersed (land /
+    # dry under the bathymetry mask). We honor the live model layout — a
+    # flat `(j - 1) * Nx + i` ordering matching `vec(OC.interior(...))`,
+    # which is also what CR uses as the column index of the FV cell.
+    if respect_immersed_mask && grid_oc isa OC.ImmersedBoundaryGrid
+        grid_with_mask_cpu = OC.on_architecture(OC.CPU(), grid_oc)
+        Nx_oc, Ny_oc, _ = size(grid_with_mask_cpu)
+        is_dry = Vector{Bool}(undef, Nx_oc * Ny_oc)
+        @inbounds for j in 1:Ny_oc, i in 1:Nx_oc
+            is_dry[(j - 1) * Nx_oc + i] =
+                OC.ImmersedBoundaries.immersed_cell(i, j, 1, grid_with_mask_cpu)
+        end
+        keep = .!is_dry[oc_indices]
+        cc_indices = cc_indices[keep]
+        oc_indices = oc_indices[keep]
+        areas = areas[keep]
+    end
+
+    # Recompute per-row / per-column totals from the (possibly filtered)
+    # entries so that `ig.cc_areas[i]` and `ig.oc_areas[j]` agree with
+    # the live `areas` vector. This keeps `scatter_to_cc!` / `scatter_to_oc!`
+    # area-conserving on the polygons we actually retain.
     n_cc, n_oc = size(intersections)
+    cc_areas_vec = zeros(FT, n_cc)
+    oc_areas_vec = zeros(FT, n_oc)
+    @inbounds for k in eachindex(areas)
+        cc_areas_vec[cc_indices[k]] += areas[k]
+        oc_areas_vec[oc_indices[k]] += areas[k]
+    end
+
     n_intersections = length(areas)
 
     return IntersectionGrid(
         cc_indices,
         oc_indices,
         FT.(areas),
-        FT.(cc_areas_vec),
-        FT.(oc_areas_vec),
+        cc_areas_vec,
+        oc_areas_vec,
         n_cc,
         n_oc,
         n_intersections,
@@ -118,13 +159,23 @@ function extract_intersection_grid(boundary_space, grid_oc)
 end
 
 """
-    extract_intersection_grid(boundary_space, grid_oc, ArrayType)
+    extract_intersection_grid(boundary_space, grid_oc, ArrayType;
+                              respect_immersed_mask = true)
 
 Build an `IntersectionGrid` (see the two-argument method) and convert its
 backing arrays to `ArrayType` (e.g. `CuArray` for GPU computation).
 """
-function extract_intersection_grid(boundary_space, grid_oc, ArrayType)
-    ig_cpu = extract_intersection_grid(boundary_space, grid_oc)
+function extract_intersection_grid(
+    boundary_space,
+    grid_oc,
+    ArrayType;
+    respect_immersed_mask::Bool = true,
+)
+    ig_cpu = extract_intersection_grid(
+        boundary_space,
+        grid_oc;
+        respect_immersed_mask,
+    )
 
     return IntersectionGrid(
         ArrayType(ig_cpu.cc_indices),

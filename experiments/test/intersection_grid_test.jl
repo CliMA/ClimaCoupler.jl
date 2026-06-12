@@ -87,7 +87,15 @@ arch = OC.CPU()
         @test length(ig.areas) == ig.n_intersections
         @test all(ig.areas .> 0)
         @test all(ig.cc_areas .> 0)
-        @test all(ig.oc_areas .> 0)
+        # CR's `PaddedTreeWrapper` (used by `TripolarGrid` under the
+        # `RightCenterFolded` topology) returns the folded half of the top
+        # row as zero-area "shadow" cells: their indices still exist in
+        # the flat `Nx*Ny` layout (because the live OC tracer arrays use
+        # that layout) but they contribute no intersection geometry. We
+        # require strict positivity on every other cell.
+        n_shadow = count(==(0), ig.oc_areas)
+        @test n_shadow == Nx ÷ 2  # 18 = top-row fold shadows
+        @test all(ig.oc_areas[ig.oc_areas .> 0] .> 0)
     end
 
     @testset "Gather/scatter conservation (OC direction)" begin
@@ -107,8 +115,13 @@ arch = OC.CPU()
         oc_result = zeros(FT, ig.n_oc)
         CMIPExt.scatter_to_oc!(oc_result, ig, intersection_values)
 
-        # Result should match original (within floating point precision)
-        @test maximum(abs.(oc_result .- oc_values)) < 1e-10
+        # Round-trip identity holds exactly on every OC cell that
+        # carries non-zero intersection area. Fold-shadow cells receive
+        # no intersection contribution by construction, so we mask them
+        # out here (they will read their live model value at runtime via
+        # `extract_oc_surface_state!`, not the scatter result).
+        live = ig.oc_areas .> 0
+        @test maximum(abs.(oc_result[live] .- oc_values[live])) < 1e-10
     end
 
     @testset "Gather/scatter with varying values (CC direction)" begin
@@ -235,12 +248,15 @@ arch = OC.CPU()
         )
         CMIPExt.aggregate_fluxes_to_oc!(oc_fluxes, flux_state, ig)
 
-        # With full-sphere tripolar coverage every underlying OC cell is
-        # tiled by at least one intersection polygon, so every OC cell
-        # must receive a strictly positive turbulent flux for this warm-
-        # ocean / cool-atmosphere setup.
-        @test all(oc_fluxes.F_sh .> 0)
-        @test all(oc_fluxes.F_lh .> 0)
+        # On a tripolar grid every *live* underlying OC cell (i.e. every
+        # cell with non-zero intersection area; fold-shadow cells on the
+        # folded top row are explicitly excluded) is tiled by at least
+        # one intersection polygon, so the warm-ocean / cool-atmosphere
+        # setup produces strictly positive turbulent fluxes everywhere
+        # the FV grid actually carries physics.
+        live = ig.oc_areas .> 0
+        @test all(oc_fluxes.F_sh[live] .> 0)
+        @test all(oc_fluxes.F_lh[live] .> 0)
     end
 
     @testset "Integration with construct_remapper" begin

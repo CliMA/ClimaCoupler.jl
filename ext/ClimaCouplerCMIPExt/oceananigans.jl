@@ -345,8 +345,10 @@ function construct_remapper(grid_oc, boundary_space)
 
     _alloc(n) = OC.on_architecture(arch, zeros(FT, n))
     n_cc = intersection_grid.n_cc
-    n_oc = intersection_grid.n_oc
     n_int = intersection_grid.n_intersections
+
+    Nx_oc, Ny_oc, _ = size(grid_oc)
+    n_oc_layout = Nx_oc * Ny_oc
 
     intersection_flux_state = IntersectionFluxState(
         _alloc(n_int), _alloc(n_int), _alloc(n_int), _alloc(n_int),
@@ -371,12 +373,11 @@ function construct_remapper(grid_oc, boundary_space)
     )
 
     # Per-OC-cell scratch for ocean surface state. `extract_oc_surface_state!`
-    # writes the four fields below from `OC.interior(sim.ocean.model.tracers.T)`.
     oc_surface_temp = (
-        T   = _alloc(n_oc),
-        z0m = _alloc(n_oc),
-        z0b = _alloc(n_oc),
-        h   = _alloc(n_oc),
+        T   = _alloc(n_oc_layout),
+        z0m = _alloc(n_oc_layout),
+        z0b = _alloc(n_oc_layout),
+        h   = _alloc(n_oc_layout),
     )
 
     # `TripolarGrid` covers the full sphere by construction, so no polar
@@ -547,6 +548,149 @@ end
 
 function Interfacer.update_field!(sim::OceananigansSimulation, ::Val{:area_fraction}, field)
     sim.area_fraction .= field
+    return nothing
+end
+
+"""
+    update_turbulent_fluxes_intersection_grid!(sim::OceananigansSimulation, csf,
+                                               surface_fluxes_params, thermo_params)
+
+
+Caution: Claude assisted refactor - not yet reviewed!!
+
+Opt-in counterpart to
+[`FluxCalculator.update_turbulent_fluxes!(::OceananigansSimulation, fields)`](@ref)
+that performs the full *intersection-grid* flux exchange end-to-end:
+
+1. `compute_intersection_grid_fluxes!` computes one SurfaceFluxes call per
+   CC↔OC intersection polygon, against per-CC-element atmosphere state
+   (taken from `csf`) and per-OC-cell surface state (taken from the live
+   ocean tracer fields). Dry polygons are already absent from
+   `sim.remapping.intersection_grid` because `construct_remapper` honors
+   the immersed mask via `extract_intersection_grid(...,
+   respect_immersed_mask = true)`.
+2. `scatter_to_oc!` area-averages the polygon fluxes back to the live
+   `(Nx, Ny)` OC layout. This is the *exact* area-weighted mean over
+   the polygon partition of each cell — it conserves
+   `Σ_poly flux × area` and is gradient-preserving at coastlines, in
+   contrast to the SE → FV principled regrid which blends across
+   element boundaries unconditionally.
+3. The OC-aggregated fluxes are then pushed into the ocean's surface
+   BCs exactly as the production path does, including:
+   * sea-ice-concentration weighting `(1 - α)`,
+   * extrinsic-vector rotation of `(F_τx, F_τy)` (in lon/lat / UV basis,
+     because `SurfaceFluxes` returns `ρτxz, ρτyz` in the same frame as
+     its input wind, and `csf.u_int / v_int` are stored in extrinsic
+     atmos basis) into the OC's intrinsic curvilinear basis via
+     `set_from_extrinsic_vector!`,
+   * unit-conversion divisions by `reference_density` and
+     `reference_density * heat_capacity`,
+   * salinity sign flip from upward evaporation to downward salinity
+     tendency.
+
+# Frame note
+
+Unlike the standard path, *no* `contravariant_to_cartesian!` step is
+required here. The standard path receives `F_turb_ρτxz / F_turb_ρτyz`
+from ClimaAtmos as *contravariant* components on the cubed sphere; the
+intersection-grid path consumes `csf.u_int / v_int` (which are already
+stored as `UVVector` lon/lat components on the boundary space) and
+passes them through `SurfaceFluxes`, so the polygon momentum fluxes
+come back in lon/lat too.
+
+# Vector-rotation caveat
+
+For non-`LatitudeLongitudeGrid` ocean grids (e.g. `TripolarGrid`),
+`set_from_extrinsic_vector!` handles the lon/lat → curvilinear-intrinsic
+rotation correctly on a per-cell basis. The intra-polygon variation of
+the rotation matrix is *not* applied — i.e. all polygons under OC cell
+`j` use cell `j`'s rotation. At realistic OC resolutions this is far
+below SF discretization noise, but if it ever became material the fix
+would be to rotate `(flux_τx, flux_τy)` from lon/lat → cell intrinsic
+inside `compute_surface_fluxes_on_intersection!` before aggregating.
+"""
+function update_turbulent_fluxes_intersection_grid!(
+    sim::OceananigansSimulation,
+    csf,
+    surface_fluxes_params,
+    thermo_params,
+)
+    # Step 1: compute per-polygon fluxes (writes into
+    # `sim.remapping.intersection_flux_state`).
+    compute_intersection_grid_fluxes!(sim, csf, surface_fluxes_params, thermo_params)
+
+    (; intersection_grid, intersection_flux_state) = sim.remapping
+    (; reference_density, heat_capacity) = sim.ocean_properties
+    grid = sim.ocean.model.grid
+    ice_concentration_field = sim.ice_concentration
+
+    Nx_oc, Ny_oc, _ = size(grid)
+    n_oc_layout = Nx_oc * Ny_oc
+    FT = eltype(intersection_flux_state.flux_sh)
+
+    # Step 2: aggregate polygon fluxes to the live `(Nx, Ny)` OC layout.
+    # `intersection_grid.oc_indices` ranges over `1:n_oc_layout` (we
+    # sized `oc_surface_temp` to `Nx*Ny` for exactly this reason — see
+    # `construct_remapper`).
+    F_sh_oc   = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
+    F_lh_oc   = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
+    F_τx_oc   = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
+    F_τy_oc   = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
+    F_evap_oc = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
+    scatter_to_oc!(F_sh_oc,   intersection_grid, intersection_flux_state.flux_sh)
+    scatter_to_oc!(F_lh_oc,   intersection_grid, intersection_flux_state.flux_lh)
+    scatter_to_oc!(F_τx_oc,   intersection_grid, intersection_flux_state.flux_τx)
+    scatter_to_oc!(F_τy_oc,   intersection_grid, intersection_flux_state.flux_τy)
+    scatter_to_oc!(F_evap_oc, intersection_grid, intersection_flux_state.flux_evap)
+
+    # Reshape to the 2D layout the OC surface fields expect.
+    F_sh_oc_2d   = reshape(F_sh_oc,   Nx_oc, Ny_oc)
+    F_lh_oc_2d   = reshape(F_lh_oc,   Nx_oc, Ny_oc)
+    F_τx_oc_2d   = reshape(F_τx_oc,   Nx_oc, Ny_oc)
+    F_τy_oc_2d   = reshape(F_τy_oc,   Nx_oc, Ny_oc)
+    F_evap_oc_2d = reshape(F_evap_oc, Nx_oc, Ny_oc)
+
+    ice_concentration = OC.interior(ice_concentration_field, :, :, 1)
+    one_minus_ice = 1.0 .- ice_concentration
+
+    # Step 3a: momentum BCs.
+    # Stage the lon/lat-frame, ice-weighted, density-normalized fluxes
+    # into the same scratch Center,Center fields the standard path uses,
+    # then rotate to OC intrinsic via `set_from_extrinsic_vector!`.
+    OC.interior(sim.remapping.scratch_field_oc1, :, :, 1) .=
+        F_τx_oc_2d .* one_minus_ice ./ reference_density
+    OC.interior(sim.remapping.scratch_field_oc2, :, :, 1) .=
+        F_τy_oc_2d .* one_minus_ice ./ reference_density
+    oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
+    oc_flux_v = surface_flux(sim.ocean.model.velocities.v)
+    set_from_extrinsic_vector!(
+        (; u = oc_flux_u, v = oc_flux_v),
+        grid,
+        sim.remapping.scratch_field_oc1,
+        sim.remapping.scratch_field_oc2,
+    )
+
+    # Step 3b: T surface BC from sensible + latent heat. Sign convention
+    # matches the standard path: SurfaceFluxes returns SH / LH positive
+    # upward and the ocean sees an upward heat loss as a *positive*
+    # temperature-tendency contribution. (Radiation and precipitation
+    # already filled `oc_flux_T` upstream via `update_sim!`; we add.)
+    oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
+    OC.interior(oc_flux_T, :, :, 1) .+=
+        one_minus_ice .* (F_lh_oc_2d .+ F_sh_oc_2d) ./
+        (reference_density * heat_capacity)
+
+    # Step 3c: salinity BC from moisture (evaporation).
+    # The OC convention is that moisture leaving the surface (positive
+    # `F_evap`) raises near-surface salinity, which appears as a
+    # *negative* salinity-flux contribution at the bottom of the surface
+    # tendency: `-S_sfc · (E / ρ₀)`.
+    moisture_fresh_water_flux = F_evap_oc_2d ./ reference_density
+    oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
+    surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
+    OC.interior(oc_flux_S, :, :, 1) .-=
+        one_minus_ice .* surface_salinity .* moisture_fresh_water_flux
+
     return nothing
 end
 

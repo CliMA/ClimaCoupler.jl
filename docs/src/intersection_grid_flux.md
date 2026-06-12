@@ -382,7 +382,7 @@ println("Reconstructed $(length(rings)) map-safe intersection polygons.")
 We can now overlay the intersection polygons (filled, colored by area) on a
 GeoMakie projection, with the parent CC elements drawn as black outlines so
 you can see how each cubed-sphere element is carved into pieces by the
-LatitudeLongitudeGrid:
+underlying `TripolarGrid`:
 
 ```@example intersection_flux
 # CC element outlines, processed the same way as the intersection polygons.
@@ -496,171 +496,6 @@ fig = plot_intersection_polygons(ocean_sim;
 )
 ```
 
-## Legacy: intersection polygons against a `LatitudeLongitudeGrid`
-
-The production CMIP path uses a `TripolarGrid` (above). Earlier versions of
-the coupler used a `LatitudeLongitudeGrid` instead because it aligns with
-the lon/lat graticule used by most plotting tools, but that grid has two
-well-known limitations:
-
-* It cannot extend over the poles without a coordinate singularity — the
-  legacy default truncated at `latitude = (-80°, 80°)`, leaving a polar
-  gap that the coupler papered over with a high-latitude polar mask
-  (`ocean_polar_mask`, since removed) that zeroed fluxes for `|lat| ≥ 78°`.
-* Cell areas shrunk rapidly toward the truncation limit, so high-latitude
-  cells became very small relative to their tropical neighbours.
-
-The **tripolar grid** (`OC.TripolarGrid`, the same one ClimaOcean uses for
-its global production runs) avoids both: it covers the full sphere, but
-moves the North Pole singularity into two displaced "north poles" placed
-over Greenland / Eurasia so every ocean cell has a finite area, and both
-singularities end up over land in the immersed-bathymetry mask. In return
-the cells are curvilinear in `(lon°, lat°)` space and the top row is
-folded onto itself — see the
-[ConservativeRegridding.jl Oceananigans extension](https://github.com/CliMA/ConservativeRegridding.jl/blob/main/ext/ConservativeRegriddingOceananigansExt.jl)
-for the dedicated fold-aware tree (`PaddedTreeWrapper`) that handles the
-fold row when computing intersections.
-
-We can build the CC ↔ Tripolar intersection grid directly with
-`ConservativeRegridding.Regridder` — this is what `CMIPExt.construct_remapper`
-does internally (it is grid-agnostic; the polar-mask construction that used
-to specialize the lat-long path has been removed). Calling the lower-level
-`CR.Regridder` here makes the tree-building step explicit so that the
-intersection polygons can be reconstructed for plotting:
-
-```@example intersection_flux
-import ConservativeRegridding as CR
-import SparseArrays
-
-# Small TripolarGrid with broadly the same resolution as the lat-lon grid
-# above.  RightCenterFolded is Oceananigans' default fold topology; CR's
-# Oceananigans extension dispatches to its fold-aware tree for it.
-tripolar_grid = OC.TripolarGrid(
-    arch;
-    size = (Nx, Ny, Nz),
-    southernmost_latitude = -80,
-    north_poles_latitude = 55,
-    first_pole_longitude = 70,
-    fold_topology = OC.RightCenterFolded,
-    z = (-100.0, 0.0),
-    halo = (4, 4, 4),
-)
-
-boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
-tripolar_cpu = OC.on_architecture(OC.CPU(), tripolar_grid)
-R_cc = CC.Spaces.topology(boundary_space_cpu).mesh.domain.radius
-manifold_tp = GO.Spherical(; radius = R_cc)
-
-regridder_tp = CR.Regridder(
-    manifold_tp,
-    boundary_space_cpu,
-    tripolar_cpu;
-    normalize = false,
-    threaded = false,
-)
-cc_indices_tp, oc_indices_tp, areas_tp =
-    SparseArrays.findnz(regridder_tp.intersections)
-
-println("CC ↔ TripolarGrid:")
-println("  Nx × Ny: $(Nx) × $(Ny)")
-println("  Intersection polygons: ", length(areas_tp))
-```
-
-Reconstruct each intersection polygon in `(lon°, lat°)` using exactly the
-same helpers we defined for the lat-lon case (`_polygon_lonlat_ring`,
-`_process_ring`), and stash the per-polygon area for colouring:
-
-```@example intersection_flux
-dst_tree_tp = CR.Trees.treeify(manifold_tp, boundary_space_cpu)
-src_tree_tp = CR.Trees.treeify(manifold_tp, tripolar_cpu)
-
-rings_tp = Vector{Vector{Tuple{Float64,Float64}}}()
-poly_areas_tp = Float64[]
-for k in eachindex(areas_tp)
-    cc_poly = CR.Trees.getcell(dst_tree_tp, cc_indices_tp[k])
-    oc_poly = CR.Trees.getcell(src_tree_tp, oc_indices_tp[k])
-    ipolys_raw = GO.intersection(
-        GO.ConvexConvexSutherlandHodgman(manifold_tp),
-        cc_poly, oc_poly;
-        target = GI.PolygonTrait(),
-    )
-    ipolys = ipolys_raw isa AbstractVector ? ipolys_raw : (ipolys_raw,)
-    for poly in ipolys
-        for branch in _process_ring(_polygon_lonlat_ring(poly))
-            length(branch) >= 3 || continue
-            push!(rings_tp, branch)
-            push!(poly_areas_tp, areas_tp[k])
-        end
-    end
-end
-println("Reconstructed $(length(rings_tp)) map-safe tripolar intersection polygons.")
-```
-
-Plot the result with the same `+proj=eqearth` projection and coastline
-backdrop used for the lat-lon plot, so the two figures are directly
-comparable:
-
-```@example intersection_flux
-fig_tp = Figure(size = (1300, 700))
-ax_tp = bare_geo_axis(fig_tp[1, 1];
-    title = "Intersection polygons — CC ↔ TripolarGrid " *
-            "(n = $(length(rings_tp)))",
-)
-GeoMakie.lines!(ax_tp, GeoMakie.coastlines();
-    color = :black, linewidth = 0.5,
-)
-pl_tp = poly!(ax_tp,
-    [Point2f.(r) for r in rings_tp];
-    color       = poly_areas_tp,
-    colormap    = :viridis,
-    strokewidth = 0.2,
-    strokecolor = (:black, 0.5),
-)
-# SE GLL sub-grid + element outlines, same recipe as the lat-long plot above.
-poly!(ax_tp,
-    [Point2f.(r) for r in se_node_rings];
-    color       = (:white, 0.0),
-    strokewidth = 0.25,
-    strokecolor = (:black, 0.35),
-)
-poly!(ax_tp,
-    [Point2f.(r) for r in cc_outline_rings];
-    color       = (:white, 0.0),
-    strokewidth = 0.8,
-    strokecolor = (:black, 0.8),
-)
-Colorbar(fig_tp[1, 2], pl_tp; label = "intersection area [m²]")
-fig_tp
-```
-
-A few features stand out compared with the lat-lon plot above:
-
-* **Polar coverage.**  The northern polar cap is now tiled by intersection
-  polygons all the way to the displaced poles, where the LatitudeLongitudeGrid
-  version was empty above 80° N.  These extra polygons sit inside the CC
-  elements that cap the cubed sphere at the poles, which lets the coupler
-  exchange fluxes with the ocean model over the whole Arctic instead of
-  cutting them off at ±80°.
-* **Curvilinear cells.**  In the Northern Hemisphere the tripolar cells
-  spiral around the two displaced poles, so a single CC element near the
-  fold contains intersection polygons of visibly different shapes — that
-  is the curvilinear OC mesh showing through.
-* **Conservation still holds.**  Each colored polygon is still one row of
-  the sparse intersection matrix and `areas_tp` is the spherical area of
-  that exact polygon, so the area-weighted gather / scatter operations
-  derived in the rest of this page apply unchanged to the tripolar grid.
-
-A self-contained version of this same plot — without any boilerplate to
-build the boundary space, OC grid, or regridder — is available in the
-standalone script:
-
-```julia
-include("experiments/test/plot_intersection_polygons.jl")
-fig_tp = plot_intersection_polygons_tripolar(
-    output_file = "intersection_polygons_tripolar.png",
-)
-```
-
 ## Continents on the Intersection Plot
 
 In a CMIP coupled simulation, the Oceananigans grid is an
@@ -674,8 +509,8 @@ or "dry", and immediately see where the ocean model is and isn't active.
 To make this self-contained inside the doc we rebuild the OC grid with
 [`ClimaOcean.regrid_bathymetry`](https://clima.github.io/ClimaOcean.jl/dev/) —
 the same call `OceananigansSimulation` uses internally to interpolate ETOPO
-onto its lat-lon grid — and then read the wet/dry status of each surface cell
-directly from the resulting `ImmersedBoundaryGrid`** via
+onto the `TripolarGrid` — and then read the wet/dry status of each surface
+cell directly from the resulting `ImmersedBoundaryGrid` via
 `Oceananigans.ImmersedBoundaries.immersed_cell`.
 
 ```@example intersection_flux
@@ -691,7 +526,19 @@ continent_grid = OC.ImmersedBoundaryGrid(
     active_cells_map = false,
 )
 continent_remapping = CMIPExt.construct_remapper(continent_grid, boundary_space)
-continent_ig = CMIPExt.extract_intersection_grid(boundary_space, continent_grid)
+
+# Build the IntersectionGrid with `respect_immersed_mask = false` so the
+# *raw* CC↔OC geometry is visible — including polygons that fall over
+# land cells. The visualization below colours each polygon by its parent
+# OC cell's wet/dry status, which would otherwise be filtered out.
+# For flux-exchange use (e.g. the `intersection_grid` baked into
+# `construct_remapper`'s return value), the default `respect_immersed_mask = true`
+# drops these dry-cell polygons so the OC sink only sees wet contributions.
+continent_ig = CMIPExt.extract_intersection_grid(
+    boundary_space,
+    continent_grid;
+    respect_immersed_mask = false,
+)
 
 # Per-OC-cell wet/dry status, read straight from the ocean model's grid.
 # `immersed_cell(i, j, k, grid)` returns `true` for cells the model skips.
@@ -802,12 +649,13 @@ A few things worth noting from this plot:
 
 * The continents are taken from the ETOPO2022 bathymetry that
   `ClimaOcean.regrid_bathymetry` interpolates onto the OC grid, then encoded
-  as the immersed boundary of an `ImmersedBoundaryGrid`.  Coastlines follow
-  the OC cell edges at the resolution of the underlying lat-lon grid — so at
+  as the immersed boundary of an `ImmersedBoundaryGrid`. Coastlines follow
+  the OC cell edges of the underlying `TripolarGrid` — so at
   `Nx × Ny = 90 × 45`, large continents like Eurasia and South America are
   well resolved while small islands and narrow channels are merged into the
-  surrounding land or ocean. Increasing `Nx`, `Ny` would give finer
-  coastlines.
+  surrounding land or ocean, and the displaced "north poles" sit inside the
+  Greenland / Eurasia landmasks where the immersed-cell test returns `true`.
+  Increasing `Nx`, `Ny` would give finer coastlines.
 * The wet/dry classification is read **straight from the ocean model's
   grid** via `OC.ImmersedBoundaries.immersed_cell(i, j, k, grid)`, so what
   you see is exactly the set of cells Oceananigans skips on each time step
@@ -822,166 +670,6 @@ A few things worth noting from this plot:
 * Land polygons have area in the IntersectionGrid but contribute zero ocean
   fluxes; in a real coupled run their contribution is replaced by the land
   model's surface flux through the area-weighted scatter step.
-
-## Continents on a Tripolar Ocean grid
-
-The same wet/dry colouring trick applies to a tripolar ocean grid.  The
-benefit here is **full polar coverage of the immersed boundary** — Greenland,
-the Canadian Arctic Archipelago, Svalbard, and the northern coasts of
-Eurasia and North America are all part of the OC landmask, where the
-lat-long version above truncates at ±80°.
-
-We wrap the same `tripolar_grid` defined in the
-[Intersection polygons against a Tripolar Ocean grid](#intersection-polygons-against-a-tripolar-ocean-grid)
-section with an `ImmersedBoundaryGrid` whose bathymetry comes from the
-identical [`ClimaOcean.regrid_bathymetry`](https://clima.github.io/ClimaOcean.jl/dev/)
-call that `OceananigansSimulation` runs internally — then read the wet/dry
-status of every surface cell via the same
-`OC.ImmersedBoundaries.immersed_cell` API as before:
-
-```@example intersection_flux
-tripolar_bottom = ClimaOcean.regrid_bathymetry(
-    tripolar_grid;
-    minimum_depth        = 30,
-    interpolation_passes = 5,
-    major_basins         = 1,
-)
-tripolar_continent_grid = OC.ImmersedBoundaryGrid(
-    tripolar_grid,
-    OC.GridFittedBottom(tripolar_bottom);
-    active_cells_map = false,
-)
-
-# Build the CC ↔ Tripolar regridder directly so that the intersection
-# polygons can be reconstructed for plotting. `CMIPExt.construct_remapper`
-# would build the same regridder internally — it is grid-agnostic and no
-# longer applies a polar-mask specialization for any OC grid type.
-tripolar_continent_cpu =
-    OC.on_architecture(OC.CPU(), tripolar_continent_grid.underlying_grid)
-regridder_tp_cont = CR.Regridder(
-    manifold_tp,
-    boundary_space_cpu,
-    tripolar_continent_cpu;
-    normalize = false,
-    threaded = false,
-)
-cc_indices_tp_cont, oc_indices_tp_cont, areas_tp_cont =
-    SparseArrays.findnz(regridder_tp_cont.intersections)
-
-# Reuse `ocean_grid_dry_mask` from the lat-long continents section above:
-# it indexes wet/dry via the same column-major `(j-1)*Nx + i` ordering that
-# CR uses for OC cells, which is consistent for both LL and tripolar grids.
-is_oc_cell_dry_tp = ocean_grid_dry_mask(tripolar_continent_grid, Nx, Ny)
-n_land_tp  = count(is_oc_cell_dry_tp)
-n_ocean_tp = Nx * Ny - n_land_tp
-println("Tripolar OC grid: $n_ocean_tp wet cells, $n_land_tp dry (land) cells.")
-```
-
-Reconstruct each intersection polygon and tag its parent OC cell as wet or
-dry, exactly like the lat-long version:
-
-```@example intersection_flux
-src_tree_tp_cont = CR.Trees.treeify(manifold_tp, tripolar_continent_cpu)
-
-land_rings_tp  = Vector{Vector{Tuple{Float64,Float64}}}()
-ocean_rings_tp = Vector{Vector{Tuple{Float64,Float64}}}()
-ocean_areas_tp = Float64[]
-for k in eachindex(areas_tp_cont)
-    cc_idx = cc_indices_tp_cont[k]
-    oc_idx = oc_indices_tp_cont[k]
-    cc_poly = CR.Trees.getcell(dst_tree_tp, cc_idx)
-    oc_poly = CR.Trees.getcell(src_tree_tp_cont, oc_idx)
-    ipolys_raw = GO.intersection(
-        GO.ConvexConvexSutherlandHodgman(manifold_tp),
-        cc_poly, oc_poly;
-        target = GI.PolygonTrait(),
-    )
-    ipolys = ipolys_raw isa AbstractVector ? ipolys_raw : (ipolys_raw,)
-    for poly in ipolys
-        for branch in _process_ring(_polygon_lonlat_ring(poly))
-            length(branch) >= 3 || continue
-            if is_oc_cell_dry_tp[oc_idx]
-                push!(land_rings_tp, branch)
-            else
-                push!(ocean_rings_tp, branch)
-                push!(ocean_areas_tp, areas_tp_cont[k])
-            end
-        end
-    end
-end
-println("Tripolar intersection polygons: $(length(ocean_rings_tp)) over ocean, ",
-        "$(length(land_rings_tp)) over land (no ocean computation).")
-```
-
-Same colour scheme as the lat-long version — land in tan, ocean coloured
-by intersection area, plus the CC element outlines on top so coastal
-cubed-sphere elements are easy to spot:
-
-```@example intersection_flux
-fig_land_tp = Figure(size = (1300, 700))
-ax_land_tp = bare_geo_axis(fig_land_tp[1, 1];
-    title = "Tripolar intersection polygons over ImmersedBoundaryGrid: " *
-            "$(length(ocean_rings_tp)) ocean, $(length(land_rings_tp)) land",
-)
-# Land first, so ocean polygons stroke over the boundary.
-poly!(ax_land_tp,
-    [Point2f.(r) for r in land_rings_tp];
-    color       = (:tan, 0.85),
-    strokewidth = 0.15,
-    strokecolor = (:saddlebrown, 0.6),
-    label       = "land (no ocean equations solved)",
-)
-pl_ocean_tp = poly!(ax_land_tp,
-    [Point2f.(r) for r in ocean_rings_tp];
-    color       = ocean_areas_tp,
-    colormap    = :deep,
-    strokewidth = 0.15,
-    strokecolor = (:black, 0.4),
-    label       = "ocean polygon (area-coloured)",
-)
-GeoMakie.lines!(ax_land_tp, GeoMakie.coastlines();
-    color = (:black, 0.45), linewidth = 0.5,
-)
-# SE GLL sub-grid + element outlines, matching the figures above.
-poly!(ax_land_tp,
-    [Point2f.(r) for r in se_node_rings];
-    color       = (:white, 0.0),
-    strokewidth = 0.25,
-    strokecolor = (:black, 0.35),
-)
-poly!(ax_land_tp,
-    [Point2f.(r) for r in cc_outline_rings];
-    color       = (:white, 0.0),
-    strokewidth = 0.8,
-    strokecolor = (:black, 0.7),
-)
-Colorbar(fig_land_tp[1, 2], pl_ocean_tp; label = "ocean intersection area [m²]")
-fig_land_tp
-```
-
-A few observations specific to the tripolar version:
-
-* **Arctic continents now appear.**  In the lat-long version the
-  `(- 80°, 80°)` latitude clamp excised the Arctic and the highest-
-  latitude parts of the Antarctic continent; in the tripolar plot
-  Greenland, the Canadian Arctic Archipelago, Svalbard, the northern
-  coasts of Russia and Alaska, and the high-latitude Antarctic margin
-  are all part of the land mask.
-* **Curvilinear coastlines near the fold.**  Around the two displaced
-  poles (over Greenland and Eurasia), the OC cells are no longer aligned
-  with `(lon°, lat°)`, so the polygon edges separating land from ocean
-  follow the curvilinear OC mesh rather than the graticule.  This is
-  exactly the behaviour you want when coupling: the *coastline geometry*
-  that the ocean model actually sees gets reflected into the
-  intersection-grid flux exchange, not an artefact of the plotting
-  projection.
-* **Conservation is unchanged.**  Each colored polygon is still one row
-  of the sparse intersection matrix and `ocean_areas_tp` is the spherical
-  area of that exact polygon.  The area-weighted scatter step that
-  routes land contributions to the land model and ocean contributions to
-  the ocean model (see
-  [Step 3: Scatter Fluxes Back to Component Grids](#step-3-scatter-fluxes-back-to-component-grids)
-  below) applies verbatim to this tripolar landmask too.
 
 ## The Flux Computation Flow
 

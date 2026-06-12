@@ -374,8 +374,6 @@ and ClimaSeaIce represents moisture moving from atmosphere to ocean as a positiv
 so a sign change is needed when we convert from moisture to salinity flux.
 """
 function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fields)
-    # Only LatitudeLongitudeGrid are supported because otherwise we have to rotate the vectors
-
     (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
     grid = sim.ice.model.grid
     ice_concentration = sim.ice.model.ice_concentration

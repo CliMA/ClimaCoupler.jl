@@ -3,7 +3,7 @@
 #
 # This test verifies the intersection-grid flux exchange mechanism for better
 # coastline representation when coupling atmosphere (ClimaCore cubed-sphere)
-# with ocean/sea-ice (Oceananigans LatitudeLongitudeGrid).
+# with ocean/sea-ice (Oceananigans `TripolarGrid`).
 #
 # Tests include:
 # 1. IntersectionGrid extraction from CR.Regridder
@@ -48,13 +48,22 @@ arch = OC.CPU()
         context,
     )
 
-    # Create Oceananigans grid
-    Nx, Ny, Nz = 36, 16, 1
-    underlying_grid = OC.LatitudeLongitudeGrid(
+    # Create Oceananigans grid — small `TripolarGrid` that matches the
+    # production ocean's fold topology and full-sphere coverage. The two
+    # displaced north poles sit at `north_poles_latitude = 55°N` (over
+    # Greenland / Eurasia in the production run); the southern boundary is
+    # a regular latitude circle at `southernmost_latitude = -80°`. The
+    # immersed boundary is a flat -100 m bottom so every surface cell is
+    # wet — the geometric tests below therefore see the full underlying
+    # tripolar mesh, not a land mask.
+    Nx, Ny, Nz = 36, 18, 1
+    underlying_grid = OC.TripolarGrid(
         arch;
         size = (Nx, Ny, Nz),
-        longitude = (-180, 180),
-        latitude = (-80, 80),
+        southernmost_latitude = -80,
+        north_poles_latitude = 55,
+        first_pole_longitude = 70,
+        fold_topology = OC.RightCenterFolded,
         z = (-100.0, 0.0),
         halo = (4, 4, 4),
     )
@@ -71,7 +80,7 @@ arch = OC.CPU()
         ig = remapping.intersection_grid
         @test ig isa CMIPExt.IntersectionGrid
         @test ig.n_cc == 96  # 4^2 * 6 elements for h_elem=4 cubed sphere
-        @test ig.n_oc == Nx * Ny  # 36 * 16 = 576 OC cells
+        @test ig.n_oc == Nx * Ny  # 36 * 18 = 648 tripolar OC cells
         @test ig.n_intersections > 0
         @test length(ig.cc_indices) == ig.n_intersections
         @test length(ig.oc_indices) == ig.n_intersections
@@ -121,32 +130,19 @@ arch = OC.CPU()
         cc_result = zeros(FT, ig.n_cc)
         CMIPExt.scatter_to_cc!(cc_result, ig, intersection_values)
 
-        # Note: CC elements that only partially overlap the OC grid will have
-        # smoothing. This is expected behavior - area-weighted averaging over
-        # partial overlaps doesn't reconstruct the original value exactly.
-        # 
-        # For CC elements fully within the OC coverage band, the round-trip
-        # should be exact. Elements at the edge (|lat| > ~60°) will show
-        # smoothing effects since they only partially overlap the OC grid.
-        #
-        # We test that:
-        # 1. Elements with intersections have non-zero results
-        # 2. The area-weighted integral is preserved (tested separately)
-        has_intersection = zeros(Bool, ig.n_cc)
-        for k in 1:ig.n_intersections
-            has_intersection[ig.cc_indices[k]] = true
-        end
+        # With a `TripolarGrid` covering the full sphere, every CC cubed-
+        # sphere element is fully tiled by intersection polygons — there
+        # are no "partially covered" elements as there would be with a
+        # `LatitudeLongitudeGrid` truncated at |lat| = 80°. So every CC
+        # element must end up with a non-zero result, and the round trip
+        # is the area-weighted mean over its own intersection polygons.
+        @test all(cc_result .> 0)
 
-        n_with_intersection = sum(has_intersection)
-        @test n_with_intersection > 0
-
-        for i in 1:ig.n_cc
-            if has_intersection[i]
-                @test cc_result[i] > 0  # Non-zero result
-            else
-                @test cc_result[i] == 0  # No coverage → zero
-            end
-        end
+        # Each result must lie in `[min(cc_values), max(cc_values)]` because
+        # `scatter_to_cc!` is a convex combination (area-weighted mean) of
+        # the gathered values, which themselves were a permutation of
+        # `cc_values`.
+        @test all(minimum(cc_values) .<= cc_result .<= maximum(cc_values))
     end
 
     @testset "Flux calculation on intersection grid" begin
@@ -222,20 +218,12 @@ arch = OC.CPU()
         )
         CMIPExt.aggregate_fluxes_to_cc!(cc_fluxes, flux_state, ig)
 
-        # CC elements with intersection should have non-zero fluxes
-        has_intersection = zeros(Bool, ig.n_cc)
-        for k in 1:ig.n_intersections
-            has_intersection[ig.cc_indices[k]] = true
-        end
-
-        for i in 1:ig.n_cc
-            if has_intersection[i]
-                @test cc_fluxes.F_sh[i] > 0
-                @test cc_fluxes.F_lh[i] > 0
-            else
-                @test cc_fluxes.F_sh[i] == 0
-            end
-        end
+        # With a `TripolarGrid` every CC element is tiled by intersection
+        # polygons, so the warm-ocean / cool-atmosphere setup produces
+        # strictly positive sensible and latent heat fluxes on every CC
+        # element.
+        @test all(cc_fluxes.F_sh .> 0)
+        @test all(cc_fluxes.F_lh .> 0)
 
         # Test aggregation to OC grid
         oc_fluxes = (
@@ -247,10 +235,12 @@ arch = OC.CPU()
         )
         CMIPExt.aggregate_fluxes_to_oc!(oc_fluxes, flux_state, ig)
 
-        # All OC cells should have fluxes (assuming full coverage)
-        # Note: Some cells may have zero if they don't overlap with any CC element
-        @test any(oc_fluxes.F_sh .> 0)
-        @test any(oc_fluxes.F_lh .> 0)
+        # With full-sphere tripolar coverage every underlying OC cell is
+        # tiled by at least one intersection polygon, so every OC cell
+        # must receive a strictly positive turbulent flux for this warm-
+        # ocean / cool-atmosphere setup.
+        @test all(oc_fluxes.F_sh .> 0)
+        @test all(oc_fluxes.F_lh .> 0)
     end
 
     @testset "Integration with construct_remapper" begin
@@ -286,36 +276,25 @@ arch = OC.CPU()
         # all OC cells are fully within the CC grid coverage)
         @test abs(total_intersection - total_oc) / abs(total_intersection) < 1e-10
 
-        # CC direction: scatter_to_cc! normalizes by total CC element area,
-        # not intersection area. This is correct for intensive quantities -
-        # if a CC element only partially overlaps the OC grid, its mean flux
-        # will be proportional to the overlap fraction.
+        # CC direction: `scatter_to_cc!` normalizes by the total CC element
+        # area. With a `TripolarGrid` the OC mesh fully tiles every CC
+        # element, so `cc_intersection_area[i] == ig.cc_areas[i]` for all
+        # `i` and the area-weighted mean of a uniform field reproduces the
+        # uniform value exactly. (For a lat-long grid truncated at ±80° we
+        # would instead have `cc_result[i] = uniform_value * intersection_area[i] / cc_areas[i]`
+        # in the polar band — that branch is no longer needed.)
         cc_result = zeros(FT, ig.n_cc)
         CMIPExt.scatter_to_cc!(cc_result, ig, intersection_values)
 
-        # Compute overlap fractions
         cc_intersection_area = zeros(FT, ig.n_cc)
         for k in 1:ig.n_intersections
             cc_intersection_area[ig.cc_indices[k]] += ig.areas[k]
         end
+        @test maximum(abs.(cc_intersection_area .- ig.cc_areas) ./ ig.cc_areas) < 1e-10
+        @test maximum(abs.(cc_result .- uniform_value)) < 1e-10
 
-        # For CC elements, the result should be:
-        #   cc_result[i] = uniform_value * (intersection_area[i] / cc_area[i])
-        # because scatter_to_cc! normalizes by cc_area
-        for i in 1:ig.n_cc
-            if cc_intersection_area[i] > 0
-                expected = uniform_value * cc_intersection_area[i] / ig.cc_areas[i]
-                @test abs(cc_result[i] - expected) < 1e-10
-            else
-                @test cc_result[i] == 0
-            end
-        end
-
-        # The total flux using cc_result and cc_areas should equal total_intersection
-        # because: sum(cc_result[i] * cc_areas[i]) 
-        #        = sum(uniform_value * intersection_area[i])
-        #        = uniform_value * sum(intersection_area[i])
-        #        = total_intersection
+        # The total flux on the CC grid must equal the total on the
+        # intersection grid: `sum(cc_result * cc_areas) = uniform_value * 4πR²`.
         total_cc = sum(cc_result .* ig.cc_areas)
         @test abs(total_intersection - total_cc) / abs(total_intersection) < 1e-10
     end

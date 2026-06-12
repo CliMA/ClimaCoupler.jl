@@ -1,12 +1,19 @@
 """
     IntersectionGrid
 
-Data structure representing the intersection grid between a ClimaCore cubed-sphere
-spectral element mesh and an Oceananigans LatitudeLongitudeGrid. The intersection
-grid consists of all polygons formed by the overlap of CC elements and OC cells.
+Data structure representing the intersection grid between a ClimaCore
+cubed-sphere spectral element mesh and an Oceananigans grid (typically the
+production `TripolarGrid` wrapped in an `ImmersedBoundaryGrid`, but any OC
+grid supported by ConservativeRegridding.jl works — including the legacy
+`LatitudeLongitudeGrid` setup). The intersection grid consists of all
+polygons formed by the overlap of CC elements and OC cells.
 
-This enables flux calculations directly on the intersection polygons for better
-coastline representation, rather than computing fluxes on one grid and remapping.
+With a `TripolarGrid` covering the full sphere the intersection polygons
+tile the entire CC topology, so no polar mask or polar truncation band is
+needed; the polar-flux workaround used by the legacy lat-long setup has
+been removed. This enables flux calculations directly on the intersection
+polygons for better coastline representation, rather than computing fluxes
+on one grid and remapping.
 
 # Fields
 - `cc_indices`: CC element index for each intersection polygon

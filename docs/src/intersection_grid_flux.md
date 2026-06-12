@@ -1,8 +1,25 @@
 # Intersection Grid Flux Exchange
 
 This page demonstrates how flux exchange works on the intersection grid between
-the ClimaCore cubed-sphere (CC) atmosphere grid and the Oceananigans
-LatitudeLongitudeGrid (OC) ocean/sea-ice grid.
+the ClimaCore cubed-sphere (CC) atmosphere grid and the Oceananigans ocean /
+sea-ice grid. The production CMIP path uses Oceananigans' `TripolarGrid`
+wrapped in an `ImmersedBoundaryGrid`; that is the configuration this page
+takes as the canonical example. The `LatitudeLongitudeGrid` is retained as a
+secondary example near the end because it is convenient for plotting against
+the lon/lat graticule, but it requires an artificial polar truncation that
+the tripolar grid eliminates.
+
+## Why a tripolar OC grid removes the polar mask
+
+The `TripolarGrid` removes the need for masking high-latitudes in the ocean model:
+
+* It covers the full sphere by displacing the two northern-hemisphere
+  coordinate singularities into two displaced "north poles" placed over
+  Greenland and Eurasia, where the bathymetry mask of the wrapping
+  `ImmersedBoundaryGrid` marks them as land (dry, immersed cells).
+* Every ocean cell — including those directly adjacent to a displaced pole
+  — has a finite, well-defined area, so there is no degenerate band to
+  exclude.
 
 ## Motivation: Why Intersection-Grid Fluxes?
 
@@ -46,13 +63,20 @@ boundary_space = CC.CommonSpaces.CubedSphereSpace(
     context,
 )
 
-# Create Oceananigans lat-lon grid (ocean grid)
+# Create Oceananigans tripolar ocean grid (production OC grid).
+# The two displaced "north poles" are placed over Greenland and Eurasia
+# (`north_poles_latitude = 55°N`, `first_pole_longitude = 70°E`); the
+# southern boundary is a regular latitude circle at -80°. The wrapping
+# `ImmersedBoundaryGrid` (with a flat -50 m bottom here, for testing)
+# carries the immersed bathymetry mask in production.
 Nx, Ny, Nz = 90, 45, 1
-underlying_grid = OC.LatitudeLongitudeGrid(
+underlying_grid = OC.TripolarGrid(
     arch;
     size = (Nx, Ny, Nz),
-    longitude = (-180, 180),
-    latitude = (-80, 80),
+    southernmost_latitude = -80,
+    north_poles_latitude = 55,
+    first_pole_longitude = 70,
+    fold_topology = OC.RightCenterFolded,
     z = (-100.0, 0.0),
     halo = (4, 4, 4),
 )
@@ -442,32 +466,37 @@ fig = plot_intersection_polygons(ocean_sim;
 )
 ```
 
-## Intersection polygons against a Tripolar Ocean grid
+## Legacy: intersection polygons against a `LatitudeLongitudeGrid`
 
-The lat-lon ocean grid above is convenient because it aligns with the
-graticule used by most plotting tools, but it has two well-known
-limitations:
+The production CMIP path uses a `TripolarGrid` (above). Earlier versions of
+the coupler used a `LatitudeLongitudeGrid` instead because it aligns with
+the lon/lat graticule used by most plotting tools, but that grid has two
+well-known limitations:
 
 * It cannot extend over the poles without a coordinate singularity — the
-  CMIP default truncates at `latitude = (-80°, 80°)`, leaving a polar gap
-  that the coupler papers over with a high-latitude polar mask.
-* Cell areas shrink rapidly toward the truncation limit, so high-latitude
-  cells become very small relative to their tropical neighbours.
+  legacy default truncated at `latitude = (-80°, 80°)`, leaving a polar
+  gap that the coupler papered over with a high-latitude polar mask
+  (`ocean_polar_mask`, since removed) that zeroed fluxes for `|lat| ≥ 78°`.
+* Cell areas shrunk rapidly toward the truncation limit, so high-latitude
+  cells became very small relative to their tropical neighbours.
 
 The **tripolar grid** (`OC.TripolarGrid`, the same one ClimaOcean uses for
 its global production runs) avoids both: it covers the full sphere, but
 moves the North Pole singularity into two displaced "north poles" placed
-over Greenland / Eurasia so every ocean cell has a finite area.  In return
+over Greenland / Eurasia so every ocean cell has a finite area, and both
+singularities end up over land in the immersed-bathymetry mask. In return
 the cells are curvilinear in `(lon°, lat°)` space and the top row is
 folded onto itself — see the
 [ConservativeRegridding.jl Oceananigans extension](https://github.com/CliMA/ConservativeRegridding.jl/blob/main/ext/ConservativeRegriddingOceananigansExt.jl)
 for the dedicated fold-aware tree (`PaddedTreeWrapper`) that handles the
 fold row when computing intersections.
 
-We build the CC ↔ Tripolar intersection grid directly with
-`ConservativeRegridding.Regridder` (the `construct_remapper` helper in
-`ClimaCouplerCMIPExt` is, for now, specialized for `LatitudeLongitudeGrid`
-via its polar-mask construction, so we sidestep it here):
+We can build the CC ↔ Tripolar intersection grid directly with
+`ConservativeRegridding.Regridder` — this is what `CMIPExt.construct_remapper`
+does internally (it is grid-agnostic; the polar-mask construction that used
+to specialize the lat-long path has been removed). Calling the lower-level
+`CR.Regridder` here makes the tree-building step explicit so that the
+intersection polygons can be reconstructed for plotting:
 
 ```@example intersection_flux
 import ConservativeRegridding as CR
@@ -793,9 +822,10 @@ tripolar_continent_grid = OC.ImmersedBoundaryGrid(
     active_cells_map = false,
 )
 
-# Build the CC ↔ Tripolar regridder directly (same reason as in the previous
-# tripolar section: `CMIPExt.construct_remapper` currently assumes a
-# `LatitudeLongitudeGrid` for its polar-mask construction).
+# Build the CC ↔ Tripolar regridder directly so that the intersection
+# polygons can be reconstructed for plotting. `CMIPExt.construct_remapper`
+# would build the same regridder internally — it is grid-agnostic and no
+# longer applies a polar-mask specialization for any OC grid type.
 tripolar_continent_cpu =
     OC.on_architecture(OC.CPU(), tripolar_continent_grid.underlying_grid)
 regridder_tp_cont = CR.Regridder(

@@ -221,10 +221,12 @@ end
     underlying_grid(grid)
 
 Strip an `ImmersedBoundaryGrid` wrapper if present; `ConservativeRegridding`
-operates on the underlying lat/lon (or tripolar / orthogonal-shell) grid and
-is unaware of the immersed mask. Raw grids pass through unchanged so that
-`construct_remapper` is callable for any grid type accepted by the
-`Interfacer.remap` method dispatch in `climaocean_helpers.jl`.
+operates on the underlying geometric grid (typically `TripolarGrid`, but
+`LatitudeLongitudeGrid` and `OrthogonalSphericalShellGrid` are also
+supported) and is unaware of the immersed mask. Raw grids pass through
+unchanged so that `construct_remapper` is callable for any grid type
+accepted by the `Interfacer.remap` method dispatch in
+`climaocean_helpers.jl`.
 """
 underlying_grid(grid::OC.ImmersedBoundaryGrid) = grid.underlying_grid
 underlying_grid(grid) = grid
@@ -311,39 +313,13 @@ function construct_remapper(grid_oc, boundary_space)
 end
 
 """
-    ocean_polar_mask(grid; location)
-
-Build the ocean polar mask once at setup.
-Currently we define ocean between 80°S to 80°N with 2 degree overlap in the coupler mask.
-Returns a 2D mask (1.0 where |lat| < 78°, 0.0 elsewhere). This mask is on the ocean grid
-(unlike the polar mask which is defined on the boundary_space)
-"""
-function ocean_polar_mask(grid; location = (OC.Center(), OC.Center(), OC.Center()))
-    polar_flux_lat_deg = 78.0  # zero fluxes where |lat| ≥ this (same band as polar_mask for atmosphere)
-
-    # latitude nodes: a StepRangeLen of size grid.Ny *in degrees*
-    φ = OC.φnodes(grid, location[1], location[2], location[3])
-
-    # compute mask (1.0 where |lat| < 78°, 0.0 elsewhere)
-    mask = ifelse.(abs.(φ) .< polar_flux_lat_deg, 1.0, 0.0)  # Vector of size grid.Ny
-    mask = reshape(mask, 1, :)  # make mask a row vector (1 × grid.Ny)
-    mask = repeat(mask, grid.Nx, 1)  # repeat across longitude to get a grid.Nx × grid.Ny Matrix
-
-    # move to architecture
-    arch = OC.Architectures.architecture(grid)
-    return OC.Architectures.on_architecture(arch, mask)
-end
-
-"""
     FieldExchanger.resolve_area_fractions!(ocean_sim, ice_sim, land_fraction)
 
 Sync the ice concentration field on the ocean simulation with the ice
 simulation's concentration so that it can be used for weighting flux updates.
 
-With a `TripolarGrid` covering the full sphere there is no polar band to
-exclude from physical contribution; previously this routine forced land
-fraction to 1 (and ice / ocean fractions to 0) for `|lat| ≥ 78°` on a
-`LatitudeLongitudeGrid`, which is no longer needed.
+The production ocean is a `TripolarGrid` wrapped in an
+`ImmersedBoundaryGrid`, so it covers the full sphere with no polar gap.
 """
 function FieldExchanger.resolve_area_fractions!(
     ocean_sim::OceananigansSimulation,

@@ -75,3 +75,6 @@ value = 1800
 
 [cloud_liquid_water_specific_humidity_autoconversion_threshold]
 value = 0
+
+[alpha_rayleigh_sgs_tracer]
+value = 0.001

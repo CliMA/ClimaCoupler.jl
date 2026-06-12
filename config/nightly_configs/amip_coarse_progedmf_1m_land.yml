@@ -20,7 +20,7 @@ land_fraction_source: "era5"
 start_date: "20100924"
 t_end: "39days"
 snow_autoconversion: NoSupersaturation
-cloud_ice_melt: ~
+# cloud_ice_melt: ~
 # sgs_distribution: "lognormal"
 
 extra_atmos_diagnostics:

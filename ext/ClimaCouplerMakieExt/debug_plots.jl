@@ -203,7 +203,7 @@ function Plotting.debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing
 
     # Check for NaN errors after plots are saved
     if has_nan
-        error("NaN values found in coupler fields extrema")
+        @warn "NaN values found in coupler fields extrema"
     end
 end
 

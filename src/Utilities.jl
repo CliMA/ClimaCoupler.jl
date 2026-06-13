@@ -355,11 +355,15 @@ end
     init_dss_buffer(field::CC.Fields.Field)
     init_dss_buffer(field_object::Union{CC.Fields.FieldVector, NamedTuple})
 
-Initialize a DSS buffer for the given Field or FieldVector object.
-If the object is defined on a `PointSpace`, return `nothing`.
+Initialize a DSS buffer for the given Field or FieldVector object. DSS only
+applies to spectral-element (horizontal) spaces. If the object is defined on a
+space with no horizontal spectral-element direction (a `PointSpace` or a column
+`FiniteDifferenceSpace`), return `nothing`.
 """
 function init_dss_buffer(field::CC.Fields.Field)
-    if axes(field) isa CC.Spaces.PointSpace
+    space = axes(field)
+    if space isa CC.Spaces.PointSpace ||
+       space isa CC.Spaces.AbstractFiniteDifferenceSpace
         return nothing
     else
         return CC.Spaces.create_dss_buffer(field)

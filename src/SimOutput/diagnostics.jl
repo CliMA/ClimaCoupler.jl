@@ -1,5 +1,5 @@
 import ClimaDiagnostics as CD
-import ClimaCoupler: Interfacer
+import ClimaCoupler: Interfacer, Utilities
 import Dates
 
 export diagnostics_setup, get_reduction
@@ -86,7 +86,9 @@ function diagnostics_setup(
 
     # Create output writer (shared across all diagnostics since they all live on the boundary space)
     boundary_space = axes(fields.F_lh)
-    netcdf_writer = CD.Writers.NetCDFWriter(boundary_space, output_dir; start_date)
+    global_attribs = Utilities.diagnostics_global_attribs(start_date)
+    netcdf_writer =
+        CD.Writers.NetCDFWriter(boundary_space, output_dir; start_date, global_attribs)
 
     #### Turbulent energy fluxes diagnostic
 

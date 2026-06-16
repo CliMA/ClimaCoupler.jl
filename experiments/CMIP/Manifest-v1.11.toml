@@ -2,7 +2,7 @@
 
 julia_version = "1.11.9"
 manifest_format = "2.0"
-project_hash = "f1771a37cd25646dec7e23aff4788569a1be9217"
+project_hash = "24839e845a7b00449697486501e563b63755b356"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -544,6 +544,7 @@ deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTime
 git-tree-sha1 = "bfe34185ff07893e2b10c4fdf253b4ee90519d7b"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
 version = "1.9.0"
+weakdeps = ["Adapt", "CairoMakie", "ClimaAnalysis", "DataFrames", "DelimitedFiles", "Downloads", "Flux", "GeoMakie", "InteractiveUtils", "JLD2", "Printf", "Statistics"]
 
     [deps.ClimaLand.extensions]
     ConstrainedNeuralModelExt = ["Adapt", "Flux", "JLD2", "InteractiveUtils"]
@@ -551,34 +552,11 @@ version = "1.9.0"
     LandSimulationVisualizationExt = ["CairoMakie", "ClimaAnalysis", "GeoMakie", "Printf", "Statistics"]
     SNOTELScraperExt = ["DataFrames", "Downloads", "Statistics"]
 
-    [deps.ClimaLand.weakdeps]
-    Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-    CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
-    ClimaAnalysis = "29b5916a-a76c-4e73-9657-3c8fd22e65e6"
-    DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-    DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
-    Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
-    Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
-    GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
-    InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
-    JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
-    Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
-    Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
-
 [[deps.ClimaOcean]]
-deps = ["Adapt", "CFTime", "CUDA", "ClimaSeaIce", "CopernicusClimateDataStore", "CubicSplines", "DataDeps", "Dates", "DocStringExtensions", "Downloads", "Glob", "ImageMorphology", "JLD2", "KernelAbstractions", "MPI", "MeshArrays", "NCDatasets", "Oceananigans", "OffsetArrays", "PrecompileTools", "Printf", "Scratch", "SeawaterPolynomials", "StaticArrays", "Statistics", "Thermodynamics", "ZipFile"]
-git-tree-sha1 = "6196f08be0d172985b52ccab8e41a10d2ca6a197"
+deps = ["AbstractFFTs", "Adapt", "CUDA", "Dates", "DocStringExtensions", "Downloads", "FFTW", "Glob", "JLD2", "KernelAbstractions", "LinearAlgebra", "MPI", "NCDatasets", "NumericalEarth", "Oceananigans", "PrecompileTools", "Printf", "Reexport", "SeawaterPolynomials", "StaticArrays", "Statistics", "WorldOceanAtlasTools"]
+git-tree-sha1 = "72ccdd2194715c8bc571d28bea43de5ab83af4e5"
 uuid = "0376089a-ecfe-4b0e-a64f-9c555d74d754"
-version = "0.9.7"
-
-    [deps.ClimaOcean.extensions]
-    ClimaOceanCopernicusClimateDataStoreExt = "CopernicusClimateDataStore"
-    ClimaOceanCopernicusMarineExt = "CopernicusMarine"
-
-    [deps.ClimaOcean.weakdeps]
-    CopernicusMarine = "cd43e856-93a3-40c8-bc9e-6146cdce14fa"
-    SpeedyWeather = "9e226e20-d153-4fed-8a5b-493def4f21a9"
-    XESMF = "2e0b0046-e7a1-486f-88de-807ee8ffabe5"
+version = "0.10.0"
 
 [[deps.ClimaParams]]
 deps = ["Dates", "TOML"]
@@ -587,10 +565,10 @@ uuid = "5c42b081-d73a-476f-9059-fd94b934656c"
 version = "1.0.17"
 
 [[deps.ClimaSeaIce]]
-deps = ["Adapt", "JLD2", "KernelAbstractions", "Oceananigans", "RootSolvers", "Roots", "SeawaterPolynomials"]
-git-tree-sha1 = "813f90bc5583311d17767468df8e98209a96aa53"
+deps = ["Adapt", "JLD2", "KernelAbstractions", "Oceananigans", "RootSolvers", "SeawaterPolynomials"]
+git-tree-sha1 = "21ae7461383ecdfe4978c0abf0fad6a0bbec20d5"
 uuid = "6ba0ff68-24e6-4315-936c-2e99227c95a4"
-version = "0.4.10"
+version = "0.5.6"
 
 [[deps.ClimaTimeSteppers]]
 deps = ["ClimaComms", "Krylov", "LinearAlgebra", "LinearOperators", "NVTX", "StaticArrays"]
@@ -714,15 +692,6 @@ git-tree-sha1 = "bf07704e843daabd2cb2bb1404571656f80bce16"
 uuid = "1fbeeb36-5f17-413c-809b-666fb144f157"
 version = "0.4.3"
 
-[[deps.CommonSolve]]
-git-tree-sha1 = "dd91a10d8b8ae06e15706158eaf1a3e87e97b5f5"
-uuid = "38540f10-b2f7-11e9-35d8-d573e4eb0ff2"
-version = "0.2.7"
-weakdeps = ["EnzymeCore"]
-
-    [deps.CommonSolve.extensions]
-    CommonSolveEnzymeCoreExt = "EnzymeCore"
-
 [[deps.CommonSubexpressions]]
 deps = ["MacroTools"]
 git-tree-sha1 = "cda2cfaebb4be89c9084adaca7dd7333369715c5"
@@ -770,17 +739,11 @@ git-tree-sha1 = "21d088c496ea22914fe80906eb5bce65755e5ec8"
 uuid = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
 version = "2.5.1"
 
-[[deps.CondaPkg]]
-deps = ["JSON", "Markdown", "MicroMamba", "Pidfile", "Pkg", "Preferences", "Scratch", "TOML", "pixi_jll"]
-git-tree-sha1 = "2b1afb8ae65a0758795b00adafb37f97e67ef0e9"
-uuid = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
-version = "0.2.36"
-
 [[deps.ConservativeRegridding]]
 deps = ["ChunkSplitters", "DocStringExtensions", "Extents", "GeoInterface", "GeometryOps", "GeometryOpsCore", "LinearAlgebra", "ProgressMeter", "SciMLPublic", "SortTileRecursiveTree", "SparseArrays", "StableTasks", "StaticArrays"]
-git-tree-sha1 = "fe5597149321616eb59b98900cc1c701f311557a"
+git-tree-sha1 = "31cfc266e880cd3f50e9407a1482c4bc701b3f7f"
 uuid = "8e50ac2c-eb48-49bc-a402-07c87b949343"
-version = "0.2.3"
+version = "0.2.5"
 
     [deps.ConservativeRegridding.extensions]
     ConservativeRegriddingClimaCoreExt = "ClimaCore"
@@ -833,12 +796,6 @@ git-tree-sha1 = "a692f5e257d332de1e554e4566a4e5a8a72de2b2"
 uuid = "150eb455-5306-5404-9cee-2592286d6298"
 version = "0.6.4"
 
-[[deps.CopernicusClimateDataStore]]
-deps = ["CondaPkg"]
-git-tree-sha1 = "62ec3ff0c6d3babb596f17937f6006f4dd001d88"
-uuid = "bce3f73f-acea-4481-bd86-df89ecc2cb46"
-version = "0.1.0"
-
 [[deps.CoreMath]]
 deps = ["CoreMath_jll"]
 git-tree-sha1 = "8c0480f92b1b1796239156a1b9b1bfb1b39499b4"
@@ -868,12 +825,6 @@ git-tree-sha1 = "6ffea589cf350b1582722e57a8de787907d59454"
 uuid = "7445602f-e544-4518-8976-18f8e8ae6cdb"
 version = "0.3.4"
 
-[[deps.CubicSplines]]
-deps = ["Random", "Test"]
-git-tree-sha1 = "4875023d456ea37c581f406b8b1bc35bea95ae67"
-uuid = "9c784101-8907-5a6d-9be6-98f00873c89b"
-version = "0.2.1"
-
 [[deps.DataAPI]]
 git-tree-sha1 = "abe83f3a2f1b857aac70ef8b269080af17764bbe"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
@@ -884,6 +835,12 @@ deps = ["HTTP", "Libdl", "Reexport", "SHA", "Scratch", "p7zip_jll"]
 git-tree-sha1 = "75226661988f5b66a4c52358933eaa43b9278bb2"
 uuid = "124859b0-ceae-595e-8997-d05f6a7a8dfe"
 version = "0.7.14"
+
+[[deps.DataFrames]]
+deps = ["Compat", "DataAPI", "DataStructures", "Future", "InlineStrings", "InvertedIndices", "IteratorInterfaceExtensions", "LinearAlgebra", "Markdown", "Missings", "PooledArrays", "PrecompileTools", "PrettyTables", "Printf", "Random", "Reexport", "SentinelArrays", "SortingAlgorithms", "Statistics", "TableTraits", "Tables", "Unicode"]
+git-tree-sha1 = "5fab31e2e01e70ad66e3e24c968c264d1cf166d6"
+uuid = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+version = "1.8.2"
 
 [[deps.DataStructures]]
 deps = ["OrderedCollections"]
@@ -1595,6 +1552,25 @@ git-tree-sha1 = "4da0f88e9a39111c2fa3add390ab15f3a44f3ca3"
 uuid = "22cec73e-a1b8-11e9-2c92-598750a2cf9c"
 version = "0.3.1"
 
+[[deps.InlineStrings]]
+git-tree-sha1 = "8f3d257792a522b4601c24a577954b0a8cd7334d"
+uuid = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
+version = "1.4.5"
+
+    [deps.InlineStrings.extensions]
+    ArrowTypesExt = "ArrowTypes"
+    ParsersExt = "Parsers"
+
+    [deps.InlineStrings.weakdeps]
+    ArrowTypes = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
+    Parsers = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
+
+[[deps.Inpaintings]]
+deps = ["LinearAlgebra", "Match", "SparseArrays", "SuiteSparse"]
+git-tree-sha1 = "aa4e89ed3dcb4cc854ac386cbdcfa3c3b3de4f87"
+uuid = "a3d749fb-087c-5225-80b3-65fbd02ae0fd"
+version = "0.3.1"
+
 [[deps.Insolation]]
 deps = ["Adapt", "Artifacts", "Dates", "DelimitedFiles", "Interpolations"]
 git-tree-sha1 = "e4bc3ed7b1984c94e0145bd6ef8fafc04fab15e4"
@@ -1677,6 +1653,11 @@ weakdeps = ["Dates", "Test"]
     [deps.InverseFunctions.extensions]
     InverseFunctionsDatesExt = "Dates"
     InverseFunctionsTestExt = "Test"
+
+[[deps.InvertedIndices]]
+git-tree-sha1 = "6da3c4316095de0f5ee2ebd875df8721e7e0bdbe"
+uuid = "41ab1584-1d38-5bbf-9106-f11c6c58b48f"
+version = "1.3.1"
 
 [[deps.IrrationalConstants]]
 git-tree-sha1 = "b2d91fe939cae05960e760110b328288867b5758"
@@ -2176,6 +2157,12 @@ deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 version = "1.11.0"
 
+[[deps.Match]]
+deps = ["MacroTools", "OrderedCollections"]
+git-tree-sha1 = "58c5c5db26f2f0512facb359991410b7b5982c38"
+uuid = "7eb4fadd-790c-5f42-8a69-bfa0b872bfbf"
+version = "2.4.1"
+
 [[deps.MathOptInterface]]
 deps = ["CodecBzip2", "CodecZlib", "ForwardDiff", "JSON", "LinearAlgebra", "MutableArithmetics", "NaNMath", "OrderedCollections", "PrecompileTools", "Printf", "SparseArrays", "SpecialFunctions", "Test"]
 git-tree-sha1 = "9f23c8c1667bd0b0e611110aaf80aa91c1bdf274"
@@ -2236,12 +2223,6 @@ deps = ["Accessors", "BangBang", "InitialValues"]
 git-tree-sha1 = "44d32db644e84c75dab479f1bc15ee76a1a3618f"
 uuid = "128add7d-3638-4c79-886c-908ea0c25c34"
 version = "0.2.0"
-
-[[deps.MicroMamba]]
-deps = ["Pkg", "Scratch", "micromamba_jll"]
-git-tree-sha1 = "535656ce55266bfed0575cd051acc4f36dc869a0"
-uuid = "0b3b1443-0f03-428d-bdfb-f27f9c1191ea"
-version = "0.1.15"
 
 [[deps.MicrosoftMPI_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2408,16 +2389,51 @@ git-tree-sha1 = "343c7bb67d0a29ea5d7d2b3e945afe81e2862337"
 uuid = "0d71be07-595a-4f89-9529-4065a4ab43a6"
 version = "0.1.0"
 
+[[deps.NumericalEarth]]
+deps = ["Accessors", "Adapt", "CFTime", "ClimaSeaIce", "CubedSphere", "DataDeps", "Dates", "Distances", "DocStringExtensions", "Downloads", "GPUArraysCore", "Glob", "ImageMorphology", "JLD2", "KernelAbstractions", "LibCURL", "MeshArrays", "NCDatasets", "Oceananigans", "OffsetArrays", "PrecompileTools", "Printf", "Scratch", "SeawaterPolynomials", "StaticArrays", "Statistics", "Thermodynamics", "ZipFile"]
+git-tree-sha1 = "ecbffc062801f2be346d79a55e69081d8857ce49"
+uuid = "904d977b-046a-4731-8b86-9235c0d1ef02"
+version = "0.5.5"
+
+    [deps.NumericalEarth.extensions]
+    NumericalEarthArchGDALExt = "ArchGDAL"
+    NumericalEarthBreezeExt = "Breeze"
+    NumericalEarthCDSAPIExt = "CDSAPI"
+    NumericalEarthCopernicusMarineExt = "CopernicusMarine"
+    NumericalEarthReactantExt = "Reactant"
+    NumericalEarthSpeedyWeatherExt = ["SpeedyWeather", "ConservativeRegridding"]
+    NumericalEarthVerosExt = ["PythonCall", "CondaPkg"]
+    NumericalEarthWOAExt = "WorldOceanAtlasTools"
+
+    [deps.NumericalEarth.weakdeps]
+    ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
+    Breeze = "660aa2fb-d4c8-4359-a52c-9c057bc511da"
+    CDSAPI = "8a7b9de3-9c00-473e-88b4-7eccd7ef2fea"
+    CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
+    ConservativeRegridding = "8e50ac2c-eb48-49bc-a402-07c87b949343"
+    CopernicusMarine = "cd43e856-93a3-40c8-bc9e-6146cdce14fa"
+    PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
+    RRTMGP = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
+    Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
+    SpeedyWeather = "9e226e20-d153-4fed-8a5b-493def4f21a9"
+    WorldOceanAtlasTools = "04f20302-f1b9-11e8-29d9-7d841cb0a64a"
+
 [[deps.Observables]]
 git-tree-sha1 = "7438a59546cf62428fc9d1bc94729146d37a7225"
 uuid = "510215fc-4207-5dde-b226-833fc4488ee2"
 version = "0.5.5"
 
+[[deps.OceanGrids]]
+deps = ["Inpaintings", "Interpolations", "LinearAlgebra", "NearestNeighbors", "SparseArrays", "Unitful"]
+git-tree-sha1 = "d9e8b601f80be7fd0f77a3d5f14fc2524b32b264"
+uuid = "cfe838f4-859f-11e9-2ea1-df7d4e7c3537"
+version = "0.4.7"
+
 [[deps.Oceananigans]]
 deps = ["Adapt", "Crayons", "CubedSphere", "Dates", "Distances", "DocStringExtensions", "FFTW", "GPUArraysCore", "Glob", "InteractiveUtils", "JLD2", "KernelAbstractions", "Krylov", "LinearAlgebra", "Logging", "MPI", "MuladdMacro", "OffsetArrays", "OrderedCollections", "Pkg", "Printf", "ReactantCore", "Rotations", "SeawaterPolynomials", "SparseArrays", "StaticArrays", "Statistics", "StructArrays"]
-git-tree-sha1 = "ccdb005c9c13ba360512415d627a764ac5296e66"
+git-tree-sha1 = "154c45ba801a2b3e7c9ad6a4c300b74c2ed01b3c"
 uuid = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
-version = "0.107.7"
+version = "0.110.1"
 
     [deps.Oceananigans.extensions]
     OceananigansAMDGPUExt = ["AMDGPU", "AbstractFFTs"]
@@ -2428,6 +2444,7 @@ version = "0.107.7"
     OceananigansNCDatasetsExt = "NCDatasets"
     OceananigansOneAPIExt = "oneAPI"
     OceananigansReactantExt = ["Reactant", "KernelAbstractions", "ConstructionBase", "AbstractFFTs"]
+    OceananigansZarrExt = "Zarr"
 
     [deps.Oceananigans.weakdeps]
     AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
@@ -2440,6 +2457,7 @@ version = "0.107.7"
     Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
     NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
     Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
+    Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
     oneAPI = "8f75cd03-7ff8-4ecb-9b8f-daf728133b1b"
 
 [[deps.OffsetArrays]]
@@ -2621,12 +2639,6 @@ git-tree-sha1 = "468dbe2b510c876dc091b2c74ed52c7c34f48b9b"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 version = "2.8.5"
 
-[[deps.Pidfile]]
-deps = ["FileWatching", "Test"]
-git-tree-sha1 = "2d8aaf8ee10df53d0dfb9b8ee44ae7c04ced2b03"
-uuid = "fa939f87-e72e-5be4-a000-7fc836dbe307"
-version = "1.3.0"
-
 [[deps.Pixman_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LLVMOpenMP_jll", "Libdl"]
 git-tree-sha1 = "e4a6721aa89e62e5d4217c0b21bd714263779dda"
@@ -2664,6 +2676,12 @@ version = "0.2.2"
 git-tree-sha1 = "77b3d3605fc1cd0b42d95eba87dfcd2bf67d5ff6"
 uuid = "647866c9-e3ac-4575-94e7-e3d426903924"
 version = "0.1.2"
+
+[[deps.PooledArrays]]
+deps = ["DataAPI", "Future"]
+git-tree-sha1 = "36d8b4b899628fb92c2749eb488d884a926614d3"
+uuid = "2dfb63ee-cc39-5dd5-95bd-886bf059d720"
+version = "1.4.3"
 
 [[deps.Poppler_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "JpegTurbo_jll", "LibCURL_jll", "Libdl", "Libtiff_jll", "OpenJpeg_jll", "libpng_jll"]
@@ -2906,28 +2924,6 @@ git-tree-sha1 = "3b6c0089c3dc3d5780786d5007e976fe9d1b7887"
 uuid = "7181ea78-2dcb-4de3-ab41-2b8ab5a31e74"
 version = "1.0.2"
 
-[[deps.Roots]]
-deps = ["Accessors", "CommonSolve", "Printf"]
-git-tree-sha1 = "3eff988b9bd09543783e2e051b0a1eef11f65c2d"
-uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
-version = "2.3.0"
-
-    [deps.Roots.extensions]
-    RootsChainRulesCoreExt = "ChainRulesCore"
-    RootsForwardDiffExt = "ForwardDiff"
-    RootsIntervalRootFindingExt = "IntervalRootFinding"
-    RootsSymPyExt = "SymPy"
-    RootsSymPyPythonCallExt = "SymPyPythonCall"
-    RootsUnitfulExt = "Unitful"
-
-    [deps.Roots.weakdeps]
-    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
-    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
-    IntervalRootFinding = "d2bf35a9-74e0-55ec-b149-d360ff49b807"
-    SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
-    SymPyPythonCall = "bc8888f7-b21e-4b7c-a06a-5d9c9496438c"
-    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
-
 [[deps.Rotations]]
 deps = ["LinearAlgebra", "Quaternions", "Random", "StaticArrays"]
 git-tree-sha1 = "5680a9276685d392c87407df00d57c9924d9f11e"
@@ -3022,6 +3018,12 @@ version = "1.3.0"
 git-tree-sha1 = "e2671e9abe2a2faa51dcecd9d911522931c16012"
 uuid = "d496a93d-167e-4197-9f49-d3af4ff8fe40"
 version = "0.3.10"
+
+[[deps.SentinelArrays]]
+deps = ["Dates", "Random"]
+git-tree-sha1 = "084c47c7c5ce5cfecefa0a98dff69eb3646b5a80"
+uuid = "91c51154-3ec4-41a3-a24f-3f23e20d615c"
+version = "1.4.10"
 
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
@@ -3523,6 +3525,12 @@ git-tree-sha1 = "248a7031b3da79a127f14e5dc5f417e26f9f6db7"
 uuid = "efce3f68-66dc-5838-9240-27a6d6f5f9b6"
 version = "1.1.0"
 
+[[deps.WorldOceanAtlasTools]]
+deps = ["DataDeps", "DataFrames", "Downloads", "Match", "NCDatasets", "NearestNeighbors", "OceanGrids", "Statistics", "StatsBase", "Unitful"]
+git-tree-sha1 = "134d30d8a0f03a1deb57767a478e230edbfa627f"
+uuid = "04f20302-f1b9-11e8-29d9-7d841cb0a64a"
+version = "0.6.4"
+
 [[deps.XML2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Zlib_jll"]
 git-tree-sha1 = "80d3930c6347cfce7ccf96bd3bafdf079d9c0390"
@@ -3779,12 +3787,6 @@ git-tree-sha1 = "86addc139bca85fdf9e7741e10977c45785727b7"
 uuid = "337d8026-41b4-5cde-a456-74a10e5b31d1"
 version = "1.11.3+0"
 
-[[deps.micromamba_jll]]
-deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
-git-tree-sha1 = "717df6f6892af4ee13279a73aa58474e58a88667"
-uuid = "f8abcde7-e9b7-5caa-b8af-a437887ae8e4"
-version = "2.3.1+0"
-
 [[deps.mpif_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIABI_jll", "MPICH_jll", "MPIPreferences", "MPItrampoline_jll", "MicrosoftMPI_jll", "OpenMPI_jll", "TOML"]
 git-tree-sha1 = "a8083ee0737c243c8f40a4ba86a0956997facb73"
@@ -3806,12 +3808,6 @@ version = "2022.3.0+0"
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 version = "17.4.0+2"
-
-[[deps.pixi_jll]]
-deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
-git-tree-sha1 = "3667b0931a7fe50f0a5554c61af00e5640019e21"
-uuid = "4d7b5844-a134-5dcd-ac86-c8f19cd51bed"
-version = "0.63.2+0"
 
 [[deps.s2n_tls_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]

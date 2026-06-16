@@ -26,9 +26,10 @@ seaice_diagnostic_mode: "average"
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "366days"
+t_end: "188days"
 topo_smoothing: true
 topography: "Earth"
+use_itime: false
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]
     period: 1months

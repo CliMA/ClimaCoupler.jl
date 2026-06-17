@@ -1,8 +1,8 @@
 albedo_model: "CouplerAlbedo"
-atmos_config_file: "config/atmos_configs/climaatmos_wx_diagedmf.yml"
+atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
 binary_area_fraction: false
 checkpoint_dt: "900days"
-coupler_toml: ["toml/wxquest_diagedmf.toml"]
+coupler_toml: ["toml/wxquest_progedmf.toml"]
 dt_cloud_fraction: "1hours"
 dt_cpl: "150secs"
 dt_ogw: 1800secs

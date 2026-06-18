@@ -17,7 +17,8 @@ export get_device,
     setup_output_dirs,
     time_to_seconds,
     integral,
-    create_boundary_space
+    create_boundary_space,
+    diagnostics_global_attribs
 
 """
     get_device(config_dict)
@@ -212,6 +213,44 @@ function time_to_seconds(s::String)
         return parse(Float64, first(split(s, match))) * factor[match]
     end
     error("Uncaught case in computing time from given string.")
+end
+
+"""
+    diagnostics_global_attribs(start_date)
+
+Build a dictionary of global (file-level) attributes to attach to the diagnostic
+NetCDF files produced by the coupler. These are passed to the `global_attribs`
+keyword of `ClimaDiagnostics.Writers.NetCDFWriter` and stored as metadata in
+every NetCDF file, which is useful when visualizing or sharing output.
+
+Always includes the simulation `start_date`. When running on Buildkite, also
+includes the build number (the "model run number") read from the
+`BUILDKITE_BUILD_NUMBER` environment variable; this is omitted on local runs
+where that variable is not set.
+
+Also includes the git commit hash of the code being run, read from the
+`BUILDKITE_COMMIT` environment variable on Buildkite or, on local runs, from
+`git rev-parse HEAD`. It is omitted if neither source is available (e.g. when
+the working directory is not a git repository).
+
+The returned dictionary maps `String` keys to `String` values, as required by
+`NetCDFWriter`.
+"""
+function diagnostics_global_attribs(start_date)
+    attribs = Dict{String, String}("start_date" => string(start_date))
+    build_number = get(ENV, "BUILDKITE_BUILD_NUMBER", "")
+    isempty(build_number) || (attribs["buildkite_build_number"] = build_number)
+    commit_hash = get(ENV, "BUILDKITE_COMMIT", "")
+    if isempty(commit_hash)
+        # Fall back to querying git directly on local runs
+        commit_hash = try
+            readchomp(`git rev-parse HEAD`)
+        catch
+            ""
+        end
+    end
+    isempty(commit_hash) || (attribs["commit_hash"] = commit_hash)
+    return attribs
 end
 
 """

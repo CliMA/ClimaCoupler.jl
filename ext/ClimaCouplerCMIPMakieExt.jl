@@ -6,6 +6,7 @@ including Oceananigans.
 
 Currently, it includes:
 - diagnostics plots for Oceananigans
+- movies of Oceananigans JLD2 diagnostics
 """
 module ClimaCouplerCMIPMakieExt
 
@@ -63,5 +64,7 @@ function Plotting.print_extrema(operation::OC.AbstractOperations.AbstractOperati
     OC.compute!(evaluated_field)
     return Plotting.print_extrema(evaluated_field)
 end
+
+include(joinpath(@__DIR__, "ClimaCouplerCMIPMakieExt", "ocean_diagnostics_movies.jl"))
 
 end

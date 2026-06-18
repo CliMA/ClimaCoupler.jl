@@ -127,6 +127,14 @@ The `ClimaCouplerCMIPExt` extension adds support for:
 - **Oceananigans field extrema**: Extends `Plotting.print_extrema` to format the minimum and maximum
   values of Oceananigans fields for display in plot titles and labels.
 
+- **Ocean diagnostic movies**: `Plotting.make_ocean_diagnostics_movies` reads Oceananigans JLD2
+  output (`ocean_surface*.jld2`, `ocean_fields*.jld2`) and writes CairoMakie movies of surface
+  fields and 3D field surface slices. Variables use physics-appropriate colormaps (e.g. `:thermal`
+  for temperature, `:haline` for salinity, `:balance` for velocities and SSH, `:curl` for wind
+  stress, `:RdBu` / `:BrBG` for heat and salinity fluxes), with symmetric color limits for
+  divergent quantities. Continents are masked using the ocean immersed-boundary grid and drawn
+  in black.
+
 These extensions enable the debug plotting system to automatically handle Oceananigans fields
 when they are encountered in coupled simulations, without requiring any special handling in user code.
 
@@ -139,6 +147,7 @@ For example, here are the debug plots generation for the Oceananigans component:
 Plotting.postprocess
 Plotting.make_diagnostics_plots
 Plotting.make_ocean_diagnostics_plots
+Plotting.make_ocean_diagnostics_movies
 Plotting.debug
 Plotting.debug_plot_fields
 Plotting.debug_plot!

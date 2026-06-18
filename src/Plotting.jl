@@ -20,6 +20,8 @@ function make_diagnostics_plots end
 
 function make_ocean_diagnostics_plots end
 
+function make_ocean_diagnostics_movies end
+
 function debug end
 
 function debug_plot_fields end
@@ -55,7 +57,7 @@ extension_fns = [
         :Poppler_jll,
         :Printf,
         :Oceananigans,
-    ) => [:debug_plot!, :print_extrema],
+    ) => [:debug_plot!, :print_extrema, :make_ocean_diagnostics_movies],
 ]
 
 """
@@ -131,6 +133,7 @@ function postprocess(
 
     # Note: slab ocean doesn't have diagnostics, so we only handle Oceananigans here
     make_ocean_diagnostics_plots(ocean_output_dir, artifacts_dir, output_prefix = "ocean_")
+    make_ocean_diagnostics_movies(ocean_output_dir, artifacts_dir, output_prefix = "ocean_")
 
     # Plot all model states and coupler fields (useful for debugging)
     ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext && debug(cs, artifacts_dir)

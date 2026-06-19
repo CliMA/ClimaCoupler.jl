@@ -489,13 +489,7 @@ function Plotting.view_ocean_field_globe(
         vmin,
         vmax,
     )
-    GLM.Colorbar(
-        fig[1, 2],
-        plt;
-        label = title,
-        colormap = colormap,
-        colorrange = (vmin, vmax),
-    )
+    GLM.Colorbar(fig[1, 2], plt; label = title)
 
     slider = GLM.Slider(
         fig[2, 1],

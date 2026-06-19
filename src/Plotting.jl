@@ -22,6 +22,8 @@ function make_ocean_diagnostics_plots end
 
 function make_ocean_diagnostics_movies end
 
+function view_ocean_field_globe end
+
 function debug end
 
 function debug_plot_fields end
@@ -54,10 +56,11 @@ extension_fns = [
         :CairoMakie,
         :ClimaCoreMakie,
         :GeoMakie,
+        :GLMakie,
         :Poppler_jll,
         :Printf,
         :Oceananigans,
-    ) => [:debug_plot!, :print_extrema, :make_ocean_diagnostics_movies],
+    ) => [:debug_plot!, :print_extrema, :make_ocean_diagnostics_movies, :view_ocean_field_globe],
 ]
 
 """

@@ -7,6 +7,7 @@ including Oceananigans.
 Currently, it includes:
 - diagnostics plots for Oceananigans
 - movies of Oceananigans JLD2 diagnostics
+- interactive globe viewing of ocean diagnostics
 """
 module ClimaCouplerCMIPMakieExt
 
@@ -20,26 +21,7 @@ using Makie
 using Printf
 import Oceananigans as OC
 
-"""
-    Plotting.debug_plot!(ax, fig, field, i, j)
-
-Plot a heatmap of the provided Oceananigans field or operation.
-This is intended to be used as part of the debug plotting system.
-"""
-function Plotting.debug_plot!(ax, fig, field::OC.Field, i, j)
-    hm = CairoMakie.heatmap!(ax, Array(OC.interior(field, :, :, size(field, 3))))
-    Makie.Colorbar(fig[i, j * 2], hm)
-    return nothing
-end
-function Plotting.debug_plot!(ax, fig, field::OC.AbstractOperations.AbstractOperation, i, j)
-    # Evaluate the operation to get a field
-    evaluated_field = OC.Field(field)
-    OC.compute!(evaluated_field)
-
-    # Plot the evaluated field
-    Plotting.debug_plot!(ax, fig, evaluated_field, i, j)
-    return nothing
-end
+include(joinpath(@__DIR__, "ClimaCouplerCMIPMakieExt", "ocean_diagnostics_movies.jl"))
 
 """
     print_extrema(field)
@@ -64,7 +46,5 @@ function Plotting.print_extrema(operation::OC.AbstractOperations.AbstractOperati
     OC.compute!(evaluated_field)
     return Plotting.print_extrema(evaluated_field)
 end
-
-include(joinpath(@__DIR__, "ClimaCouplerCMIPMakieExt", "ocean_diagnostics_movies.jl"))
 
 end

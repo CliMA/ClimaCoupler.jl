@@ -122,7 +122,7 @@ The `ClimaCouplerCMIPExt` extension adds support for:
 
 - **Oceananigans field plotting**: Extends `Plotting.debug_plot!` to handle `Oceananigans.Field`
   and `Oceananigans.AbstractOperations.AbstractOperation` types, allowing debug plots to visualize
-  ocean model fields directly.
+  ocean model fields directly. Land cells are masked in black and each panel has a colorbar.
 
 - **Oceananigans field extrema**: Extends `Plotting.print_extrema` to format the minimum and maximum
   values of Oceananigans fields for display in plot titles and labels.
@@ -133,7 +133,9 @@ The `ClimaCouplerCMIPExt` extension adds support for:
   for temperature, `:haline` for salinity, `:balance` for velocities and SSH, `:curl` for wind
   stress, `:RdBu` / `:BrBG` for heat and salinity fluxes), with symmetric color limits for
   divergent quantities. Continents are masked using the ocean immersed-boundary grid and drawn
-  in black.
+  in black. Tripolar output is shown in native model-index space in saved movies; for an
+  interactive 3D globe use `Plotting.view_ocean_field_globe` or
+  `experiments/CMIP/view_ocean_globe.jl` with `GLMakie`.
 
 These extensions enable the debug plotting system to automatically handle Oceananigans fields
 when they are encountered in coupled simulations, without requiring any special handling in user code.
@@ -148,6 +150,7 @@ Plotting.postprocess
 Plotting.make_diagnostics_plots
 Plotting.make_ocean_diagnostics_plots
 Plotting.make_ocean_diagnostics_movies
+Plotting.view_ocean_field_globe
 Plotting.debug
 Plotting.debug_plot_fields
 Plotting.debug_plot!

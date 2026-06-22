@@ -155,7 +155,8 @@ end
 
 @kernel function _apply_fv_wet_mask!(field, wet_mask_field, k)
     i, j = @index(Global, NTuple)
-    @inbounds field[i, j, k] *= wet_mask_field[i, j, 1]
+    @inbounds field[i, j, k] =
+        ifelse(wet_mask_field[i, j, 1] > 0, field[i, j, k], zero(eltype(field)))
 end
 
 # Non-allocating Oceananigans Field -> ClimaCore remap.

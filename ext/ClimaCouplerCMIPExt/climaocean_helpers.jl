@@ -119,10 +119,11 @@ end
 function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
     # Get the index of the top level (surface); Nz=1 for 2D fields
     Nz = size(target_field, 3)
-    dst = vec(OC.interior(target_field, :, :, Nz))
+    dst_temp = remapping.remapper_cc_to_oc.dst_temp
 
-    CR.regrid!(dst, remapping.remapper_cc_to_oc, source_field)
-    apply_fv_wet_mask!(target_field, remapping.fv_wet_mask, Nz)
+    CR.regrid!(dst_temp, remapping.remapper_cc_to_oc, source_field)
+    mask_fv_vector!(dst_temp, remapping.fv_wet_mask_1d)
+    copyto!(vec(OC.interior(target_field, :, :, Nz)), dst_temp)
     return nothing
 end
 
@@ -142,31 +143,27 @@ function Interfacer.remap(
 end
 
 """
-    apply_fv_wet_mask!(field, wet_mask_field, k)
+    mask_fv_vector!(data, wet_1d)
 
-Zero `field` at immersed (land) cells using the precomputed 2D wet mask field
-(`1` = wet, `0` = dry). Runs on the grid architecture (GPU-safe).
+Zero entries in a flat FV vector over immersed (land) cells. Both `data` and
+`wet_1d` must live on the same architecture (e.g. both `CuVector`s on GPU).
+Uses the regridder work buffer to avoid broadcasting into non-contiguous
+`vec(interior(...))` views.
 """
-function apply_fv_wet_mask!(field::OC.Field, wet_mask_field::OC.Field, k)
-    arch = OC.Architectures.architecture(field.grid)
-    OC.Utils.launch!(arch, field.grid, :xy, _apply_fv_wet_mask!, field, wet_mask_field, k)
-    return nothing
-end
-
-@kernel function _apply_fv_wet_mask!(field, wet_mask_field, k)
-    i, j = @index(Global, NTuple)
-    @inbounds field[i, j, k] =
-        ifelse(wet_mask_field[i, j, 1] > 0, field[i, j, k], zero(eltype(field)))
+function mask_fv_vector!(data::AbstractVector, wet_1d::AbstractVector)
+    @. data = ifelse(wet_1d > 0, data, zero(eltype(data)))
+    return data
 end
 
 # Non-allocating Oceananigans Field -> ClimaCore remap.
 function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field, remapping)
     # Get the index of the top level (surface); Nz=1 for 2D fields
     Nz = size(source_field, 3)
-    apply_fv_wet_mask!(source_field, remapping.fv_wet_mask, Nz)
-    src = vec(OC.interior(source_field, :, :, Nz))
+    src_temp = remapping.remapper_oc_to_cc.src_temp
 
-    CR.regrid!(target_field, remapping.remapper_oc_to_cc, src)
+    copyto!(src_temp, vec(OC.interior(source_field, :, :, Nz)))
+    mask_fv_vector!(src_temp, remapping.fv_wet_mask_1d)
+    CR.regrid!(target_field, remapping.remapper_oc_to_cc, src_temp)
     return nothing
 end
 

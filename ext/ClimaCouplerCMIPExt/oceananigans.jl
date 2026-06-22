@@ -309,29 +309,6 @@ function flat_fv_wet_mask(grid_oc)
 end
 
 """
-    fv_wet_mask_field(grid_oc, wet_mask_cpu)
-
-Build a 2D `Center/Center` mask field on `grid_oc` (`1` = wet, `0` = dry) from the
-flat CPU mask returned by [`flat_fv_wet_mask`](@ref).
-"""
-function fv_wet_mask_field(grid_oc, wet_mask_cpu::AbstractVector{Bool})
-    Nx, Ny = size(grid_oc)[1:2]
-    length(wet_mask_cpu) == Nx * Ny ||
-        error("wet mask length $(length(wet_mask_cpu)) != Nx * Ny = $(Nx * Ny)")
-
-    mask_field = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
-    arch = OC.Architectures.architecture(grid_oc)
-    wet_1d = OC.Architectures.on_architecture(arch, Float64.(wet_mask_cpu))
-    OC.Utils.launch!(arch, grid_oc, :xy, _fill_fv_wet_mask!, mask_field, wet_1d, Nx)
-    return mask_field
-end
-
-@kernel function _fill_fv_wet_mask!(mask_field, wet_1d, Nx)
-    i, j = @index(Global, NTuple)
-    @inbounds mask_field[i, j, 1] = wet_1d[(j - 1) * Nx + i]
-end
-
-"""
     zero_sparse_rows!(A, keep_row)
 
 Zero every nonzero in rows where `keep_row[row]` is `false`.
@@ -404,7 +381,7 @@ independent sparse regridders needed to remap between them in both directions.
 
 When `grid_oc` is an `ImmersedBoundaryGrid`, immersed (land) FV cells are
 excluded from both regridders via [`apply_fv_wet_mask_to_regridder!`](@ref) and
-[`flat_fv_wet_mask`](@ref). The wet mask is returned as `fv_wet_mask` for use in
+[`flat_fv_wet_mask`](@ref). The wet mask is returned as `fv_wet_mask_1d` for use in
 [`Interfacer.remap!`](@ref).
 
 For low-level use: `CR.regrid!(dst, remapper_oc_to_cc, src)` and
@@ -455,7 +432,7 @@ function construct_remapper(grid_oc, boundary_space)
     arch = OC.architecture(grid_oc)
     remapper_oc_to_cc = OC.Architectures.on_architecture(arch, remapper_oc_to_cc)
     remapper_cc_to_oc = OC.Architectures.on_architecture(arch, remapper_cc_to_oc)
-    fv_wet_mask = fv_wet_mask_field(grid_oc, wet_mask_cpu)
+    fv_wet_mask_1d = OC.Architectures.on_architecture(arch, Float64.(wet_mask_cpu))
 
     FT = CC.Spaces.undertype(boundary_space)
 
@@ -474,7 +451,7 @@ function construct_remapper(grid_oc, boundary_space)
     return (;
         remapper_oc_to_cc,
         remapper_cc_to_oc,
-        fv_wet_mask,
+        fv_wet_mask_1d,
         scratch_field_oc1,
         scratch_field_oc2,
         scratch_field_oc3,

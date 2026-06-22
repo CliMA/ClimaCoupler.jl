@@ -30,6 +30,7 @@ import SurfaceFluxes.UniversalFunctions as UF
 import Thermodynamics as TD
 import Thermodynamics.Parameters as TDP
 import ClimaParams as CP
+import Statistics: std, mean
 
 CMIPExt = Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPExt)
 
@@ -92,6 +93,52 @@ arch = OC.CPU()
         n_shadow = count(==(0), ig.oc_areas)
         @test n_shadow == Nx ÷ 2  # 18 = top-row fold shadows
         @test all(ig.oc_areas[ig.oc_areas .> 0] .> 0)
+        @test ig.n_nodes == 16 * ig.n_cc  # Nq² = 16 for n_quad_points = 4
+        @test !isempty(ig.node_gather_polygon)
+        @test length(ig.node_gather_polygon) == length(ig.node_gather_node)
+        @test length(ig.node_gather_polygon) == length(ig.node_gather_weight)
+    end
+
+    @testset "Nodal polygon gather (sin-cos SEM field)" begin
+        ig = remapping.intersection_grid
+        CRExt = CMIPExt.get_ConservativeRegriddingCCExt()
+        Nq = 4
+
+        coords = CC.Fields.coordinate_field(boundary_space)
+        test_field = CC.Fields.zeros(boundary_space)
+        λ = deg2rad.(coords.long)
+        φ = deg2rad.(coords.lat)
+        test_field .= sin.(2.0 .* λ) .* cos.(φ)
+
+        nodal = CRExt.se_field_to_vec(test_field)
+
+        gathered = zeros(FT, ig.n_intersections)
+        CMIPExt.gather_cc_nodal_to_intersection!(gathered, ig, nodal)
+
+        # Non-trivial spatial structure (not a constant field).
+        @test std(gathered) > FT(0.01)
+        @test extrema(gathered) != extrema(nodal)
+
+        # Independent COO matvec matches the gather kernel.
+        reference = zeros(FT, ig.n_intersections)
+        @inbounds for idx in eachindex(ig.node_gather_polygon)
+            k = ig.node_gather_polygon[idx]
+            n = ig.node_gather_node[idx]
+            reference[k] += ig.node_gather_weight[idx] * nodal[n]
+        end
+        @test all(isapprox.(gathered, reference; rtol = 0, atol = 1e-12))
+
+        # Analytic bounds of sin(2λ) cos(φ) on the sphere (polygon average is
+        # not necessarily within the parent element's nodal min/max).
+        @test all(-1.0 .- 1e-6 .<= gathered .<= 1.0 .+ 1e-6)
+
+        # Differs from broadcasting the per-element nodal mean (old gather path).
+        element_means = [
+            mean(nodal[((e - 1) * Nq^2 + 1):(e * Nq^2)]) for e in 1:ig.n_cc
+        ]
+        element_gathered = zeros(FT, ig.n_intersections)
+        CMIPExt.gather_cc_to_intersection!(element_gathered, ig, element_means)
+        @test maximum(abs.(gathered .- element_gathered)) > FT(1e-6)
     end
 
     @testset "Gather/scatter conservation (OC direction)" begin
@@ -148,16 +195,28 @@ arch = OC.CPU()
         ig = remapping.intersection_grid
         flux_state = remapping.intersection_flux_state
 
-        # Create atmosphere state (per CC element)
+        # Nodal atmosphere with a smooth sin-cos pattern on the cubed sphere
+        coords = CC.Fields.coordinate_field(boundary_space)
+        CRExt = CMIPExt.get_ConservativeRegriddingCCExt()
+        λ = deg2rad.(coords.long)
+        φ = deg2rad.(coords.lat)
+        trig = sin.(2.0 .* λ) .* cos.(φ)
+
+        T_field = CC.Fields.zeros(boundary_space)
+        T_field .= FT(280) .+ FT(5) .* trig
+        u_field = CC.Fields.zeros(boundary_space)
+        u_field .= FT(5) .+ FT(2) .* cos.(φ)
+
+        n_nodes = ig.n_nodes
         cc_atmos_state = (
-            T = fill(FT(290), ig.n_cc),
-            q_tot = fill(FT(0.01), ig.n_cc),
-            q_liq = fill(FT(0), ig.n_cc),
-            q_ice = fill(FT(0), ig.n_cc),
-            ρ = fill(FT(1.2), ig.n_cc),
-            u = fill(FT(5), ig.n_cc),
-            v = fill(FT(0), ig.n_cc),
-            h = fill(FT(10), ig.n_cc),
+            T = CRExt.se_field_to_vec(T_field),
+            q_tot = fill(FT(0.01), n_nodes),
+            q_liq = fill(FT(0), n_nodes),
+            q_ice = fill(FT(0), n_nodes),
+            ρ = fill(FT(1.2), n_nodes),
+            u = CRExt.se_field_to_vec(u_field),
+            v = fill(FT(0), n_nodes),
+            h = fill(FT(10), n_nodes),
         )
 
         # Create surface state (per OC cell) - warm ocean
@@ -183,8 +242,8 @@ arch = OC.CPU()
             thermo_params,
         )
 
-        # Verify flux signs and magnitudes are physically reasonable
-        # Warm ocean (300K) + cooler atmosphere (290K) → positive sensible heat flux
+        # Verify flux signs and magnitudes are physically reasonable.
+        # T(λ, φ) = 280 + 5 sin(2λ) cos(φ) stays below the 300 K ocean.
         @test all(flux_state.flux_sh .> 0)
         @test maximum(flux_state.flux_sh) < 500  # Reasonable upper bound W/m²
 
@@ -254,7 +313,7 @@ arch = OC.CPU()
 
         # Verify temporary arrays have correct sizes
         ig = remapping.intersection_grid
-        @test length(remapping.cc_atmos_temp.T) == ig.n_cc
+        @test length(remapping.cc_atmos_temp.T) == ig.n_nodes
         @test length(remapping.oc_surface_temp.T) == ig.n_oc
     end
 

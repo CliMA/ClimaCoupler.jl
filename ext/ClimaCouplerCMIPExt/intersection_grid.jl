@@ -24,6 +24,10 @@ on one grid and remapping.
 - `n_cc`: Number of CC elements
 - `n_oc`: Number of OC cells
 - `n_intersections`: Number of intersection polygons
+- `n_nodes`: Number of SE GLL nodes (`Nq² · Nh`) on the boundary space
+- `node_gather_polygon`: COO polygon indices for [`gather_cc_nodal_to_intersection!`](@ref)
+- `node_gather_node`: COO flat nodal indices (`1:n_nodes`)
+- `node_gather_weight`: COO weights `Bᵢⱼ / areaₖ` integrating the SEM basis over polygon `k`
 
 # Usage
 The intersection grid is constructed from a boundary space + Oceananigans
@@ -39,10 +43,116 @@ struct IntersectionGrid{FT, IT, VFT <: AbstractVector{FT}, VIT <: AbstractVector
     n_cc::Int
     n_oc::Int
     n_intersections::Int
+    n_nodes::Int
+    node_gather_polygon::VIT
+    node_gather_node::VIT
+    node_gather_weight::VFT
 end
 
 function Base.show(io::IO, ig::IntersectionGrid{FT}) where {FT}
     print(io, "IntersectionGrid{$FT}: $(ig.n_intersections) polygons from $(ig.n_cc) CC elements × $(ig.n_oc) OC cells")
+end
+
+_oc_underlying(grid::OC.ImmersedBoundaryGrid) = grid.underlying_grid
+_oc_underlying(grid) = grid
+
+"""
+    _se_n_nodes(boundary_space) -> Int
+
+Number of flat GLL nodal degrees of freedom on a spectral-element boundary space.
+"""
+function _se_n_nodes(boundary_space)
+    qs = CC.Spaces.quadrature_style(boundary_space)
+    Nq = CC.Quadratures.degrees_of_freedom(qs)
+    Nh = CC.Meshes.nelements(CC.Topologies.mesh(CC.Spaces.topology(boundary_space)))
+    return Nq^2 * Nh
+end
+
+"""
+    _normalize_intersection_polys(intersection_result)
+
+Normalize `GeometryOps.intersection` output to an iterable of polygons.
+"""
+function _normalize_intersection_polys(intersection_result)
+    intersection_result === nothing && return ()
+    intersection_result isa AbstractVector && return intersection_result
+    return (intersection_result,)
+end
+
+"""
+    build_polygon_nodal_gather_weights(boundary_space_cpu, grid_oc_cpu,
+                                       cc_indices, oc_indices, areas)
+
+Precompute COO weights that area-average a nodal SEM field onto each
+intersection polygon:
+
+    f̄ₖ = Σₙ wₖₙ fₙ,   wₖₙ = Bᵢⱼ(Ωₖ) / areaₖ
+
+where `Bᵢⱼ` is the principled basis integral from
+`ConservativeRegriddingClimaCoreExt.accumulate_principled_b`.
+"""
+function build_polygon_nodal_gather_weights(
+    boundary_space_cpu,
+    grid_oc_cpu,
+    cc_indices,
+    oc_indices,
+    areas,
+)
+    CRExt = get_ConservativeRegriddingCCExt()
+    @assert !isnothing(CRExt)
+    GO = CRExt.GO
+    GI = CRExt.GI
+
+    FT = CC.Spaces.undertype(boundary_space_cpu)
+    R = CC.Spaces.topology(boundary_space_cpu).mesh.domain.radius
+    manifold = CR.Spherical(; radius = FT(R))
+
+    dst_tree = CR.Trees.treeify(manifold, boundary_space_cpu)
+    src_tree = CR.Trees.treeify(manifold, grid_oc_cpu)
+
+    qs = CC.Spaces.quadrature_style(boundary_space_cpu)
+    Nq = CC.Quadratures.degrees_of_freedom(qs)
+    triangle_quad_degree = 2 * (Nq - 1)
+
+    node_gather_polygon = Int[]
+    node_gather_node = Int[]
+    node_gather_weight = FT[]
+
+    clip = GO.ConvexConvexSutherlandHodgman(manifold)
+
+    @inbounds for k in eachindex(cc_indices)
+        elem_idx = cc_indices[k]
+        cell_idx = oc_indices[k]
+        area_k = areas[k]
+        area_k == 0 && continue
+
+        elem_poly = CR.Trees.getcell(dst_tree, elem_idx)
+        cell_poly = CR.Trees.getcell(src_tree, cell_idx)
+        intersection_result = GO.intersection(clip, elem_poly, cell_poly; target = GI.PolygonTrait())
+
+        B_total = zeros(Float64, Nq, Nq)
+        for ipoly in _normalize_intersection_polys(intersection_result)
+            B_total .+= CRExt.accumulate_principled_b(
+                manifold,
+                boundary_space_cpu,
+                elem_idx,
+                ipoly;
+                triangle_quad_degree,
+            )
+        end
+
+        node_offset = (elem_idx - 1) * Nq^2
+        inv_area = 1 / area_k
+        for j in 1:Nq, i in 1:Nq
+            Bᵢⱼ = B_total[i, j]
+            Bᵢⱼ == 0 && continue
+            push!(node_gather_polygon, k)
+            push!(node_gather_node, node_offset + CC.Utilities.linear_ind((Nq, Nq), (i, j)))
+            push!(node_gather_weight, FT(Bᵢⱼ * inv_area))
+        end
+    end
+
+    return node_gather_polygon, node_gather_node, node_gather_weight
 end
 
 """
@@ -142,6 +252,16 @@ function extract_intersection_grid(
 
     n_intersections = length(areas)
 
+    node_gather_polygon, node_gather_node, node_gather_weight =
+        build_polygon_nodal_gather_weights(
+            boundary_space_cpu,
+            grid_oc_cpu,
+            cc_indices,
+            oc_indices,
+            areas,
+        )
+    n_nodes = _se_n_nodes(boundary_space_cpu)
+
     return IntersectionGrid(
         cc_indices,
         oc_indices,
@@ -151,6 +271,10 @@ function extract_intersection_grid(
         n_cc,
         n_oc,
         n_intersections,
+        n_nodes,
+        node_gather_polygon,
+        node_gather_node,
+        node_gather_weight,
     )
 end
 
@@ -182,6 +306,10 @@ function extract_intersection_grid(
         ig_cpu.n_cc,
         ig_cpu.n_oc,
         ig_cpu.n_intersections,
+        ig_cpu.n_nodes,
+        ArrayType(ig_cpu.node_gather_polygon),
+        ArrayType(ig_cpu.node_gather_node),
+        ArrayType(ig_cpu.node_gather_weight),
     )
 end
 
@@ -200,6 +328,36 @@ For each intersection polygon, look up the value from its parent CC element.
 function gather_cc_to_intersection!(intersection_values, ig::IntersectionGrid, cc_values)
     @inbounds for k in 1:ig.n_intersections
         intersection_values[k] = cc_values[ig.cc_indices[k]]
+    end
+    return nothing
+end
+
+"""
+    gather_cc_nodal_to_intersection!(intersection_values, ig::IntersectionGrid, nodal_values)
+
+Gather nodal SEM field values to the intersection grid using the precomputed
+polygon-averaging weights (`node_gather_*`).
+
+Each output entry is the area average of the SEM interpolant over the
+corresponding intersection polygon:
+
+    intersection_values[k] = Σₙ wₖₙ nodal_values[n]
+
+# Arguments
+- `intersection_values`: Output vector of length `ig.n_intersections`
+- `ig`: `IntersectionGrid` with populated `node_gather_*` COO arrays
+- `nodal_values`: Flat nodal vector of length `ig.n_nodes`
+"""
+function gather_cc_nodal_to_intersection!(
+    intersection_values,
+    ig::IntersectionGrid,
+    nodal_values,
+)
+    fill!(intersection_values, zero(eltype(intersection_values)))
+    @inbounds for idx in eachindex(ig.node_gather_polygon)
+        k = ig.node_gather_polygon[idx]
+        n = ig.node_gather_node[idx]
+        intersection_values[k] += ig.node_gather_weight[idx] * nodal_values[n]
     end
     return nothing
 end
@@ -473,14 +631,17 @@ import StaticArrays
 
 Compute turbulent surface fluxes on the intersection grid.
 
-This function gathers atmosphere state from CC elements and surface state from OC cells
-to each intersection polygon, computes fluxes using SurfaceFluxes.jl, and stores the
-results in `flux_state`.
+Atmosphere state is gathered from nodal SEM values using the
+precomputed polygon-averaging weights in `ig.node_gather_*`. When those
+weights are empty (e.g. a manually constructed degenerate `IntersectionGrid`),
+the legacy per-element lookup via `cc_indices` is used instead.
 
 # Arguments
 - `flux_state`: `IntersectionFluxState` to store computed fluxes
 - `ig`: `IntersectionGrid` defining the CC/OC intersection polygons
-- `cc_atmos_state`: NamedTuple of CC atmosphere state vectors (per CC element):
+- `cc_atmos_state`: NamedTuple of atmosphere state vectors. With polygon
+  weights populated, each field must be a flat nodal vector of length
+  `ig.n_nodes`; otherwise per-CC-element vectors of length `ig.n_cc`:
   - `T`: Temperature [K]
   - `q_tot`: Total specific humidity [kg/kg]
   - `q_liq`: Liquid specific humidity [kg/kg]
@@ -504,15 +665,7 @@ function compute_surface_fluxes_on_intersection!(
     surface_fluxes_params,
     thermo_params,
 )
-    # Gather atmosphere state to intersection grid
-    gather_cc_to_intersection!(flux_state.atmos_T, ig, cc_atmos_state.T)
-    gather_cc_to_intersection!(flux_state.atmos_q_tot, ig, cc_atmos_state.q_tot)
-    gather_cc_to_intersection!(flux_state.atmos_q_liq, ig, cc_atmos_state.q_liq)
-    gather_cc_to_intersection!(flux_state.atmos_q_ice, ig, cc_atmos_state.q_ice)
-    gather_cc_to_intersection!(flux_state.atmos_ρ, ig, cc_atmos_state.ρ)
-    gather_cc_to_intersection!(flux_state.atmos_u, ig, cc_atmos_state.u)
-    gather_cc_to_intersection!(flux_state.atmos_v, ig, cc_atmos_state.v)
-    gather_cc_to_intersection!(flux_state.atmos_h, ig, cc_atmos_state.h)
+    _gather_cc_atmos_to_intersection!(flux_state, ig, cc_atmos_state)
 
     # Gather surface state to intersection grid
     gather_oc_to_intersection!(flux_state.surface_T, ig, oc_surface_state.T)
@@ -599,6 +752,35 @@ function compute_surface_fluxes_on_intersection!(
         flux_state.flux_evap[k] = outputs.evaporation
     end
 
+    return nothing
+end
+
+"""
+    _gather_cc_atmos_to_intersection!(flux_state, ig, cc_atmos_state)
+
+Route atmosphere fields to the intersection grid via nodal polygon averages
+when `ig.node_gather_*` is populated, otherwise fall back to per-element lookup.
+"""
+function _gather_cc_atmos_to_intersection!(flux_state, ig::IntersectionGrid, cc_atmos_state)
+    if isempty(ig.node_gather_polygon)
+        gather_cc_to_intersection!(flux_state.atmos_T, ig, cc_atmos_state.T)
+        gather_cc_to_intersection!(flux_state.atmos_q_tot, ig, cc_atmos_state.q_tot)
+        gather_cc_to_intersection!(flux_state.atmos_q_liq, ig, cc_atmos_state.q_liq)
+        gather_cc_to_intersection!(flux_state.atmos_q_ice, ig, cc_atmos_state.q_ice)
+        gather_cc_to_intersection!(flux_state.atmos_ρ, ig, cc_atmos_state.ρ)
+        gather_cc_to_intersection!(flux_state.atmos_u, ig, cc_atmos_state.u)
+        gather_cc_to_intersection!(flux_state.atmos_v, ig, cc_atmos_state.v)
+        gather_cc_to_intersection!(flux_state.atmos_h, ig, cc_atmos_state.h)
+    else
+        gather_cc_nodal_to_intersection!(flux_state.atmos_T, ig, cc_atmos_state.T)
+        gather_cc_nodal_to_intersection!(flux_state.atmos_q_tot, ig, cc_atmos_state.q_tot)
+        gather_cc_nodal_to_intersection!(flux_state.atmos_q_liq, ig, cc_atmos_state.q_liq)
+        gather_cc_nodal_to_intersection!(flux_state.atmos_q_ice, ig, cc_atmos_state.q_ice)
+        gather_cc_nodal_to_intersection!(flux_state.atmos_ρ, ig, cc_atmos_state.ρ)
+        gather_cc_nodal_to_intersection!(flux_state.atmos_u, ig, cc_atmos_state.u)
+        gather_cc_nodal_to_intersection!(flux_state.atmos_v, ig, cc_atmos_state.v)
+        gather_cc_nodal_to_intersection!(flux_state.atmos_h, ig, cc_atmos_state.h)
+    end
     return nothing
 end
 

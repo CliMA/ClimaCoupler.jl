@@ -566,37 +566,34 @@ fig_land
 ### Step 1: Gather State to Intersection Grid
 
 For each intersection polygon, we look up:
-- **Atmosphere state** from its parent CC element (T, q, ρ, u, v, height)
+- **Atmosphere state** as the SEM area average over the polygon (from GLL nodal
+  values via precomputed `node_gather_*` weights), not the parent element mean
 - **Surface state** from its parent OC cell (T_sfc, roughness)
 
 ```@example intersection_flux
-# Demonstrate gather operation with a test field
+# Demonstrate nodal polygon-averaging gather with a test field
 
 # Create a CC field with latitude-dependent values (simulating temperature)
 cc_test = CC.Fields.zeros(boundary_space)
 cc_test .= 280.0 .+ 20.0 .* cos.(deg2rad.(coords.lat))
 
-# Extract per-element values
+# Flatten to nodal values and gather via polygon-averaging weights
 CRExt = CMIPExt.get_ConservativeRegriddingCCExt()
-cc_per_element = zeros(FT, ig.n_cc)
-field_ones = CC.Fields.ones(boundary_space)
-CRExt.get_value_per_element!(cc_per_element, cc_test, field_ones)
+cc_nodal = CRExt.se_field_to_vec(cc_test)
 
-# Gather to intersection grid
 intersection_values = zeros(FT, ig.n_intersections)
-CMIPExt.gather_cc_to_intersection!(intersection_values, ig, cc_per_element)
+CMIPExt.gather_cc_nodal_to_intersection!(intersection_values, ig, cc_nodal)
 
-println("CC field statistics:")
-println("  Range: ", extrema(cc_per_element))
-println("Intersection values (gathered from CC):")
+println("Nodal CC field statistics:")
+println("  Range: ", extrema(cc_nodal))
+println("Intersection values (polygon-averaged from nodal SEM field):")
 println("  Range: ", extrema(intersection_values))
-println("  Same range confirms correct gather!")
 ```
 
 ### Step 2: Compute Fluxes on Intersection Polygons
 
-Each intersection polygon gets its own flux calculation using the atmosphere
-state from its CC element and surface state from its OC cell:
+Each intersection polygon gets its own flux calculation using the
+polygon-averaged atmosphere state and the surface state from its OC cell:
 
 ```@example intersection_flux
 import SurfaceFluxes as SF
@@ -611,16 +608,17 @@ toml_dict = CP.create_toml_dict(FT)
 thermo_params = TDP.ThermodynamicsParameters(toml_dict)
 surface_fluxes_params = SFP.SurfaceFluxesParameters(toml_dict, UF.BusingerParams)
 
-# Create atmosphere state (per CC element) - cooler atmosphere
+# Create atmosphere state (per SE node) - cooler atmosphere
+n_nodes = ig.n_nodes
 cc_atmos_state = (
-    T = fill(FT(285), ig.n_cc),      # 285 K atmosphere
-    q_tot = fill(FT(0.008), ig.n_cc), # 8 g/kg humidity
-    q_liq = fill(FT(0), ig.n_cc),
-    q_ice = fill(FT(0), ig.n_cc),
-    ρ = fill(FT(1.2), ig.n_cc),
-    u = fill(FT(5), ig.n_cc),         # 5 m/s wind
-    v = fill(FT(2), ig.n_cc),
-    h = fill(FT(10), ig.n_cc),        # 10 m reference height
+    T = fill(FT(285), n_nodes),      # 285 K atmosphere
+    q_tot = fill(FT(0.008), n_nodes), # 8 g/kg humidity
+    q_liq = fill(FT(0), n_nodes),
+    q_ice = fill(FT(0), n_nodes),
+    ρ = fill(FT(1.2), n_nodes),
+    u = fill(FT(5), n_nodes),         # 5 m/s wind
+    v = fill(FT(2), n_nodes),
+    h = fill(FT(10), n_nodes),        # 10 m reference height
 )
 
 # Create surface state (per OC cell) - latitude-varying SST.

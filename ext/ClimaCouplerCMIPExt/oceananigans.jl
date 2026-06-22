@@ -316,10 +316,10 @@ intersection-grid flux pipeline used by `compute_intersection_grid_fluxes!`:
   uses CR's tree-level `intersection_areas`). On a `TripolarGrid` the fold
   row is handled by CR's `PaddedTreeWrapper` automatically.
 * `intersection_flux_state::IntersectionFluxState` — per-polygon scratch
-  for atmosphere/surface state at the polygon centroid plus the five
-  computed fluxes (`flux_sh`, `flux_lh`, `flux_τx`, `flux_τy`, `flux_evap`).
-* `cc_atmos_temp::NamedTuple` — per-CC-element scratch written by
-  `extract_cc_atmos_state!` from the coupler fields.
+  for atmosphere/surface state plus the five computed fluxes
+  (`flux_sh`, `flux_lh`, `flux_τx`, `flux_τy`, `flux_evap`).
+* `cc_atmos_temp::NamedTuple` — per-SE-node scratch written by
+  `extract_cc_atmos_state!` from the coupler fields (flat GLL layout).
 * `oc_surface_temp::NamedTuple` — per-OC-cell scratch written by
   `extract_oc_surface_state!` from the live ocean state.
 
@@ -395,12 +395,17 @@ function construct_remapper(grid_oc, boundary_space)
             intersection_grid.n_cc,
             intersection_grid.n_oc,
             intersection_grid.n_intersections,
+            intersection_grid.n_nodes,
+            AT(intersection_grid.node_gather_polygon),
+            AT(intersection_grid.node_gather_node),
+            AT(intersection_grid.node_gather_weight),
         )
     end
 
     _alloc(n) = OC.on_architecture(arch, zeros(FT, n))
     n_cc = intersection_grid.n_cc
     n_int = intersection_grid.n_intersections
+    n_nodes = intersection_grid.n_nodes
 
     Nx_oc, Ny_oc, _ = size(grid_oc)
     n_oc_layout = Nx_oc * Ny_oc
@@ -413,18 +418,18 @@ function construct_remapper(grid_oc, boundary_space)
         _alloc(n_int), _alloc(n_int),
     )
 
-    # Per-CC-element scratch for atmosphere state. `extract_cc_atmos_state!`
-    # writes the nine fields below via `CRExt.get_value_per_element!`.
+    # Per-SE-node scratch for atmosphere state. `extract_cc_atmos_state!`
+    # writes the nine fields below via `se_field_to_vec`.
     cc_atmos_temp = (
-        T     = _alloc(n_cc),
-        q_tot = _alloc(n_cc),
-        q_liq = _alloc(n_cc),
-        q_ice = _alloc(n_cc),
-        ρ     = _alloc(n_cc),
-        u     = _alloc(n_cc),
-        v     = _alloc(n_cc),
-        h     = _alloc(n_cc),
-        h_sfc = _alloc(n_cc),
+        T     = _alloc(n_nodes),
+        q_tot = _alloc(n_nodes),
+        q_liq = _alloc(n_nodes),
+        q_ice = _alloc(n_nodes),
+        ρ     = _alloc(n_nodes),
+        u     = _alloc(n_nodes),
+        v     = _alloc(n_nodes),
+        h     = _alloc(n_nodes),
+        h_sfc = _alloc(n_nodes),
     )
 
     # Per-OC-cell scratch for ocean surface state. `extract_oc_surface_state!`
@@ -840,25 +845,21 @@ Plotting.debug_plot_fields(sim::OceananigansSimulation) =
 """
     extract_cc_atmos_state!(cc_atmos_temp, csf, boundary_space)
 
-Extract atmosphere state from coupler fields into per-CC-element vectors.
-
-The coupler fields are stored as ClimaCore Fields on the boundary space.
-This function extracts the per-element mean values into vectors suitable
-for intersection-grid flux calculations.
+Extract atmosphere state from coupler fields into flat nodal vectors suitable
+for polygon-averaged intersection-grid flux calculations.
 """
 function extract_cc_atmos_state!(cc_atmos_temp::NamedTuple, csf, boundary_space)
     CRExt = get_ConservativeRegriddingCCExt()
-    field_ones = CC.Fields.ones(boundary_space)
 
-    CRExt.get_value_per_element!(cc_atmos_temp.T, csf.T_atmos, field_ones)
-    CRExt.get_value_per_element!(cc_atmos_temp.q_tot, csf.q_tot_atmos, field_ones)
-    CRExt.get_value_per_element!(cc_atmos_temp.q_liq, csf.q_liq_atmos, field_ones)
-    CRExt.get_value_per_element!(cc_atmos_temp.q_ice, csf.q_ice_atmos, field_ones)
-    CRExt.get_value_per_element!(cc_atmos_temp.ρ, csf.ρ_atmos, field_ones)
-    CRExt.get_value_per_element!(cc_atmos_temp.u, csf.u_int, field_ones)
-    CRExt.get_value_per_element!(cc_atmos_temp.v, csf.v_int, field_ones)
-    CRExt.get_value_per_element!(cc_atmos_temp.h, csf.height_int, field_ones)
-    CRExt.get_value_per_element!(cc_atmos_temp.h_sfc, csf.height_sfc, field_ones)
+    cc_atmos_temp.T     .= CRExt.se_field_to_vec(csf.T_atmos)
+    cc_atmos_temp.q_tot .= CRExt.se_field_to_vec(csf.q_tot_atmos)
+    cc_atmos_temp.q_liq .= CRExt.se_field_to_vec(csf.q_liq_atmos)
+    cc_atmos_temp.q_ice .= CRExt.se_field_to_vec(csf.q_ice_atmos)
+    cc_atmos_temp.ρ     .= CRExt.se_field_to_vec(csf.ρ_atmos)
+    cc_atmos_temp.u     .= CRExt.se_field_to_vec(csf.u_int)
+    cc_atmos_temp.v     .= CRExt.se_field_to_vec(csf.v_int)
+    cc_atmos_temp.h     .= CRExt.se_field_to_vec(csf.height_int)
+    cc_atmos_temp.h_sfc .= CRExt.se_field_to_vec(csf.height_sfc)
     return nothing
 end
 
@@ -913,7 +914,7 @@ function compute_intersection_grid_fluxes!(
     (; intersection_grid, intersection_flux_state, cc_atmos_temp, oc_surface_temp) = sim.remapping
     boundary_space = axes(csf)
 
-    # Extract atmosphere state from coupler fields to per-element vectors
+    # Extract atmosphere state from coupler fields to per-node vectors
     extract_cc_atmos_state!(cc_atmos_temp, csf, boundary_space)
 
     # Prepare cc_atmos_state NamedTuple (using h_sfc for surface height)

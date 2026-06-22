@@ -316,12 +316,19 @@ flat CPU mask returned by [`flat_fv_wet_mask`](@ref).
 """
 function fv_wet_mask_field(grid_oc, wet_mask_cpu::AbstractVector{Bool})
     Nx, Ny = size(grid_oc)[1:2]
+    length(wet_mask_cpu) == Nx * Ny ||
+        error("wet mask length $(length(wet_mask_cpu)) != Nx * Ny = $(Nx * Ny)")
+
     mask_field = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
-    wet_2d_cpu = reshape(Float64.(wet_mask_cpu), Nx, Ny)
     arch = OC.Architectures.architecture(grid_oc)
-    wet_2d = OC.Architectures.on_architecture(arch, wet_2d_cpu)
-    copyto!(OC.interior(mask_field, :, :, 1), wet_2d)
+    wet_1d = OC.Architectures.on_architecture(arch, Float64.(wet_mask_cpu))
+    OC.Utils.launch!(arch, grid_oc, :xy, _fill_fv_wet_mask!, mask_field, wet_1d, Nx)
     return mask_field
+end
+
+@kernel function _fill_fv_wet_mask!(mask_field, wet_1d, Nx)
+    i, j = @index(Global, NTuple)
+    @inbounds mask_field[i, j, 1] = wet_1d[(j - 1) * Nx + i]
 end
 
 """

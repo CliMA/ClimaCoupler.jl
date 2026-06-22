@@ -288,7 +288,7 @@ underlying_grid(grid::OC.ImmersedBoundaryGrid) = grid.underlying_grid
 underlying_grid(grid) = grid
 
 """
-    fv_wet_mask(grid_oc)
+    flat_fv_wet_mask(grid_oc)
 
 Return a `BitVector` of length `Nx * Ny` indicating wet (non-immersed) ocean FV
 cells. Indexing matches `vec(OC.interior(field, :, :, k))` — column-major with
@@ -296,7 +296,7 @@ cells. Indexing matches `vec(OC.interior(field, :, :, k))` — column-major with
 
 For grids without an immersed boundary, every cell is wet.
 """
-function fv_wet_mask(grid_oc)
+function flat_fv_wet_mask(grid_oc)
     Nx, Ny = size(grid_oc)[1:2]
     wet = trues(Nx * Ny)
     grid_oc isa OC.ImmersedBoundaryGrid || return wet
@@ -306,6 +306,20 @@ function fv_wet_mask(grid_oc)
         wet[(j - 1) * Nx + i] = !OC.ImmersedBoundaries.immersed_cell(i, j, 1, grid_cpu)
     end
     return wet
+end
+
+"""
+    fv_wet_mask_field(grid_oc, wet_mask_cpu)
+
+Build a 2D `Center/Center` mask field on `grid_oc` (`1` = wet, `0` = dry) from the
+flat CPU mask returned by [`flat_fv_wet_mask`](@ref).
+"""
+function fv_wet_mask_field(grid_oc, wet_mask_cpu::AbstractVector{Bool})
+    Nx, Ny = size(grid_oc)[1:2]
+    mask_field = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
+    wet_2d = reshape(Float64.(wet_mask_cpu), Nx, Ny)
+    OC.interior(mask_field, :, :, 1) .= wet_2d
+    return mask_field
 end
 
 """
@@ -381,7 +395,7 @@ independent sparse regridders needed to remap between them in both directions.
 
 When `grid_oc` is an `ImmersedBoundaryGrid`, immersed (land) FV cells are
 excluded from both regridders via [`apply_fv_wet_mask_to_regridder!`](@ref) and
-[`fv_wet_mask`](@ref). The wet mask is returned as `fv_wet_mask` for use in
+[`flat_fv_wet_mask`](@ref). The wet mask is returned as `fv_wet_mask` for use in
 [`Interfacer.remap!`](@ref).
 
 For low-level use: `CR.regrid!(dst, remapper_oc_to_cc, src)` and
@@ -420,7 +434,7 @@ function construct_remapper(grid_oc, boundary_space)
     # ConservativeRegridding is built on the underlying grid and is unaware of
     # the immersed boundary; zeroing dry rows/columns excludes land from both
     # SST projection (OC → CC) and flux deposition (CC → OC).
-    wet_mask_cpu = fv_wet_mask(grid_oc)
+    wet_mask_cpu = flat_fv_wet_mask(grid_oc)
     apply_fv_wet_mask_to_regridder!(remapper_oc_to_cc, wet_mask_cpu; fv_role = :source)
     apply_fv_wet_mask_to_regridder!(remapper_cc_to_oc, wet_mask_cpu; fv_role = :destination)
 
@@ -432,7 +446,7 @@ function construct_remapper(grid_oc, boundary_space)
     arch = OC.architecture(grid_oc)
     remapper_oc_to_cc = OC.Architectures.on_architecture(arch, remapper_oc_to_cc)
     remapper_cc_to_oc = OC.Architectures.on_architecture(arch, remapper_cc_to_oc)
-    fv_wet_mask_oc = OC.Architectures.on_architecture(arch, wet_mask_cpu)
+    fv_wet_mask = fv_wet_mask_field(grid_oc, wet_mask_cpu)
 
     FT = CC.Spaces.undertype(boundary_space)
 
@@ -451,7 +465,7 @@ function construct_remapper(grid_oc, boundary_space)
     return (;
         remapper_oc_to_cc,
         remapper_cc_to_oc,
-        fv_wet_mask = fv_wet_mask_oc,
+        fv_wet_mask,
         scratch_field_oc1,
         scratch_field_oc2,
         scratch_field_oc3,

@@ -122,7 +122,7 @@ function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field
     dst = vec(OC.interior(target_field, :, :, Nz))
 
     CR.regrid!(dst, remapping.remapper_cc_to_oc, source_field)
-    zero_immersed_fv_values!(dst, remapping.fv_wet_mask)
+    apply_fv_wet_mask!(target_field, remapping.fv_wet_mask, Nz)
     return nothing
 end
 
@@ -142,21 +142,28 @@ function Interfacer.remap(
 end
 
 """
-    zero_immersed_fv_values!(data, wet_mask)
+    apply_fv_wet_mask!(field, wet_mask_field, k)
 
-Zero entries in a flat FV vector over immersed (land) cells.
+Zero `field` at immersed (land) cells using the precomputed 2D wet mask field
+(`1` = wet, `0` = dry). Runs on the grid architecture (GPU-safe).
 """
-function zero_immersed_fv_values!(data, wet_mask)
-    data .= ifelse.(wet_mask, data, zero(eltype(data)))
-    return data
+function apply_fv_wet_mask!(field::OC.Field, wet_mask_field::OC.Field, k)
+    arch = OC.Architectures.architecture(field.grid)
+    OC.Utils.launch!(arch, field.grid, :xy, _apply_fv_wet_mask!, field, wet_mask_field, k)
+    return nothing
+end
+
+@kernel function _apply_fv_wet_mask!(field, wet_mask_field, k)
+    i, j = @index(Global, NTuple)
+    @inbounds field[i, j, k] *= wet_mask_field[i, j, 1]
 end
 
 # Non-allocating Oceananigans Field -> ClimaCore remap.
 function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field, remapping)
     # Get the index of the top level (surface); Nz=1 for 2D fields
     Nz = size(source_field, 3)
+    apply_fv_wet_mask!(source_field, remapping.fv_wet_mask, Nz)
     src = vec(OC.interior(source_field, :, :, Nz))
-    zero_immersed_fv_values!(src, remapping.fv_wet_mask)
 
     CR.regrid!(target_field, remapping.remapper_oc_to_cc, src)
     return nothing

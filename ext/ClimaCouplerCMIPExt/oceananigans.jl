@@ -287,6 +287,82 @@ is unaware of the immersed mask. Raw grids pass through unchanged so that
 underlying_grid(grid::OC.ImmersedBoundaryGrid) = grid.underlying_grid
 underlying_grid(grid) = grid
 
+"""
+    fv_wet_mask(grid_oc)
+
+Return a `BitVector` of length `Nx * Ny` indicating wet (non-immersed) ocean FV
+cells. Indexing matches `vec(OC.interior(field, :, :, k))` — column-major with
+`i` fastest: `(j - 1) * Nx + i`.
+
+For grids without an immersed boundary, every cell is wet.
+"""
+function fv_wet_mask(grid_oc)
+    Nx, Ny = size(grid_oc)[1:2]
+    wet = trues(Nx * Ny)
+    grid_oc isa OC.ImmersedBoundaryGrid || return wet
+
+    grid_cpu = OC.on_architecture(OC.CPU(), grid_oc)
+    @inbounds for j in 1:Ny, i in 1:Nx
+        wet[(j - 1) * Nx + i] = !OC.ImmersedBoundaries.immersed_cell(i, j, 1, grid_cpu)
+    end
+    return wet
+end
+
+"""
+    zero_sparse_rows!(A, keep_row)
+
+Zero every nonzero in rows where `keep_row[row]` is `false`.
+"""
+function zero_sparse_rows!(A::SparseArrays.SparseMatrixCSC, keep_row::AbstractVector{Bool})
+    @inbounds for k in eachindex(A.nzval)
+        keep_row[A.rowval[k]] || (A.nzval[k] = zero(A.nzval[k]))
+    end
+    return A
+end
+
+"""
+    zero_sparse_cols!(A, keep_col)
+
+Zero every nonzero in columns where `keep_col[col]` is `false`.
+"""
+function zero_sparse_cols!(A::SparseArrays.SparseMatrixCSC, keep_col::AbstractVector{Bool})
+    @inbounds for col in 1:size(A, 2)
+        keep_col[col] && continue
+        for k in SparseArrays.nzrange(A, col)
+            A.nzval[k] = zero(A.nzval[k])
+        end
+    end
+    return A
+end
+
+"""
+    apply_fv_wet_mask_to_regridder!(regridder, wet_mask; fv_role)
+
+Apply an immersed-boundary wet mask to a `ConservativeRegridding.Regridder`.
+
+* `fv_role = :source` — FV cells index matrix columns (OC → CC).
+* `fv_role = :destination` — FV cells index matrix rows (CC → OC).
+"""
+function apply_fv_wet_mask_to_regridder!(
+    regridder::CR.Regridder,
+    wet_mask::AbstractVector{Bool};
+    fv_role::Symbol,
+)
+    if fv_role === :source
+        n_fv = length(regridder.src_areas)
+        length(wet_mask) == n_fv ||
+            error("wet mask length $(length(wet_mask)) != FV source count $n_fv")
+        zero_sparse_cols!(regridder.intersections, wet_mask)
+    elseif fv_role === :destination
+        n_fv = length(regridder.dst_areas)
+        length(wet_mask) == n_fv ||
+            error("wet mask length $(length(wet_mask)) != FV destination count $n_fv")
+        zero_sparse_rows!(regridder.intersections, wet_mask)
+    else
+        error("fv_role must be :source or :destination, got $fv_role")
+    end
+    return regridder
+end
 
 """
     construct_remapper(grid_oc, boundary_space)
@@ -335,6 +411,14 @@ function construct_remapper(grid_oc, boundary_space)
         threaded = false,
     )
 
+    # Mask immersed (land) FV cells so they do not participate in regridding.
+    # ConservativeRegridding is built on the underlying grid and is unaware of
+    # the immersed boundary; zeroing dry rows/columns excludes land from both
+    # SST projection (OC → CC) and flux deposition (CC → OC).
+    wet_mask_cpu = fv_wet_mask(grid_oc)
+    apply_fv_wet_mask_to_regridder!(remapper_oc_to_cc, wet_mask_cpu; fv_role = :source)
+    apply_fv_wet_mask_to_regridder!(remapper_cc_to_oc, wet_mask_cpu; fv_role = :destination)
+
     # Convert sparse matrix element types to match the simulation's float type,
     # then move both remappers to the architecture of `grid_oc`.
     remapper_oc_to_cc = convert_regridder_eltype(FT_cc, remapper_oc_to_cc)
@@ -343,6 +427,7 @@ function construct_remapper(grid_oc, boundary_space)
     arch = OC.architecture(grid_oc)
     remapper_oc_to_cc = OC.Architectures.on_architecture(arch, remapper_oc_to_cc)
     remapper_cc_to_oc = OC.Architectures.on_architecture(arch, remapper_cc_to_oc)
+    fv_wet_mask_oc = OC.Architectures.on_architecture(arch, wet_mask_cpu)
 
     FT = CC.Spaces.undertype(boundary_space)
 
@@ -361,6 +446,7 @@ function construct_remapper(grid_oc, boundary_space)
     return (;
         remapper_oc_to_cc,
         remapper_cc_to_oc,
+        fv_wet_mask = fv_wet_mask_oc,
         scratch_field_oc1,
         scratch_field_oc2,
         scratch_field_oc3,

@@ -122,6 +122,7 @@ function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field
     dst = vec(OC.interior(target_field, :, :, Nz))
 
     CR.regrid!(dst, remapping.remapper_cc_to_oc, source_field)
+    zero_immersed_fv_values!(dst, remapping.fv_wet_mask)
     return nothing
 end
 
@@ -140,11 +141,24 @@ function Interfacer.remap(
     return target_field
 end
 
+"""
+    zero_immersed_fv_values!(data, wet_mask)
+
+Zero entries in a flat FV vector over immersed (land) cells.
+"""
+function zero_immersed_fv_values!(data, wet_mask)
+    @inbounds for k in eachindex(data)
+        wet_mask[k] || (data[k] = zero(eltype(data)))
+    end
+    return data
+end
+
 # Non-allocating Oceananigans Field -> ClimaCore remap.
 function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field, remapping)
     # Get the index of the top level (surface); Nz=1 for 2D fields
     Nz = size(source_field, 3)
     src = vec(OC.interior(source_field, :, :, Nz))
+    zero_immersed_fv_values!(src, remapping.fv_wet_mask)
 
     CR.regrid!(target_field, remapping.remapper_oc_to_cc, src)
     return nothing

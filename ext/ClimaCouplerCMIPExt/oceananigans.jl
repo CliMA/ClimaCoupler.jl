@@ -465,20 +465,47 @@ end
 Sync the ice concentration field on the ocean simulation with the ice
 simulation's concentration so that it can be used for weighting flux updates.
 
-With a `TripolarGrid` covering the full sphere there is no polar band to
-exclude from physical contribution; previously this routine forced land
-fraction to 1 (and ice / ocean fractions to 0) for `|lat| ≥ 78°` on a
-`LatitudeLongitudeGrid`, which is no longer needed.
+For a capped `LatitudeLongitudeGrid` (±80°), the ocean and ice models do not
+cover the poles; land is assigned the full area fraction for `|lat| ≥ 78°`
+(same band historically used to zero ocean surface fluxes).
+
+For a full-sphere `TripolarGrid`, ocean and sea ice are active at all latitudes
+and no polar reassignment is applied. In both cases, ice and ocean area
+fractions are sanitized and the ocean fraction is recomputed as the residual
+`1 - ice - land` so the partition-of-unity check in `update_surface_fractions!`
+is robust to remap NaNs and floating-point drift.
 """
 function FieldExchanger.resolve_area_fractions!(
     ocean_sim::OceananigansSimulation,
     ice_sim,
     land_fraction,
 )
-    ice_sim isa ClimaSeaIceSimulation && (
-        ocean_sim.ice_concentration .=
-            Interfacer.get_field(ice_sim, Val(:ice_concentration))
+    ice_sim isa ClimaSeaIceSimulation || return nothing
+
+    ocean_sim.ice_concentration .=
+        Interfacer.get_field(ice_sim, Val(:ice_concentration))
+
+    ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
+    ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
+    boundary_space = axes(ocean_fraction)
+    FT = CC.Spaces.undertype(boundary_space)
+
+    if ocean_sim.ocean.model.grid.underlying_grid isa OC.LatitudeLongitudeGrid
+        lat = CC.Fields.coordinate_field(boundary_space).lat
+        polar_mask = CC.Fields.zeros(boundary_space)
+        polar_mask .= abs.(lat) .< FT(78)
+        @. land_fraction = polar_mask * land_fraction + (1 - polar_mask)
+        @. ice_fraction = polar_mask * ice_fraction
+        @. ocean_fraction = polar_mask * ocean_fraction
+    end
+
+    @. ice_fraction = ifelse(
+        isfinite(ice_fraction),
+        max(min(ice_fraction, FT(1) - land_fraction), FT(0)),
+        FT(0),
     )
+    @. ocean_fraction = max(FT(1) - ice_fraction - land_fraction, FT(0))
+
     return nothing
 end
 

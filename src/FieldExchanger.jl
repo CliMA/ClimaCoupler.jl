@@ -47,6 +47,9 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
         ice_sim = cs.model_sims.ice_sim
         Interfacer.get_field!(cs.fields.scalar_temp2, ice_sim, Val(:ice_concentration))
         ice_concentration = cs.fields.scalar_temp2
+        # Remap can yield NaN where no wet FV cells overlap (tripolar fold / coast).
+        @. ice_concentration =
+            ifelse(isfinite(ice_concentration), ice_concentration, FT(0))
 
         # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
         Interfacer.update_field!(
@@ -72,6 +75,9 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
         # Apply any additional constraints on the ocean and ice fractions if necessary
         if haskey(cs.model_sims, :ice_sim)
             resolve_area_fractions!(ocean_sim, cs.model_sims.ice_sim, land_fraction)
+            # `resolve_area_fractions!` may adjust fields in place (e.g. polar band).
+            ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
+            ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
         end
     else
         cs.fields.scalar_temp3 .= 0

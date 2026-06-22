@@ -164,6 +164,9 @@ function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field
     copyto!(src_temp, vec(OC.interior(source_field, :, :, Nz)))
     mask_fv_vector!(src_temp, remapping.fv_wet_mask_1d)
     CR.regrid!(target_field, remapping.remapper_oc_to_cc, src_temp)
+    # L2 projection nodes with no wet FV overlap can be NaN; treat as zero.
+    @. target_field =
+        ifelse(isfinite(target_field), target_field, zero(eltype(target_field)))
     return nothing
 end
 

@@ -147,9 +147,7 @@ end
 Zero entries in a flat FV vector over immersed (land) cells.
 """
 function zero_immersed_fv_values!(data, wet_mask)
-    @inbounds for k in eachindex(data)
-        wet_mask[k] || (data[k] = zero(eltype(data)))
-    end
+    data .= ifelse.(wet_mask, data, zero(eltype(data)))
     return data
 end
 

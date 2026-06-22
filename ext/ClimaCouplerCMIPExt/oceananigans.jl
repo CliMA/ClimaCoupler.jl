@@ -379,6 +379,11 @@ independent sparse regridders needed to remap between them in both directions.
   FV intersection polygon and divides by the FV cell area, giving a mean-
   preserving cell average that preserves constants exactly.
 
+When `grid_oc` is an `ImmersedBoundaryGrid`, immersed (land) FV cells are
+excluded from both regridders via [`apply_fv_wet_mask_to_regridder!`](@ref) and
+[`fv_wet_mask`](@ref). The wet mask is returned as `fv_wet_mask` for use in
+[`Interfacer.remap!`](@ref).
+
 For low-level use: `CR.regrid!(dst, remapper_oc_to_cc, src)` and
 `CR.regrid!(dst, remapper_cc_to_oc, src)`. The `Interfacer.remap!` methods in
 `climaocean_helpers.jl` accept `CC.Fields.Field` directly as source or

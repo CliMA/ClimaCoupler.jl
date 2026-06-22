@@ -42,12 +42,10 @@ const DEFAULT_OCEAN_SURFACE_MOVIE_FIELDS = [
     ("surface_salinity_flux", "Surface salinity flux"),
 ]
 
-const DEFAULT_OCEAN_FIELDS_MOVIE_FIELDS = [
-    ("temperature", "Temperature (surface)"),
-    ("salinity", "Salinity (surface)"),
-    ("zonal_velocity", "Zonal velocity (surface)"),
-    ("meridional_velocity", "Meridional velocity (surface)"),
-]
+# The 3-D fields writer stores T, S, u, v at all depths; surface slices duplicate
+# `DEFAULT_OCEAN_SURFACE_MOVIE_FIELDS`. Pass `field_fields` explicitly for subsurface
+# or non-overlapping variables (e.g. `vertical_velocity`).
+const DEFAULT_OCEAN_FIELDS_MOVIE_FIELDS = Tuple{String, String}[]
 
 # Colormap and color-range style for each diagnostic variable.
 # `:sequential` uses the data extrema; `:divergent` uses a symmetric range about zero.
@@ -75,6 +73,53 @@ Unknown variables default to a sequential viridis scale.
 """
 function _ocean_movie_plot_style(variable_name)
     return get(OCEAN_MOVIE_PLOT_STYLES, variable_name, (:viridis, :sequential))
+end
+
+"""
+    _ocean_part_jld2_paths(collection_path)
+
+Return sorted paths to split JLD2 part files for a diagnostic collection, if any exist.
+"""
+function _ocean_part_jld2_paths(collection_path)
+    dir = dirname(collection_path)
+    base = basename(collection_path)
+    part_number(f) = parse(Int, match(r"_part(\d+)\.jld2$", f).captures[1])
+    part_files = filter(readdir(dir)) do f
+        startswith(f, base * "_part") && endswith(f, ".jld2")
+    end
+    return joinpath.(dir, sort(part_files, by = part_number))
+end
+
+"""
+    _ocean_diagnostic_field_time_series(collection_path, variable_name)
+
+Load a diagnostic `FieldTimeSeries` for visualization only.
+
+Boundary conditions are omitted (`boundary_conditions = nothing`) because serialized
+metadata for some velocity fields (notably meridional velocity on tripolar grids)
+can fail JLD2 deserialization and break halo filling when indexing snapshots.
+Interior values are sufficient for plotting.
+
+When split part files exist (``<collection>_part1.jld2``, etc.), all parts are merged.
+Oceananigans only auto-discovers parts if the base ``<collection>.jld2`` is missing;
+writers often leave a stale base file alongside parts, which would otherwise truncate
+movies at the first split boundary (typically 10 days for a 15-day split interval).
+"""
+function _ocean_diagnostic_field_time_series(collection_path, variable_name)
+    part_paths = _ocean_part_jld2_paths(collection_path)
+    if !isempty(part_paths)
+        return JLD2.jldopen(first(part_paths)) do file
+            FieldTimeSeries(
+                file,
+                variable_name;
+                boundary_conditions = nothing,
+                Nparts = length(part_paths),
+                part_paths = part_paths,
+                path = first(part_paths),
+            )
+        end
+    end
+    return FieldTimeSeries(collection_path, variable_name; boundary_conditions = nothing)
 end
 
 """
@@ -303,7 +348,7 @@ function make_ocean_field_movie(
     colormap = isnothing(colormap) ? default_colormap : colormap
     range_style = isnothing(range_style) ? default_range_style : range_style
 
-    fts = FieldTimeSeries(collection_path, variable_name)
+    fts = _ocean_diagnostic_field_time_series(collection_path, variable_name)
     length(fts.times) < 2 && begin
         @warn "Skipping movie for `$variable_name`: fewer than 2 time snapshots"
         return nothing
@@ -457,7 +502,7 @@ function Plotting.view_ocean_field_globe(
     colormap = isnothing(colormap) ? default_colormap : colormap
     range_style = isnothing(range_style) ? default_range_style : range_style
 
-    fts = FieldTimeSeries(collection_path, variable_name)
+    fts = _ocean_diagnostic_field_time_series(collection_path, variable_name)
     Nt = length(fts.times)
     time_index = clamp(time_index, 1, Nt)
 
@@ -530,8 +575,8 @@ end
 Create movies for Oceananigans ocean diagnostics written by `add_ocean_diagnostics!`.
 
 Reads JLD2 collections in `output_path`:
-- `<filename_prefix>_surface[...].jld2` for 2D surface diagnostics
-- `<filename_prefix>_fields[...].jld2` for 3D fields (surface level plotted)
+- `<filename_prefix>_surface[...].jld2` for 2D surface diagnostics (default movies)
+- `<filename_prefix>_fields[...].jld2` only when `field_fields` is non-empty
 
 Movies are saved to `plot_path` as `<output_prefix><variable_name>.<format>`.
 Returns a vector of paths to the created movie files.

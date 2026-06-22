@@ -317,8 +317,10 @@ flat CPU mask returned by [`flat_fv_wet_mask`](@ref).
 function fv_wet_mask_field(grid_oc, wet_mask_cpu::AbstractVector{Bool})
     Nx, Ny = size(grid_oc)[1:2]
     mask_field = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
-    wet_2d = reshape(Float64.(wet_mask_cpu), Nx, Ny)
-    OC.interior(mask_field, :, :, 1) .= wet_2d
+    wet_2d_cpu = reshape(Float64.(wet_mask_cpu), Nx, Ny)
+    arch = OC.Architectures.architecture(grid_oc)
+    wet_2d = OC.Architectures.on_architecture(arch, wet_2d_cpu)
+    copyto!(OC.interior(mask_field, :, :, 1), wet_2d)
     return mask_field
 end
 

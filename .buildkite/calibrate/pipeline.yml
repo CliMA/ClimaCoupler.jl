@@ -1,0 +1,34 @@
+agents:
+  queue: derecho
+  modules: climacommon/2025_02_25
+  pbs_l_select: "1:ncpus=1:ngpus=1"
+
+steps:
+  - label: "init"
+    key: "init_env"
+    command:
+      - echo "--- Instantiate AMIP env"
+      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true); Pkg.status()'
+
+    env:
+      JULIA_NUM_PRECOMPILE_TASKS: 8
+      JULIA_MAX_NUM_PRECOMPILE_FILES: 50
+
+  - wait
+  - group: "Flagship AMIP calibration"
+    steps:
+    - label: "Generate observations"
+      key: "gen_obs"
+      command:
+      - julia --project=experiments/AMIP/ experiments/calibration/amip/generate_observations.jl
+
+    - label: "Run calibration"
+      depends_on: "gen_obs"
+      command:
+        - julia --project=experiments/AMIP/ experiments/calibration/amip/run_calibration.jl
+      agents:
+        pbs_l_walltime: "12:00:00"
+      retry:
+        automatic:
+          - exit_status: -1
+            limit: 3

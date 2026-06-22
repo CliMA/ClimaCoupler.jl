@@ -29,6 +29,7 @@ surface_setup: "PrescribedSurface"
 t_end: "3650days"
 topo_smoothing: true
 topography: "Earth"
+use_itime: false
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]
     period: 1months

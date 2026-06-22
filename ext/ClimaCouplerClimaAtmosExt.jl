@@ -667,8 +667,11 @@ function get_atmos_config_dict(
     atmos_toml = CP.create_toml_dict(FT; override_file)
     toml_dict = CP.merge_override_default_values(coupled_param_dict, atmos_toml)
 
-    # Specify atmos output directory to be inside the coupler output directory
-    atmos_config["output_dir_style"] = "RemovePreexisting"
+    # Specify atmos output directory to be inside the coupler output directory.
+    # Honor the coupler's output_dir_style if set (e.g. "activelink" so atmos
+    # can auto-detect a restart file across runs); otherwise default to
+    # RemovePreexisting.
+    get!(atmos_config, "output_dir_style", "RemovePreexisting")
     atmos_config["output_dir"] = atmos_output_dir
 
     # Add all extra atmos diagnostic entries into the vector of atmos diagnostics

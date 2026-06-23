@@ -378,6 +378,7 @@ steps:
           automatic:
             - exit_status: -1  # Retry on agent lost
               limit: 1
+        timeout_in_minutes: 1440
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1

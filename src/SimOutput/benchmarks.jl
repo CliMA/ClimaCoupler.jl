@@ -36,7 +36,7 @@ function argparse_settings_benchmarks()
         help = "The name of the GPU atmos-only run we want to compare."
         arg_type = String
         default = nothing
-        "--job_id_atmos_diagedmf"
+        "--job_id_atmos_progedmf"
         help = "The name of the GPU atmos-only run we want to compare."
         arg_type = String
         default = nothing
@@ -76,7 +76,7 @@ get_benchmark_args() = ArgParse.parse_args(ARGS, argparse_settings_benchmarks())
 Use the input `parsed_args` to get the job ID and artifacts directories for
 the GPU run of the given `run_type`.
 
-`run_type` must be one of "coupled", "coupled_io", "atmos", "atmos_diagedmf",
+`run_type` must be one of "coupled", "coupled_io", "atmos", "atmos_progedmf",
 "coupled_progedmf_coarse", or "coupled_progedmf_fine".
 """
 function get_run_info(parsed_args, run_type)
@@ -87,8 +87,8 @@ function get_run_info(parsed_args, run_type)
     elseif run_type == "coupled_io"
         job_id = parsed_args["job_id_coupled_io"]
         mode_name = "amip"
-    elseif run_type == "atmos_diagedmf"
-        job_id = parsed_args["job_id_atmos_diagedmf"]
+    elseif run_type == "atmos_progedmf"
+        job_id = parsed_args["job_id_atmos_progedmf"]
         mode_name = "climaatmos"
     elseif run_type == "atmos"
         job_id = parsed_args["job_id_atmos"]

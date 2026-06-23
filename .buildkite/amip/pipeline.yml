@@ -40,7 +40,7 @@ steps:
         key: "amip"
         command:
           - echo "--- Run simulation"
-          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_land.yml --job_id amip"
+          - "srun --cpu-bind=threads --cpus-per-task=4 julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip.yml --job_id amip"
         artifact_paths: "output/amip/artifacts/*"
         timeout_in_minutes: 5760
         env:
@@ -60,7 +60,10 @@ steps:
 
       - label: "Send simulation output to Azure VM for visualization"
         command:
-          - rsync -avz output/amip/output_active/* azure-arenchon:/home/arenchon/GitHub/ClimaViz.jl/data/climacoupler-amip/
+          # Exclude restart checkpoints (*.hdf5): ClimaViz/ClimaAnalysis only read the
+          # NetCDF diagnostics, and the checkpoints (~2.4 GB/run) otherwise fill the VM's
+          # 16 GB ephemeral disk. They remain written/kept on the cluster for restarts.
+          - rsync -avz --exclude='*.hdf5' output/amip/output_active/* azure-arenchon:/home/arenchon/GitHub/ClimaViz.jl/data/climacoupler-amip/
 
       - label: ":envelope: Slack report: current AMIP"
         command:

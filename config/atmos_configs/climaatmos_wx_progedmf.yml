@@ -40,7 +40,7 @@ microphysics_model: "0M"
 
 ### 1M Microphysics ###
 # microphysics_model: "NonEquilibriumMicrophysics0M"
-# toml: [toml/diagnostic_edmfx_1M.toml]
+# toml: [toml/prognostic_edmfx_1M.toml]
 
 cloud_model: "quadrature"
 use_itime: true

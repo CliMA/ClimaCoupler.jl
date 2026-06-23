@@ -16,5 +16,5 @@ h_elem: 8
 mode_name: "slabplanet_aqua"
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "10days"
+t_end: "5days"
 use_land_diagnostics: false

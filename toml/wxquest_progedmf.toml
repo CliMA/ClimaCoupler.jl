@@ -1,71 +1,83 @@
 [zd_rayleigh]
 value = 40000.0
+type = "float"
 
 [zd_viscous]
 value = 40000.0
-
-[alpha_rayleigh_sgs_tracer]
-value = 0.001
+type = "float"
 
 [EDMF_surface_area]
 value = 0.1
+type = "float"
 
 [EDMF_min_area]
 value = 1.0e-5
+type = "float"
 
 [EDMF_max_area]
 value = 0.7
+type = "float"
 
 [entr_inv_tau]
 value = 0
+type = "float"
 
 [entr_coeff]
 value = 0.1
+type = "float"
 
 [min_area_limiter_scale]
 value = 0.0001
+type = "float"
 
 [min_area_limiter_power]
 value = 1
+type = "float"
 
 [turb_entr_param_vec]
 value = [1e-4, 10]
+type = "float"
 
 [entr_detr_limit_inv_tau]
 value = 0
+type = "float"
 
 [detr_inv_tau]
 value = 0
+type = "float"
 
 [detr_coeff]
 value = 0
+type = "float"
 
 [detr_buoy_coeff]
 value = 1
+type = "float"
 
 [detr_vertdiv_coeff]
 value = 0
+type = "float"
 
 [detr_massflux_vertdiv_coeff]
 value = 0.1
+type = "float"
 
 [max_area_limiter_scale]
 value = 0.001
+type = "float"
 
 [max_area_limiter_power]
 value = 1
+type = "float"
 
 [pressure_normalmode_drag_coeff]
 value = 40.0
+type = "float"
 
 [mixing_length_eddy_viscosity_coefficient]
 value = 0.56
+type = "float"
 
-[tracer_vertical_diffusion_factor]
-value = 0
-
-[condensation_evaporation_timescale]
-value = 100
-
-[sublimation_deposition_timescale]
-value = 100
+[precipitation_timescale]
+value = 1200
+type = "float"

@@ -41,6 +41,53 @@ function Interfacer.OceanSimulation(::Type{FT}, ::Val{:oceananigans}; kwargs...)
 end
 
 """
+    tripolar_ocean_simulation(arch; active_cells_map, kwargs...)
+
+One-degree tripolar ocean setup matching
+`ClimaOcean.OceanConfigurations.one_degree_tripolar_ocean`, but exposing
+`active_cells_map`. Tripolar immersed grids with `active_cells_map = true`
+exceed the 4 KiB CUDA kernel parameter limit on sm_60 (P100) even with a
+minimal closure; disabling the map keeps the tripolar grid while staying
+within the limit.
+"""
+function tripolar_ocean_simulation(
+    arch;
+    active_cells_map = true,
+    zstar = true,
+    Nz = 32,
+    depth = 5500,
+    momentum_advection = OC.WENOVectorInvariant(order = 5),
+    tracer_advection = OC.WENO(order = 5),
+    closure = nothing,
+    halo = (5, 5, 4),
+    minimum_depth = 10,
+    interpolation_passes = 10,
+    substeps = 70,
+    kwargs...,
+)
+    z = OC.ExponentialDiscretization(Nz, -depth, 0; mutable = zstar)
+
+    grid = OC.TripolarGrid(arch; size = (360, 180, Nz), z, halo)
+
+    bottom_height =
+        CO.regrid_bathymetry(grid; minimum_depth, major_basins = 2, interpolation_passes)
+
+    grid =
+        OC.ImmersedBoundaryGrid(grid, OC.GridFittedBottom(bottom_height); active_cells_map)
+
+    free_surface = OC.SplitExplicitFreeSurface(grid; substeps)
+
+    return CO.ocean_simulation(
+        grid;
+        momentum_advection,
+        tracer_advection,
+        free_surface,
+        closure,
+        kwargs...,
+    )
+end
+
+"""
     OceananigansSimulation(; kwargs...)
 
 Creates an OceananigansSimulation object containing a model, an integrator, and
@@ -99,10 +146,15 @@ function OceananigansSimulation(
 
     # Create ocean simulation
     closure = if simple_ocean
+        @info "Using simpler ocean setup; to be used for software testing only."
         CO.OceanConfigurations.simplified_ocean_closure()
     else
         CO.OceanConfigurations.default_one_degree_closure()
     end
+
+    # Tripolar active_cells_map kernels exceed the 4 KiB sm_60 limit on P100.
+    active_cells_map = !simple_ocean
+    zstar = !simple_ocean
 
     if tspan[1] isa ITime
         # create a model clock that uses DateTime, for compatibility with ITime.
@@ -115,10 +167,15 @@ function OceananigansSimulation(
         error("Unsupported time type: $(typeof(tspan[1]))")
     end
 
-    ocean = CO.OceanConfigurations.one_degree_tripolar_ocean(
+    ocean = tripolar_ocean_simulation(
         arch;
+        zstar,
+        active_cells_map,
         clock = model_clock,
         depth = 5500,
+        Nz = 32,
+        closure,
+        substeps = simple_ocean ? 70 : 150,
     )
     ocean.stop_time = stop_time
     ocean.Δt = float(dt)

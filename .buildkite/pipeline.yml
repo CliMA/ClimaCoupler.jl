@@ -140,7 +140,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_ntasks: 1
-          slurm_gres: "gpu:1"
+          slurm_gpus: 1
           slurm_mem: 32GB
 
   - group: "Integration Tests (single column)"
@@ -290,16 +290,6 @@ steps:
           slurm_gpus: 1
 
       # GPU RUNS: AMIP
-      - label: "GPU AMIP: diag. EDMF + integrated land"
-        key: "gpu_amip_diagedmf_integrated_land"
-        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_diagedmf_integrated_land.yml --job_id gpu_amip_diagedmf_integrated_land"
-        artifact_paths: "output/gpu_amip_diagedmf_integrated_land/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        retry: *retry_policy
-        agents:
-          slurm_mem: 20GB
-          slurm_gpus: 1
 
       - label: "GPU AMIP: prog. EDMF + bucket"
         key: "gpu_amip_progedmf_bucket"

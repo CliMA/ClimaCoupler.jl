@@ -4,6 +4,12 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Update to use ClimaOcean#0.10.0. [#1971](https://github.com/CliMA/ClimaCoupler.jl/pull/1971)
+Enables the 1 deg. TripolarGrid configuration as the default, with the updated spectral element <-> finite-volume regridding method (ConservativeRegridding0.2.5).
+
+#### Remove all diagnostic EDMF jobs PR[#1988](https://github.com/CliMA/ClimaCoupler.jl/pull/1988)
+ClimaAtmos.jl v0.39.5 is the last one to support `turbconv_model: diagnostic_edmfx`.
+
 #### Turbulent flux time-averaging for slow surface models PR[#1945](https://github.com/CliMA/ClimaCoupler.jl/pull/1945)
 For surface simulations whose own timestep is larger than the coupling
 timestep (e.g. `dt_ocean > Δt_cpl` or `dt_seaice > Δt_cpl`), the coupler now

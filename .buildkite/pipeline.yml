@@ -396,74 +396,74 @@ steps:
 
   - group: "CMIP Sweep"
     steps:
-      # - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 0.25 1 10 10"
-      #   key: "gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_10_10"
-      #   command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_0.25_1_10_10.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_10_10"
-      #   artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_10_10/artifacts/*"
-      #   retry: &retry_policy
-      #     automatic:
-      #       - exit_status: -1  # Retry on agent lost
-      #         limit: 1
-      #   env:
-      #     CLIMACOMMS_DEVICE: "CUDA"
-      #   agents:
-      #     slurm_mem: 20GB
-      #     slurm_gpus: 1
+      - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 0_25 1 10 10"
+        key: "gpu_cmip_oceananigans_climaseaice_sweep_0_25_1_10_10"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_0_25_1_10_10.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_0_25_1_10_10"
+        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0_25_1_10_10/artifacts/*"
+        retry: &retry_policy
+          automatic:
+            - exit_status: -1  # Retry on agent lost
+              limit: 1
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
     
-      # - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 0.25 1 15 15"
-      #   key: "gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_15_15"
-      #   command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_0.25_1_15_15.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_15_15"
-      #   artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_15_15/artifacts/*"
-      #   env:
-      #     CLIMACOMMS_DEVICE: "CUDA"
-      #   retry: *retry_policy
-      #   agents:
-      #     slurm_mem: 20GB
-      #     slurm_gpus: 1
+      - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 0_25 1 15 15"
+        key: "gpu_cmip_oceananigans_climaseaice_sweep_0_25_1_15_15"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_0_25_1_15_15.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_0_25_1_15_15"
+        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0_25_1_15_15/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
 
-      # - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 0.25 1 30 30"
-      #   key: "gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_30_30"
-      #   command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_0.25_1_30_30.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_30_30"
-      #   artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_30_30/artifacts/*"
-      #   env:
-      #     CLIMACOMMS_DEVICE: "CUDA"
-      #   retry: *retry_policy
-      #   agents:
-      #     slurm_mem: 20GB
-      #     slurm_gpus: 1
+      - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 0_25 1 30 30"
+        key: "gpu_cmip_oceananigans_climaseaice_sweep_0_25_1_30_30"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_0_25_1_30_30.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_0_25_1_30_30"
+        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0_25_1_30_30/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
 
-      # - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 0.5 2 10 10"
-      #   key: "gpu_cmip_oceananigans_climaseaice_sweep_0.5_2_10_10"
-      #   command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_0.5_2_10_10.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_0.5_2_10_10"
-      #   artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0.5_2_10_10/artifacts/*"
-      #   env:
-      #     CLIMACOMMS_DEVICE: "CUDA"
-      #   retry: *retry_policy
-      #   agents:
-      #     slurm_mem: 20GB
-      #     slurm_gpus: 1
+      - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 0_5 2 10 10"
+        key: "gpu_cmip_oceananigans_climaseaice_sweep_0_5_2_10_10"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_0_5_2_10_10.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_0_5_2_10_10"
+        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0_5_2_10_10/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
 
-      # - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 0.5 2 15 15"
-      #   key: "gpu_cmip_oceananigans_climaseaice_sweep_0.5_2_15_15"
-      #   command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_0.5_2_15_15.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_0.5_2_15_15"
-      #   artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0.5_2_15_15/artifacts/*"
-      #   env:
-      #     CLIMACOMMS_DEVICE: "CUDA"
-      #   retry: *retry_policy
-      #   agents:
-      #     slurm_mem: 20GB
-      #     slurm_gpus: 1
+      - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 0_5 2 15 15"
+        key: "gpu_cmip_oceananigans_climaseaice_sweep_0_5_2_15_15"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_0_5_2_15_15.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_0_5_2_15_15"
+        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0_5_2_15_15/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
 
-      # - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 0.5 2 30 30"
-      #   key: "gpu_cmip_oceananigans_climaseaice_sweep_0.5_2_30_30"
-      #   command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_0.5_2_30_30.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_0.5_2_30_30"
-      #   artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0.5_2_30_30/artifacts/*"
-      #   env:
-      #     CLIMACOMMS_DEVICE: "CUDA"
-      #   retry: *retry_policy
-      #   agents:
-      #     slurm_mem: 20GB
-      #     slurm_gpus: 1
+      - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 0_5 2 30 30"
+        key: "gpu_cmip_oceananigans_climaseaice_sweep_0_5_2_30_30"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_0_5_2_30_30.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_0_5_2_30_30"
+        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0_5_2_30_30/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
 
       - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 1 3 10 10"
         key: "gpu_cmip_oceananigans_climaseaice_sweep_1_3_10_10"
@@ -531,27 +531,27 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-      # - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 2.5 7.5 15 15"
-      #   key: "gpu_cmip_oceananigans_climaseaice_sweep_2.5_7.5_15_15"
-      #   command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_2.5_7.5_15_15.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_2.5_7.5_15_15"
-      #   artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_2.5_7.5_15_15/artifacts/*"
-      #   env:
-      #     CLIMACOMMS_DEVICE: "CUDA"
-      #   retry: *retry_policy
-      #   agents:
-      #     slurm_mem: 20GB
-      #     slurm_gpus: 1
+      - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 2_5 7_5 15 15"
+        key: "gpu_cmip_oceananigans_climaseaice_sweep_2_5_7_5_15_15"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_2_5_7_5_15_15.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_2_5_7_5_15_15"
+        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_2_5_7_5_15_15/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
 
-      # - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 2.5 7.5 30 30"
-      #   key: "gpu_cmip_oceananigans_climaseaice_sweep_2.5_7.5_30_30"
-      #   command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_2.5_7.5_30_30.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_2.5_7.5_30_30"
-      #   artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_2.5_7.5_30_30/artifacts/*"
-      #   env:
-      #     CLIMACOMMS_DEVICE: "CUDA"
-      #   retry: *retry_policy
-      #   agents:
-      #     slurm_mem: 20GB
-      #     slurm_gpus: 1
+      - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 2.5 7.5 30 30"
+        key: "gpu_cmip_oceananigans_climaseaice_sweep_2.5_7.5_30_30"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_2.5_7.5_30_30.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_2.5_7.5_30_30"
+        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_2.5_7.5_30_30/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
 
       - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 3 6 12 12"
         key: "gpu_cmip_oceananigans_climaseaice_sweep_3_6_12_12"
@@ -619,27 +619,27 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-      # - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 7.5 15 15 15"
-      #   key: "gpu_cmip_oceananigans_climaseaice_sweep_7.5_15_15_15"
-      #   command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_7.5_15_15_15.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_7.5_15_15_15"
-      #   artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_7.5_15_15_15/artifacts/*"
-      #   env:
-      #     CLIMACOMMS_DEVICE: "CUDA"
-      #   retry: *retry_policy
-      #   agents:
-      #     slurm_mem: 20GB
-      #     slurm_gpus: 1
+      - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 7_5 15 15 15"
+        key: "gpu_cmip_oceananigans_climaseaice_sweep_7_5_15_15"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_7_5_15_15.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_7_5_15_15"
+        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_7_5_15_15/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
 
-      # - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 7.5 15 30 30"
-      #   key: "gpu_cmip_oceananigans_climaseaice_sweep_7.5_15_30_30"
-      #   command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_7.5_15_30_30.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_7.5_15_30_30"
-      #   artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_7.5_15_30_30/artifacts/*"
-      #   env:
-      #     CLIMACOMMS_DEVICE: "CUDA"
-      #   retry: *retry_policy
-      #   agents:
-      #     slurm_mem: 20GB
-      #     slurm_gpus: 1
+      - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 7_5 15 30 30"
+        key: "gpu_cmip_oceananigans_climaseaice_sweep_7_5_15_30_30"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_7_5_15_30_30.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_7_5_15_30_30"
+        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_7_5_15_30_30/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 20GB
+          slurm_gpus: 1
 
   - wait
 

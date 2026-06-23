@@ -374,7 +374,10 @@ steps:
         artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_10_10/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
-        retry: *retry_policy
+        retry: &retry_policy
+          automatic:
+            - exit_status: -1  # Retry on agent lost
+              limit: 1
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1

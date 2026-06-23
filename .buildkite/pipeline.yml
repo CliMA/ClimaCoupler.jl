@@ -366,23 +366,51 @@ steps:
   #         slurm_ntasks: 3
   #         slurm_cpus_per_task: 4
 
+  # - group: "Unit Tests"
+  #   steps:
+
+  #     - label: "MPI Utilities unit tests"
+  #       key: "utilities_mpi_tests"
+  #       command: "srun julia -O0 --color=yes --project=test/ test/utilities_tests.jl"
+  #       retry: &retry_policy
+  #         automatic:
+  #           - exit_status: -1  # Retry on agent lost
+  #             limit: 1
+  #       timeout_in_minutes: 5
+  #       env:
+  #         CLIMACOMMS_CONTEXT: "MPI"
+  #       agents:
+  #         slurm_ntasks: 2
+  #         slurm_mem: 16GB
+
+  #     - label: "MPI Interfacer unit tests"
+  #       key: "interfacer_mpi_tests"
+  #       command: "srun julia -O0 --color=yes --project=test/ test/interfacer_tests.jl"
+  #       retry: *retry_policy
+  #       timeout_in_minutes: 5
+  #       env:
+  #         CLIMACOMMS_CONTEXT: "MPI"
+  #       agents:
+  #         slurm_ntasks: 2
+  #         slurm_mem: 16GB
+
   - group: "CMIP Sweep"
     steps:
       - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 0.25 1 10 10"
         key: "gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_10_10"
         command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_0.25_1_10_10.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_10_10"
         artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_10_10/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
         retry: &retry_policy
           automatic:
             - exit_status: -1  # Retry on agent lost
               limit: 1
         timeout_in_minutes: 1440
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
-
+    
       - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce sweep 0.25 1 15 15"
         key: "gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_15_15"
         command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $SWEEP_CONFIG_PATH/cmip_edonly_land_0.25_1_15_15.yml --job_id gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_15_15"
@@ -613,7 +641,7 @@ steps:
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
-
+  
  - wait
 
   # plot job performance history

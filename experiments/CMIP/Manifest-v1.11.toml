@@ -1513,25 +1513,6 @@ git-tree-sha1 = "aa4e89ed3dcb4cc854ac386cbdcfa3c3b3de4f87"
 uuid = "a3d749fb-087c-5225-80b3-65fbd02ae0fd"
 version = "0.3.1"
 
-[[deps.InlineStrings]]
-git-tree-sha1 = "8f3d257792a522b4601c24a577954b0a8cd7334d"
-uuid = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
-version = "1.4.5"
-
-    [deps.InlineStrings.extensions]
-    ArrowTypesExt = "ArrowTypes"
-    ParsersExt = "Parsers"
-
-    [deps.InlineStrings.weakdeps]
-    ArrowTypes = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
-    Parsers = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-
-[[deps.Inpaintings]]
-deps = ["LinearAlgebra", "Match", "SparseArrays", "SuiteSparse"]
-git-tree-sha1 = "aa4e89ed3dcb4cc854ac386cbdcfa3c3b3de4f87"
-uuid = "a3d749fb-087c-5225-80b3-65fbd02ae0fd"
-version = "0.3.1"
-
 [[deps.Insolation]]
 deps = ["Adapt", "Artifacts", "Dates", "DelimitedFiles", "Interpolations"]
 git-tree-sha1 = "e4bc3ed7b1984c94e0145bd6ef8fafc04fab15e4"

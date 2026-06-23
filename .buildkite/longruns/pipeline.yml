@@ -39,7 +39,8 @@ steps:
   - wait
   
   - group: "CMIP simulations"
-
+    
+    steps: 
       - label: "GPU CMIP: ED only + integrated land"
         key: "cmip_edonly_land"
         command:

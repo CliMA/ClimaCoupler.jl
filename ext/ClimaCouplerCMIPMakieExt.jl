@@ -17,6 +17,7 @@ import ClimaCoupler: Plotting
 using CairoMakie
 using ClimaCoreMakie
 using GeoMakie
+using JLD2
 using Makie
 using Printf
 import Oceananigans as OC

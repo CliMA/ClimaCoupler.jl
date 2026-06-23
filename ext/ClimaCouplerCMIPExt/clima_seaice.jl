@@ -181,6 +181,9 @@ function ClimaSeaIceSimulation(
 
     # Ensure ocean temperature is above freezing where there is sea ice
     CO.EarthSystemModels.above_freezing_ocean_temperature!(ocean.ocean, grid, ice)
+
+    OC.interior(ice.model.ice_thermodynamics.top_surface_temperature, :, :, 1) .= 0
+
     return sim
 end
 
@@ -255,6 +258,9 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     FT = CC.Spaces.undertype(boundary_space)
     surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
 
+    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
+    maximum(area_fraction) ≤ eps(FT) && return nothing
+
     uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
 
     # Sea ice parameters for `update_T_sfc_cb` (load into boundary-space scratch Fields first
@@ -285,6 +291,7 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     # Surface temperature guess from last timestep
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
     T_sfc = csf.scalar_temp1
+    @. T_sfc = ifelse(area_fraction .≈ 0, csf.T_atmos, T_sfc)
 
     # Surface humidity
     ρ_sfc =
@@ -326,7 +333,6 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
         )
 
     FluxCalculator.update_flux_fields!(csf, sim, fluxes, accumulator)
-    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
     csf.scalar_temp2 .=

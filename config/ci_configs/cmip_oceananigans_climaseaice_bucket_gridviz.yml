@@ -1,0 +1,37 @@
+# Low-resolution CMIP + bucket + Oceananigans + ClimaSeaIce setup for fast grid / layout checks.
+# Smaller `h_elem` / `z_elem`, short `t_end`, and coarse `oceananigans_resolution_points`.
+
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
+bucket_albedo_type: "map_temporal"
+coupler_toml: ["toml/amip_edonly.toml"]
+# `dt_cpl` must be divisible by every component dt (see `Input.parse_component_dts!`).
+dt_atmos: "200secs"
+dt_cpl: "400secs"
+dt_land: "200secs"
+dt_ocean: "400secs"
+dt_seaice: "400secs"
+dz_bottom: 100.0
+energy_check: false
+h_elem: 8
+ice_model: "clima_seaice"
+mode_name: "cmip"
+land_fraction_source: "ocean"
+netcdf_output_at_levels: false
+ocean_model: "oceananigans"
+oceananigans_resolution_points: [720, 360, 4]
+oceananigans_horizontal_grid: latitude_longitude 
+# oceananigans_horizontal_grid: tripolar  # default is latitude_longitude; set to tripolar for TripolarGrid
+output_default_diagnostics: false
+radiation_reset_rng_seed: true
+rayleigh_sponge: true
+simple_ocean: true
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+t_end: "800secs"
+topo_smoothing: true
+topography: "Earth"
+viscous_sponge: true
+z_elem: 12
+z_max: 60000.0

@@ -16,14 +16,18 @@ is a surface/ocean simulation for dispatch.
 It contains the following objects:
 - `ocean::SIM`: The Oceananigans simulation object.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
+- `component_area_fraction::CAF`: Open-ocean weight on the FV grid (`wet * (1 - ice)`; zero on dry cells).
+- `surface_mask::SM`: A binary mask on the ocean FV grid (`1` = wet, `0` = dry) indicating where the ocean model is evaluated.
 - `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters (including COARE3 roughness params).
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ice_concentration::SIC`: An Oceananigans Field representing the sea ice concentration on the ocean/sea ice grid.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, MDT} <:
+struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, MDT, SM, CAF} <:
        Interfacer.AbstractOceanSimulation
     ocean::SIM
     area_fraction::A
+    component_area_fraction::CAF
+    surface_mask::SM
     ocean_properties::OPROP
     remapping::REMAP
     ice_concentration::SIC
@@ -240,12 +244,17 @@ function OceananigansSimulation(
     # if the ocean is coupled to a non-prescribed sea ice model.
     ice_concentration = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
-    # Create a dummy area fraction that will get overwritten in `update_surface_fractions!`
-    area_fraction = ones(boundary_space)
+    # Placeholder; overwritten in `update_surface_fractions!` before the first step.
+    area_fraction = CC.Fields.zeros(boundary_space)
+    component_area_fraction = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    surface_mask = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    fill_ocean_wet_mask!(surface_mask, grid)
 
     sim = OceananigansSimulation(
         ocean,
         area_fraction,
+        component_area_fraction,
+        surface_mask,
         ocean_properties,
         remapping,
         ice_concentration,
@@ -260,6 +269,92 @@ function OceananigansSimulation(
     )
 
     return sim
+end
+
+"""
+    fill_ocean_wet_mask!(wet_field, grid)
+
+Fill `wet_field` with `1` on wet ocean cells and `0` on dry (immersed) cells,
+using the same immersed-boundary mask as the ocean model.
+"""
+function fill_ocean_wet_mask!(wet_field::OC.Field, grid)
+    grid_cpu = OC.on_architecture(OC.CPU(), grid)
+    wet_cpu = OC.Field{OC.Center, OC.Center, Nothing}(grid_cpu)
+    Nx, Ny = size(grid, 1), size(grid, 2)
+    wet_data = OC.interior(wet_cpu, :, :, 1)
+    @inbounds for j in 1:Ny, i in 1:Nx
+        wet_data[i, j] = OC.ImmersedBoundaries.immersed_cell(i, j, 1, grid_cpu) ? 0.0 : 1.0
+    end
+    wet_field .= OC.on_architecture(OC.architecture(grid), wet_cpu)
+    return wet_field
+end
+
+"""
+    land_fraction_from_ocean(ocean_sim, boundary_space; binary_area_fraction = true)
+
+Derive the coupler land fraction on `boundary_space` from the ocean model's
+immersed-boundary wet/dry mask. This is the definitive land–sea partition for
+CMIP runs: surface components and the atmosphere exchange grid share the mask
+that the ocean model uses internally.
+"""
+function land_fraction_from_ocean(
+    ocean_sim::OceananigansSimulation,
+    boundary_space;
+    binary_area_fraction = true,
+)
+    grid = ocean_sim.ocean.model.grid
+    wet_oc = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    fill_ocean_wet_mask!(wet_oc, grid)
+
+    ocean_wet_fraction = Interfacer.remap(
+        boundary_space,
+        wet_oc,
+        ocean_sim.remapping;
+        apply_wet_mask = false,
+    )
+
+    FT = CC.Spaces.undertype(boundary_space)
+    ocean_wet_fraction = max.(min.(ocean_wet_fraction, FT(1)), FT(0))
+
+    binary_area_fraction &&
+        @warn "land_fraction_source=\"ocean\": using fractional wet coverage on the " *
+              "exchange grid; binary_area_fraction is ignored for this source."
+    land_fraction = FT(1) .- ocean_wet_fraction
+    return max.(min.(land_fraction, FT(1)), FT(0))
+end
+
+"""
+    construct_fv_wet_mask_1d(grid)
+
+Return a flat device vector (`1` = wet, `0` = dry) aligned with
+`vec(OC.interior(field, :, :, k))` for surface Center/Center fields.
+"""
+function construct_fv_wet_mask_1d(grid)
+    grid_cpu = OC.on_architecture(OC.CPU(), grid)
+    Nx, Ny = size(grid, 1), size(grid, 2)
+    mask_cpu = Vector{Float64}(undef, Nx * Ny)
+    @inbounds for j in 1:Ny, i in 1:Nx
+        mask_cpu[(j - 1) * Nx + i] =
+            OC.ImmersedBoundaries.immersed_cell(i, j, 1, grid_cpu) ? 0.0 : 1.0
+    end
+    return OC.on_architecture(OC.architecture(grid), mask_cpu)
+end
+
+"""
+    update_component_area_fraction!(sim::OceananigansSimulation)
+
+Set the ocean area fraction on the native FV grid. Each immersed-boundary
+cell is either wet or dry, so the open-ocean weight `wet * (1 - ice)` is the
+correct FV representation. Reverse-remapping the exchange-grid partition with
+the SE→FV operator is not bounded in `[0, 1]` and produces NaNs at tripolar
+fold lines. See
+[CliMA/ClimaCoupler.jl#1783](https://github.com/CliMA/ClimaCoupler.jl/issues/1783).
+"""
+function update_component_area_fraction!(sim::OceananigansSimulation)
+    _, open_water_weight = _ocean_open_water_weight(sim)
+    comp = OC.interior(sim.component_area_fraction, :, :, 1)
+    comp .= open_water_weight
+    return nothing
 end
 
 """
@@ -362,6 +457,7 @@ function construct_remapper(grid_oc, boundary_space)
     # masking is needed on either the OC or CC side. The FV → SE projection
     # has no structural-zero "no-data" nodes to repair, and `weighted_dss!`
     # operates on a fully-physical SE field.
+    fv_wet_mask_1d = construct_fv_wet_mask_1d(grid_oc)
     return (;
         remapper_oc_to_cc,
         remapper_cc_to_oc,
@@ -369,6 +465,7 @@ function construct_remapper(grid_oc, boundary_space)
         scratch_field_oc2,
         scratch_field_oc3,
         temp_uv_vec,
+        fv_wet_mask_1d,
     )
 end
 
@@ -388,10 +485,11 @@ function FieldExchanger.resolve_area_fractions!(
     ice_sim,
     land_fraction,
 )
-    ice_sim isa ClimaSeaIceSimulation && (
+    if ice_sim isa ClimaSeaIceSimulation
         ocean_sim.ice_concentration .=
             Interfacer.get_field(ice_sim, Val(:ice_concentration))
-    )
+        update_component_area_fraction!(ocean_sim)
+    end
     return nothing
 end
 
@@ -420,6 +518,9 @@ NVTX.@annotate function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
 end
 
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:component_area_fraction}) =
+    sim.component_area_fraction
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_mask}) = sim.surface_mask
 
 # TODO: Better values for this
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_model}) = :coare3
@@ -463,7 +564,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
     (; reference_density, heat_capacity) = sim.ocean_properties
     grid = sim.ocean.model.grid
-    ice_concentration_field = sim.ice_concentration
+    _, open_water_weight = _ocean_open_water_weight(sim)
 
     # Convert the momentum fluxes from contravariant to Cartesian basis
     contravariant_to_cartesian!(sim.remapping.temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz)
@@ -477,14 +578,11 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     F_turb_ρτxz_oc = sim.remapping.scratch_field_oc1
     F_turb_ρτyz_oc = sim.remapping.scratch_field_oc2
 
-    # Weight by (1 - sea ice concentration)
-    ice_concentration = OC.interior(ice_concentration_field, :, :, 1)
+    # Weight by open-water fraction (wet cells only; dry cells masked out)
     OC.interior(F_turb_ρτxz_oc, :, :, 1) .=
-        OC.interior(F_turb_ρτxz_oc, :, :, 1) .* (1.0 .- ice_concentration) ./
-        reference_density
+        OC.interior(F_turb_ρτxz_oc, :, :, 1) .* open_water_weight ./ reference_density
     OC.interior(F_turb_ρτyz_oc, :, :, 1) .=
-        OC.interior(F_turb_ρτyz_oc, :, :, 1) .* (1.0 .- ice_concentration) ./
-        reference_density
+        OC.interior(F_turb_ρτyz_oc, :, :, 1) .* open_water_weight ./ reference_density
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
@@ -508,7 +606,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     # everything on the surface, but later we will need to account for this.
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
     OC.interior(oc_flux_T, :, :, 1) .+=
-        (1.0 .- ice_concentration) .* (remapped_F_lh .+ remapped_F_sh) ./
+        open_water_weight .* (remapped_F_lh .+ remapped_F_sh) ./
         (reference_density * heat_capacity)
 
     # Add the part of the salinity flux that comes from the moisture flux, we also need to
@@ -520,13 +618,26 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
     OC.interior(oc_flux_S, :, :, 1) .-=
-        (1.0 .- ice_concentration) .* surface_salinity .* moisture_fresh_water_flux
+        open_water_weight .* surface_salinity .* moisture_fresh_water_flux
     return nothing
 end
 
 function Interfacer.update_field!(sim::OceananigansSimulation, ::Val{:area_fraction}, field)
     sim.area_fraction .= field
+    update_component_area_fraction!(sim)
     return nothing
+end
+
+"""
+    _ocean_open_water_weight(sim::OceananigansSimulation)
+
+Return `(wet_mask, open_water_weight)` on the ocean surface: wet mask from the
+immersed boundary and open-water weight `(1 - sea ice concentration)`.
+"""
+function _ocean_open_water_weight(sim::OceananigansSimulation)
+    wet = OC.interior(sim.surface_mask, :, :, 1)
+    ice_concentration = OC.interior(sim.ice_concentration, :, :, 1)
+    return wet, (1.0 .- ice_concentration) .* wet
 end
 
 """
@@ -552,7 +663,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     (; reference_density, heat_capacity) = sim.ocean_properties
     grid = sim.ocean.model.grid
     Nz = grid.Nz
-    ice_concentration = OC.interior(sim.ice_concentration, :, :, 1)
+    _, open_water_weight = _ocean_open_water_weight(sim)
 
     # Reset fluxes to 0 at the start of the step
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
@@ -576,7 +687,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     # Compute radiative contribution.
     rad_T_flux = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
     rad_T_flux .=
-        (1.0 .- ice_concentration) .* (
+        open_water_weight .* (
             -(1 - α) .* remapped_SW_d .-
             ϵ * (
                 remapped_LW_d .-
@@ -594,7 +705,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
 
     # Note the negative sign here to account for the sign change from precipitation to salinity flux
     OC.interior(oc_flux_S, :, :, 1) .-=
-        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
+        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* open_water_weight .*
         (remapped_P_liq .+ remapped_P_snow) ./ reference_density
     return nothing
 end
@@ -614,5 +725,11 @@ Return the fields to include in debug plots for an Oceananigans simulation.
 This includes the area fraction, surface temperature, salinity, velocity, and
 free surface displacement. These plots are not polished, and are intended for debugging.
 """
-Plotting.debug_plot_fields(sim::OceananigansSimulation) =
-    (:area_fraction, :surface_temperature, :salinity, :u, :v, :free_surface_displacement)
+Plotting.debug_plot_fields(sim::OceananigansSimulation) = (
+    :component_area_fraction,
+    :surface_temperature,
+    :salinity,
+    :u,
+    :v,
+    :free_surface_displacement,
+)

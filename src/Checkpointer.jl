@@ -394,17 +394,24 @@ function restart_model_state!(sim, input_file, comms_ctx)
     return nothing
 end
 
+const _COUPLER_AREA_FRACTION_FIELDS =
+    (:land_area_fraction, :ocean_area_fraction, :ice_area_fraction, :is_land, :is_ocean)
+
 """
     restart_coupler_fields!(cs, input_file)
 
 Overwrite the content of the coupled simulation `cs` with the coupler fields
 read from `input_file`.
+
+Area-fraction fields are not restored from checkpoint: they are recomputed from
+component models in `FieldExchanger.update_surface_fractions!` after restart.
 """
 function restart_coupler_fields!(cs, input_file)
     ispath(input_file) || error("File $(input_file) not found")
     JLD2.jldopen(input_file) do file
         fields_read = file["coupler_fields"]
         for name in propertynames(cs.fields)
+            name in _COUPLER_AREA_FRACTION_FIELDS && continue
             ArrayType = ClimaComms.array_type(ClimaComms.device(cs))
             parent(getproperty(cs.fields, name)) .=
                 ArrayType(parent(getproperty(fields_read, name)))

@@ -24,6 +24,7 @@ insolation: "timevarying"
 land_diagnostics_period: "10days"
 land_diagnostics_reduction: "average"
 land_model: "integrated"
+land_fraction_source: "ocean"
 land_spun_up_ic: false
 mode_name: "cmip"
 ocean_model: "oceananigans"

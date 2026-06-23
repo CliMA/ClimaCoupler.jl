@@ -116,12 +116,20 @@ function unit_basis_vector_data(::Type{V}, local_geometry) where {V}
 end
 
 # Non-allocating ClimaCore -> Oceananigans remap.
-function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
+function Interfacer.remap!(
+    target_field::OC.Field,
+    source_field::CC.Fields.Field,
+    remapping;
+    apply_wet_mask::Bool = true,
+)
     # Get the index of the top level (surface); Nz=1 for 2D fields
     Nz = size(target_field, 3)
     dst = vec(OC.interior(target_field, :, :, Nz))
 
     CR.regrid!(dst, remapping.remapper_cc_to_oc, source_field)
+    if apply_wet_mask && hasproperty(remapping, :fv_wet_mask_1d)
+        dst .*= remapping.fv_wet_mask_1d
+    end
     return nothing
 end
 
@@ -141,10 +149,19 @@ function Interfacer.remap(
 end
 
 # Non-allocating Oceananigans Field -> ClimaCore remap.
-function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field, remapping)
+function Interfacer.remap!(
+    target_field::CC.Fields.Field,
+    source_field::OC.Field,
+    remapping;
+    apply_wet_mask::Bool = true,
+)
     # Get the index of the top level (surface); Nz=1 for 2D fields
     Nz = size(source_field, 3)
     src = vec(OC.interior(source_field, :, :, Nz))
+    # OC → CC: mask dry FV source cells before regridding
+    if apply_wet_mask && hasproperty(remapping, :fv_wet_mask_1d)
+        src .= src .* remapping.fv_wet_mask_1d
+    end
 
     CR.regrid!(target_field, remapping.remapper_oc_to_cc, src)
     return nothing
@@ -154,10 +171,11 @@ end
 function Interfacer.remap(
     target_space::CC.Spaces.AbstractSpace,
     source_field::OC.Field,
-    remapping,
+    remapping;
+    apply_wet_mask::Bool = true,
 )
     target_field = CC.Fields.zeros(target_space)
-    Interfacer.remap!(target_field, source_field, remapping)
+    Interfacer.remap!(target_field, source_field, remapping; apply_wet_mask)
     return target_field
 end
 

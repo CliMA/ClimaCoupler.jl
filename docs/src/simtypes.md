@@ -36,12 +36,16 @@ and sea ice is thermodynamically active.
     component models. Running on a GPU is strongly recommended; see
     the `device` option in [Input](@ref) for how to select the compute device.
 
+!!! note "Land–sea mask"
+    CMIP configs should set `land_fraction_source: ocean` so the coupler, land model,
+    and sea ice share the same wet/dry mask as the Oceananigans immersed boundary
+    (ETOPO bathymetry with `minimum_depth`). AMIP and other modes continue to use
+    `land_fraction_source: etopo` (or `era5`) by default.
+
 !!! note "Behavior at the poles"
-    The Oceananigans and ClimaSeaIce models currently run on a capped latitude-longitude
-    grid spanning 80°S to 80°N. To avoid a gap at the poles, the selected land model is
-    used to fill the polar regions. As a result, the land model cannot be started from saved
-    initial conditions in this configuration. This will change in the future when the models
-    switch to a tripolar grid.
+    The ocean and sea ice models use a tripolar grid that covers the full sphere.
+    The land fraction is derived from the ocean immersed-boundary mask rather than
+    a separate ETOPO land–sea artifact on the coupler exchange grid.
 
 CMIP mode is enabled by setting `mode_name: "cmip"`.
 

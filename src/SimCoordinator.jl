@@ -22,6 +22,7 @@ import ClimaCore as CC
 import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
 import Random
+import Statistics
 
 import ClimaCoupler
 import ..Interfacer
@@ -29,8 +30,8 @@ import ..ConservationChecker
 import ..FieldExchanger
 import ..FluxCalculator
 import ..TimeManager
-import ..Input
 import ..Utilities
+import ..Input
 import ..Checkpointer
 import ..SimOutput
 
@@ -307,25 +308,89 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     atmos_h =
         Interfacer.get_atmos_height_delta(atmos_bottom_center_height, surface_elevation)
 
-    land_fraction = Input.get_land_fraction(
-        boundary_space,
-        comms_ctx;
-        land_fraction_source,
-        binary_area_fraction,
-        sim_mode,
-        domain_type,
-        scm_surface_type,
-    )
+    (; sst_path, sic_path, land_ic_path, albedo_path, bucket_initial_condition) =
+        era5_filepaths
+
+    ocean_sim = nothing
+    land_fraction = if land_fraction_source == "ocean"
+        ocean_sim = Interfacer.OceanSimulation(
+            FT,
+            ocean_model;
+            dt = component_dt_dict["dt_ocean"],
+            start_date,
+            tspan,
+            coupled_param_dict,
+            thermo_params,
+            comms_ctx,
+            progress_interval,
+            boundary_space,
+            output_dir = dir_paths.ocean_output_dir,
+            simple_ocean,
+            sst_path,
+            sst_adjustment,
+            saveat,
+            evolving = evolving_ocean,
+            ocean_diagnostic_interval,
+            ocean_diagnostic_mode,
+        )
+        cmip_ext = Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPExt)
+        isnothing(cmip_ext) && error(
+            "land_fraction_source=\"ocean\" requires ClimaCouplerCMIPExt " *
+            "(load Oceananigans, ClimaOcean, ClimaSeaIce, ConservativeRegridding, " *
+            "KernelAbstractions, and Adapt).",
+        )
+        @info "Deriving land fraction from ocean immersed-boundary mask"
+        cmip_ext.land_fraction_from_ocean(
+            ocean_sim,
+            boundary_space;
+            binary_area_fraction,
+        )
+    else
+        Input.get_land_fraction(
+            boundary_space,
+            comms_ctx;
+            land_fraction_source,
+            binary_area_fraction,
+            sim_mode,
+            domain_type,
+            scm_surface_type,
+        )
+    end
+
+    if land_fraction_source == "ocean" && domain_type == "global"
+        etopo_land = Input.get_land_fraction(
+            boundary_space,
+            comms_ctx;
+            land_fraction_source = "etopo",
+            binary_area_fraction,
+            sim_mode,
+            domain_type,
+            scm_surface_type,
+        )
+        land_arr = CC.Fields.field2array(CC.to_cpu(land_fraction))
+        etopo_arr = CC.Fields.field2array(CC.to_cpu(etopo_land))
+        n_mismatch = count(abs.(land_arr .- etopo_arr) .> eps(FT))
+        @info "Ocean immersed-boundary land mask differs from ETOPO on $n_mismatch / $(length(land_arr)) exchange cells"
+        land_etopo_cor = Statistics.cor(land_arr, etopo_arr)
+        @info "Ocean-derived land fraction correlation with ETOPO: $(round(land_etopo_cor, digits=3))"
+        land_etopo_cor < FT(0) && error(
+            "Ocean-derived land fraction is anticorrelated with ETOPO (ρ = $land_etopo_cor). " *
+            "The immersed-boundary mask orientation is likely wrong.",
+        )
+    end
 
     #=
     ### Surface Models
     Initialize land, ocean, and sea ice component models.
+
+    Land–sea partition: area fractions on the exchange grid weight fluxes to the
+    atmosphere and sum to 1. Binary evaluation masks (`Input.surface_evaluation_masks`)
+    indicate where each surface model is active; at fractional coastlines both land
+    and ocean may be evaluated. For CMIP, prefer `land_fraction_source: "ocean"` so
+    the exchange-grid partition matches the ocean immersed-boundary coastline.
     =#
     @info(sim_mode)
-    land_sim = ice_sim = ocean_sim = nothing
-
-    (; sst_path, sic_path, land_ic_path, albedo_path, bucket_initial_condition) =
-        era5_filepaths
+    land_sim = ice_sim = nothing
 
     shared_surface_space =
         (share_surface_space || domain_type == "column") ? boundary_space : nothing
@@ -353,26 +418,28 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         lai_source,
     )
 
-    ocean_sim = Interfacer.OceanSimulation(
-        FT,
-        ocean_model;
-        dt = component_dt_dict["dt_ocean"],
-        start_date,
-        tspan,
-        coupled_param_dict,
-        thermo_params,
-        comms_ctx,
-        progress_interval,
-        boundary_space,
-        output_dir = dir_paths.ocean_output_dir,
-        simple_ocean,
-        sst_path,
-        sst_adjustment,
-        saveat,
-        evolving = evolving_ocean,
-        ocean_diagnostic_interval,
-        ocean_diagnostic_mode,
-    )
+    if isnothing(ocean_sim)
+        ocean_sim = Interfacer.OceanSimulation(
+            FT,
+            ocean_model;
+            dt = component_dt_dict["dt_ocean"],
+            start_date,
+            tspan,
+            coupled_param_dict,
+            thermo_params,
+            comms_ctx,
+            progress_interval,
+            boundary_space,
+            output_dir = dir_paths.ocean_output_dir,
+            simple_ocean,
+            sst_path,
+            sst_adjustment,
+            saveat,
+            evolving = evolving_ocean,
+            ocean_diagnostic_interval,
+            ocean_diagnostic_mode,
+        )
+    end
 
     ice_sim = Interfacer.SeaIceSimulation(
         FT,
@@ -427,20 +494,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     )
     isempty(slow_surface_keys) ||
         @info "Allocated flux accumulators for slow surfaces: $(slow_surface_keys)"
-
-    # set initial area fractions (remain set to 0 if model does not exist)
-    if haskey(model_sims, :land_sim)
-        coupler_fields.land_area_fraction .=
-            Interfacer.get_field(model_sims.land_sim, Val(:area_fraction))
-    end
-    if haskey(model_sims, :ice_sim)
-        coupler_fields.ice_area_fraction .=
-            Interfacer.get_field(model_sims.ice_sim, Val(:area_fraction))
-    end
-    if haskey(model_sims, :ocean_sim)
-        coupler_fields.ocean_area_fraction .=
-            Interfacer.get_field(model_sims.ocean_sim, Val(:area_fraction))
-    end
 
     ## Conservation checks (only applicable to global slabplanet mode)
     conservation_checks = nothing

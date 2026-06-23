@@ -375,6 +375,10 @@ NVTX.@annotate function compute_surface_fluxes!(
     FT = CC.Spaces.undertype(boundary_space)
     surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
 
+    Interfacer.get_field!(csf.scalar_temp4, sim, Val(:area_fraction))
+    area_fraction = csf.scalar_temp4
+    maximum(area_fraction) ≤ eps(FT) && return nothing
+
     # Atmosphere fields are stored in coupler fields so we only regrid them once per timestep
     # `_int` refers to atmos state of center level 1
     uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
@@ -382,6 +386,7 @@ NVTX.@annotate function compute_surface_fluxes!(
     # compute surface humidity from the surface temperature, surface density, and phase
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
     T_sfc = csf.scalar_temp1
+    @. T_sfc = ifelse(area_fraction .≈ 0, csf.T_atmos, T_sfc)
 
     # TODO: This is not accurate - we shouldn't assume condensate is 0.
     ρ_sfc =

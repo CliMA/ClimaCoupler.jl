@@ -240,6 +240,9 @@ for FT in (Float32, Float64)
         # Test that fractions updated correctly (ice and land unchanged, ocean updated)
         @test all(CC.Fields.field2array(ice_fraction)[1:(nelements ÷ 2)] .== FT(0.5))
         @test all(CC.Fields.field2array(ocean_fraction)[1:(nelements ÷ 2)] .== FT(0.5))
+        @test cs.fields.land_area_fraction == land_fraction
+        @test cs.fields.ice_area_fraction == ice_fraction
+        @test cs.fields.ocean_area_fraction == ocean_fraction
     end
 
     @testset "test combine_surfaces" begin

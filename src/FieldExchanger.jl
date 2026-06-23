@@ -8,7 +8,7 @@ module FieldExchanger
 
 import ClimaCore as CC
 
-import ..Interfacer, ..FluxCalculator, ..Utilities
+import ..Interfacer, ..FluxCalculator, ..Input
 
 export update_sim!,
     update_model_sims!,
@@ -24,7 +24,9 @@ export update_sim!,
 Updates dynamically changing area fractions.
 Maintains the invariant that the sum of area fractions is 1 at all points.
 Area fractions are expected to be defined on the boundary space of the coupled simulation,
-since they are used by the coupler.
+since they are used by the coupler. Component models with mismatched grids (e.g. CMIP ocean
+FV grids) also store a remapped `component_area_fraction` and a binary `surface_mask` on
+their native grid; see `ClimaCouplerCMIPExt`.
 
 If a surface model is not present, the area fraction is set to 0.
 
@@ -78,9 +80,18 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
         ocean_fraction = cs.fields.scalar_temp3
     end
 
-    # update the ice and ocean area fraction coupler fields (land is static)
+    # update all area fraction coupler fields (land is static on component models)
+    cs.fields.land_area_fraction .= land_fraction
     cs.fields.ice_area_fraction .= ice_fraction
     cs.fields.ocean_area_fraction .= ocean_fraction
+
+    # update binary evaluation masks (issue #1838)
+    # is_land = 1 wherever land model should be evaluated (land_fraction > 0)
+    # is_ocean = 1 wherever ocean/ice should be evaluated (land_fraction < 1)
+    # At fractional coastline cells both masks are 1.
+    is_land, is_ocean = Input.surface_evaluation_masks(land_fraction)
+    cs.fields.is_land .= is_land
+    cs.fields.is_ocean .= is_ocean
 
     # check that the sum of area fractions is 1
     @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
@@ -354,7 +365,12 @@ function combine_surfaces!(csf, sims, field_name_val::Val{field_name}) where {fi
             # Zero out the contribution from this surface if the area fraction is zero.
             # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs
             combined_field .+=
-                area_fraction .* ifelse.(area_fraction .≈ 0, zero(FT), surface_field)
+                area_fraction .*
+                ifelse.(
+                    area_fraction .≈ 0,
+                    zero(FT),
+                    ifelse.(isfinite.(surface_field), surface_field, zero(FT)),
+                )
         end
     end
     return nothing
@@ -383,11 +399,23 @@ function combine_surfaces!(csf, sims, ::Val{:surface_temperature})
             # Compute upward longwave radiation from surface temperature for this simulation
             T_sfc .+=
                 area_fraction .*
-                ifelse.(area_fraction .≈ 0, zero(FT), emissivity_sim .* T_sfc_sim .^ FT(4))
+                ifelse.(
+                    area_fraction .≈ 0,
+                    zero(FT),
+                    ifelse.(
+                        isfinite.(T_sfc_sim),
+                        emissivity_sim .* T_sfc_sim .^ FT(4),
+                        zero(FT),
+                    ),
+                )
         end
     end
     # Convert the combined upward longwave radiation into a surface temperature
-    @. T_sfc = (T_sfc / emissivity_sfc)^FT(1 / 4)
+    @. T_sfc = ifelse(
+        emissivity_sfc .> eps(FT),
+        (T_sfc / emissivity_sfc)^FT(1 / 4),
+        zero(FT),
+    )
     return nothing
 end
 

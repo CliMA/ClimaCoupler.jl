@@ -17,6 +17,7 @@ ice_model: "clima_seaice"
 land_diagnostics_period: "1hours"
 land_diagnostics_reduction: "instantaneous"
 mode_name: "cmip"
+land_fraction_source: "ocean"
 netcdf_output_at_levels: true
 ocean_diagnostic_interval: "1hours"
 ocean_diagnostic_mode: "instantaneous"

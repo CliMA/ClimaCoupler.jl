@@ -131,6 +131,12 @@ default_coupler_fields() = [
     :land_area_fraction,
     :ocean_area_fraction,
     :ice_area_fraction,
+    # binary evaluation masks (1 where the model is active, 0 elsewhere).
+    # Unlike area fractions these do not sum to 1: at fractional coastline cells
+    # both is_land and is_ocean are 1 so both models contribute.
+    # See https://github.com/CliMA/ClimaCoupler.jl/issues/1838
+    :is_land,
+    :is_ocean,
     # fields used to compute turbulent fluxes
     :T_atmos,
     :q_tot_atmos,

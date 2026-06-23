@@ -436,3 +436,54 @@ end
         scm_surface_type = "invalid_surface",
     )
 end
+
+@testset "validate_land_fraction_source" begin
+    @test Input.validate_land_fraction_source("etopo", Val(:oceananigans), "global") === nothing
+    @test Input.validate_land_fraction_source("era5", Val(:oceananigans), "global") === nothing
+    @test Input.validate_land_fraction_source("ocean", Val(:oceananigans), "global") === nothing
+
+    @test_throws ErrorException Input.validate_land_fraction_source(
+        "ocean",
+        Val(:prescribed),
+        "global",
+    )
+    @test_throws ErrorException Input.validate_land_fraction_source(
+        "ocean",
+        Val(:oceananigans),
+        "column",
+    )
+    @test_throws ErrorException Input.validate_land_fraction_source(
+        "invalid",
+        Val(:oceananigans),
+        "global",
+    )
+end
+
+@testset "surface_evaluation_masks" begin
+    import ClimaCore as CC
+    import ClimaComms
+    FT = Float64
+    context = ClimaComms.context()
+    space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = FT(6.371e6),
+        n_quad_points = 4,
+        h_elem = 4,
+        context,
+    )
+    land_fraction = CC.Fields.zeros(space)
+    land_fraction .= FT(0.25)
+    is_land, is_ocean = Input.surface_evaluation_masks(land_fraction)
+    @test minimum(is_land) == maximum(is_land) == FT(1)
+    @test minimum(is_ocean) == maximum(is_ocean) == FT(1)
+
+    land_fraction .= FT(0)
+    is_land, is_ocean = Input.surface_evaluation_masks(land_fraction)
+    @test minimum(is_land) == maximum(is_land) == FT(0)
+    @test minimum(is_ocean) == maximum(is_ocean) == FT(1)
+
+    land_fraction .= FT(1)
+    is_land, is_ocean = Input.surface_evaluation_masks(land_fraction)
+    @test minimum(is_land) == maximum(is_land) == FT(1)
+    @test minimum(is_ocean) == maximum(is_ocean) == FT(0)
+end

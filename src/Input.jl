@@ -24,6 +24,7 @@ export argparse_settings,
     atmos_default_config_dict,
     get_coupler_args,
     get_land_fraction,
+    surface_evaluation_masks,
     get_era5_filepaths
 
 const MODE_NAME_DICT = Dict(
@@ -301,7 +302,7 @@ function argparse_settings()
         arg_type = String
         default = "average"
         "--land_fraction_source"
-        help = "Source for land fraction data. [`etopo` (default) uses ETOPO-derived landsea_mask artifact, `era5` uses ERA5 land fraction artifact]"
+        help = "Source for land fraction data. [`etopo` (default) uses ETOPO-derived landsea_mask artifact, `era5` uses ERA5 land fraction artifact, `ocean` uses the Oceananigans immersed-boundary wet/dry mask (CMIP only)]"
         arg_type = String
         default = "etopo"
         "--binary_area_fraction"
@@ -624,6 +625,7 @@ function get_coupler_args(config_dict::Dict)
 
     # Land fraction source
     land_fraction_source = config_dict["land_fraction_source"]
+    validate_land_fraction_source(land_fraction_source, ocean_model, domain_type)
 
     # Binary area fraction
     binary_area_fraction = config_dict["binary_area_fraction"]
@@ -839,9 +841,11 @@ Land-sea Fraction
     Note that land-sea area fraction is different to the land-sea mask, which is a binary field
     (masks are used internally by the coupler to indicate passive cells that are not populated by a given component model).
 
-    Two sources are supported via the `land_fraction_source` config option:
+    Three sources are supported via the `land_fraction_source` config option:
     - "etopo": ETOPO-derived binary land-sea mask (landsea_mask_60arcseconds artifact)
     - "era5": ERA5 land fraction field (era5_land_fraction artifact)
+    - "ocean": immersed-boundary wet/dry mask from an `OceananigansSimulation`
+      (requires `ClimaCouplerCMIPExt`; see `land_fraction_from_ocean`)
 """
 function get_land_fraction(
     boundary_space,
@@ -892,6 +896,53 @@ function get_land_fraction(
     end
 
     return land_fraction
+end
+
+"""
+    surface_evaluation_masks(land_fraction)
+
+Return binary evaluation masks `(is_land, is_ocean)` on the exchange grid.
+
+Unlike area fractions (which partition the surface and sum to 1), these masks
+indicate where each surface model is evaluated. At fractional coastline cells
+(`0 < land_fraction < 1`), both masks are 1 so land and ocean are both active.
+
+See [CliMA/ClimaCoupler.jl#1838](https://github.com/CliMA/ClimaCoupler.jl/issues/1838).
+"""
+function surface_evaluation_masks(land_fraction)
+    FT = CC.Spaces.undertype(axes(land_fraction))
+    is_land = ifelse.(land_fraction .> eps(FT), FT(1), FT(0))
+    is_ocean = ifelse.(land_fraction .< FT(1) .- eps(FT), FT(1), FT(0))
+    return is_land, is_ocean
+end
+
+"""
+    validate_land_fraction_source(land_fraction_source, ocean_model, domain_type)
+
+Validate `land_fraction_source` against the selected ocean model and domain type.
+"""
+function validate_land_fraction_source(land_fraction_source, ocean_model, domain_type)
+    if land_fraction_source == "ocean"
+        ocean_model == Val(:oceananigans) ||
+            error(
+                "land_fraction_source=\"ocean\" requires ocean_model=\"oceananigans\"; " *
+                "got ocean_model=$(ocean_model).",
+            )
+        domain_type == "global" ||
+            error(
+                "land_fraction_source=\"ocean\" is only supported for domain_type=\"global\".",
+            )
+    elseif land_fraction_source ∉ ("etopo", "era5")
+        error(
+            "Unknown land_fraction_source: $land_fraction_source. " *
+            "Must be \"etopo\", \"era5\", or \"ocean\".",
+        )
+    elseif ocean_model == Val(:oceananigans) && domain_type == "global"
+        @warn "land_fraction_source=\"$land_fraction_source\" with ocean_model=\"oceananigans\" " *
+              "can misalign coastlines on the exchange grid and the ocean FV grid. " *
+              "Prefer land_fraction_source=\"ocean\" for CMIP runs."
+    end
+    return nothing
 end
 
 """

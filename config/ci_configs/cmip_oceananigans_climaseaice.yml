@@ -16,6 +16,7 @@ ice_model: "clima_seaice"
 land_diagnostics_period: "1hours"
 land_diagnostics_reduction: "instantaneous"
 land_model: "integrated"
+land_fraction_source: "ocean"
 land_spun_up_ic: false
 mode_name: "cmip"
 netcdf_output_at_levels: true

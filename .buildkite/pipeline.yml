@@ -650,4 +650,3 @@ steps:
     retry: *retry_policy
     artifact_paths:
       - "build_history.html"
-        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_sweep_0.25_1_10_10/artifacts/*"

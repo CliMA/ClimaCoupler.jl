@@ -4,13 +4,40 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Update to use ClimaOcean#0.10.0. [#1971](https://github.com/CliMA/ClimaCoupler.jl/pull/1971)
+Enables the 1 deg. TripolarGrid configuration as the default, with the updated spectral element <-> finite-volume regridding method (ConservativeRegridding0.2.5).
+
+#### Remove all diagnostic EDMF jobs PR[#1988](https://github.com/CliMA/ClimaCoupler.jl/pull/1988)
+ClimaAtmos.jl v0.39.5 is the last one to support `turbconv_model: diagnostic_edmfx`.
+
+#### Turbulent flux time-averaging for slow surface models PR[#1945](https://github.com/CliMA/ClimaCoupler.jl/pull/1945)
+For surface simulations whose own timestep is larger than the coupling
+timestep (e.g. `dt_ocean > Δt_cpl` or `dt_seaice > Δt_cpl`), the coupler now
+accumulates the per-surface turbulent fluxes (`F_lh`, `F_sh`,
+`F_turb_moisture`, `F_turb_ρτxz`, `F_turb_ρτyz`) every coupling step and
+pushes the time-average to the surface only immediately before it steps.
+This replaces the previous behavior of pushing an instantaneous flux every
+coupling step, only one of which (the last one before each component step)
+was actually used by the surface. The area-weighted combined `cs.fields.F_*`
+fields read by the atmosphere are unchanged (still instantaneous per
+coupling step). The new `FluxCalculator.FluxAccumulator`s are checkpointed
+alongside the rest of the coupled simulation state.
+
+This is a behavior change for CMIP configs that already have `dt_ocean` or
+`dt_seaice > dt_cpl`
+(`config/ci_configs/cmip_oceananigans_climaseaice*.yml`,
+`config/longrun_configs/`); their CI outputs will differ from prior
+baselines. Integrated land at `dt_land > Δt_cpl` is out of scope for this change
+and continues to use the previous behavior (it is an `AbstractImplicitFluxSimulation`
+and computes its own fluxes inside its `step!`).
+
 #### Conservative regridding used with lat-long grids PR[#1919](https://github.com/CliMA/ClimaCoupler.jl/pull/1919)
-Enables conservative regridding in CMIP runs with lat-long grids. 
-This uses the FV `value-per-element` approximation, and is a precursor 
-to more consistent regridding methods to be introduced in future versions 
+Enables conservative regridding in CMIP runs with lat-long grids.
+This uses the FV `value-per-element` approximation, and is a precursor
+to more consistent regridding methods to be introduced in future versions
 of ConservativeRegridding.jl[PR#99](https://github.com/JuliaGeo/ConservativeRegridding.jl/pull/99)
 
-#### Configurable land and coupler diagnostics output frequency and reduction
+#### Configurable land and coupler diagnostics output frequency and reduction PR[#1991](https://github.com/CliMA/ClimaCoupler.jl/pull/1939)
 Adds new config options to control the period and reduction type of land and
 coupler diagnostics, matching the existing options for ocean and sea-ice:
 - `land_diagnostics_period` (default `"monthly"`) and

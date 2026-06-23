@@ -30,6 +30,8 @@ export CoupledSimulation,
     AbstractSurfaceStub,
     SurfaceStub,
     step!,
+    sim_dt,
+    will_step,
     set_cache!,
     remap,
     remap!,
@@ -67,6 +69,7 @@ struct CoupledSimulation{
     TP,
     DH,
     SC <: Bool,
+    NTFA <: NamedTuple,
 }
     start_date::D
     fields::FV
@@ -81,6 +84,7 @@ struct CoupledSimulation{
     thermo_params::TP
     diags_handler::DH
     save_cache::SC
+    flux_accumulators::NTFA
 end
 
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args)...}(args...)
@@ -433,6 +437,27 @@ NVTX.@annotate function step!(sim::AbstractComponentSimulation, t::ITime)
         step!(sim.integrator)
     end
     return nothing
+end
+
+"""
+    sim_dt(sim::AbstractComponentSimulation)
+
+Return the component model's timestep in seconds as a `Float64`.
+
+This default accesses `sim.integrator.dt`, which is appropriate for models
+which use a ClimaTimeSteppers-style integrator.
+"""
+sim_dt(sim::AbstractComponentSimulation) = Float64(float(sim.integrator.dt))
+
+"""
+    will_step(sim::AbstractComponentSimulation, t)
+
+Return `true` if calling `Interfacer.step!(sim, t)` would take at least one
+step, i.e. if `t` has advanced by at least one of the component's
+timestep since the component last stepped.
+"""
+function will_step(sim::AbstractComponentSimulation, t)
+    return (Float64(float(t)) - Float64(float(sim.integrator.t))) >= sim_dt(sim)
 end
 
 """

@@ -42,10 +42,10 @@ data = [
 run_names = [
     ("coupled_progedmf_coarse", "Coupled with progedmf + 1M (16 helem)"),
     ("coupled_progedmf_fine", "Coupled with progedmf + 1M (30 helem)"),
-    ("coupled_io", "Coupled with diag. EDMF + IO"),
-    ("coupled", "Coupled with diag. EDMF"),
-    ("atmos_diagedmf", "Atmos with diag. EDMF"),
-    ("atmos", "Atmos without diag. EDMF"),
+    ("coupled_io", "Coupled with prog. EDMF + IO"),
+    ("coupled", "Coupled with prog. EDMF"),
+    ("atmos_progedmf", "Atmos with prog. EDMF"),
+    ("atmos", "Atmos without EDMF"),
 ]
 
 # For each run, get the run info and append it to the table
@@ -55,7 +55,7 @@ for (run_name, description) in run_names
 end
 
 # Output table to file, note that this must match the slack upload command in the pipeline.yml file
-table_output_dir = joinpath(output_dir, "compare_amip_climaatmos_amip_diagedmf")
+table_output_dir = joinpath(output_dir, "compare_amip_climaatmos_amip_progedmf")
 mkpath(table_output_dir)
 open(joinpath(table_output_dir, "table.txt"), "w") do f
     # Output the table, including lines before and after the header
@@ -66,5 +66,7 @@ open(joinpath(table_output_dir, "table.txt"), "w") do f
         table_format = PrettyTables.TextTableFormat(
             horizontal_lines_at_data_rows = [2, 4, 6, 8, 10, 12, 14],
         ),
+        fit_table_in_display_horizontally = false,
+        fit_table_in_display_vertically = false,
     )
 end

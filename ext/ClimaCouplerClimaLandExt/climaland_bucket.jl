@@ -2,7 +2,7 @@
 ### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###
 """
-    BucketSimulation{M, I, A}
+    BucketSimulation{M, I, A, FB, OW}
 
 The bucket model simulation object.
 
@@ -10,13 +10,23 @@ It contains the following objects:
 - `model::M`: The `ClimaLand.Bucket.BucketModel`.
 - `integrator::I`: The integrator used in timestepping this model.
 - `area_fraction::A`: A ClimaCore Field on the boundary space representing the surface area fraction of this component model.
+- `flux_buffer::FB`: A ClimaCore Field of NamedTuples on the bucket surface space, used as a
+    scratch space to hold the turbulent fluxes computed at each coupling step when using
+    flux accumulation. This is needed because bucket fluxes are computed on the bucket's
+    surface space via `CL.turbulent_fluxes_at_a_point`.
 - `output_writer`: The diagnostic file writer.
 """
-struct BucketSimulation{M <: CL.Bucket.BucketModel, I, A <: CC.Fields.Field, OW} <:
-       Interfacer.AbstractLandSimulation
+struct BucketSimulation{
+    M <: CL.Bucket.BucketModel,
+    I,
+    A <: CC.Fields.Field,
+    FB <: CC.Fields.Field,
+    OW,
+} <: Interfacer.AbstractLandSimulation
     model::M
     integrator::I
     area_fraction::A
+    flux_buffer::FB
     output_writer::OW
 end
 
@@ -182,8 +192,13 @@ function BucketSimulation(
 
     # Add diagnostics
     if use_land_diagnostics
-        output_writer =
-            CD.Writers.NetCDFWriter(domain.space.subsurface, output_dir; start_date)
+        global_attribs = Utilities.diagnostics_global_attribs(start_date)
+        output_writer = CD.Writers.NetCDFWriter(
+            domain.space.subsurface,
+            output_dir;
+            start_date,
+            global_attribs,
+        )
         diagnostics = CL.default_diagnostics(
             model,
             start_date,
@@ -218,7 +233,18 @@ function BucketSimulation(
         timestepper,
     )
 
-    return BucketSimulation(model, simulation._integrator, area_fraction, output_writer)
+    # Scratch buffer for `turbulent_fluxes_at_a_point` output when the bucket is a slow
+    # surface, so we don't clobber the time-averaged fluxes already in
+    # `p.bucket.turbulent_fluxes`. Unused for fast buckets.
+    flux_buffer = similar(simulation._integrator.p.bucket.turbulent_fluxes)
+
+    return BucketSimulation(
+        model,
+        simulation._integrator,
+        area_fraction,
+        flux_buffer,
+        output_writer,
+    )
 end
 
 # extensions required by Interfacer
@@ -295,25 +321,9 @@ function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_velocity}, u
             sim.integrator.p.bucket.scratch2,
         )
 end
-function Interfacer.update_field!(
-    sim::BucketSimulation,
-    ::Val{:turbulent_energy_flux},
-    fields,
-)
-    Interfacer.remap!(sim.integrator.p.bucket.turbulent_fluxes.lhf, fields.F_lh)
-    Interfacer.remap!(sim.integrator.p.bucket.turbulent_fluxes.shf, fields.F_sh)
-end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:snow_precipitation}, field)
     ρ_liq = LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
     Interfacer.remap!(sim.integrator.p.drivers.P_snow, field ./ ρ_liq)
-end
-function Interfacer.update_field!(
-    sim::BucketSimulation,
-    ::Val{:turbulent_moisture_flux},
-    field,
-)
-    ρ_liq = LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
-    Interfacer.remap!(sim.integrator.p.bucket.turbulent_fluxes.vapor_flux, field ./ ρ_liq) # TODO: account for sublimation
 end
 
 
@@ -348,37 +358,42 @@ end
 
 ## Extend functions for land-specific flux calculation
 """
-    compute_surface_fluxes!(csf, sim::BucketSimulation, atmos_sim, thermo_params)
+    compute_surface_fluxes!(csf, sim::BucketSimulation, atmos_sim, thermo_params, accumulator = nothing)
 
 This function computes surface fluxes between the bucket simulation and the atmosphere.
 
-Update the input coupler surface fields `csf` in-place with the computed fluxes
-for this model. These are then summed using area-weighting across all surface
-models to get the total fluxes. Fluxes where the area fraction is zero are set to zero.
+The bucket computes its turbulent fluxes on its own surface space rather than in coupler space,
+so we cannot use the generic coupler-space `FluxCalculator.update_flux_fields!`. Instead:
 
-Currently, this calculation is done on the land surface space, and the computed fluxes
-are remapped onto the coupler boundary space as the coupler fields are updated. In the future,
-we may compute fluxes in the bucket model's internal `step!` function.
+1. Compute the turbulent fluxes at each coupler step via `turbulent_fluxes_at_a_point` directly
+   into `bucket_dest`. For fast buckets (`dt_land <= dt_cpl`), `bucket_dest = p.bucket.turbulent_fluxes`.
+   For slow buckets, `bucket_dest = sim.flux_buffer` so we don't overwrite the time-averaged fluxes
+   already in `p.bucket.turbulent_fluxes`.
+2. Remap each component to the coupler boundary-space `sim.remapped_fluxes`, including the
+   `vapor_flux` (m/s) → `F_turb_moisture` (kg/m²/s) unit conversion. For slow buckets,
+   also add the fluxes to the accumulator, which will be sent to the bucket just before it steps.
 
 # Arguments
 - `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
 - `sim`: [BucketSimulation] the bucket simulation to compute fluxes for.
 - `atmos_sim`: [Interfacer.AbstractAtmosSimulation] the atmosphere simulation to compute fluxes with.
 - `thermo_params`: [ClimaParams.ThermodynamicParameters] the thermodynamic parameters for the simulation.
+- `accumulator`: optional `FluxAccumulator` for slow buckets; `nothing` (default) for fast buckets.
 """
 function FluxCalculator.compute_surface_fluxes!(
     csf,
     sim::BucketSimulation,
     atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
+    accumulator = nothing,
 )
-    boundary_space = axes(csf)
-    FT = CC.Spaces.undertype(boundary_space)
     Y, p, t, model = sim.integrator.u, sim.integrator.p, sim.integrator.t, sim.model
 
-    # Compute fluxes directly via `turbulent_fluxes_at_a_point`
+    # For fast buckets, write directly to the cache. For slow buckets, use `flux_buffer`
+    # to hold the intermediate fluxes while we accumulate them.
+    bucket_dest = isnothing(accumulator) ? p.bucket.turbulent_fluxes : sim.flux_buffer
+
     coupled_atmos = sim.model.atmos
-    bucket_dest = p.bucket.turbulent_fluxes
     T_sfc = CL.component_temperature(model, Y, p)
     q_sfc = CL.component_specific_humidity(model, Y, p)
     roughness_model = CL.surface_roughness_model(model, Y, p)
@@ -413,64 +428,67 @@ function FluxCalculator.compute_surface_fluxes!(
             earth_param_set,
         )
 
-    # Update the coupler fields with the computed fluxes
-    FluxCalculator.update_flux_fields!(csf, sim, bucket_dest)
+    # Per-component: remap bucket-space src into `csf.scalar_temp1`, area-mask, add the
+    # area-weighted contribution to `csf.F_*`, and (slow case) also add the masked value
+    # to the accumulator.
+    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
+
+    Interfacer.remap!(csf.scalar_temp1, bucket_dest.lhf)
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction ≈ 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.F_lh += csf.scalar_temp1 * area_fraction
+    isnothing(accumulator) || (@. accumulator.F_lh += csf.scalar_temp1)
+
+    Interfacer.remap!(csf.scalar_temp1, bucket_dest.shf)
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction ≈ 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.F_sh += csf.scalar_temp1 * area_fraction
+    isnothing(accumulator) || (@. accumulator.F_sh += csf.scalar_temp1)
+
+    # vapor_flux (m/s) → F_turb_moisture (kg/m²/s) unit conversion
+    ρ_liq = LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
+    Interfacer.remap!(csf.scalar_temp1, bucket_dest.vapor_flux .* ρ_liq)
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction ≈ 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.F_turb_moisture += csf.scalar_temp1 * area_fraction
+    isnothing(accumulator) || (@. accumulator.F_turb_moisture += csf.scalar_temp1)
+
+    Interfacer.remap!(csf.scalar_temp1, bucket_dest.ρτxz)
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction ≈ 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.F_turb_ρτxz += csf.scalar_temp1 * area_fraction
+    isnothing(accumulator) || (@. accumulator.F_turb_ρτxz += csf.scalar_temp1)
+
+    Interfacer.remap!(csf.scalar_temp1, bucket_dest.ρτyz)
+    @. csf.scalar_temp1 =
+        ifelse(area_fraction ≈ 0, zero(csf.scalar_temp1), csf.scalar_temp1)
+    @. csf.F_turb_ρτyz += csf.scalar_temp1 * area_fraction
+    isnothing(accumulator) || (@. accumulator.F_turb_ρτyz += csf.scalar_temp1)
+
+    isnothing(accumulator) || (accumulator.n_steps[] += 1)
+
     return nothing
 end
 
 """
-    FluxCalculator.update_flux_fields!(csf, sim::BucketSimulation, fluxes)
+    FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields)
 
-Update the surface simulation `sim` with the values stored in `fluxes,
-without any area-weighting. Then, update the coupler fields `csf` with
-the area-weighted fluxes after remapping to the boundary space.
+Push the time-averaged coupler-boundary-space turbulent fluxes from a slow bucket's
+`FluxAccumulator` back into the bucket's BC fields in `p.bucket.turbulent_fluxes`. Called
+by `push_and_reset!` immediately before each bucket step. (Fast buckets skip this entirely:
+`compute_surface_fluxes!` writes directly to `p.bucket.turbulent_fluxes`.)
 
-# Arguments
-- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields:
-    `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
-- `sim`: [Interfacer.AbstractComponentSimulation] the surface simulation to update.
-- `fluxes`: [NamedTuple] containing the fluxes to update the surface simulation with.
+Remaps each component from boundary space to bucket surface space, and applies the
+F_turb_moisture (kg/m²/s) → vapor_flux (m/s) unit conversion.
 """
-function FluxCalculator.update_flux_fields!(csf, sim::BucketSimulation, fluxes)
-    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
-    FT = CC.Spaces.undertype(axes(csf))
-
-    # Combine turbulent energy fluxes from the bucket model
-    # Use temporary variables to avoid allocating
-    Interfacer.remap!(csf.scalar_temp1, fluxes.lhf)
-    Interfacer.remap!(csf.scalar_temp2, fluxes.shf)
-
-    # Zero out the fluxes where the area fraction is zero
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    @. csf.scalar_temp2 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp2), csf.scalar_temp2)
-
-    # Update the coupler field in-place
-    @. csf.F_lh += csf.scalar_temp1 * area_fraction
-    @. csf.F_sh += csf.scalar_temp2 * area_fraction
-
-    # Combine turbulent moisture fluxes from each component of the land model
-    # Note that we multiply by ρ_liq to convert from m s-1 to kg m-2 s-1
-    ρ_liq = (LP.ρ_cloud_liq(sim.model.parameters.earth_param_set))
-    Interfacer.remap!(csf.scalar_temp1, fluxes.vapor_flux .* ρ_liq)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    @. csf.F_turb_moisture += csf.scalar_temp1 * area_fraction
-
-    # Combine turbulent momentum fluxes from each component of the land model
-    # Note that we exclude the canopy component here for now, since we can have nonzero momentum fluxes
-    #  where there is zero LAI. This should be fixed in ClimaLand.
-    Interfacer.remap!(csf.scalar_temp1, fluxes.ρτxz)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    @. csf.F_turb_ρτxz += csf.scalar_temp1 * area_fraction
-
-    Interfacer.remap!(csf.scalar_temp1, fluxes.ρτyz)
-    @. csf.scalar_temp1 =
-        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
-    @. csf.F_turb_ρτyz += csf.scalar_temp1 * area_fraction
-
+function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields)
+    bucket_dest = sim.integrator.p.bucket.turbulent_fluxes
+    Interfacer.remap!(bucket_dest.lhf, fields.F_lh)
+    Interfacer.remap!(bucket_dest.shf, fields.F_sh)
+    ρ_liq = LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
+    Interfacer.remap!(bucket_dest.vapor_flux, fields.F_turb_moisture ./ ρ_liq) # TODO: account for sublimation
+    Interfacer.remap!(bucket_dest.ρτxz, fields.F_turb_ρτxz)
+    Interfacer.remap!(bucket_dest.ρτyz, fields.F_turb_ρτyz)
     return nothing
 end
 

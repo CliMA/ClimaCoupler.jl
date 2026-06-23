@@ -16,11 +16,6 @@ edmfx_upwinding: "first_order"
 edmfx_vertical_diffusion: true
 h_elem: 16
 implicit_diffusion: true
-implicit_sgs_advection: true
-implicit_sgs_entr_detr: true
-implicit_sgs_mass_flux: true
-implicit_sgs_nh_pressure: true
-implicit_sgs_vertdiff: true
 insolation: "timevarying"
 netcdf_output_at_levels: true
 ode_algo: ARS222
@@ -31,7 +26,7 @@ rayleigh_sponge: true
 surface_setup: "DefaultMoninObukhov"
 t_end: "120days"
 time_varying_trace_gases: ["CO2", "O3"]
-toml: [toml/longrun_aquaplanet_diagedmf.toml]
+toml: [toml/longrun_aquaplanet_progedmf.toml]
 turbconv: "prognostic_edmfx"
 viscous_sponge: true
 z_elem: 63

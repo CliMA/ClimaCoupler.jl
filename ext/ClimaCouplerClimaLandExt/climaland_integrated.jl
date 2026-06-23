@@ -184,7 +184,13 @@ function ClimaLandSimulation(
 
     # Set up diagnostics
     if use_land_diagnostics
-        output_writer = CD.Writers.NetCDFWriter(subsurface_space, output_dir; start_date)
+        global_attribs = Utilities.diagnostics_global_attribs(start_date)
+        output_writer = CD.Writers.NetCDFWriter(
+            subsurface_space,
+            output_dir;
+            start_date,
+            global_attribs,
+        )
         diagnostics = CL.default_diagnostics(
             model,
             start_date,
@@ -452,7 +458,7 @@ end
 
 ## Extend functions for land-specific flux calculation
 """
-    compute_surface_fluxes!(csf, sim::ClimaLandSimulation, atmos_sim, thermo_params)
+    compute_surface_fluxes!(csf, sim::ClimaLandSimulation, atmos_sim, thermo_params, accumulator = nothing)
 
 This function computes surface fluxes between the integrated land model
 simulation and the atmosphere.
@@ -464,8 +470,8 @@ models to get the total fluxes. Fluxes where the area fraction is zero are set t
 The integrated land model requires fluxes to be computed implicitly, so they are
 computed in the land model's internal `step!` function, where they can be solved for
 at the same time as canopy temperature. As a result, this function does not actually compute
-the fluxes. However, it does access them from the land cache, combine them to get the
-total fluxes for the integrated land model, and update the coupler fields in-place.
+the fluxes, and some inputs are unused. However, it does access them from the land cache, combine
+them to get the total fluxes for the integrated land model, and update the coupler fields in-place.
 
 Because the integrated land model is composed of multiple sub-components, the
 fluxes are computed for each sub-component and then combined here to get the total for this model.
@@ -482,6 +488,7 @@ function FluxCalculator.compute_surface_fluxes!(
     sim::ClimaLandSimulation,
     atmos_sim::Interfacer.AbstractAtmosSimulation,
     thermo_params,
+    accumulator = nothing,
 )
     boundary_space = axes(csf)
     FT = CC.Spaces.undertype(boundary_space)

@@ -11,7 +11,7 @@ nsys profile --start-later=true --capture-range=cudaProfilerApi \
     --trace=nvtx,mpi,cuda,osrt --cuda-memory-usage=true --kill=none \
     --output=path/to/report \
     julia --project=experiments/AMIP experiments/AMIP/profile_simulation.jl \
-    --config_file config/benchmark_configs/amip_diagedmf_profile.yml
+    --config_file config/benchmark_configs/amip_progedmf_profile.yml
 ```
 
 Two coupling steps are run first to trigger precompilation. The Nsight profiler

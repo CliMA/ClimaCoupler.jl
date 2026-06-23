@@ -18,7 +18,6 @@ module SimCoordinator
 import ClimaComms
 import ClimaDiagnostics as CD
 import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
-import ClimaAtmos as CA
 import ClimaCore as CC
 import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
@@ -69,10 +68,8 @@ function run!(
     =#
     @info "Starting coupling loop"
     walltime = ClimaComms.@elapsed ClimaComms.device(cs) begin
-        s = CA.@timed_str begin
-            while cs.t[] < cs.tspan[end]
-                step!(cs)
-            end
+        while cs.t[] < cs.tspan[end]
+            step!(cs)
         end
     end
     @info "Simulation took $(walltime) seconds"
@@ -414,6 +411,23 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
 
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 
+    # Allocate a FluxAccumulator per slow explicit surface (one whose timestep is
+    # strictly greater than Δt_cpl). Other surfaces avoid this and receive turbulent
+    # fluxes directly via `update_turbulent_fluxes!` each coupling step.
+    Δt_cpl_secs = Float64(float(Δt_cpl))
+    slow_surface_keys = Tuple(
+        name for (name, sim) in pairs(model_sims) if
+        sim isa Interfacer.AbstractSurfaceSimulation &&
+        !(sim isa Interfacer.AbstractImplicitFluxSimulation) &&
+        !(sim isa Interfacer.AbstractSurfaceStub) &&
+        Interfacer.sim_dt(sim) > Δt_cpl_secs
+    )
+    flux_accumulators = NamedTuple{slow_surface_keys}(
+        Tuple(FluxCalculator.FluxAccumulator(boundary_space) for _ in slow_surface_keys),
+    )
+    isempty(slow_surface_keys) ||
+        @info "Allocated flux accumulators for slow surfaces: $(slow_surface_keys)"
+
     # set initial area fractions (remain set to 0 if model does not exist)
     if haskey(model_sims, :land_sim)
         coupler_fields.land_area_fraction .=
@@ -489,6 +503,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         thermo_params,
         diags_handler,
         save_cache,
+        flux_accumulators,
     )
 
     ## Restart component model states if specified
@@ -509,6 +524,15 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         FieldExchanger.set_caches!(cs)
         FluxCalculator.turbulent_fluxes!(cs)
         FluxCalculator.ocean_seaice_fluxes!(cs)
+
+        # The initial `turbulent_fluxes!` above fills the flux accumulators.
+        # Push the accumulated flux to each slow surface here.
+        FluxCalculator.push_ready_accumulators!(
+            cs.model_sims,
+            cs.flux_accumulators,
+            cs.t[];
+            force = true,
+        )
     end
     Utilities.show_memory_usage()
     return cs

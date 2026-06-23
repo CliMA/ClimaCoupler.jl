@@ -15,26 +15,26 @@ env:
 timeout_in_minutes: 1800 # 30 hours
 
 steps:
-  # - label: "init :computer:"
-  #   key: "init_cpu_env"
-  #   command:
-  #     - "echo $$JULIA_DEPOT_PATH"
+  - label: "init :computer:"
+    key: "init_cpu_env"
+    command:
+      - "echo $$JULIA_DEPOT_PATH"
 
-      # - echo "--- Instantiate AMIP env"
-      # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
-      # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
+      - echo "--- Instantiate AMIP env"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 
-      # - echo "--- Instantiate CMIP env"
-      # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
-      # - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
+      - echo "--- Instantiate CMIP env"
+      - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
 
-  #   agents:
-  #     slurm_cpus_per_task: 8
-  #   env:
-  #     JULIA_NUM_PRECOMPILE_TASKS: 8
-  #     JULIA_MAX_NUM_PRECOMPILE_FILES: 50
+    agents:
+      slurm_cpus_per_task: 8
+    env:
+      JULIA_NUM_PRECOMPILE_TASKS: 8
+      JULIA_MAX_NUM_PRECOMPILE_FILES: 50
 
   - label: "init clima :computer:"
     key: "init_cpu_env_clima"
@@ -59,22 +59,22 @@ steps:
 
   - wait
 
-  # - group: "Coupler integration and conservation tests"
+  - group: "Coupler integration and conservation tests"
 
-    # steps:
-    #   - label: "Aquaplanet: evolving slab ocean"
-    #     key: "slabplanet_aqua_evolve_ocean"
-    #     command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_aqua_evolve_ocean.yml --job_id slabplanet_aqua_evolve_ocean"
-    #     artifact_paths: "output/slabplanet_aqua_evolve_ocean/artifacts/*"
-    #     agents:
-    #       slurm_mem: 32GB
+    steps:
+      - label: "Aquaplanet: evolving slab ocean"
+        key: "slabplanet_aqua_evolve_ocean"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_aqua_evolve_ocean.yml --job_id slabplanet_aqua_evolve_ocean"
+        artifact_paths: "output/slabplanet_aqua_evolve_ocean/artifacts/*"
+        agents:
+          slurm_mem: 32GB
 
-    #   - label: "Slabplanet: evolving slab ocean, bucket"
-    #     key: "slabplanet_evolve_ocean"
-    #     command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_evolve_ocean.yml --job_id slabplanet_evolve_ocean"
-    #     artifact_paths: "output/slabplanet_evolve_ocean/artifacts/*"
-    #     agents:
-    #       slurm_mem: 32GB
+      - label: "Slabplanet: evolving slab ocean, bucket"
+        key: "slabplanet_evolve_ocean"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_evolve_ocean.yml --job_id slabplanet_evolve_ocean"
+        artifact_paths: "output/slabplanet_evolve_ocean/artifacts/*"
+        agents:
+          slurm_mem: 32GB
 
   - group: "AMIP simulations"
 
@@ -84,20 +84,6 @@ steps:
         key: "amip_edonly"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_edonly.yml --job_id amip_edonly"
         artifact_paths: "output/amip_edonly/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          queue: clima
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 32GB
-
-      - label: "GPU AMIP + diag. EDMF + integrated land"
-        key: "amip_diagedmf_land"
-        command:
-          - "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_diagedmf_land.yml --job_id amip_diagedmf_land"
-        artifact_paths: "output/amip_diagedmf_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -120,7 +106,7 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 32GB
-      
+
       - label: "GPU AMIP + prog. EDMF + integrated land + 2K SST"
         key: "amip_progedmf_land_p2k"
         command:
@@ -177,18 +163,6 @@ steps:
           slurm_mem: 32GB
           slurm_gpus: 1
 
-      - label: "GPU CMIP: diag. EDMF + integrated land"
-        key: "cmip_diagedmf_land"
-        command:
-            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_diagedmf_land.yml --job_id cmip_diagedmf_land"
-        artifact_paths: "output/cmip_diagedmf_land/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          queue: clima
-          slurm_mem: 32GB
-          slurm_gpus: 1
-
       - label: "GPU CMIP: prog. EDMF + integrated land"
         key: "cmip_progedmf_land"
         command:
@@ -216,6 +190,8 @@ steps:
             output/amip_progedmf_land_p2k
             output/ecs_analysis
         artifact_paths: "output/ecs_analysis/*"
+        agents:
+          queue: clima
 
       # plot job performance history
       - label: ":chart_with_downwards_trend: build history"

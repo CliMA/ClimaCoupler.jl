@@ -23,6 +23,7 @@ Here we will describe the structure and internals of `CoupledSimulation`.
 | `conservation_checks` | `NamedTuple{(:energy,:water)}` or `nothing` | Energy and water conservation accumulators; `nothing` when disabled |
 | `diags_handler`       | `ClimaDiagnostics.DiagnosticsHandler` or `nothing` | ClimaDiagnostics.jl handler that schedules and writes diagnostics |
 | `thermo_params`       | `Thermodynamics.Parameters.ThermodynamicsParameters` or `nothing` | Thermodynamic parameters shared across component models |
+| `flux_accumulators`   | `NamedTuple` of `FluxCalculator.FluxAccumulator` | Per-surface turbulent flux accumulators for slow explicit surfaces (`sim_dt > Δt_cpl`); empty otherwise |
 | `save_cache`          | `Bool` | Whether model caches are included when writing checkpoint files |
 
 ## Component model simulations (`cs.model_sims`)
@@ -118,6 +119,33 @@ configure which variables are saved and at what frequency.
 `cs.thermo_params` is a `Thermodynamics.Parameters.ThermodynamicsParameters` object
 shared across all component models. It is used by `FluxCalculator` when computing
 turbulent surface fluxes. In testing contexts only it may be `nothing`.
+
+## Turbulent flux accumulators (`cs.flux_accumulators`)
+
+`cs.flux_accumulators` is a `NamedTuple` of `FluxCalculator.FluxAccumulator`
+objects, keyed by the surface simulation name (e.g. `:ocean_sim`, `:ice_sim`).
+Each accumulator holds a step counter as well as the running sum of each turbulent
+flux (`F_lh`, `F_sh`, `F_turb_moisture`, `F_turb_ρτxz`, `F_turb_ρτyz`)
+for this simulation, defined on the coupler boundary space.
+
+An entry is allocated only for "slow explicit" surfaces — surfaces whose own
+timestep is larger than `Δt_cpl`, that are not `AbstractImplicitFluxSimulation`
+(integrated land), and that are not `AbstractSurfaceStub` (prescribed data without
+turbulent flux exchange). All other surfaces have no entry in this `NamedTuple`,
+and the coupler pushes turbulent fluxes directly via `FluxCalculator.update_turbulent_fluxes!`
+at every coupling step.
+
+When an accumulator is present, the coupler:
+
+- adds the per-surface turbulent flux to the accumulator each coupling step
+  (instead of calling `update_turbulent_fluxes!` on that surface), and
+- if the surface is about to step, divides the accumulator by
+  `n_steps`, writes the time-averaged flux to the surface boundary conditions
+  via `update_turbulent_fluxes!`, and resets the accumulator.
+
+The area-weighted combined `csf.F_*` fields (which the atmosphere reads) are
+recomputed every call to `turbulent_fluxes!` regardless of accumulator state.
+See [FluxCalculator](@ref) for the accumulator API.
 
 ## Checkpoint settings (`cs.save_cache`, `cs.prev_checkpoint_t`)
 

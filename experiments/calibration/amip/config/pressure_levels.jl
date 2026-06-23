@@ -16,10 +16,10 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     # pressure_coordinates: true in config
     short_names = ["ta", "hur"],
     minibatch_size = 1,
-    n_iterations = 6,
+    n_iterations = 5,
     sample_date_ranges,
     extend = Dates.Month(1),
-    spinup = Dates.Day(7),
+    spinup = Dates.Day(0),
     output_dir,
     rng_seed = 42,
 )

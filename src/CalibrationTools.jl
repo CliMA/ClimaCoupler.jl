@@ -443,7 +443,7 @@ CERES name to CliMA name.
 """
 function CERESDataLoader(; ceres_to_clima_names = CERES_TO_CLIMA_NAMES)
     artifact_dir = @clima_artifact("radiation_obs")
-    ceres_file = joinpath(artifact_dir, "CERES_EBAF_Ed4.2_Subset_200003-201910.nc")
+    ceres_file = joinpath(artifact_dir, "CERES_EBAF_Ed4.2.1_Subset_200003-202512.nc")
 
     catalog = NCCatalog()
     ClimaAnalysis.add_file!(catalog, ceres_file, ceres_to_clima_names...)

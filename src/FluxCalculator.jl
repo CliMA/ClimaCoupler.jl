@@ -6,6 +6,7 @@ or to call flux calculating functions from the component models.
 """
 module FluxCalculator
 
+import LazyBroadcast: @lazy
 import StaticArrays
 import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters as SFP
@@ -399,16 +400,13 @@ NVTX.@annotate function compute_surface_fluxes!(
     csf.scalar_temp2 .= TD.q_vap_saturation.(thermo_params, T_sfc, ρ_sfc, 0, 0)
     q_sfc = csf.scalar_temp2
 
-    # Set some scalars that we hardcode for now
-    gustiness = ones(boundary_space)
-
     # Set SurfaceFluxConfig containing models for roughness and gustiness
     roughness_params = get_roughness_params(csf, sim)
-    config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
+    gustiness_spec = SF.ConstantGustinessSpec(FT(1))
+    config = @lazy SF.SurfaceFluxConfig.(roughness_params, gustiness_spec)
 
     # Set surface velocity to zero for now
-    csf.scalar_temp3 .= 0
-    uv_sfc = csf.scalar_temp3
+    uv_sfc = @lazy @. (uv_int * FT(0))
     fluxes =
         FluxCalculator.get_surface_fluxes.(
             surface_fluxes_params,
@@ -419,7 +417,7 @@ NVTX.@annotate function compute_surface_fluxes!(
             csf.q_ice_atmos,
             csf.ρ_atmos,
             csf.height_int, # h_int
-            uv_int .* FT(0), # uv_sfc
+            uv_sfc,
             T_sfc,
             q_sfc,
             csf.height_sfc, # h_sfc
@@ -521,7 +519,7 @@ function get_roughness_params(csf, sim, ::Val{:constant})
     z0m = csf.scalar_temp3
     Interfacer.get_field!(csf.scalar_temp4, sim, Val(:roughness_buoyancy))
     z0b = csf.scalar_temp4
-    return SF.ConstantRoughnessParams.(z0m, z0b)
+    return @lazy SF.ConstantRoughnessParams.(z0m, z0b)
 end
 
 """

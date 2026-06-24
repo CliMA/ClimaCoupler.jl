@@ -549,6 +549,26 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
     return nothing
 end
 
+function FluxCalculator.reset_fluxes!(sim::ClimaAtmosSimulation)
+    integrator = sim.integrator
+    sfc = integrator.p.precomputed.sfc_conditions
+
+    fill!(sfc.ρ_flux_h_tot, zero(eltype(sfc.ρ_flux_h_tot)))
+    fill!(sfc.ρ_flux_uₕ, zero(eltype(sfc.ρ_flux_uₕ)))
+
+    if hasmoisture(integrator)
+        fill!(sfc.ρ_flux_q_tot, zero(eltype(sfc.ρ_flux_q_tot)))
+        fill!(integrator.p.precomputed.surface_rain_flux, zero(eltype(integrator.p.precomputed.surface_rain_flux)))
+        fill!(integrator.p.precomputed.surface_snow_flux, zero(eltype(integrator.p.precomputed.surface_snow_flux)))
+    end
+
+    fill!(sfc.obukhov_length, zero(eltype(sfc.obukhov_length)))
+    fill!(sfc.ustar, zero(eltype(sfc.ustar)))
+    fill!(sfc.buoyancy_flux, zero(eltype(sfc.buoyancy_flux)))
+
+    return nothing
+end
+
 """
 Extend Interfacer.add_coupler_fields! to add the fields required for ClimaAtmosSimulation.
 

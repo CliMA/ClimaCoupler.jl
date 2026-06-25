@@ -4,6 +4,9 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Remove all diagnostic EDMF jobs PR[#1988](https://github.com/CliMA/ClimaCoupler.jl/pull/1988)
+ClimaAtmos.jl v0.39.5 is the last one to support `turbconv_model: diagnostic_edmfx`.
+
 #### Turbulent flux time-averaging for slow surface models PR[#1945](https://github.com/CliMA/ClimaCoupler.jl/pull/1945)
 For surface simulations whose own timestep is larger than the coupling
 timestep (e.g. `dt_ocean > Δt_cpl` or `dt_seaice > Δt_cpl`), the coupler now

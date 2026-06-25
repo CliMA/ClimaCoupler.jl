@@ -174,7 +174,7 @@ function get_obs_var_dict()
                 obs_var = ClimaAnalysis.OutputVar(
                     joinpath(
                         @clima_artifact("radiation_obs"),
-                        "CERES_EBAF_Ed4.2_Subset_200003-201910.nc",
+                        "CERES_EBAF_Ed4.2.1_Subset_200003-202512.nc",
                     ),
                     obs_name,
                     new_start_date = start_date,

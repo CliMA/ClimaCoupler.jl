@@ -596,6 +596,16 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     OC.interior(oc_flux_S, :, :, 1) .-=
         OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
         (remapped_P_liq .+ remapped_P_snow) ./ reference_density
+
+    Interfacer.remap!(sim.remapping.scratch_field_oc3, csf.P_atmos, sim.remapping)
+
+    # Fill the barotropic potential with atmospheric surface pressure
+    potential = CO.Oceans.forcing_barotropic_potential(sim.ocean)
+
+    if !isnothing(potential)
+        parent(potential) .= parent(sim.remapping.scratch_field_oc3) ./ reference_density
+    end
+
     return nothing
 end
 

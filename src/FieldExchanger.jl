@@ -230,6 +230,7 @@ function update_sim!(atmos_sim::Interfacer.AbstractAtmosSimulation, csf)
     Interfacer.update_field!(atmos_sim, Val(:emissivity), csf.emissivity)
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf.T_sfc)
     Interfacer.update_field!(atmos_sim, Val(:surface_humidity), csf)
+    Interfacer.update_field!(atmos_sim, Val(:air_pressure), csf)
     return nothing
 end
 

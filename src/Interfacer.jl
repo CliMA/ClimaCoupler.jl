@@ -338,6 +338,7 @@ update_field!(
         Val{:surface_direct_albedo},
         Val{:surface_diffuse_albedo},
         Val{:surface_temperature},
+        Val{:air_pressure}
     },
     _,
 ) = update_field_warning(sim, val)
@@ -359,6 +360,7 @@ update_field!(
         Val{:snow_precipitation},
         Val{:turbulent_energy_flux},
         Val{:turbulent_moisture_flux},
+        Val{:air_pressure}
     },
     _,
 ) = update_field_warning(sim, val)

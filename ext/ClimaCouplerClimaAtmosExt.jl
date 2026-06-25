@@ -364,6 +364,10 @@ function Interfacer.update_field!(
 )
     Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.T_sfc, field)
 end
+
+Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:air_pressure}, csf) = 
+    Interfacer.get_field!(csf.P_atmos, sim, Val(:air_pressure))
+
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_humidity}, csf)
     # NOTE: This update_field! takes as argument the entire coupler fields struct, instead
     # of a single field. This is unlike most of other functions, so we may want to revisit it.
@@ -404,7 +408,9 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_humi
     # Remap surface temperature and humidity to atmosphere surface space
     q_sfc_atmos = Interfacer.remap(atmos_surface_space, csf.scalar_temp1)
     sim.integrator.p.precomputed.sfc_conditions.q_vap_sfc .= q_sfc_atmos
+    return nothing
 end
+
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
     CC.Spaces.level(CC.Fields.coordinate_field(sim.integrator.u.c).z, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_sfc}) =

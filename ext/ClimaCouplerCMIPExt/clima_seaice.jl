@@ -213,6 +213,8 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_concentration}) =
     sim.ice.model.ice_concentration
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_thickness}) =
     sim.ice.model.ice_thickness
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:snow_thickness}) =
+    sim.ice.model.snow_thickness
 # Internal temperature in Kelvin (same convention as :surface_temperature)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:internal_temperature}) =
     sim.ocean_ice_interface.temperature + sim.ice_properties.C_to_K
@@ -230,9 +232,13 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_direct_albedo}) 
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_diffuse_albedo}) =
     eltype(sim.ice.model)(0.7)
 
+top_thermodynamics(sim::ClimaSeaIceSimulation) =
+    isnothing(sim.ice.model.snow_thermodynamics) ? sim.ice.model.ice_thermodynamics :
+    sim.ice.model.snow_thermodynamics
+
 # Surface temperature from last timestep (Celsius → Kelvin)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
-    sim.ice_properties.C_to_K + sim.ice.model.ice_thermodynamics.top_surface_temperature
+    sim.ice_properties.C_to_K + top_thermodynamics(sim).top_surface_temperature
 
 """
     FluxCalculator.compute_surface_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim, thermo_params)
@@ -259,20 +265,30 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
 
     # Sea ice parameters for `update_T_sfc_cb` (load into boundary-space scratch Fields first
     # to avoid GPU scalar indexing when building the closure)
+
+    # Conductive resistance of the column R = h_ice/k_ice + h_snow/k_snow [m² K W⁻¹].
+    # Snow and ice add in series; with no snow layer (or h_snow = 0) this reduces to h_ice/k_ice.
+    ice_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
+    k_ice =
+        hasfield(typeof(ice_heat_flux), :conductivity) ? FT(ice_heat_flux.conductivity) :
+        convert(FT, 2) # default conductivity [W m⁻¹ K⁻¹]
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:ice_thickness))
+    R = csf.scalar_temp1
+    snow_thermo = sim.ice.model.snow_thermodynamics
+    if isnothing(snow_thermo)
+        R .= R ./ k_ice
+    else
+        k_snow = FT(snow_thermo.internal_heat_flux.conductivity)
+        Interfacer.get_field!(csf.scalar_temp2, sim, Val(:snow_thickness))
+        R .= R ./ k_ice .+ csf.scalar_temp2 ./ k_snow
+    end
+
     Interfacer.get_field!(csf.scalar_temp2, sim, Val(:internal_temperature))
     Interfacer.get_field!(csf.scalar_temp3, sim, Val(:emissivity))
     Interfacer.get_field!(csf.scalar_temp4, sim, Val(:surface_direct_albedo))
-    δ = csf.scalar_temp1
     T_i = csf.scalar_temp2
     ϵ = csf.scalar_temp3
     α_albedo = csf.scalar_temp4
-    internal_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
-    κ = if hasfield(typeof(internal_heat_flux), :conductivity)
-        FT.(internal_heat_flux.conductivity)
-    else
-        convert(FT, 2) # default conductivity [W m⁻¹ K⁻¹]
-    end
     σ = FT(sim.ice_properties.σ)
     SW_d = csf.SW_d
     LW_d = csf.LW_d
@@ -280,7 +296,7 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
 
     # Build element-wise `update_T_sfc_cb` closures (each closes over local ice parameters)
     update_T_sfc_cb =
-        ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
+        ClimaCouplerCMIPExt.update_T_sfc.(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
 
     # Surface temperature guess from last timestep
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
@@ -339,7 +355,7 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     remapped_T_sfc = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
 
     ice_concentration = sim.ice.model.ice_concentration
-    top_sfc_T = sim.ice.model.ice_thermodynamics.top_surface_temperature
+    top_sfc_T = top_thermodynamics(sim).top_surface_temperature
     OC.interior(top_sfc_T, :, :, 1) .=
         ifelse.(
             OC.interior(ice_concentration, :, :, 1) .> 0,
@@ -434,18 +450,14 @@ end
 Update the sea ice simulation with the provided fields, which have been filled in
 by the coupler.
 
-Update the portion of the surface_fluxes for T and S that is due to radiation and
-precipitation. The rest will be updated in `update_turbulent_fluxes!`.
-
-Note that currently precipitation has no effect on the sea ice model, which has
-constant salinity.
+Update the portion of the surface_fluxes for T that is due to radiation, and the snow
+precipitation that drives snow accumulation. The rest will be updated in `update_turbulent_fluxes!`.
 
 A note on sign conventions:
 ClimaAtmos and ClimaSeaIce both use the convention that a positive flux is an upward flux.
-No sign change is needed during the exchange, except for precipitation/salinity fluxes.
-ClimaAtmos provides precipitation as a negative flux at the surface, and
-ClimaSeaIce represents precipitation as a positive salinity flux,
-so a sign change is needed when we convert from precipitation to salinity flux.
+No sign change is needed during the exchange for radiation. Precipitation is the exception:
+ClimaAtmos provides snowfall as a negative (downward) mass flux at the surface, while
+ClimaSeaIce expects `snowfall` as a positive accumulation rate, so the sign is flipped.
 """
 function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
     ice_concentration = sim.ice.model.ice_concentration
@@ -469,6 +481,16 @@ function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
         OC.interior(si_flux_heat, :, :, 1) .=
             (OC.interior(ice_concentration, :, :, 1) .> 0) .*
             (-(1 .- α) .* remapped_SW_d .- ϵ .* remapped_LW_d)
+    end
+
+    # Snow precipitation drives snow accumulation (sign flip: downward atmospheric mass 
+    # flux to positive `snowfall`).
+    snowfall = sim.ice.model.snowfall
+    if snowfall isa OC.Field
+        Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.P_snow, sim.remapping)
+        remapped_P_snow = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
+        OC.interior(snowfall, :, :, 1) .=
+            (OC.interior(ice_concentration, :, :, 1) .> 0) .* (.-remapped_P_snow)
     end
     return nothing
 end

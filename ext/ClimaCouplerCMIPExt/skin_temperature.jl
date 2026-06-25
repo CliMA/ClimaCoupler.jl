@@ -3,23 +3,26 @@
 
 Solve the steady-state flux balance for surface temperature Tₛ:
 
-            κ
-Jᵃ(Tₛ) + --- (Tₛ - Tᵢ) = 0
-            δ
+         Tₛ - Tᵢ
+Jᵃ(Tₛ) + ──────── = 0
+            R
 
-where Jᵃ is the net upward surface flux and κ/δ·(Tₛ - Tᵢ) is the conductive flux.
+where Jᵃ is the net upward surface flux and (Tₛ - Tᵢ)/R is the conductive flux
+through the column. `R` is the conductive resistance [m² K W⁻¹]: for bare ice
+`R = δ/κ`, and with a snow layer the snow and ice resistances add in series,
+`R = h_snow/k_snow + h_ice/k_ice`.
 """
 
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 
 """
-    update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
+    update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
 
 Create a callback for `SurfaceFluxes.jl` that updates surface temperature using
 a semi-implicit linearization of the LW emission term:
 
-    Tₛⁿ⁺¹ = (Tᵢ - δ/κ · (Jᵃ - 4σϵTₛⁿ⁴)) / (1 + 4δσϵTₛⁿ³/κ)
+    Tₛⁿ⁺¹ = (Tᵢ - R · (Jᵃ - 4σϵTₛⁿ⁴)) / (1 + 4RσϵTₛⁿ³)
 
 where Jᵃ = σϵTₛⁿ⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh  (positive upward).
 
@@ -27,8 +30,7 @@ The result is capped at the melting temperature T_melt to prevent the surface
 temperature from exceeding the melting point under heating fluxes.
 
 # Arguments
-- `κ`: Thermal conductivity [W m⁻¹ K⁻¹]
-- `δ`: Ice thickness [m]
+- `R`: Conductive resistance of the column [m² K W⁻¹] (snow and ice in series)
 - `T_i`: Internal (ice-ocean interface) temperature [K]
 - `σ`: Stefan-Boltzmann constant [W m⁻² K⁻⁴]
 - `ϵ`: Surface emissivity [-]
@@ -37,7 +39,7 @@ temperature from exceeding the melting point under heating fluxes.
 - `α_albedo`: Surface albedo [-]
 - `T_melt`: Melting temperature [K] (typically 273.15 K for freshwater ice)
 """
-function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
+function update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
     return function (ζ, param_set, thermo_params_callback, inputs, scheme, u_star, z0m, z0s)
         T_sfc_n = inputs.T_sfc_guess
 
@@ -88,8 +90,8 @@ function update_T_sfc(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
         J_a = σ * ϵ * T_sfc_n^4 - (1 - α_albedo) * SW_d - ϵ * LW_d + F_sh + F_lh
 
         # Semi-implicit solve: linearize σϵT⁴ ≈ -3σϵTₙ⁴ + 4σϵTₙ³T
-        numerator = T_i - (δ / κ) * (J_a - 4 * σ * ϵ * T_sfc_n^4)
-        denominator = 1 + 4 * δ * σ * ϵ * T_sfc_n^3 / κ
+        numerator = T_i - R * (J_a - 4 * σ * ϵ * T_sfc_n^4)
+        denominator = 1 + 4 * R * σ * ϵ * T_sfc_n^3
         T_sfc_new = numerator / denominator
 
         # Cap surface temperature at melting temperature 

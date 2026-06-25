@@ -33,7 +33,7 @@ end
         "job_id_coupled" => "test_coupled",
         "job_id_atmos" => "test_atmos",
         "job_id_coupled_io" => "test_coupled_io",
-        "job_id_atmos_diagedmf" => "test_atmos_diagedmf",
+        "job_id_atmos_progedmf" => "test_atmos_progedmf",
         "job_id_coupled_progedmf_coarse" => "test_coarse",
         "job_id_coupled_progedmf_fine" => "test_fine",
         "coupler_output_dir" => test_output_dir,
@@ -44,7 +44,7 @@ end
         ("coupled", "test_coupled"),
         ("atmos", "test_atmos"),
         ("coupled_io", "test_coupled_io"),
-        ("atmos_diagedmf", "test_atmos_diagedmf"),
+        ("atmos_progedmf", "test_atmos_progedmf"),
         ("coupled_progedmf_coarse", "test_coarse"),
         ("coupled_progedmf_fine", "test_fine"),
     ]

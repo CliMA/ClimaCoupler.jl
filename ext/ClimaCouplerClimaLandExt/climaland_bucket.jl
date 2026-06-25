@@ -192,8 +192,13 @@ function BucketSimulation(
 
     # Add diagnostics
     if use_land_diagnostics
-        output_writer =
-            CD.Writers.NetCDFWriter(domain.space.subsurface, output_dir; start_date)
+        global_attribs = Utilities.diagnostics_global_attribs(start_date)
+        output_writer = CD.Writers.NetCDFWriter(
+            domain.space.subsurface,
+            output_dir;
+            start_date,
+            global_attribs,
+        )
         diagnostics = CL.default_diagnostics(
             model,
             start_date,

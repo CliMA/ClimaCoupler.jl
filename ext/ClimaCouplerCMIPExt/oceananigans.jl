@@ -167,15 +167,24 @@ function OceananigansSimulation(
         error("Unsupported time type: $(typeof(tspan[1]))")
     end
 
-    ocean = tripolar_ocean_simulation(
+    #ocean = tripolar_ocean_simulation(
+    #    arch;
+    #    zstar,
+    #    active_cells_map,
+    #    clock = model_clock,
+    #    depth = 5500,
+    #    Nz = 32,
+    #    closure,
+    #    substeps = simple_ocean ? 70 : 150,
+    #)
+    ocean = CO.orca_ocean(
         arch;
-        zstar,
-        active_cells_map,
+        zstar = !simple_ocean,
         clock = model_clock,
-        depth = 5500,
-        Nz = 32,
         closure,
         substeps = simple_ocean ? 70 : 150,
+        Nz = 32,
+        depth = 5500,
     )
     ocean.stop_time = stop_time
     ocean.Δt = float(dt)

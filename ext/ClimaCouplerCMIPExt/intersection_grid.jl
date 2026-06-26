@@ -423,6 +423,42 @@ end
 zeros_on_arch(FT, ::OC.CPU, n) = zeros(FT, n)
 zeros_on_arch(FT, arch, n) = OC.on_architecture(arch, zeros(FT, n))
 
+"""Return a CPU vector for host-side intersection loops (no-op for `Array`)."""
+host_intersection_vector(v::Array) = v
+host_intersection_vector(v) = Array(v)
+
+"""Copy a host vector back to its device counterpart when needed."""
+function sync_intersection_vector!(device_v, host_v)
+    device_v === host_v && return device_v
+    copyto!(device_v, host_v)
+    return device_v
+end
+
+on_gpu_intersection_array(v) = !(v isa Array)
+
+function _host_intersection_namedtuple(nt::NamedTuple)
+    return NamedTuple{keys(nt)}(map(host_intersection_vector, values(nt)))
+end
+
+function _sync_intersection_namedtuple!(device_nt, host_nt::NamedTuple)
+    for name in keys(device_nt)
+        sync_intersection_vector!(device_nt[name], host_nt[name])
+    end
+    return nothing
+end
+
+function _host_intersection_struct(s)
+    names = fieldnames(typeof(s))
+    return (; zip(names, map(n -> host_intersection_vector(getfield(s, n)), names))...)
+end
+
+function _sync_intersection_struct!(device_s, host_nt::NamedTuple)
+    for name in keys(host_nt)
+        sync_intersection_vector!(getfield(device_s, name), host_nt[name])
+    end
+    return nothing
+end
+
 _oc_surface_scratch(FT, arch, n) = (;
     T = zeros_on_arch(FT, arch, n),
     z0m = zeros_on_arch(FT, arch, n),
@@ -552,8 +588,19 @@ For each intersection polygon, look up the value from its parent CC element.
 - `cc_values`: Vector of values per CC element (length `ig.n_cc`)
 """
 function gather_cc_to_intersection!(intersection_values, ig::IntersectionGrid, cc_values)
+    if on_gpu_intersection_array(intersection_values)
+        gather_cc_to_intersection_gpu!(
+            intersection_values,
+            ig,
+            cc_values,
+            get_backend(intersection_values),
+        )
+        return nothing
+    end
+    cc_host = host_intersection_vector(cc_values)
+    cc_indices = host_intersection_vector(ig.cc_indices)
     @inbounds for k in 1:ig.n_intersections
-        intersection_values[k] = cc_values[ig.cc_indices[k]]
+        intersection_values[k] = cc_host[cc_indices[k]]
     end
     return nothing
 end
@@ -580,10 +627,23 @@ function gather_cc_nodal_to_intersection!(
     nodal_values,
 )
     fill!(intersection_values, zero(eltype(intersection_values)))
-    @inbounds for idx in eachindex(ig.node_gather_polygon)
-        k = ig.node_gather_polygon[idx]
-        n = ig.node_gather_node[idx]
-        intersection_values[k] += ig.node_gather_weight[idx] * nodal_values[n]
+    if on_gpu_intersection_array(intersection_values)
+        gather_cc_nodal_to_intersection_gpu!(
+            intersection_values,
+            ig,
+            nodal_values,
+            get_backend(intersection_values),
+        )
+        return nothing
+    end
+    node_gather_polygon = host_intersection_vector(ig.node_gather_polygon)
+    node_gather_node = host_intersection_vector(ig.node_gather_node)
+    node_gather_weight = host_intersection_vector(ig.node_gather_weight)
+    nodal_host = host_intersection_vector(nodal_values)
+    @inbounds for idx in eachindex(node_gather_polygon)
+        k = node_gather_polygon[idx]
+        n = node_gather_node[idx]
+        intersection_values[k] += node_gather_weight[idx] * nodal_host[n]
     end
     return nothing
 end
@@ -601,8 +661,19 @@ For each intersection polygon, look up the value from its parent OC cell.
 - `oc_values`: Vector of values per OC cell (length `ig.n_oc`)
 """
 function gather_oc_to_intersection!(intersection_values, ig::IntersectionGrid, oc_values)
+    if on_gpu_intersection_array(intersection_values)
+        gather_oc_to_intersection_gpu!(
+            intersection_values,
+            ig,
+            oc_values,
+            get_backend(intersection_values),
+        )
+        return nothing
+    end
+    oc_host = host_intersection_vector(oc_values)
+    oc_indices = host_intersection_vector(ig.oc_indices)
     @inbounds for k in 1:ig.n_intersections
-        intersection_values[k] = oc_values[ig.oc_indices[k]]
+        intersection_values[k] = oc_host[oc_indices[k]]
     end
     return nothing
 end
@@ -625,18 +696,23 @@ where the sum is over all polygons k belonging to CC element i.
 - `intersection_values`: Vector of values per intersection polygon
 """
 function scatter_to_cc!(cc_values, ig::IntersectionGrid, intersection_values)
-    fill!(cc_values, zero(eltype(cc_values)))
+    cc_host = cc_values isa Array ? cc_values : similar(cc_values, Array)
+    iv = host_intersection_vector(intersection_values)
+    cc_indices = host_intersection_vector(ig.cc_indices)
+    areas = host_intersection_vector(ig.areas)
+    cc_areas = host_intersection_vector(ig.cc_areas)
 
+    fill!(cc_host, zero(eltype(cc_host)))
     @inbounds for k in 1:ig.n_intersections
-        i = ig.cc_indices[k]
-        cc_values[i] += intersection_values[k] * ig.areas[k]
+        i = cc_indices[k]
+        cc_host[i] += iv[k] * areas[k]
     end
-
     @inbounds for i in 1:ig.n_cc
-        if ig.cc_areas[i] > 0
-            cc_values[i] /= ig.cc_areas[i]
+        if cc_areas[i] > 0
+            cc_host[i] /= cc_areas[i]
         end
     end
+    sync_intersection_vector!(cc_values, cc_host)
     return nothing
 end
 
@@ -658,18 +734,23 @@ where the sum is over all polygons k belonging to OC cell j.
 - `intersection_values`: Vector of values per intersection polygon
 """
 function scatter_to_oc!(oc_values, ig::IntersectionGrid, intersection_values)
-    fill!(oc_values, zero(eltype(oc_values)))
+    oc_host = oc_values isa Array ? oc_values : similar(oc_values, Array)
+    iv = host_intersection_vector(intersection_values)
+    oc_indices = host_intersection_vector(ig.oc_indices)
+    areas = host_intersection_vector(ig.areas)
+    oc_areas = host_intersection_vector(ig.oc_areas)
 
+    fill!(oc_host, zero(eltype(oc_host)))
     @inbounds for k in 1:ig.n_intersections
-        j = ig.oc_indices[k]
-        oc_values[j] += intersection_values[k] * ig.areas[k]
+        j = oc_indices[k]
+        oc_host[j] += iv[k] * areas[k]
     end
-
     @inbounds for j in 1:ig.n_oc
-        if ig.oc_areas[j] > 0
-            oc_values[j] /= ig.oc_areas[j]
+        if oc_areas[j] > 0
+            oc_host[j] /= oc_areas[j]
         end
     end
+    sync_intersection_vector!(oc_values, oc_host)
     return nothing
 end
 
@@ -729,6 +810,44 @@ GPU-accelerated version of `gather_oc_to_intersection!`.
 function gather_oc_to_intersection_gpu!(intersection_values, ig::IntersectionGrid, oc_values, backend)
     kernel! = gather_oc_to_intersection_kernel!(backend)
     kernel!(intersection_values, ig.oc_indices, oc_values; ndrange=ig.n_intersections)
+    return nothing
+end
+
+@kernel function gather_cc_nodal_to_intersection_kernel!(
+    intersection_values,
+    node_gather_polygon,
+    node_gather_node,
+    node_gather_weight,
+    nodal_values,
+)
+    idx = @index(Global)
+    @inbounds begin
+        k = node_gather_polygon[idx]
+        n = node_gather_node[idx]
+        @atomic intersection_values[k] += node_gather_weight[idx] * nodal_values[n]
+    end
+end
+
+"""
+    gather_cc_nodal_to_intersection_gpu!(intersection_values, ig, nodal_values, backend)
+
+GPU-accelerated version of `gather_cc_nodal_to_intersection!`.
+"""
+function gather_cc_nodal_to_intersection_gpu!(
+    intersection_values,
+    ig::IntersectionGrid,
+    nodal_values,
+    backend,
+)
+    kernel! = gather_cc_nodal_to_intersection_kernel!(backend)
+    kernel!(
+        intersection_values,
+        ig.node_gather_polygon,
+        ig.node_gather_node,
+        ig.node_gather_weight,
+        nodal_values;
+        ndrange = length(ig.node_gather_polygon),
+    )
     return nothing
 end
 
@@ -872,29 +991,32 @@ function compute_surface_fluxes_on_intersection!(
         gather_oc_to_intersection!(getfield(flux_state, dst), ig, getfield(oc_surface_state, src))
     end
 
+    flux = _host_intersection_struct(flux_state)
+    ice_balance = isnothing(ice_balance_at_int) ? nothing : _host_intersection_namedtuple(ice_balance_at_int)
+
     # Compute surface humidity from surface temperature and density
     # Use atmosphere density extrapolated to surface as approximation
-    FT = eltype(flux_state.atmos_T)
+    FT = eltype(flux.atmos_T)
     @inbounds for k in 1:ig.n_intersections
-        T_sfc = flux_state.surface_T[k]
-        h_int = flux_state.atmos_h[k]
-        h_sfc = flux_state.surface_h[k]
+        T_sfc = flux.surface_T[k]
+        h_int = flux.atmos_h[k]
+        h_sfc = flux.surface_h[k]
         Δz = h_int - h_sfc
 
         # Estimate surface density using barometric formula approximation
         ρ_sfc = SF.surface_density(
             surface_fluxes_params,
-            flux_state.atmos_T[k],
-            flux_state.atmos_ρ[k],
+            flux.atmos_T[k],
+            flux.atmos_ρ[k],
             T_sfc,
             Δz,
-            flux_state.atmos_q_tot[k],
+            flux.atmos_q_tot[k],
             FT(0),  # q_liq at surface
             FT(0),  # q_ice at surface
         )
 
         # Compute saturation specific humidity at surface
-        flux_state.surface_q[k] = TD.q_vap_saturation(thermo_params, T_sfc, ρ_sfc, FT(0), FT(0))
+        flux.surface_q[k] = TD.q_vap_saturation(thermo_params, T_sfc, ρ_sfc, FT(0), FT(0))
     end
 
     use_ice_balance = !isnothing(ice_balance_at_int)
@@ -903,22 +1025,22 @@ function compute_surface_fluxes_on_intersection!(
     # Compute fluxes at each intersection polygon
     @inbounds for k in 1:ig.n_intersections
         if !isnothing(ice_active) && !ice_active[k]
-            flux_state.flux_sh[k] = zero(FT)
-            flux_state.flux_lh[k] = zero(FT)
-            flux_state.flux_τx[k] = zero(FT)
-            flux_state.flux_τy[k] = zero(FT)
-            flux_state.flux_evap[k] = zero(FT)
+            flux.flux_sh[k] = zero(FT)
+            flux.flux_lh[k] = zero(FT)
+            flux.flux_τx[k] = zero(FT)
+            flux.flux_τy[k] = zero(FT)
+            flux.flux_evap[k] = zero(FT)
             continue
         end
 
         # Build wind vector
-        uv_int = StaticArrays.SVector(flux_state.atmos_u[k], flux_state.atmos_v[k])
+        uv_int = StaticArrays.SVector(flux.atmos_u[k], flux.atmos_v[k])
         uv_sfc = StaticArrays.SVector(FT(0), FT(0))  # Surface velocity = 0
 
         # Build roughness parameters
         roughness_params = SF.ConstantRoughnessParams(
-            flux_state.surface_z0m[k],
-            flux_state.surface_z0b[k],
+            flux.surface_z0m[k],
+            flux.surface_z0b[k],
         )
 
         # Build flux configuration
@@ -926,13 +1048,13 @@ function compute_surface_fluxes_on_intersection!(
         config = SF.SurfaceFluxConfig(roughness_params, SF.ConstantGustinessSpec(gustiness))
 
         # Compute heights
-        h_sfc = flux_state.surface_h[k]
-        h_int = flux_state.atmos_h[k]
+        h_sfc = flux.surface_h[k]
+        h_int = flux.atmos_h[k]
         Φ_sfc = SFP.grav(surface_fluxes_params) * h_sfc
         Δz = h_int - h_sfc
 
         update_T_sfc_cb = if use_ice_balance
-            ib = ice_balance_at_int
+            ib = ice_balance
             update_T_sfc(
                 ib.κ[k],
                 ib.δ[k],
@@ -951,13 +1073,13 @@ function compute_surface_fluxes_on_intersection!(
         # Call SurfaceFluxes
         outputs = SF.surface_fluxes(
             surface_fluxes_params,
-            flux_state.atmos_T[k],
-            flux_state.atmos_q_tot[k],
-            flux_state.atmos_q_liq[k],
-            flux_state.atmos_q_ice[k],
-            flux_state.atmos_ρ[k],
-            flux_state.surface_T[k],
-            flux_state.surface_q[k],
+            flux.atmos_T[k],
+            flux.atmos_q_tot[k],
+            flux.atmos_q_liq[k],
+            flux.atmos_q_ice[k],
+            flux.atmos_ρ[k],
+            flux.surface_T[k],
+            flux.surface_q[k],
             Φ_sfc,
             Δz,
             FT(0),  # displacement height d
@@ -973,14 +1095,19 @@ function compute_surface_fluxes_on_intersection!(
         )
 
         # Store flux outputs
-        flux_state.flux_sh[k] = outputs.shf
-        flux_state.flux_lh[k] = outputs.lhf
-        flux_state.flux_τx[k] = outputs.ρτxz
-        flux_state.flux_τy[k] = outputs.ρτyz
-        flux_state.flux_evap[k] = outputs.evaporation
+        flux.flux_sh[k] = outputs.shf
+        flux.flux_lh[k] = outputs.lhf
+        flux.flux_τx[k] = outputs.ρτxz
+        flux.flux_τy[k] = outputs.ρτyz
+        flux.flux_evap[k] = outputs.evaporation
         if use_ice_balance
-            flux_state.surface_T[k] = outputs.T_sfc
+            flux.surface_T[k] = outputs.T_sfc
         end
+    end
+
+    _sync_intersection_struct!(flux_state, flux)
+    if use_ice_balance
+        _sync_intersection_namedtuple!(ice_balance_at_int, ice_balance)
     end
 
     return nothing
@@ -1020,7 +1147,9 @@ end
 Return a per-polygon mask that is `true` when the parent OC cell carries ice.
 """
 function ice_intersection_active_mask(ig::IntersectionGrid, sic_oc::AbstractVector)
-    return [sic_oc[ig.oc_indices[k]] > 0 for k in 1:ig.n_intersections]
+    sic_host = host_intersection_vector(sic_oc)
+    oc_indices = host_intersection_vector(ig.oc_indices)
+    return [sic_host[oc_indices[k]] > 0 for k in 1:ig.n_intersections]
 end
 
 """

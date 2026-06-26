@@ -365,7 +365,7 @@ backing arrays to `ArrayType` (e.g. `CuArray` for GPU computation).
 function extract_intersection_grid(
     boundary_space,
     grid_oc,
-    ArrayType;
+    arch;
     respect_immersed_mask::Bool = true,
 )
     ig_cpu = extract_intersection_grid(
@@ -373,21 +373,22 @@ function extract_intersection_grid(
         grid_oc;
         respect_immersed_mask,
     )
+    to_arch = x -> OC.on_architecture(arch, x)
 
     return IntersectionGrid(
-        ArrayType(ig_cpu.cc_indices),
-        ArrayType(ig_cpu.oc_indices),
-        ArrayType(ig_cpu.areas),
-        ArrayType(ig_cpu.cc_areas),
-        ArrayType(ig_cpu.cc_total_areas),
-        ArrayType(ig_cpu.oc_areas),
+        to_arch(ig_cpu.cc_indices),
+        to_arch(ig_cpu.oc_indices),
+        to_arch(ig_cpu.areas),
+        to_arch(ig_cpu.cc_areas),
+        to_arch(ig_cpu.cc_total_areas),
+        to_arch(ig_cpu.oc_areas),
         ig_cpu.n_cc,
         ig_cpu.n_oc,
         ig_cpu.n_intersections,
         ig_cpu.n_nodes,
-        ArrayType(ig_cpu.node_gather_polygon),
-        ArrayType(ig_cpu.node_gather_node),
-        ArrayType(ig_cpu.node_gather_weight),
+        to_arch(ig_cpu.node_gather_polygon),
+        to_arch(ig_cpu.node_gather_node),
+        to_arch(ig_cpu.node_gather_weight),
     )
 end
 
@@ -415,7 +416,7 @@ function extract_intersection_grid_on_arch(boundary_space, grid_oc, arch; kwargs
     return extract_intersection_grid(
         boundary_space,
         grid_oc,
-        intersection_array_type(arch);
+        arch;
         kwargs...,
     )
 end

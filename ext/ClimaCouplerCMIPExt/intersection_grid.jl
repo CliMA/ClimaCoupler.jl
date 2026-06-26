@@ -626,9 +626,7 @@ function gather_cc_nodal_to_intersection!(
     ig::IntersectionGrid,
     nodal_values,
 )
-    iv_host =
-        intersection_values isa Array ? intersection_values : similar(intersection_values, Array)
-    fill!(iv_host, zero(eltype(iv_host)))
+    iv_host = zeros(eltype(intersection_values), length(intersection_values))
 
     node_gather_polygon = host_intersection_vector(ig.node_gather_polygon)
     node_gather_node = host_intersection_vector(ig.node_gather_node)

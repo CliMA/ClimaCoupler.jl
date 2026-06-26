@@ -479,7 +479,6 @@ function allocate_intersection_flux_scratch(FT, arch, ig::IntersectionGrid, n_oc
             u = zeros_on_arch(FT, arch, n_nodes),
             v = zeros_on_arch(FT, arch, n_nodes),
             h = zeros_on_arch(FT, arch, n_nodes),
-            h_sfc = zeros_on_arch(FT, arch, n_nodes),
         ),
         oc_surface_temp = _oc_surface_scratch(FT, arch, n_oc_layout),
         ice_cc_balance_nodal = (;

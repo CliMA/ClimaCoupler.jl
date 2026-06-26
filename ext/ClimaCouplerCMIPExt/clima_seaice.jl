@@ -301,17 +301,7 @@ function compute_ice_intersection_grid_fluxes!(
         cc_atmos_temp,
     ) = sim.remapping
 
-    extract_cc_atmos_state!(cc_atmos_temp, csf, boundary_space)
-    cc_atmos_state = (
-        T = cc_atmos_temp.T,
-        q_tot = cc_atmos_temp.q_tot,
-        q_liq = cc_atmos_temp.q_liq,
-        q_ice = cc_atmos_temp.q_ice,
-        ρ = cc_atmos_temp.ρ,
-        u = cc_atmos_temp.u,
-        v = cc_atmos_temp.v,
-        h = cc_atmos_temp.h,
-    )
+    extract_cc_atmos_state!(cc_atmos_temp, csf)
 
     extract_ice_balance_cc_nodal!(ice_cc_balance_nodal, csf, sim, boundary_space)
 
@@ -329,12 +319,6 @@ function compute_ice_intersection_grid_fluxes!(
     )
 
     extract_ice_surface_state_for_intersection!(ice_surface_temp, sim)
-    ice_surface_state = (
-        T = ice_surface_temp.T,
-        z0m = ice_surface_temp.z0m,
-        z0b = ice_surface_temp.z0b,
-        h = ice_surface_temp.h,
-    )
 
     sic_oc = vec(OC.interior(sim.ice.model.ice_concentration, :, :, 1))
     ice_active = ice_intersection_active_mask(intersection_grid, sic_oc)
@@ -342,8 +326,8 @@ function compute_ice_intersection_grid_fluxes!(
     compute_surface_fluxes_on_intersection!(
         ice_intersection_flux_state,
         intersection_grid,
-        cc_atmos_state,
-        ice_surface_state,
+        cc_atmos_temp,
+        ice_surface_temp,
         surface_fluxes_params,
         thermo_params;
         ice_balance_at_int,
@@ -389,32 +373,39 @@ Scatter precomputed ice intersection-grid fluxes to ClimaSeaIce boundary
 conditions. Assumes `compute_ice_intersection_grid_fluxes!` has already run.
 """
 function push_intersection_fluxes_to_ice!(sim::ClimaSeaIceSimulation)
-    (; intersection_grid, ice_intersection_flux_state) = sim.remapping
+    (; intersection_grid, ice_intersection_flux_state, temp_uv_vec) = sim.remapping
     grid = sim.ice.model.grid
     ice_concentration = sim.ice.model.ice_concentration
+    boundary_space = axes(sim.area_fraction)
 
     Nx_oc, Ny_oc, _ = size(grid)
     n_oc_layout = Nx_oc * Ny_oc
     FT = eltype(ice_intersection_flux_state.flux_sh)
 
+    fluxes = intersection_fluxes_to_boundary_fields(
+        boundary_space,
+        intersection_grid,
+        ice_intersection_flux_state,
+    )
+
     F_sh_oc = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
     F_lh_oc = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
-    F_τx_oc = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
-    F_τy_oc = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
     scatter_to_oc!(F_sh_oc, intersection_grid, ice_intersection_flux_state.flux_sh)
     scatter_to_oc!(F_lh_oc, intersection_grid, ice_intersection_flux_state.flux_lh)
-    scatter_to_oc!(F_τx_oc, intersection_grid, ice_intersection_flux_state.flux_τx)
-    scatter_to_oc!(F_τy_oc, intersection_grid, ice_intersection_flux_state.flux_τy)
 
     F_sh_2d = reshape(F_sh_oc, Nx_oc, Ny_oc)
     F_lh_2d = reshape(F_lh_oc, Nx_oc, Ny_oc)
-    F_τx_2d = reshape(F_τx_oc, Nx_oc, Ny_oc)
-    F_τy_2d = reshape(F_τy_oc, Nx_oc, Ny_oc)
     has_ice = OC.interior(ice_concentration, :, :, 1) .> 0
 
     if !isnothing(sim.ice.model.dynamics)
-        OC.interior(sim.remapping.scratch_field_oc1, :, :, 1) .= F_τx_2d
-        OC.interior(sim.remapping.scratch_field_oc2, :, :, 1) .= F_τy_2d
+        remap_contravariant_momentum_fluxes_to_oc!(
+            sim.remapping.scratch_field_oc1,
+            sim.remapping.scratch_field_oc2,
+            temp_uv_vec,
+            sim.remapping,
+            fluxes.F_turb_ρτxz,
+            fluxes.F_turb_ρτyz,
+        )
         si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
         si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
         set_from_extrinsic_vector!(

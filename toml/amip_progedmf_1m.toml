@@ -4,10 +4,10 @@ value = 40000.0
 [zd_viscous]
 value = 40000.0
 
-[alpha_rayleigh_sgs_tracer]
+[alpha_rayleigh_tracer]
 value = 0.001
 
-[EDMF_surface_area]
+[EDMF_max_surface_area]
 value = 0.1
 
 [EDMF_min_area]
@@ -47,7 +47,7 @@ value = 1
 value = 0
 
 [detr_massflux_vertdiv_coeff]
-value = 0.1
+value = 0.3
 
 [max_area_limiter_scale]
 value = 0.001

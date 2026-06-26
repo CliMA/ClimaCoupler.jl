@@ -6,7 +6,7 @@ type = "float"
 value = 40000.0
 type = "float"
 
-[EDMF_surface_area]
+[EDMF_max_surface_area]
 value = 0.1
 type = "float"
 
@@ -59,7 +59,7 @@ value = 0
 type = "float"
 
 [detr_massflux_vertdiv_coeff]
-value = 0.1
+value = 0.3
 type = "float"
 
 [max_area_limiter_scale]

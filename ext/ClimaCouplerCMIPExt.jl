@@ -30,7 +30,7 @@ import ClimaOcean as CO
 import ClimaSeaIce as CSI
 import ClimaCore as CC
 import ClimaParams as CP
-using KernelAbstractions: @kernel, @index, @inbounds, @atomic, get_backend
+using KernelAbstractions: @kernel, @index, @inbounds, get_backend
 
 import Adapt # for ConservativeRegridding
 import ClimaCore as CC # for ConservativeRegriddingClimaCoreExt

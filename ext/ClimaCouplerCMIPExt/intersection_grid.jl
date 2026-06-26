@@ -626,16 +626,10 @@ function gather_cc_nodal_to_intersection!(
     ig::IntersectionGrid,
     nodal_values,
 )
-    fill!(intersection_values, zero(eltype(intersection_values)))
-    if on_gpu_intersection_array(intersection_values)
-        gather_cc_nodal_to_intersection_gpu!(
-            intersection_values,
-            ig,
-            nodal_values,
-            get_backend(intersection_values),
-        )
-        return nothing
-    end
+    iv_host =
+        intersection_values isa Array ? intersection_values : similar(intersection_values, Array)
+    fill!(iv_host, zero(eltype(iv_host)))
+
     node_gather_polygon = host_intersection_vector(ig.node_gather_polygon)
     node_gather_node = host_intersection_vector(ig.node_gather_node)
     node_gather_weight = host_intersection_vector(ig.node_gather_weight)
@@ -643,8 +637,9 @@ function gather_cc_nodal_to_intersection!(
     @inbounds for idx in eachindex(node_gather_polygon)
         k = node_gather_polygon[idx]
         n = node_gather_node[idx]
-        intersection_values[k] += node_gather_weight[idx] * nodal_host[n]
+        iv_host[k] += node_gather_weight[idx] * nodal_host[n]
     end
+    sync_intersection_vector!(intersection_values, iv_host)
     return nothing
 end
 
@@ -810,44 +805,6 @@ GPU-accelerated version of `gather_oc_to_intersection!`.
 function gather_oc_to_intersection_gpu!(intersection_values, ig::IntersectionGrid, oc_values, backend)
     kernel! = gather_oc_to_intersection_kernel!(backend)
     kernel!(intersection_values, ig.oc_indices, oc_values; ndrange=ig.n_intersections)
-    return nothing
-end
-
-@kernel function gather_cc_nodal_to_intersection_kernel!(
-    intersection_values,
-    node_gather_polygon,
-    node_gather_node,
-    node_gather_weight,
-    nodal_values,
-)
-    idx = @index(Global)
-    @inbounds begin
-        k = node_gather_polygon[idx]
-        n = node_gather_node[idx]
-        @atomic intersection_values[k] += node_gather_weight[idx] * nodal_values[n]
-    end
-end
-
-"""
-    gather_cc_nodal_to_intersection_gpu!(intersection_values, ig, nodal_values, backend)
-
-GPU-accelerated version of `gather_cc_nodal_to_intersection!`.
-"""
-function gather_cc_nodal_to_intersection_gpu!(
-    intersection_values,
-    ig::IntersectionGrid,
-    nodal_values,
-    backend,
-)
-    kernel! = gather_cc_nodal_to_intersection_kernel!(backend)
-    kernel!(
-        intersection_values,
-        ig.node_gather_polygon,
-        ig.node_gather_node,
-        ig.node_gather_weight,
-        nodal_values;
-        ndrange = length(ig.node_gather_polygon),
-    )
     return nothing
 end
 

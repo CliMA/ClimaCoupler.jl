@@ -19,7 +19,7 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     n_iterations = 5,
     sample_date_ranges,
     extend = Dates.Month(1),
-    spinup = Dates.Day(0),
+    spinup = Dates.Day(7),
     output_dir,
     rng_seed = 42,
 )

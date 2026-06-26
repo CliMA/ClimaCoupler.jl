@@ -503,7 +503,7 @@ function allocate_intersection_flux_scratch(FT, arch, ig::IntersectionGrid, n_oc
 end
 
 """
-    wet_ocean_cc_fractions(ig::IntersectionGrid) -> Vector
+    wet_ocean_cc_fractions(ig::IntersectionGrid) -> AbstractVector
 
 Per-CC-element wet-ocean fraction of the boundary column.
 
@@ -518,13 +518,11 @@ Values lie in `[0, 1]`.
 """
 function wet_ocean_cc_fractions(ig::IntersectionGrid)
     FT = eltype(ig.areas)
-    fractions = zeros(FT, ig.n_cc)
-    @inbounds for i in 1:ig.n_cc
-        if ig.cc_total_areas[i] > zero(FT)
-            fractions[i] = ig.cc_areas[i] / ig.cc_total_areas[i]
-        end
-    end
-    return clamp.(fractions, zero(FT), one(FT))
+    return clamp.(
+        ifelse.(ig.cc_total_areas .> zero(FT), ig.cc_areas ./ ig.cc_total_areas, zero(FT)),
+        zero(FT),
+        one(FT),
+    )
 end
 
 """
@@ -1088,6 +1086,8 @@ end
 Broadcast per-SE-element scalars to all GLL nodes of each element.
 """
 function _element_values_to_se_field!(field, element_values::AbstractVector, boundary_space)
+    # Per-element vectors are small; host copy avoids GPU scalar indexing here.
+    element_values = Array(element_values)
     p = parent(CC.Fields.field_values(field))
     if ndims(p) == 4
         @inbounds for e in eachindex(element_values)

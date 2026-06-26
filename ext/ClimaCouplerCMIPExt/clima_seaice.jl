@@ -292,7 +292,7 @@ function compute_ice_intersection_grid_fluxes!(
 )
     boundary_space = axes(csf)
     FT = CC.Spaces.undertype(boundary_space)
-    (
+    (;
         intersection_grid,
         ice_intersection_flux_state,
         ice_cc_balance_nodal,

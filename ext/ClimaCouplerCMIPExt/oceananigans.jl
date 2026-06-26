@@ -88,6 +88,48 @@ function tripolar_ocean_simulation(
 end
 
 """
+    ocean_simulation(arch, ocean_grid; simple_ocean, closure, clock, kwargs...)
+
+Build an Oceananigans `Simulation` on either the standard one-degree tripolar grid
+or the NEMO eORCA1 mesh (`orca`).
+"""
+function ocean_simulation(arch, ocean_grid::Symbol; simple_ocean, closure, clock, kwargs...)
+    substeps = simple_ocean ? 70 : 150
+
+    if ocean_grid == :orca
+        if simple_ocean
+            @warn "`simple_ocean=true` not supported for ORCA1 grid,  using one_deg_tripolar grid instead"
+            ocean_grid = :one_deg_tripolar
+        else
+            @info "Using ORCA1 ocean grid"
+            return CO.OceanConfigurations.orca_ocean(
+                arch;
+                closure,
+                clock,
+                substeps,
+                kwargs...,
+            )
+        end
+    end
+
+    @info "Using one-degree tripolar ocean grid"
+    active_cells_map = !simple_ocean
+    zstar = !simple_ocean
+
+    return tripolar_ocean_simulation(
+        arch;
+        zstar,
+        active_cells_map,
+        clock,
+        depth = 5500,
+        Nz = 32,
+        closure,
+        substeps,
+        kwargs...,
+    )
+end
+
+"""
     OceananigansSimulation(; kwargs...)
 
 Creates an OceananigansSimulation object containing a model, an integrator, and
@@ -107,6 +149,7 @@ dispatch in coupling.
 - `comms_ctx`: Communication context (default: `ClimaComms.context()`)
 - `coupled_param_dict`: Coupled parameter dictionary (default: created from `area_fraction`)
 - `progress_interval`: iteration interval for printing progress information (default: `nothing`)
+- `ocean_grid`: Horizontal grid for Oceananigans (`:one_deg_tripolar` or `:orca`, default: `:one_deg_tripolar`)
 
 Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
@@ -118,6 +161,7 @@ function OceananigansSimulation(
     tspan,
     output_dir,
     simple_ocean = false,
+    ocean_grid = :one_deg_tripolar,
     dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
@@ -152,10 +196,6 @@ function OceananigansSimulation(
         CO.OceanConfigurations.default_one_degree_closure()
     end
 
-    # Tripolar active_cells_map kernels exceed the 4 KiB sm_60 limit on P100.
-    active_cells_map = !simple_ocean
-    zstar = !simple_ocean
-
     if tspan[1] isa ITime
         # create a model clock that uses DateTime, for compatibility with ITime.
         model_clock = OC.TimeSteppers.Clock(time = start_date)
@@ -167,16 +207,7 @@ function OceananigansSimulation(
         error("Unsupported time type: $(typeof(tspan[1]))")
     end
 
-    ocean = tripolar_ocean_simulation(
-        arch;
-        zstar,
-        active_cells_map,
-        clock = model_clock,
-        depth = 5500,
-        Nz = 32,
-        closure,
-        substeps = simple_ocean ? 70 : 150,
-    )
+    ocean = ocean_simulation(arch, ocean_grid; simple_ocean, closure, clock = model_clock)
     ocean.stop_time = stop_time
     ocean.Δt = float(dt)
 

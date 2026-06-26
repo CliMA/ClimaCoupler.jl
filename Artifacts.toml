@@ -81,3 +81,10 @@ git-tree-sha1 = "131153e848325a03139ca7966a1857ac3316b564"
     [[ecco4_SIarea_SIheff_2010_01.download]]
     sha256 = "dfcc6f930fd0d182f1076a4fdd81047aafc522eb433b2c6d5b75446307963044"
     url = "https://caltech.box.com/shared/static/84s5osmyjcpvil5iv4v2qbmyi6i172w2.gz"
+
+[mac_lwp]
+git-tree-sha1 = "edd3265e3be0938821451c24d411f4dc066bbf0e"
+
+    [[mac_lwp.download]]
+    sha256 = "fd24ea0d4491ef95b0a3a362d9f5faf320e5dd6caf3f4fb8683e9ab71357c13f"
+    url = "https://caltech.box.com/shared/static/4ukyc2pn5mq3zou5f7g2mjfkr86s7vdr.gz"

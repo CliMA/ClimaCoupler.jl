@@ -25,12 +25,12 @@ land_model: "integrated"
 land_spun_up_ic: false
 mode_name: "cmip"
 ocean_model: "oceananigans"
-ocean_diagnostic_interval: "30days"
-ocean_diagnostic_mode: "average"
+ocean_diagnostic_interval: "10days"
+ocean_diagnostic_mode: "instantaneous"
 output_default_diagnostics: true
 rmse_check: true
-seaice_diagnostic_interval: "30days"
-seaice_diagnostic_mode: "average"
+seaice_diagnostic_interval: "10days"
+seaice_diagnostic_mode: "instantaneous"
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "188days"

@@ -235,14 +235,209 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
     sim.ice_properties.C_to_K + sim.ice.model.ice_thermodynamics.top_surface_temperature
 
 """
+    extract_ice_balance_cc_nodal!(balance_nodal, csf, sim, boundary_space)
+
+Flatten ice skin-balance inputs from boundary-space fields into nodal vectors
+for polygon averaging on the intersection grid.
+"""
+function extract_ice_balance_cc_nodal!(balance_nodal, csf, sim, boundary_space)
+    CRExt = get_ConservativeRegriddingCCExt()
+    scratch = CC.Fields.zeros(boundary_space)
+
+    balance_nodal.SW_d .= CRExt.se_field_to_vec(csf.SW_d)
+    balance_nodal.LW_d .= CRExt.se_field_to_vec(csf.LW_d)
+
+    Interfacer.get_field!(scratch, sim, Val(:ice_thickness))
+    balance_nodal.δ .= CRExt.se_field_to_vec(scratch)
+    Interfacer.get_field!(scratch, sim, Val(:internal_temperature))
+    balance_nodal.T_i .= CRExt.se_field_to_vec(scratch)
+    Interfacer.get_field!(scratch, sim, Val(:emissivity))
+    balance_nodal.ϵ .= CRExt.se_field_to_vec(scratch)
+    Interfacer.get_field!(scratch, sim, Val(:surface_direct_albedo))
+    balance_nodal.α_albedo .= CRExt.se_field_to_vec(scratch)
+    return nothing
+end
+
+"""
+    extract_ice_surface_state_for_intersection!(ice_surface_temp, sim)
+
+Extract sea-ice surface state onto the flat OC-cell layout used by the
+intersection grid.
+"""
+function extract_ice_surface_state_for_intersection!(ice_surface_temp, sim::ClimaSeaIceSimulation)
+    C_to_K = sim.ice_properties.C_to_K
+    top_T = sim.ice.model.ice_thermodynamics.top_surface_temperature
+    ice_surface_temp.T .= vec(OC.interior(top_T, :, :, 1)) .+ C_to_K
+
+    FT = eltype(ice_surface_temp.T)
+    z0m = Interfacer.get_field(sim, Val(:roughness_momentum))
+    z0b = Interfacer.get_field(sim, Val(:roughness_buoyancy))
+    fill!(ice_surface_temp.z0m, FT(z0m))
+    fill!(ice_surface_temp.z0b, FT(z0b))
+    fill!(ice_surface_temp.h, FT(0))
+    return nothing
+end
+
+"""
+    compute_ice_intersection_grid_fluxes!(sim, csf, surface_fluxes_params, thermo_params)
+
+Compute sea-ice–atmosphere fluxes on the CC×OC intersection grid with a
+per-polygon [`update_T_sfc`](@ref) skin-temperature balance.
+"""
+function compute_ice_intersection_grid_fluxes!(
+    sim::ClimaSeaIceSimulation,
+    csf,
+    surface_fluxes_params,
+    thermo_params,
+)
+    boundary_space = axes(csf)
+    FT = CC.Spaces.undertype(boundary_space)
+    (
+        intersection_grid,
+        ice_intersection_flux_state,
+        ice_cc_balance_nodal,
+        ice_balance_at_int,
+        ice_surface_temp,
+        cc_atmos_temp,
+    ) = sim.remapping
+
+    extract_cc_atmos_state!(cc_atmos_temp, csf, boundary_space)
+    cc_atmos_state = (
+        T = cc_atmos_temp.T,
+        q_tot = cc_atmos_temp.q_tot,
+        q_liq = cc_atmos_temp.q_liq,
+        q_ice = cc_atmos_temp.q_ice,
+        ρ = cc_atmos_temp.ρ,
+        u = cc_atmos_temp.u,
+        v = cc_atmos_temp.v,
+        h = cc_atmos_temp.h,
+    )
+
+    extract_ice_balance_cc_nodal!(ice_cc_balance_nodal, csf, sim, boundary_space)
+
+    internal_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
+    κ = if hasfield(typeof(internal_heat_flux), :conductivity)
+        FT(internal_heat_flux.conductivity)
+    else
+        FT(2)
+    end
+    gather_ice_balance_to_intersection!(
+        ice_balance_at_int,
+        intersection_grid,
+        ice_cc_balance_nodal,
+        κ,
+    )
+
+    extract_ice_surface_state_for_intersection!(ice_surface_temp, sim)
+    ice_surface_state = (
+        T = ice_surface_temp.T,
+        z0m = ice_surface_temp.z0m,
+        z0b = ice_surface_temp.z0b,
+        h = ice_surface_temp.h,
+    )
+
+    sic_oc = vec(OC.interior(sim.ice.model.ice_concentration, :, :, 1))
+    ice_active = ice_intersection_active_mask(intersection_grid, sic_oc)
+
+    compute_surface_fluxes_on_intersection!(
+        ice_intersection_flux_state,
+        intersection_grid,
+        cc_atmos_state,
+        ice_surface_state,
+        surface_fluxes_params,
+        thermo_params;
+        ice_balance_at_int,
+        σ = FT(sim.ice_properties.σ),
+        T_melt = FT(sim.ice_properties.C_to_K),
+        ice_active,
+    )
+    return nothing
+end
+
+"""
+    write_diagnosed_ice_T_sfc_to_model!(sim::ClimaSeaIceSimulation)
+
+Scatter polygon-diagnosed surface temperatures back to the ice model's
+`top_surface_temperature` field (Celsius) on cells with `SIC > 0`.
+"""
+function write_diagnosed_ice_T_sfc_to_model!(sim::ClimaSeaIceSimulation)
+    (; intersection_grid, ice_intersection_flux_state) = sim.remapping
+    grid = sim.ice.model.grid
+    Nx_oc, Ny_oc, _ = size(grid)
+    n_oc_layout = Nx_oc * Ny_oc
+    FT = eltype(ice_intersection_flux_state.surface_T)
+
+    T_oc = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
+    scatter_to_oc!(T_oc, intersection_grid, ice_intersection_flux_state.surface_T)
+    T_oc_2d = reshape(T_oc, Nx_oc, Ny_oc)
+
+    C_to_K = sim.ice_properties.C_to_K
+    ice_concentration = OC.interior(sim.ice.model.ice_concentration, :, :, 1)
+    top_sfc_T = sim.ice.model.ice_thermodynamics.top_surface_temperature
+    OC.interior(top_sfc_T, :, :, 1) .= ifelse.(
+        ice_concentration .> 0,
+        T_oc_2d .- C_to_K,
+        OC.interior(top_sfc_T, :, :, 1),
+    )
+    return nothing
+end
+
+"""
+    push_intersection_fluxes_to_ice!(sim::ClimaSeaIceSimulation)
+
+Scatter precomputed ice intersection-grid fluxes to ClimaSeaIce boundary
+conditions. Assumes `compute_ice_intersection_grid_fluxes!` has already run.
+"""
+function push_intersection_fluxes_to_ice!(sim::ClimaSeaIceSimulation)
+    (; intersection_grid, ice_intersection_flux_state) = sim.remapping
+    grid = sim.ice.model.grid
+    ice_concentration = sim.ice.model.ice_concentration
+
+    Nx_oc, Ny_oc, _ = size(grid)
+    n_oc_layout = Nx_oc * Ny_oc
+    FT = eltype(ice_intersection_flux_state.flux_sh)
+
+    F_sh_oc = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
+    F_lh_oc = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
+    F_τx_oc = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
+    F_τy_oc = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
+    scatter_to_oc!(F_sh_oc, intersection_grid, ice_intersection_flux_state.flux_sh)
+    scatter_to_oc!(F_lh_oc, intersection_grid, ice_intersection_flux_state.flux_lh)
+    scatter_to_oc!(F_τx_oc, intersection_grid, ice_intersection_flux_state.flux_τx)
+    scatter_to_oc!(F_τy_oc, intersection_grid, ice_intersection_flux_state.flux_τy)
+
+    F_sh_2d = reshape(F_sh_oc, Nx_oc, Ny_oc)
+    F_lh_2d = reshape(F_lh_oc, Nx_oc, Ny_oc)
+    F_τx_2d = reshape(F_τx_oc, Nx_oc, Ny_oc)
+    F_τy_2d = reshape(F_τy_oc, Nx_oc, Ny_oc)
+    has_ice = OC.interior(ice_concentration, :, :, 1) .> 0
+
+    if !isnothing(sim.ice.model.dynamics)
+        OC.interior(sim.remapping.scratch_field_oc1, :, :, 1) .= F_τx_2d
+        OC.interior(sim.remapping.scratch_field_oc2, :, :, 1) .= F_τy_2d
+        si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
+        si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
+        set_from_extrinsic_vector!(
+            (; u = si_flux_u, v = si_flux_v),
+            grid,
+            sim.remapping.scratch_field_oc1,
+            sim.remapping.scratch_field_oc2,
+        )
+    end
+
+    si_flux_heat = sim.ice.model.external_heat_fluxes.top
+    if si_flux_heat isa OC.Field
+        OC.interior(si_flux_heat, :, :, 1) .+=
+            has_ice .* (F_lh_2d .+ F_sh_2d)
+    end
+    return nothing
+end
+
+"""
     FluxCalculator.compute_surface_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim, thermo_params)
 
-Compute surface fluxes for `ClimaSeaIceSimulation`, iteratively diagnosing T_sfc
-via the per-column `update_T_sfc_cb` closure (from `ClimaCouplerCMIPExt.update_T_sfc`) to satisfy
-the skin-temperature flux balance.
-
-The diagnosed T_sfc is written back to ClimaSeaIce's `top_surface_temperature`
-(used by `PrescribedTemperature`) so the ice thermodynamics stays consistent.
+Compute surface fluxes for `ClimaSeaIceSimulation` on the CC×OC intersection grid,
+diagnosing `T_sfc` per polygon via [`update_T_sfc`](@ref).
 """
 NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     csf,
@@ -252,172 +447,29 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     accumulator = nothing,
 )
     boundary_space = axes(csf)
-    FT = CC.Spaces.undertype(boundary_space)
     surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
 
-    uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
+    compute_ice_intersection_grid_fluxes!(sim, csf, surface_fluxes_params, thermo_params)
 
-    # Sea ice parameters for `update_T_sfc_cb` (load into boundary-space scratch Fields first
-    # to avoid GPU scalar indexing when building the closure)
-    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:ice_thickness))
-    Interfacer.get_field!(csf.scalar_temp2, sim, Val(:internal_temperature))
-    Interfacer.get_field!(csf.scalar_temp3, sim, Val(:emissivity))
-    Interfacer.get_field!(csf.scalar_temp4, sim, Val(:surface_direct_albedo))
-    δ = csf.scalar_temp1
-    T_i = csf.scalar_temp2
-    ϵ = csf.scalar_temp3
-    α_albedo = csf.scalar_temp4
-    internal_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
-    κ = if hasfield(typeof(internal_heat_flux), :conductivity)
-        FT.(internal_heat_flux.conductivity)
-    else
-        convert(FT, 2) # default conductivity [W m⁻¹ K⁻¹]
-    end
-    σ = FT(sim.ice_properties.σ)
-    SW_d = csf.SW_d
-    LW_d = csf.LW_d
-    T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
-
-    # Build element-wise `update_T_sfc_cb` closures (each closes over local ice parameters)
-    update_T_sfc_cb =
-        ClimaCouplerCMIPExt.update_T_sfc.(κ, δ, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
-
-    # Surface temperature guess from last timestep
-    Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
-    T_sfc = csf.scalar_temp1
-
-    # Surface humidity
-    ρ_sfc =
-        SF.surface_density.(
-            surface_fluxes_params,
-            csf.T_atmos,
-            csf.ρ_atmos,
-            T_sfc,
-            csf.height_int .- csf.height_sfc,
-            csf.q_tot_atmos,
-            0,
-            0,
-        )
-    csf.scalar_temp2 .= TD.q_vap_saturation.(thermo_params, T_sfc, ρ_sfc, 0, 0)
-    q_sfc = csf.scalar_temp2
-
-    # Roughness and gustiness configuration
-    gustiness = ones(boundary_space)
-    roughness_params = FluxCalculator.get_roughness_params(csf, sim)
-    config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
-
-    fluxes =
-        FluxCalculator.get_surface_fluxes.(
-            surface_fluxes_params,
-            uv_int,
-            csf.T_atmos,
-            csf.q_tot_atmos,
-            csf.q_liq_atmos,
-            csf.q_ice_atmos,
-            csf.ρ_atmos,
-            csf.height_int,
-            uv_int .* FT(0),
-            T_sfc,
-            q_sfc,
-            csf.height_sfc,
-            FT(0),
-            config,
-            update_T_sfc_cb,
-        )
+    fluxes = intersection_fluxes_to_boundary_fields(
+        boundary_space,
+        sim.remapping.intersection_grid,
+        sim.remapping.ice_intersection_flux_state,
+    )
 
     FluxCalculator.update_flux_fields!(csf, sim, fluxes, accumulator)
-    area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
-
-    # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
-    csf.scalar_temp2 .=
-        ifelse.(
-            area_fraction .≈ 0,
-            zero(FT),
-            fluxes.T_sfc_new .- FT(sim.ice_properties.C_to_K),
-        )
-    Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.scalar_temp2, sim.remapping)
-    remapped_T_sfc = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
-
-    ice_concentration = sim.ice.model.ice_concentration
-    top_sfc_T = sim.ice.model.ice_thermodynamics.top_surface_temperature
-    OC.interior(top_sfc_T, :, :, 1) .=
-        ifelse.(
-            OC.interior(ice_concentration, :, :, 1) .> 0,
-            remapped_T_sfc,
-            OC.interior(top_sfc_T, :, :, 1),
-        )
-
+    write_diagnosed_ice_T_sfc_to_model!(sim)
     return nothing
 end
 
 """
     FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fields)
 
-Update the turbulent fluxes in the simulation using the values stored in the coupler fields.
-These include latent heat flux, sensible heat flux, momentum fluxes, and moisture flux.
-
-The input `fields` are already area-weighted, so there's no need to weight them again.
-
-Note that currently the moisture flux has no effect on the sea ice model, which has
-constant salinity.
-
-A note on sign conventions:
-SurfaceFluxes and ClimaSeaIce both use the convention that a positive flux is an upward flux.
-No sign change is needed during the exchange, except for moisture/salinity fluxes:
-SurfaceFluxes provides moisture moving from atmosphere to ocean as a negative flux at the surface,
-and ClimaSeaIce represents moisture moving from atmosphere to ocean as a positive salinity flux,
-so a sign change is needed when we convert from moisture to salinity flux.
+Push intersection-grid turbulent fluxes from `ice_intersection_flux_state` to the
+ice model boundary conditions.
 """
-function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fields)
-    (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
-    grid = sim.ice.model.grid
-    ice_concentration = sim.ice.model.ice_concentration
-
-    # We only need to provide momentum fluxes if the sea ice model has dynamics
-    if !isnothing(sim.ice.model.dynamics)
-        # Convert the momentum fluxes from contravariant to Cartesian basis
-        contravariant_to_cartesian!(sim.remapping.temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz)
-        F_turb_ρτxz_uv = sim.remapping.temp_uv_vec.components.data.:1
-        F_turb_ρτyz_uv = sim.remapping.temp_uv_vec.components.data.:2
-
-        # Remap momentum fluxes onto reduced 2D Center, Center Oceananigans scratch fields
-        Interfacer.remap!(sim.remapping.scratch_field_oc1, F_turb_ρτxz_uv, sim.remapping) # zonal momentum flux
-        Interfacer.remap!(sim.remapping.scratch_field_oc2, F_turb_ρτyz_uv, sim.remapping) # meridional momentum flux
-
-        # Rename for clarity; these are now Center, Center Oceananigans fields
-        F_turb_ρτxz_cell = sim.remapping.scratch_field_oc1
-        F_turb_ρτyz_cell = sim.remapping.scratch_field_oc2
-
-        # Set the momentum flux BCs at the correct locations using the remapped scratch fields
-        # Note that this requires the sea ice model to always be run with dynamics turned on
-        si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
-        si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
-        set_from_extrinsic_vector!(
-            (; u = si_flux_u, v = si_flux_v),
-            grid,
-            F_turb_ρτxz_cell,
-            F_turb_ρτyz_cell,
-        )
-    end
-
-    # Remap the latent and sensible heat fluxes using scratch fields
-    Interfacer.remap!(sim.remapping.scratch_field_oc1, F_lh, sim.remapping) # latent heat flux
-    Interfacer.remap!(sim.remapping.scratch_field_oc2, F_sh, sim.remapping) # sensible heat flux
-
-    # Rename for clarity; recall F_turb_energy = F_lh + F_sh (interiors match main's scratch-array sum)
-    remapped_F_lh = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
-    remapped_F_sh = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
-
-    # Update the sea ice heat flux only where the concentration is greater than zero.
-    # With PrescribedTemperature the top heat flux is a FluxFunction, not a Field;
-    # the flux is determined from the diagnosed T_sfc so we skip writing here.
-    si_flux_heat = sim.ice.model.external_heat_fluxes.top
-    if si_flux_heat isa OC.Field
-        OC.interior(si_flux_heat, :, :, 1) .+=
-            (OC.interior(ice_concentration, :, :, 1) .> 0) .*
-            (remapped_F_lh .+ remapped_F_sh)
-    end
-
+function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fields::NamedTuple)
+    push_intersection_fluxes_to_ice!(sim)
     return nothing
 end
 

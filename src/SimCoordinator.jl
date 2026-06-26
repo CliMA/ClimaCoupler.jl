@@ -248,6 +248,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         seaice_diagnostic_mode,
         land_fraction_source,
         binary_area_fraction,
+        align_surface_fractions_with_ocean_bathymetry,
         domain_type,
         column_latlon,
         scm_surface_type,
@@ -372,6 +373,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         evolving = evolving_ocean,
         ocean_diagnostic_interval,
         ocean_diagnostic_mode,
+        align_surface_fractions_with_ocean_bathymetry,
     )
 
     ice_sim = Interfacer.SeaIceSimulation(

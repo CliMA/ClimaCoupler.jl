@@ -16,7 +16,8 @@ export update_sim!,
     exchange!,
     set_caches!,
     update_surface_fractions!,
-    resolve_area_fractions!
+    resolve_area_fractions!,
+    align_surface_fractions!
 
 """
     update_surface_fractions!(cs::Interfacer.CoupledSimulation)
@@ -32,6 +33,26 @@ If a surface model is not present, the area fraction is set to 0.
 - `cs`: [Interfacer.CoupledSimulation] containing area fraction information.
 """
 function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
+    if haskey(cs.model_sims, :ocean_sim) &&
+       align_surface_fractions!(cs.model_sims.ocean_sim, cs)
+        return nothing
+    end
+    _update_surface_fractions_legacy!(cs)
+    return nothing
+end
+
+"""
+    align_surface_fractions!(ocean_sim, cs::Interfacer.CoupledSimulation) -> Bool
+
+If `true` is returned, surface fractions were updated by a model-specific
+implementation (e.g. ocean-bathymetry alignment for `OceananigansSimulation`)
+and the legacy ETOPO-based update was skipped.
+"""
+function align_surface_fractions!(ocean_sim, cs::Interfacer.CoupledSimulation)
+    return false
+end
+
+function _update_surface_fractions_legacy!(cs::Interfacer.CoupledSimulation)
     FT = CC.Spaces.undertype(Interfacer.boundary_space(cs))
 
     # land fraction is static
@@ -85,6 +106,7 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     # check that the sum of area fractions is 1
     @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
     @assert maximum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
+    return nothing
 end
 
 """

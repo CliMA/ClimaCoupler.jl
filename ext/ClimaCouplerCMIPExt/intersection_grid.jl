@@ -1,4 +1,67 @@
 """
+    IntersectionGridOperator
+
+Custom [`ConservativeRegridding`](https://github.com/JuliaGeo/ConservativeRegridding.jl)
+intersection operator that assembles a sparse matrix of intersection *polygons*
+rather than scalar areas. Implements the return-type API from
+[ConservativeRegridding.jl#121](https://github.com/JuliaGeo/ConservativeRegridding.jl/pull/121).
+"""
+struct IntersectionGridOperator{M <: CR.Manifold}
+    manifold::M
+end
+
+IntersectionGridOperator(manifold::CR.Spherical) = IntersectionGridOperator{typeof(manifold)}(manifold)
+
+function _intersection_polygon_type()
+    CRExt = get_ConservativeRegriddingCCExt()
+    @assert !isnothing(CRExt)
+    GI = CRExt.GI
+    GO = CRExt.GO
+    return GI.Polygon{
+        true,
+        false,
+        Vector{
+            GI.LinearRing{
+                true,
+                false,
+                Vector{GO.UnitSpherical.UnitSphericalPoint{Float64}},
+                Nothing,
+                Nothing,
+            },
+        },
+        Nothing,
+        Nothing,
+    }
+end
+
+CR.IntersectionReturnStyle(::IntersectionGridOperator) = CR.OutOfPlaceSingleResult()
+CR.output_eltype(::IntersectionGridOperator) = _intersection_polygon_type()
+CR.output_eltype(op::IntersectionGridOperator, src_tree, dst_tree) = CR.output_eltype(op)
+
+function CR.should_store_result(::IntersectionGridOperator, result)
+    result === nothing && return false
+    CRExt = get_ConservativeRegriddingCCExt()
+    return result isa CRExt.GI.Polygon
+end
+
+function (op::IntersectionGridOperator)(src_cell, dst_cell)
+    CRExt = get_ConservativeRegriddingCCExt()
+    GO = CRExt.GO
+    GI = CRExt.GI
+    intersection_poly = GO.intersection(
+        GO.ConvexConvexSutherlandHodgman(op.manifold),
+        src_cell,
+        dst_cell;
+        target = GI.PolygonTrait(),
+    )
+    if iszero(GO.area(op.manifold, intersection_poly))
+        return nothing
+    else
+        return intersection_poly
+    end
+end
+
+"""
     IntersectionGrid
 
 Data structure representing the intersection grid between a ClimaCore
@@ -19,7 +82,10 @@ on one grid and remapping.
 - `cc_indices`: CC element index for each intersection polygon
 - `oc_indices`: OC cell index for each intersection polygon  
 - `areas`: Area of each intersection polygon [m²]
-- `cc_areas`: Total area of each CC element [m²]
+- `cc_areas`: Wet-ocean intersection area of each CC element [m²] (after the
+  immersed mask filter when `respect_immersed_mask = true`)
+- `cc_total_areas`: Total CC↔OC intersection area per element [m²] before the
+  immersed mask filter (used for bathymetry-aligned surface fractions)
 - `oc_areas`: Total area of each OC cell [m²]
 - `n_cc`: Number of CC elements
 - `n_oc`: Number of OC cells
@@ -31,14 +97,16 @@ on one grid and remapping.
 
 # Usage
 The intersection grid is constructed from a boundary space + Oceananigans
-grid pair via [`extract_intersection_grid`](@ref), which builds the
-element-level intersection matrix through `ConservativeRegridding.jl`.
+grid pair via [`extract_intersection_grid`](@ref), which assembles the
+element-level intersection matrix through `ConservativeRegridding.jl` using
+[`IntersectionGridOperator`](@ref).
 """
 struct IntersectionGrid{FT, IT, VFT <: AbstractVector{FT}, VIT <: AbstractVector{IT}}
     cc_indices::VIT
     oc_indices::VIT
     areas::VFT
     cc_areas::VFT
+    cc_total_areas::VFT
     oc_areas::VFT
     n_cc::Int
     n_oc::Int
@@ -80,8 +148,8 @@ function _normalize_intersection_polys(intersection_result)
 end
 
 """
-    build_polygon_nodal_gather_weights(boundary_space_cpu, grid_oc_cpu,
-                                       cc_indices, oc_indices, areas)
+    build_polygon_nodal_gather_weights(boundary_space_cpu, cc_indices,
+                                       intersection_polys, areas)
 
 Precompute COO weights that area-average a nodal SEM field onto each
 intersection polygon:
@@ -90,25 +158,22 @@ intersection polygon:
 
 where `Bᵢⱼ` is the principled basis integral from
 `ConservativeRegriddingClimaCoreExt.accumulate_principled_b`.
+
+`intersection_polys` are the polygon values from a sparse intersection
+matrix assembled with [`IntersectionGridOperator`](@ref).
 """
 function build_polygon_nodal_gather_weights(
     boundary_space_cpu,
-    grid_oc_cpu,
     cc_indices,
-    oc_indices,
+    intersection_polys,
     areas,
 )
     CRExt = get_ConservativeRegriddingCCExt()
     @assert !isnothing(CRExt)
-    GO = CRExt.GO
-    GI = CRExt.GI
 
     FT = CC.Spaces.undertype(boundary_space_cpu)
     R = CC.Spaces.topology(boundary_space_cpu).mesh.domain.radius
     manifold = CR.Spherical(; radius = FT(R))
-
-    dst_tree = CR.Trees.treeify(manifold, boundary_space_cpu)
-    src_tree = CR.Trees.treeify(manifold, grid_oc_cpu)
 
     qs = CC.Spaces.quadrature_style(boundary_space_cpu)
     Nq = CC.Quadratures.degrees_of_freedom(qs)
@@ -118,20 +183,13 @@ function build_polygon_nodal_gather_weights(
     node_gather_node = Int[]
     node_gather_weight = FT[]
 
-    clip = GO.ConvexConvexSutherlandHodgman(manifold)
-
     @inbounds for k in eachindex(cc_indices)
         elem_idx = cc_indices[k]
-        cell_idx = oc_indices[k]
         area_k = areas[k]
         area_k == 0 && continue
 
-        elem_poly = CR.Trees.getcell(dst_tree, elem_idx)
-        cell_poly = CR.Trees.getcell(src_tree, cell_idx)
-        intersection_result = GO.intersection(clip, elem_poly, cell_poly; target = GI.PolygonTrait())
-
         B_total = zeros(Float64, Nq, Nq)
-        for ipoly in _normalize_intersection_polys(intersection_result)
+        for ipoly in _normalize_intersection_polys(intersection_polys[k])
             B_total .+= CRExt.accumulate_principled_b(
                 manifold,
                 boundary_space_cpu,
@@ -161,7 +219,9 @@ end
 
 Build an `IntersectionGrid` directly from a ClimaCore boundary space and an
 Oceananigans grid by computing the CC-element × OC-cell intersection matrix
-via the tree-level `ConservativeRegridding.intersection_areas` call.
+via `ConservativeRegridding.intersection_areas` with an
+[`IntersectionGridOperator`](@ref) that stores intersection polygons (see
+[ConservativeRegridding.jl#121](https://github.com/JuliaGeo/ConservativeRegridding.jl/pull/121)).
 
 This is the correct constructor for CC ↔ OC regridding because:
 
@@ -216,9 +276,25 @@ function extract_intersection_grid(
     dst_tree = CR.Trees.treeify(manifold, boundary_space_cpu)
     src_tree = CR.Trees.treeify(manifold, grid_oc_cpu)
 
-    intersections = CR.intersection_areas(manifold, CR.False(), dst_tree, src_tree)
+    intersection_op = IntersectionGridOperator(manifold)
+    intersections = CR.intersection_areas(
+        manifold,
+        CR.False(),
+        dst_tree,
+        src_tree;
+        intersection_operator = intersection_op,
+    )
 
-    cc_indices, oc_indices, areas = SparseArrays.findnz(intersections)
+    cc_indices, oc_indices, intersection_polys = SparseArrays.findnz(intersections)
+    CRExt = get_ConservativeRegriddingCCExt()
+    GO = CRExt.GO
+    areas = [GO.area(manifold, poly) for poly in intersection_polys]
+
+    n_cc, n_oc = size(intersections)
+    cc_total_areas_vec = zeros(FT, n_cc)
+    @inbounds for k in eachindex(areas)
+        cc_total_areas_vec[cc_indices[k]] += areas[k]
+    end
 
     # Optionally drop polygons whose parent OC cell is immersed (land /
     # dry under the bathymetry mask). We honor the live model layout — a
@@ -235,6 +311,7 @@ function extract_intersection_grid(
         keep = .!is_dry[oc_indices]
         cc_indices = cc_indices[keep]
         oc_indices = oc_indices[keep]
+        intersection_polys = intersection_polys[keep]
         areas = areas[keep]
     end
 
@@ -242,7 +319,6 @@ function extract_intersection_grid(
     # entries so that `ig.cc_areas[i]` and `ig.oc_areas[j]` agree with
     # the live `areas` vector. This keeps `scatter_to_cc!` / `scatter_to_oc!`
     # area-conserving on the polygons we actually retain.
-    n_cc, n_oc = size(intersections)
     cc_areas_vec = zeros(FT, n_cc)
     oc_areas_vec = zeros(FT, n_oc)
     @inbounds for k in eachindex(areas)
@@ -255,9 +331,8 @@ function extract_intersection_grid(
     node_gather_polygon, node_gather_node, node_gather_weight =
         build_polygon_nodal_gather_weights(
             boundary_space_cpu,
-            grid_oc_cpu,
             cc_indices,
-            oc_indices,
+            intersection_polys,
             areas,
         )
     n_nodes = _se_n_nodes(boundary_space_cpu)
@@ -267,6 +342,7 @@ function extract_intersection_grid(
         oc_indices,
         FT.(areas),
         cc_areas_vec,
+        cc_total_areas_vec,
         oc_areas_vec,
         n_cc,
         n_oc,
@@ -302,6 +378,7 @@ function extract_intersection_grid(
         ArrayType(ig_cpu.oc_indices),
         ArrayType(ig_cpu.areas),
         ArrayType(ig_cpu.cc_areas),
+        ArrayType(ig_cpu.cc_total_areas),
         ArrayType(ig_cpu.oc_areas),
         ig_cpu.n_cc,
         ig_cpu.n_oc,
@@ -310,6 +387,68 @@ function extract_intersection_grid(
         ArrayType(ig_cpu.node_gather_polygon),
         ArrayType(ig_cpu.node_gather_node),
         ArrayType(ig_cpu.node_gather_weight),
+    )
+end
+
+"""
+    cc_element_areas(boundary_space) -> Vector
+
+Spherical area [m²] of each spectral element on `boundary_space`, integrated
+with the SEM quadrature weights (`local_geometry.WJ`).
+"""
+function cc_element_areas(boundary_space)
+    space_cpu = CC.Adapt.adapt(Array, boundary_space)
+    FT = CC.Spaces.undertype(space_cpu)
+    lg = CC.Fields.local_geometry_field(CC.Fields.ones(space_cpu))
+    wj = parent(CC.Fields.field_values(lg.WJ))
+    n_elem = size(wj, ndims(wj))
+    areas = zeros(FT, n_elem)
+    @inbounds for e in 1:n_elem
+        if ndims(wj) == 3
+            areas[e] = sum(@view wj[:, :, e])
+        elseif ndims(wj) == 4
+            areas[e] = sum(@view wj[:, :, :, e])
+        elseif ndims(wj) == 5
+            areas[e] = sum(@view wj[:, :, :, :, e])
+        else
+            error("Unsupported WJ parent dimensions $(ndims(wj)) for element areas")
+        end
+    end
+    return areas
+end
+
+"""
+    wet_ocean_cc_fractions(ig::IntersectionGrid, cc_element_areas) -> Vector
+
+Per-CC-element wet-ocean fraction of the boundary column: wet intersection
+area divided by the full spectral-element area. Values lie in `[0, 1]`.
+"""
+function wet_ocean_cc_fractions(ig::IntersectionGrid, element_areas::AbstractVector)
+    FT = eltype(element_areas)
+    fractions = zeros(FT, ig.n_cc)
+    @inbounds for i in 1:ig.n_cc
+        if element_areas[i] > zero(FT)
+            fractions[i] = ig.cc_areas[i] / element_areas[i]
+        end
+    end
+    return clamp.(fractions, zero(FT), one(FT))
+end
+
+"""
+    wet_ocean_fraction_field!(field, ig::IntersectionGrid, element_areas, boundary_space)
+
+Broadcast per-element wet-ocean fractions onto all GLL nodes of `field`.
+"""
+function wet_ocean_fraction_field!(
+    field,
+    ig::IntersectionGrid,
+    element_areas::AbstractVector,
+    boundary_space,
+)
+    return _element_values_to_se_field!(
+        field,
+        wet_ocean_cc_fractions(ig, element_areas),
+        boundary_space,
     )
 end
 
@@ -656,6 +795,15 @@ the legacy per-element lookup via `cc_indices` is used instead.
   - `h`: Surface height [m] (typically 0)
 - `surface_fluxes_params`: SurfaceFluxes.Parameters.SurfaceFluxesParameters
 - `thermo_params`: Thermodynamics parameters for humidity calculations
+
+# Keyword arguments (sea ice)
+- `ice_balance_at_int`: optional `NamedTuple` of per-intersection vectors
+  (`κ`, `δ`, `T_i`, `ϵ`, `α_albedo`, `SW_d`, `LW_d`) for the conductive
+  skin-temperature balance. When provided, [`update_T_sfc`](@ref) is invoked
+  at each polygon instead of using a prescribed surface temperature.
+- `σ`, `T_melt`: scalars required when `ice_balance_at_int` is provided.
+- `ice_active`: optional `BitVector` / `Vector{Bool}` of length
+  `ig.n_intersections`; inactive polygons receive zero flux.
 """
 function compute_surface_fluxes_on_intersection!(
     flux_state::IntersectionFluxState,
@@ -663,7 +811,11 @@ function compute_surface_fluxes_on_intersection!(
     cc_atmos_state::NamedTuple,
     oc_surface_state::NamedTuple,
     surface_fluxes_params,
-    thermo_params,
+    thermo_params;
+    ice_balance_at_int = nothing,
+    σ = nothing,
+    T_melt = nothing,
+    ice_active = nothing,
 )
     _gather_cc_atmos_to_intersection!(flux_state, ig, cc_atmos_state)
 
@@ -698,8 +850,20 @@ function compute_surface_fluxes_on_intersection!(
         flux_state.surface_q[k] = TD.q_vap_saturation(thermo_params, T_sfc, ρ_sfc, FT(0), FT(0))
     end
 
+    use_ice_balance = !isnothing(ice_balance_at_int)
+    use_ice_balance && (@assert !isnothing(σ) && !isnothing(T_melt))
+
     # Compute fluxes at each intersection polygon
     @inbounds for k in 1:ig.n_intersections
+        if !isnothing(ice_active) && !ice_active[k]
+            flux_state.flux_sh[k] = zero(FT)
+            flux_state.flux_lh[k] = zero(FT)
+            flux_state.flux_τx[k] = zero(FT)
+            flux_state.flux_τy[k] = zero(FT)
+            flux_state.flux_evap[k] = zero(FT)
+            continue
+        end
+
         # Build wind vector
         uv_int = StaticArrays.SVector(flux_state.atmos_u[k], flux_state.atmos_v[k])
         uv_sfc = StaticArrays.SVector(FT(0), FT(0))  # Surface velocity = 0
@@ -719,6 +883,23 @@ function compute_surface_fluxes_on_intersection!(
         h_int = flux_state.atmos_h[k]
         Φ_sfc = SFP.grav(surface_fluxes_params) * h_sfc
         Δz = h_int - h_sfc
+
+        update_T_sfc_cb = if use_ice_balance
+            ib = ice_balance_at_int
+            update_T_sfc(
+                ib.κ[k],
+                ib.δ[k],
+                ib.T_i[k],
+                σ,
+                ib.ϵ[k],
+                ib.SW_d[k],
+                ib.LW_d[k],
+                ib.α_albedo[k],
+                T_melt,
+            )
+        else
+            nothing
+        end
 
         # Call SurfaceFluxes
         outputs = SF.surface_fluxes(
@@ -740,7 +921,7 @@ function compute_surface_fluxes_on_intersection!(
             SF.PointValueScheme(),
             nothing,  # solver_opts
             nothing,  # flux_specs
-            nothing,  # update_T_sfc_cb
+            update_T_sfc_cb,
             nothing,  # update_q_vap_sfc
         )
 
@@ -750,9 +931,48 @@ function compute_surface_fluxes_on_intersection!(
         flux_state.flux_τx[k] = outputs.ρτxz
         flux_state.flux_τy[k] = outputs.ρτyz
         flux_state.flux_evap[k] = outputs.evaporation
+        if use_ice_balance
+            flux_state.surface_T[k] = outputs.T_sfc
+        end
     end
 
     return nothing
+end
+
+"""
+    gather_ice_balance_to_intersection!(balance_at_int, ig, balance_nodal, κ)
+
+Polygon-average ice skin-balance inputs from flat nodal SEM vectors onto the
+intersection grid. `balance_nodal` holds `SW_d`, `LW_d`, `δ`, `T_i`, `ϵ`,
+`α_albedo` nodal vectors; `κ` may be a scalar or nodal vector.
+"""
+function gather_ice_balance_to_intersection!(
+    balance_at_int::NamedTuple,
+    ig::IntersectionGrid,
+    balance_nodal::NamedTuple,
+    κ,
+)
+    gather_cc_nodal_to_intersection!(balance_at_int.SW_d, ig, balance_nodal.SW_d)
+    gather_cc_nodal_to_intersection!(balance_at_int.LW_d, ig, balance_nodal.LW_d)
+    gather_cc_nodal_to_intersection!(balance_at_int.δ, ig, balance_nodal.δ)
+    gather_cc_nodal_to_intersection!(balance_at_int.T_i, ig, balance_nodal.T_i)
+    gather_cc_nodal_to_intersection!(balance_at_int.ϵ, ig, balance_nodal.ϵ)
+    gather_cc_nodal_to_intersection!(balance_at_int.α_albedo, ig, balance_nodal.α_albedo)
+    if κ isa Number
+        fill!(balance_at_int.κ, κ)
+    else
+        gather_cc_nodal_to_intersection!(balance_at_int.κ, ig, κ)
+    end
+    return nothing
+end
+
+"""
+    ice_intersection_active_mask(ig, sic_oc) -> Vector{Bool}
+
+Return a per-polygon mask that is `true` when the parent OC cell carries ice.
+"""
+function ice_intersection_active_mask(ig::IntersectionGrid, sic_oc::AbstractVector)
+    return [sic_oc[ig.oc_indices[k]] > 0 for k in 1:ig.n_intersections]
 end
 
 """
@@ -782,6 +1002,67 @@ function _gather_cc_atmos_to_intersection!(flux_state, ig::IntersectionGrid, cc_
         gather_cc_nodal_to_intersection!(flux_state.atmos_h, ig, cc_atmos_state.h)
     end
     return nothing
+end
+
+"""
+    intersection_fluxes_to_boundary_fields(boundary_space, intersection_grid, intersection_flux_state)
+
+Area-average polygon flux densities onto CC elements and broadcast to boundary-space
+Fields for `update_flux_fields!`.
+"""
+function intersection_fluxes_to_boundary_fields(
+    boundary_space,
+    intersection_grid,
+    intersection_flux_state,
+)
+    FT = CC.Spaces.undertype(boundary_space)
+    n_cc = intersection_grid.n_cc
+
+    cc_F_sh = zeros(FT, n_cc)
+    cc_F_lh = zeros(FT, n_cc)
+    cc_F_τx = zeros(FT, n_cc)
+    cc_F_τy = zeros(FT, n_cc)
+    cc_F_evap = zeros(FT, n_cc)
+    aggregate_fluxes_to_cc!(
+        (; F_sh = cc_F_sh, F_lh = cc_F_lh, F_τx = cc_F_τx, F_τy = cc_F_τy, F_evap = cc_F_evap),
+        intersection_flux_state,
+        intersection_grid,
+    )
+
+    F_sh = CC.Fields.zeros(boundary_space)
+    F_lh = CC.Fields.zeros(boundary_space)
+    F_turb_ρτxz = CC.Fields.zeros(boundary_space)
+    F_turb_ρτyz = CC.Fields.zeros(boundary_space)
+    F_turb_moisture = CC.Fields.zeros(boundary_space)
+
+    _element_values_to_se_field!(F_sh, cc_F_sh, boundary_space)
+    _element_values_to_se_field!(F_lh, cc_F_lh, boundary_space)
+    _element_values_to_se_field!(F_turb_ρτxz, cc_F_τx, boundary_space)
+    _element_values_to_se_field!(F_turb_ρτyz, cc_F_τy, boundary_space)
+    _element_values_to_se_field!(F_turb_moisture, cc_F_evap, boundary_space)
+
+    return (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
+end
+
+"""
+    _element_values_to_se_field!(field, element_values, boundary_space)
+
+Broadcast per-SE-element scalars to all GLL nodes of each element.
+"""
+function _element_values_to_se_field!(field, element_values::AbstractVector, boundary_space)
+    p = parent(CC.Fields.field_values(field))
+    if ndims(p) == 4
+        @inbounds for e in eachindex(element_values)
+            p[:, :, 1, e] .= element_values[e]
+        end
+    elseif ndims(p) == 5
+        @inbounds for e in eachindex(element_values)
+            p[:, :, 1, 1, e] .= element_values[e]
+        end
+    else
+        error("Unsupported field parent dimensions $(ndims(p)) for element broadcast")
+    end
+    return field
 end
 
 """

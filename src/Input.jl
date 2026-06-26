@@ -308,6 +308,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use binary (thresholded) area fractions for land and ice [`true` (default), `false`]. When true, land fraction > eps becomes 1, and ice fraction > 0.5 becomes 1."
         arg_type = Bool
         default = true
+        "--align_surface_fractions_with_ocean_bathymetry"
+        help = "When using Oceananigans, derive boundary land/ice/ocean area fractions from the OC immersed bathymetry mask via the intersection grid [`true` (default), `false`]. When false, ocean fraction is `1 - ice - ETOPO land`."
+        arg_type = Bool
+        default = true
         # Single-column model (SCM) settings
         "--domain_type"
         help = "Domain type for the simulation. [`global` (default), `column`]"
@@ -628,6 +632,9 @@ function get_coupler_args(config_dict::Dict)
     # Binary area fraction
     binary_area_fraction = config_dict["binary_area_fraction"]
 
+    align_surface_fractions_with_ocean_bathymetry =
+        config_dict["align_surface_fractions_with_ocean_bathymetry"]
+
     return (;
         job_id,
         sim_mode,
@@ -677,6 +684,7 @@ function get_coupler_args(config_dict::Dict)
         seaice_diagnostic_mode,
         land_fraction_source,
         binary_area_fraction,
+        align_surface_fractions_with_ocean_bathymetry,
         domain_type,
         column_latlon,
         scm_surface_type,

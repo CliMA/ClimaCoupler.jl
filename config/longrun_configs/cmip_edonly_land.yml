@@ -25,6 +25,7 @@ land_model: "integrated"
 land_spun_up_ic: false
 mode_name: "cmip"
 ocean_model: "oceananigans"
+ocean_grid: "orca"
 ocean_diagnostic_interval: "30days"
 ocean_diagnostic_mode: "average"
 output_default_diagnostics: true

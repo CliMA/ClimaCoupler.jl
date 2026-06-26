@@ -22,7 +22,15 @@ function make_ocean_diagnostics_plots end
 
 function make_ocean_diagnostics_movies end
 
+function make_seaice_diagnostics_movies end
+
 function view_ocean_field_globe end
+
+function view_ocean_bathymetry_overlay end
+
+function view_surface_field_overlay end
+
+function view_seaice_field_overlay end
 
 function debug end
 
@@ -60,7 +68,16 @@ extension_fns = [
         :Poppler_jll,
         :Printf,
         :Oceananigans,
-    ) => [:debug_plot!, :print_extrema, :make_ocean_diagnostics_movies, :view_ocean_field_globe],
+    ) => [
+        :debug_plot!,
+        :print_extrema,
+        :make_ocean_diagnostics_movies,
+        :make_seaice_diagnostics_movies,
+        :view_ocean_field_globe,
+        :view_ocean_bathymetry_overlay,
+        :view_surface_field_overlay,
+        :view_seaice_field_overlay,
+    ],
 ]
 
 """
@@ -125,11 +142,12 @@ function postprocess(
         atmos_output_dir,
         land_output_dir,
         ocean_output_dir,
+        ice_output_dir,
         artifacts_dir,
     ) = cs.dir_paths
 
     # Plot generic diagnostics
-    @info "Plotting diagnostics for coupler, atmos, land, and ocean"
+    @info "Plotting diagnostics for coupler, atmos, land, ocean, and sea ice"
     make_diagnostics_plots(coupler_output_dir, artifacts_dir, output_prefix = "coupler_")
     make_diagnostics_plots(atmos_output_dir, artifacts_dir, output_prefix = "atmos_")
     make_diagnostics_plots(land_output_dir, artifacts_dir, output_prefix = "land_")
@@ -137,6 +155,7 @@ function postprocess(
     # Note: slab ocean doesn't have diagnostics, so we only handle Oceananigans here
     make_ocean_diagnostics_plots(ocean_output_dir, artifacts_dir, output_prefix = "ocean_")
     make_ocean_diagnostics_movies(ocean_output_dir, artifacts_dir, output_prefix = "ocean_")
+    make_seaice_diagnostics_movies(ice_output_dir, artifacts_dir, output_prefix = "seaice_")
 
     # Plot all model states and coupler fields (useful for debugging)
     ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext && debug(cs, artifacts_dir)

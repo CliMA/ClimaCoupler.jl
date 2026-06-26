@@ -6,8 +6,8 @@ including Oceananigans.
 
 Currently, it includes:
 - diagnostics plots for Oceananigans
-- movies of Oceananigans JLD2 diagnostics
-- interactive globe viewing of ocean diagnostics
+- movies of Oceananigans JLD2 diagnostics (ocean and sea ice)
+- interactive globe viewing and overlay plots for ocean and sea ice diagnostics
 """
 module ClimaCouplerCMIPMakieExt
 

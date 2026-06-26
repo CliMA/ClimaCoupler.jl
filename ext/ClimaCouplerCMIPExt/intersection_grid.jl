@@ -302,11 +302,12 @@ function extract_intersection_grid(
     # which is also what CR uses as the column index of the FV cell.
     if respect_immersed_mask && grid_oc isa OC.ImmersedBoundaryGrid
         grid_with_mask_cpu = OC.on_architecture(OC.CPU(), grid_oc)
-        Nx_oc, Ny_oc, _ = size(grid_with_mask_cpu)
+        Nx_oc, Ny_oc, Nz_oc = size(grid_with_mask_cpu)
         is_dry = Vector{Bool}(undef, Nx_oc * Ny_oc)
+
         @inbounds for j in 1:Ny_oc, i in 1:Nx_oc
             is_dry[(j - 1) * Nx_oc + i] =
-                OC.ImmersedBoundaries.immersed_cell(i, j, 1, grid_with_mask_cpu)
+                OC.ImmersedBoundaries.immersed_cell(i, j, Nz_oc, grid_with_mask_cpu)
         end
         keep = .!is_dry[oc_indices]
         cc_indices = cc_indices[keep]
@@ -391,63 +392,152 @@ function extract_intersection_grid(
 end
 
 """
-    cc_element_areas(boundary_space) -> Vector
+    intersection_array_type(arch) -> Type
 
-Spherical area [m²] of each spectral element on `boundary_space`, integrated
-with the SEM quadrature weights (`local_geometry.WJ`).
+Device array type for intersection-grid storage (`Array` on CPU, e.g. `CuArray` on GPU).
+Matches the pattern used by [`ConservativeRegriddingClimaCoreExt`](https://juliageo.org/ConservativeRegridding.jl/stable/extensions/climacore/)
+(`se_field_to_vec` / `regrid!` flat vectors on the compute device).
 """
-function cc_element_areas(boundary_space)
-    space_cpu = CC.Adapt.adapt(Array, boundary_space)
-    FT = CC.Spaces.undertype(space_cpu)
-    lg = CC.Fields.local_geometry_field(CC.Fields.ones(space_cpu))
-    wj = parent(CC.Fields.field_values(lg.WJ))
-    n_elem = size(wj, ndims(wj))
-    areas = zeros(FT, n_elem)
-    @inbounds for e in 1:n_elem
-        if ndims(wj) == 3
-            areas[e] = sum(@view wj[:, :, e])
-        elseif ndims(wj) == 4
-            areas[e] = sum(@view wj[:, :, :, e])
-        elseif ndims(wj) == 5
-            areas[e] = sum(@view wj[:, :, :, :, e])
-        else
-            error("Unsupported WJ parent dimensions $(ndims(wj)) for element areas")
-        end
-    end
-    return areas
+intersection_array_type(::OC.CPU) = Array
+function intersection_array_type(arch)
+    return typeof(OC.on_architecture(arch, zeros(Float64, 1)))
 end
 
 """
-    wet_ocean_cc_fractions(ig::IntersectionGrid, cc_element_areas) -> Vector
+    extract_intersection_grid_on_arch(boundary_space, grid_oc, arch; kwargs...)
 
-Per-CC-element wet-ocean fraction of the boundary column: wet intersection
-area divided by the full spectral-element area. Values lie in `[0, 1]`.
+Build an [`IntersectionGrid`](@ref) and place backing arrays on the device for `arch`.
 """
-function wet_ocean_cc_fractions(ig::IntersectionGrid, element_areas::AbstractVector)
-    FT = eltype(element_areas)
+function extract_intersection_grid_on_arch(boundary_space, grid_oc, arch; kwargs...)
+    if arch isa OC.CPU
+        return extract_intersection_grid(boundary_space, grid_oc; kwargs...)
+    end
+    return extract_intersection_grid(
+        boundary_space,
+        grid_oc,
+        intersection_array_type(arch);
+        kwargs...,
+    )
+end
+
+zeros_on_arch(FT, ::OC.CPU, n) = zeros(FT, n)
+zeros_on_arch(FT, arch, n) = OC.on_architecture(arch, zeros(FT, n))
+
+_oc_surface_scratch(FT, arch, n) = (;
+    T = zeros_on_arch(FT, arch, n),
+    z0m = zeros_on_arch(FT, arch, n),
+    z0b = zeros_on_arch(FT, arch, n),
+    h = zeros_on_arch(FT, arch, n),
+)
+
+# `(cc_atmos_src, flux_state_dst)` pairs for atmosphere gather kernels.
+const _ATMOS_FLUX_GATHER_PAIRS = (
+    (:T, :atmos_T),
+    (:q_tot, :atmos_q_tot),
+    (:q_liq, :atmos_q_liq),
+    (:q_ice, :atmos_q_ice),
+    (:ρ, :atmos_ρ),
+    (:u, :atmos_u),
+    (:v, :atmos_v),
+    (:h, :atmos_h),
+)
+
+const _SURFACE_FLUX_GATHER_PAIRS = (
+    (:T, :surface_T),
+    (:z0m, :surface_z0m),
+    (:z0b, :surface_z0b),
+    (:h, :surface_h),
+)
+
+const _CC_FLUX_AGGREGATE_PAIRS = (
+    (:F_sh, :flux_sh),
+    (:F_lh, :flux_lh),
+    (:F_τx, :flux_τx),
+    (:F_τy, :flux_τy),
+    (:F_evap, :flux_evap),
+)
+
+"""
+    allocate_intersection_flux_scratch(FT, arch, ig, n_oc_layout)
+
+Allocate per-polygon and nodal scratch for [`compute_intersection_grid_fluxes!`](@ref).
+"""
+function allocate_intersection_flux_scratch(FT, arch, ig::IntersectionGrid, n_oc_layout)
+    n_int = ig.n_intersections
+    n_nodes = ig.n_nodes
+    ArrayType = intersection_array_type(arch)
+
+    return (;
+        intersection_flux_state = IntersectionFluxState(FT, n_int, ArrayType),
+        ice_intersection_flux_state = IntersectionFluxState(FT, n_int, ArrayType),
+        cc_atmos_temp = (;
+            T = zeros_on_arch(FT, arch, n_nodes),
+            q_tot = zeros_on_arch(FT, arch, n_nodes),
+            q_liq = zeros_on_arch(FT, arch, n_nodes),
+            q_ice = zeros_on_arch(FT, arch, n_nodes),
+            ρ = zeros_on_arch(FT, arch, n_nodes),
+            u = zeros_on_arch(FT, arch, n_nodes),
+            v = zeros_on_arch(FT, arch, n_nodes),
+            h = zeros_on_arch(FT, arch, n_nodes),
+            h_sfc = zeros_on_arch(FT, arch, n_nodes),
+        ),
+        oc_surface_temp = _oc_surface_scratch(FT, arch, n_oc_layout),
+        ice_cc_balance_nodal = (;
+            SW_d = zeros_on_arch(FT, arch, n_nodes),
+            LW_d = zeros_on_arch(FT, arch, n_nodes),
+            δ = zeros_on_arch(FT, arch, n_nodes),
+            T_i = zeros_on_arch(FT, arch, n_nodes),
+            ϵ = zeros_on_arch(FT, arch, n_nodes),
+            α_albedo = zeros_on_arch(FT, arch, n_nodes),
+        ),
+        ice_balance_at_int = (;
+            κ = zeros_on_arch(FT, arch, n_int),
+            SW_d = zeros_on_arch(FT, arch, n_int),
+            LW_d = zeros_on_arch(FT, arch, n_int),
+            δ = zeros_on_arch(FT, arch, n_int),
+            T_i = zeros_on_arch(FT, arch, n_int),
+            ϵ = zeros_on_arch(FT, arch, n_int),
+            α_albedo = zeros_on_arch(FT, arch, n_int),
+        ),
+        ice_surface_temp = _oc_surface_scratch(FT, arch, n_oc_layout),
+    )
+end
+
+"""
+    wet_ocean_cc_fractions(ig::IntersectionGrid) -> Vector
+
+Per-CC-element wet-ocean fraction of the boundary column.
+
+Computed as `ig.cc_areas[i] / ig.cc_total_areas[i]`:
+- `cc_areas` — sum of polygon areas over **wet** OC cells (after the immersed mask filter).
+- `cc_total_areas` — sum of all polygon areas for element `i` before the immersed mask
+  filter (i.e. the full CC↔OC geometric overlap area of the element).
+
+Both quantities share the same `GO.area` computation (on the same `Spherical` manifold),
+so the ratio is independent of units or sphere-radius normalisation.
+Values lie in `[0, 1]`.
+"""
+function wet_ocean_cc_fractions(ig::IntersectionGrid)
+    FT = eltype(ig.areas)
     fractions = zeros(FT, ig.n_cc)
     @inbounds for i in 1:ig.n_cc
-        if element_areas[i] > zero(FT)
-            fractions[i] = ig.cc_areas[i] / element_areas[i]
+        if ig.cc_total_areas[i] > zero(FT)
+            fractions[i] = ig.cc_areas[i] / ig.cc_total_areas[i]
         end
     end
     return clamp.(fractions, zero(FT), one(FT))
 end
 
 """
-    wet_ocean_fraction_field!(field, ig::IntersectionGrid, element_areas, boundary_space)
+    wet_ocean_fraction_field!(field, ig::IntersectionGrid, boundary_space)
 
-Broadcast per-element wet-ocean fractions onto all GLL nodes of `field`.
+Broadcast per-element wet-ocean fractions (see [`wet_ocean_cc_fractions`](@ref))
+onto all GLL nodes of `field`.
 """
-function wet_ocean_fraction_field!(
-    field,
-    ig::IntersectionGrid,
-    element_areas::AbstractVector,
-    boundary_space,
-)
+function wet_ocean_fraction_field!(field, ig::IntersectionGrid, boundary_space)
     return _element_values_to_se_field!(
         field,
-        wet_ocean_cc_fractions(ig, element_areas),
+        wet_ocean_cc_fractions(ig),
         boundary_space,
     )
 end
@@ -698,58 +788,20 @@ struct IntersectionFluxState{FT, VFT <: AbstractVector{FT}}
 end
 
 """
-    IntersectionFluxState(FT, n_intersections)
+    IntersectionFluxState(FT, n_intersections; ArrayType = Array)
 
-Allocate an `IntersectionFluxState` for `n_intersections` polygons.
+Allocate zeroed per-polygon scratch vectors for every field of
+[`IntersectionFluxState`](@ref). `ArrayType` is `Array` on CPU or e.g. `CuArray`
+on GPU (see [`intersection_array_type`](@ref)).
 """
-function IntersectionFluxState(FT::Type, n_intersections::Int)
+function IntersectionFluxState(
+    FT::Type,
+    n_intersections::Int,
+    ArrayType = Array,
+)
+    nfields = length(fieldnames(IntersectionFluxState))
     return IntersectionFluxState(
-        zeros(FT, n_intersections),  # atmos_T
-        zeros(FT, n_intersections),  # atmos_q_tot
-        zeros(FT, n_intersections),  # atmos_q_liq
-        zeros(FT, n_intersections),  # atmos_q_ice
-        zeros(FT, n_intersections),  # atmos_ρ
-        zeros(FT, n_intersections),  # atmos_u
-        zeros(FT, n_intersections),  # atmos_v
-        zeros(FT, n_intersections),  # atmos_h
-        zeros(FT, n_intersections),  # surface_T
-        zeros(FT, n_intersections),  # surface_q
-        zeros(FT, n_intersections),  # surface_z0m
-        zeros(FT, n_intersections),  # surface_z0b
-        zeros(FT, n_intersections),  # surface_h
-        zeros(FT, n_intersections),  # flux_sh
-        zeros(FT, n_intersections),  # flux_lh
-        zeros(FT, n_intersections),  # flux_τx
-        zeros(FT, n_intersections),  # flux_τy
-        zeros(FT, n_intersections),  # flux_evap
-    )
-end
-
-"""
-    IntersectionFluxState(FT, n_intersections, ArrayType)
-
-Allocate an `IntersectionFluxState` for GPU computation using the specified `ArrayType`.
-"""
-function IntersectionFluxState(FT::Type, n_intersections::Int, ArrayType)
-    return IntersectionFluxState(
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
-        ArrayType(zeros(FT, n_intersections)),
+        ntuple(_ -> ArrayType(zeros(FT, n_intersections)), nfields)...,
     )
 end
 
@@ -819,11 +871,9 @@ function compute_surface_fluxes_on_intersection!(
 )
     _gather_cc_atmos_to_intersection!(flux_state, ig, cc_atmos_state)
 
-    # Gather surface state to intersection grid
-    gather_oc_to_intersection!(flux_state.surface_T, ig, oc_surface_state.T)
-    gather_oc_to_intersection!(flux_state.surface_z0m, ig, oc_surface_state.z0m)
-    gather_oc_to_intersection!(flux_state.surface_z0b, ig, oc_surface_state.z0b)
-    gather_oc_to_intersection!(flux_state.surface_h, ig, oc_surface_state.h)
+    for (src, dst) in _SURFACE_FLUX_GATHER_PAIRS
+        gather_oc_to_intersection!(getfield(flux_state, dst), ig, getfield(oc_surface_state, src))
+    end
 
     # Compute surface humidity from surface temperature and density
     # Use atmosphere density extrapolated to surface as approximation
@@ -952,12 +1002,13 @@ function gather_ice_balance_to_intersection!(
     balance_nodal::NamedTuple,
     κ,
 )
-    gather_cc_nodal_to_intersection!(balance_at_int.SW_d, ig, balance_nodal.SW_d)
-    gather_cc_nodal_to_intersection!(balance_at_int.LW_d, ig, balance_nodal.LW_d)
-    gather_cc_nodal_to_intersection!(balance_at_int.δ, ig, balance_nodal.δ)
-    gather_cc_nodal_to_intersection!(balance_at_int.T_i, ig, balance_nodal.T_i)
-    gather_cc_nodal_to_intersection!(balance_at_int.ϵ, ig, balance_nodal.ϵ)
-    gather_cc_nodal_to_intersection!(balance_at_int.α_albedo, ig, balance_nodal.α_albedo)
+    for f in (:SW_d, :LW_d, :δ, :T_i, :ϵ, :α_albedo)
+        gather_cc_nodal_to_intersection!(
+            getfield(balance_at_int, f),
+            ig,
+            getfield(balance_nodal, f),
+        )
+    end
     if κ isa Number
         fill!(balance_at_int.κ, κ)
     else
@@ -982,24 +1033,12 @@ Route atmosphere fields to the intersection grid via nodal polygon averages
 when `ig.node_gather_*` is populated, otherwise fall back to per-element lookup.
 """
 function _gather_cc_atmos_to_intersection!(flux_state, ig::IntersectionGrid, cc_atmos_state)
-    if isempty(ig.node_gather_polygon)
-        gather_cc_to_intersection!(flux_state.atmos_T, ig, cc_atmos_state.T)
-        gather_cc_to_intersection!(flux_state.atmos_q_tot, ig, cc_atmos_state.q_tot)
-        gather_cc_to_intersection!(flux_state.atmos_q_liq, ig, cc_atmos_state.q_liq)
-        gather_cc_to_intersection!(flux_state.atmos_q_ice, ig, cc_atmos_state.q_ice)
-        gather_cc_to_intersection!(flux_state.atmos_ρ, ig, cc_atmos_state.ρ)
-        gather_cc_to_intersection!(flux_state.atmos_u, ig, cc_atmos_state.u)
-        gather_cc_to_intersection!(flux_state.atmos_v, ig, cc_atmos_state.v)
-        gather_cc_to_intersection!(flux_state.atmos_h, ig, cc_atmos_state.h)
-    else
-        gather_cc_nodal_to_intersection!(flux_state.atmos_T, ig, cc_atmos_state.T)
-        gather_cc_nodal_to_intersection!(flux_state.atmos_q_tot, ig, cc_atmos_state.q_tot)
-        gather_cc_nodal_to_intersection!(flux_state.atmos_q_liq, ig, cc_atmos_state.q_liq)
-        gather_cc_nodal_to_intersection!(flux_state.atmos_q_ice, ig, cc_atmos_state.q_ice)
-        gather_cc_nodal_to_intersection!(flux_state.atmos_ρ, ig, cc_atmos_state.ρ)
-        gather_cc_nodal_to_intersection!(flux_state.atmos_u, ig, cc_atmos_state.u)
-        gather_cc_nodal_to_intersection!(flux_state.atmos_v, ig, cc_atmos_state.v)
-        gather_cc_nodal_to_intersection!(flux_state.atmos_h, ig, cc_atmos_state.h)
+    gather! =
+        isempty(ig.node_gather_polygon) ?
+        gather_cc_to_intersection! :
+        gather_cc_nodal_to_intersection!
+    for (src, dst) in _ATMOS_FLUX_GATHER_PAIRS
+        gather!(getfield(flux_state, dst), ig, getfield(cc_atmos_state, src))
     end
     return nothing
 end
@@ -1076,11 +1115,9 @@ Aggregate fluxes from the intersection grid to CC elements.
 - `ig`: `IntersectionGrid`
 """
 function aggregate_fluxes_to_cc!(cc_fluxes::NamedTuple, flux_state::IntersectionFluxState, ig::IntersectionGrid)
-    scatter_flux_to_cc!(cc_fluxes.F_sh, ig, flux_state.flux_sh)
-    scatter_flux_to_cc!(cc_fluxes.F_lh, ig, flux_state.flux_lh)
-    scatter_flux_to_cc!(cc_fluxes.F_τx, ig, flux_state.flux_τx)
-    scatter_flux_to_cc!(cc_fluxes.F_τy, ig, flux_state.flux_τy)
-    scatter_flux_to_cc!(cc_fluxes.F_evap, ig, flux_state.flux_evap)
+    for (dst, src) in _CC_FLUX_AGGREGATE_PAIRS
+        scatter_flux_to_cc!(getfield(cc_fluxes, dst), ig, getfield(flux_state, src))
+    end
     return nothing
 end
 
@@ -1095,10 +1132,8 @@ Aggregate fluxes from the intersection grid to OC cells.
 - `ig`: `IntersectionGrid`
 """
 function aggregate_fluxes_to_oc!(oc_fluxes::NamedTuple, flux_state::IntersectionFluxState, ig::IntersectionGrid)
-    scatter_flux_to_oc!(oc_fluxes.F_sh, ig, flux_state.flux_sh)
-    scatter_flux_to_oc!(oc_fluxes.F_lh, ig, flux_state.flux_lh)
-    scatter_flux_to_oc!(oc_fluxes.F_τx, ig, flux_state.flux_τx)
-    scatter_flux_to_oc!(oc_fluxes.F_τy, ig, flux_state.flux_τy)
-    scatter_flux_to_oc!(oc_fluxes.F_evap, ig, flux_state.flux_evap)
+    for (dst, src) in _CC_FLUX_AGGREGATE_PAIRS
+        scatter_flux_to_oc!(getfield(oc_fluxes, dst), ig, getfield(flux_state, src))
+    end
     return nothing
 end

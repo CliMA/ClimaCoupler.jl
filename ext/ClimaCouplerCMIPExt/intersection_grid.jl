@@ -690,7 +690,7 @@ where the sum is over all polygons k belonging to CC element i.
 - `intersection_values`: Vector of values per intersection polygon
 """
 function scatter_to_cc!(cc_values, ig::IntersectionGrid, intersection_values)
-    cc_host = cc_values isa Array ? cc_values : similar(cc_values, Array)
+    cc_host = zeros(eltype(cc_values), ig.n_cc)
     iv = host_intersection_vector(intersection_values)
     cc_indices = host_intersection_vector(ig.cc_indices)
     areas = host_intersection_vector(ig.areas)
@@ -728,7 +728,7 @@ where the sum is over all polygons k belonging to OC cell j.
 - `intersection_values`: Vector of values per intersection polygon
 """
 function scatter_to_oc!(oc_values, ig::IntersectionGrid, intersection_values)
-    oc_host = oc_values isa Array ? oc_values : similar(oc_values, Array)
+    oc_host = zeros(eltype(oc_values), ig.n_oc)
     iv = host_intersection_vector(intersection_values)
     oc_indices = host_intersection_vector(ig.oc_indices)
     areas = host_intersection_vector(ig.areas)

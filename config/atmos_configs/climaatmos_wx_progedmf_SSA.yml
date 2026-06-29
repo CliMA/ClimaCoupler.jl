@@ -1,0 +1,54 @@
+dt: 120secs
+t_end: 12hours
+start_date: "20250831"
+initial_condition: "WeatherModel"
+discrete_hydrostatic_balance: false
+topo_smoothing: true
+topography: "Earth"
+rayleigh_sponge: true
+viscous_sponge: true
+divergence_damping_factor: 20.0
+scalar_hyperdiffusion_coefficient: 0.929738
+vorticity_hyperdiffusion_coefficient: 0.1857
+insolation: "timevarying"
+rad: allskywithclear
+dt_cloud_fraction: "1hours"
+dt_rad: "1hours"
+aerosol_radiation: true
+# time_varying_trace_gases: ["CO2", "O3"]
+prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05", "OC1", "OC2", "SO4"]
+interactive_aerosols: ["SSLT01", "SSLT02", "SSLT03", "SSLT04", "SSLT05"]
+turbconv: "prognostic_edmfx"
+ode_algo: "ARS222"
+implicit_diffusion: true
+approximate_linear_solve_iters: 2
+prognostic_tke: true
+edmfx_upwinding: first_order
+h_elem: 15
+z_max: 70000.0
+z_elem: 70
+dz_bottom: 30.0
+edmfx_entr_model: "Generalized"
+edmfx_detr_model: "Generalized"
+edmfx_nh_pressure: true
+edmfx_sgs_mass_flux: true
+edmfx_sgs_diffusive_flux: true
+edmfx_vertical_diffusion: true
+edmfx_filter: true
+edmfx_aerosols: true
+
+### 0M Microphysics ##
+# microphysics_model: "0M"
+# toml: [toml/longrun_aquaplanet_progedmf.toml]
+
+### 1M Microphysics ###
+microphysics_model: "1M"
+toml: [toml/prognostic_edmfx_1M.toml]
+
+cloud_model: "quadrature"
+use_itime: true
+deep_atmosphere: true
+
+### Gravity waves ###
+non_orographic_gravity_wave: true
+orographic_gravity_wave: "raw_topo"

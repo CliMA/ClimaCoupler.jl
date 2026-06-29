@@ -157,30 +157,9 @@ function ClimaLandSimulation(
             "Unknown lai_source: $lai_source. Must be \"modis_monthly\" or \"modis_monthly_climatology\"",
         )
     end
-    ground = CL.PrognosticGroundConditions{FT}()
-    canopy_forcing = (; forcing.atmos, forcing.radiation, ground)
     prognostic_land_components = (:canopy, :snow, :soil, :soilco2)
-    surface_domain = CL.Domains.obtain_surface_domain(domain)
-    photosynthesis = CL.Canopy.FarquharModel{FT}(surface_domain, toml_dict)
-    conductance = CL.Canopy.MedlynConductanceModel{FT}(surface_domain, toml_dict)
-    canopy = CL.Canopy.CanopyModel{FT}(
-        surface_domain,
-        canopy_forcing,
-        LAI,
-        toml_dict;
-        prognostic_land_components,
-        photosynthesis,
-        conductance,
-    )
-    model = CL.LandModel{FT}(
-        forcing,
-        LAI,
-        toml_dict,
-        domain,
-        dt;
-        prognostic_land_components,
-        canopy,
-    )
+    model =
+        CL.LandModel{FT}(forcing, LAI, toml_dict, domain, dt; prognostic_land_components)
 
     # Set up diagnostics
     if use_land_diagnostics

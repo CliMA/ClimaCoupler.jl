@@ -948,4 +948,73 @@ function emulate_diagnostics!(sim, t_end)
     return nothing
 end
 
+
+"""
+    MACDataLoader
+
+A struct for loading preprocessed MAC data on pressure levels as `OutputVar`s.
+"""
+struct MACDataLoader <: AbstractDataLoader
+    catalog::NCCatalog
+    available_vars::Set{String}
+end
+
+const MAC_TO_CLIMA_NAMES = ["lwp" => "lwp", "iwp" => "iwp"]
+
+"""
+    MACDataLoader(;
+        mac_to_clima_names = MAC_TO_CLIMA_NAMES,
+    )
+
+Construct a data loader which you can used to load preprocessed monthly time-averaged
+MAC data on single levels in `OutputVar`, where
+- the short name and sign of the data match CliMA conventions,
+- the latitudes are shifted to be -180 to 180 degrees,
+- the times are at the start of the time period (e.g. the time average of
+  January is on the first of January instead of January 15th).
+
+For `lwp` and `iwp`, there are `NaN`s in the data. These `NaN`s was imputted
+with mean of the non-`NaN` data for the dataset.
+
+The MAC data comes from the `mac_lwp` artifact. See
+[ClimaArtifacts](https://github.com/CliMA/ClimaArtifacts/tree/main/mac_lwp/)
+for more information about this artifact.
+
+The keyword argument `mac_to_clima_names` is a vector of pairs mapping
+MAC name to CliMA name.
+"""
+function MACDataLoader(; mac_to_clima_names = MODIS_TO_CLIMA_NAMES)
+    artifact_dir = @clima_artifact"mac_lwp"
+    mac_file = joinpath(artifact_dir, "mac_lwp.nc")
+
+    catalog = NCCatalog()
+    ClimaAnalysis.add_file!(catalog, mac_file, mac_to_clima_names...)
+    return MACDataLoader(catalog, Set(last.(mac_to_clima_names)))
+end
+
+"""
+    get(loader::MACDataLoader, short_name::String)
+
+Get the preprocessed `OutputVar` with the name `short_name` from the MAC
+dataset.
+"""
+function Base.get(loader::MACDataLoader, short_name::String)
+    (; catalog, available_vars) = loader
+    short_name in available_vars || error(
+        "$short_name is not available to load. To add this variable, pass it to mac_to_clima_names as a pair mapping var name to CliMA name and create a new MACDataLoader",
+    )
+    var = get(catalog, short_name; var_kwargs = (shift_by = Dates.firstdayofmonth,))
+    return preprocess(loader, var, Val(Symbol(short_name)))
+end
+
+function preprocess(::MACDataLoader, var, ::Union{Val{:iwp}, Val{:lwp}})
+    var = _preprocess_var(var)
+    not_nans = filter(!isnan, var.data)
+    global_mean = sum(not_nans) / length(not_nans)
+    @info "$(ClimaAnalysis.short_name(var)): Imputing global mean $global_mean for NaNs"
+    replace!(x -> isnan(x) ? global_mean : x, var)
+    var = ClimaAnalysis.convert_units(var, "kg m^-2", conversion_function = x -> 0.001 * x)
+    return var
+end
+
 end

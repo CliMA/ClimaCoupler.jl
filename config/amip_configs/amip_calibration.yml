@@ -11,6 +11,7 @@ topography: "Earth"
 ### Time and Simulation ###
 start_date: "20100101"
 initial_condition: "WeatherModel"
+era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_v1_dev"
 t_end: "39days"
 dt: "180secs"
 dt_cpl: "180secs"

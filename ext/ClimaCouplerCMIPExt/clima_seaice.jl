@@ -373,23 +373,17 @@ Scatter precomputed ice intersection-grid fluxes to ClimaSeaIce boundary
 conditions. Assumes `compute_ice_intersection_grid_fluxes!` has already run.
 """
 function push_intersection_fluxes_to_ice!(sim::ClimaSeaIceSimulation)
-    (; intersection_grid, ice_intersection_flux_state, temp_uv_vec) = sim.remapping
+    (; intersection_grid, ice_intersection_flux_state, momentum_geom) = sim.remapping
     grid = sim.ice.model.grid
     ice_concentration = sim.ice.model.ice_concentration
-    boundary_space = axes(sim.area_fraction)
+    arch = OC.architecture(grid)
 
     Nx_oc, Ny_oc, _ = size(grid)
     n_oc_layout = Nx_oc * Ny_oc
     FT = eltype(ice_intersection_flux_state.flux_sh)
 
-    fluxes = intersection_fluxes_to_boundary_fields(
-        boundary_space,
-        intersection_grid,
-        ice_intersection_flux_state,
-    )
-
-    F_sh_oc = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
-    F_lh_oc = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
+    F_sh_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
+    F_lh_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
     scatter_to_oc!(F_sh_oc, intersection_grid, ice_intersection_flux_state.flux_sh)
     scatter_to_oc!(F_lh_oc, intersection_grid, ice_intersection_flux_state.flux_lh)
 
@@ -398,14 +392,21 @@ function push_intersection_fluxes_to_ice!(sim::ClimaSeaIceSimulation)
     has_ice = OC.interior(ice_concentration, :, :, 1) .> 0
 
     if !isnothing(sim.ice.model.dynamics)
-        remap_contravariant_momentum_fluxes_to_oc!(
-            sim.remapping.scratch_field_oc1,
-            sim.remapping.scratch_field_oc2,
-            temp_uv_vec,
-            sim.remapping,
-            fluxes.F_turb_ρτxz,
-            fluxes.F_turb_ρτyz,
+        # Convert per-polygon contravariant stress → Cartesian UV and scatter to
+        # ice-grid cells directly, at intersection-polygon resolution.
+        F_τu_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
+        F_τv_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
+        scatter_contravariant_momentum_to_oc!(
+            F_τu_oc, F_τv_oc,
+            intersection_grid,
+            ice_intersection_flux_state.flux_τx,
+            ice_intersection_flux_state.flux_τy,
+            momentum_geom.ct1_u, momentum_geom.ct1_v,
+            momentum_geom.ct2_u, momentum_geom.ct2_v,
         )
+        OC.interior(sim.remapping.scratch_field_oc1, :, :, 1) .= reshape(F_τu_oc, Nx_oc, Ny_oc)
+        OC.interior(sim.remapping.scratch_field_oc2, :, :, 1) .= reshape(F_τv_oc, Nx_oc, Ny_oc)
+
         si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
         si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
         set_from_extrinsic_vector!(

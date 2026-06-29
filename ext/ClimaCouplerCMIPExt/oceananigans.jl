@@ -385,8 +385,40 @@ function construct_remapper(
 
     # Intersection-grid flux pipeline: element×cell polygons via CR
     # `intersection_areas` (distinct from node-indexed `remapper_*` matrices).
-    intersection_grid =
-        extract_intersection_grid_on_arch(boundary_space, grid_oc, arch)
+    # Build the CPU intersection grid explicitly so we can:
+    #  1. Precompute per-polygon contravariant→UV geometry factors (static, mesh-only).
+    #  2. Move it to the device exactly once, without a redundant second extraction.
+    ig_cpu = extract_intersection_grid(boundary_space, grid_oc)
+
+    # Precompute polygon-level geometry: UV components of unit CT1 / CT2 basis vectors.
+    momentum_geom_cpu = precompute_intersection_momentum_geometry(ig_cpu, boundary_space_cpu)
+
+    # Move intersection grid and geometry to the compute device.
+    if arch isa OC.CPU
+        intersection_grid = ig_cpu
+        momentum_geom     = momentum_geom_cpu
+    else
+        to_arch           = x -> OC.on_architecture(arch, x)
+        intersection_grid = IntersectionGrid(
+            to_arch(ig_cpu.cc_indices),
+            to_arch(ig_cpu.oc_indices),
+            to_arch(ig_cpu.areas),
+            to_arch(ig_cpu.cc_areas),
+            to_arch(ig_cpu.cc_total_areas),
+            to_arch(ig_cpu.oc_areas),
+            ig_cpu.n_cc,
+            ig_cpu.n_oc,
+            ig_cpu.n_intersections,
+            ig_cpu.n_nodes,
+            to_arch(ig_cpu.node_gather_polygon),
+            to_arch(ig_cpu.node_gather_node),
+            to_arch(ig_cpu.node_gather_weight),
+        )
+        momentum_geom = NamedTuple{keys(momentum_geom_cpu)}(
+            map(to_arch, values(momentum_geom_cpu))
+        )
+    end
+
     n_oc_layout = prod(size(grid_oc)[1:2])
     flux_scratch =
         allocate_intersection_flux_scratch(FT, arch, intersection_grid, n_oc_layout)
@@ -399,6 +431,7 @@ function construct_remapper(
         scratch_field_oc3,
         temp_uv_vec,
         intersection_grid,
+        momentum_geom,
         flux_scratch...,
         align_surface_fractions_with_ocean_bathymetry,
     )
@@ -621,7 +654,7 @@ converted to extrinsic `UVVector` components via
 rotated to the tripolar intrinsic basis via [`set_from_extrinsic_vector!`](@ref).
 """
 function push_intersection_fluxes_to_ocean!(sim::OceananigansSimulation)
-    (; intersection_grid, intersection_flux_state, temp_uv_vec) = sim.remapping
+    (; intersection_grid, intersection_flux_state, momentum_geom) = sim.remapping
     (; reference_density, heat_capacity) = sim.ocean_properties
     grid = sim.ocean.model.grid
     ice_concentration_field = sim.ice_concentration
@@ -632,36 +665,42 @@ function push_intersection_fluxes_to_ocean!(sim::OceananigansSimulation)
     FT = eltype(intersection_flux_state.flux_sh)
     arch = OC.architecture(grid)
 
-    fluxes = intersection_fluxes_to_boundary_fields(
-        boundary_space,
-        intersection_grid,
-        intersection_flux_state,
-    )
-
-    F_sh_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
-    F_lh_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
+    F_sh_oc   = OC.on_architecture(arch, zeros(FT, n_oc_layout))
+    F_lh_oc   = OC.on_architecture(arch, zeros(FT, n_oc_layout))
     F_evap_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
-    scatter_to_oc!(F_sh_oc, intersection_grid, intersection_flux_state.flux_sh)
-    scatter_to_oc!(F_lh_oc, intersection_grid, intersection_flux_state.flux_lh)
+    scatter_to_oc!(F_sh_oc,   intersection_grid, intersection_flux_state.flux_sh)
+    scatter_to_oc!(F_lh_oc,   intersection_grid, intersection_flux_state.flux_lh)
     scatter_to_oc!(F_evap_oc, intersection_grid, intersection_flux_state.flux_evap)
 
-    F_sh_oc_2d = reshape(F_sh_oc, Nx_oc, Ny_oc)
-    F_lh_oc_2d = reshape(F_lh_oc, Nx_oc, Ny_oc)
+    F_sh_oc_2d   = reshape(F_sh_oc,   Nx_oc, Ny_oc)
+    F_lh_oc_2d   = reshape(F_lh_oc,   Nx_oc, Ny_oc)
     F_evap_oc_2d = reshape(F_evap_oc, Nx_oc, Ny_oc)
 
     ice_concentration = OC.interior(ice_concentration_field, :, :, 1)
     one_minus_ice = 1 .- ice_concentration
 
-    remap_contravariant_momentum_fluxes_to_oc!(
-        sim.remapping.scratch_field_oc1,
-        sim.remapping.scratch_field_oc2,
-        temp_uv_vec,
-        sim.remapping,
-        fluxes.F_turb_ρτxz,
-        fluxes.F_turb_ρτyz,
+    # Convert per-polygon contravariant stress → Cartesian UV and scatter to OC cells
+    # directly, at the intersection-polygon resolution.  This avoids the
+    # `scatter_to_cc!` → `_element_values_to_se_field!` → `CR.regrid!` path that
+    # previously collapsed every intersection polygon within a CC element to a single
+    # area-weighted mean and broadcast that constant to all OC cells in the element.
+    F_τu_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
+    F_τv_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
+    scatter_contravariant_momentum_to_oc!(
+        F_τu_oc, F_τv_oc,
+        intersection_grid,
+        intersection_flux_state.flux_τx,
+        intersection_flux_state.flux_τy,
+        momentum_geom.ct1_u, momentum_geom.ct1_v,
+        momentum_geom.ct2_u, momentum_geom.ct2_v,
     )
-    OC.interior(sim.remapping.scratch_field_oc1, :, :, 1) .*= one_minus_ice ./ reference_density
-    OC.interior(sim.remapping.scratch_field_oc2, :, :, 1) .*= one_minus_ice ./ reference_density
+
+    # Fill OC Center/Center scratch fields and apply ice and density scaling.
+    OC.interior(sim.remapping.scratch_field_oc1, :, :, 1) .=
+        reshape(F_τu_oc, Nx_oc, Ny_oc) .* (one_minus_ice ./ reference_density)
+    OC.interior(sim.remapping.scratch_field_oc2, :, :, 1) .=
+        reshape(F_τv_oc, Nx_oc, Ny_oc) .* (one_minus_ice ./ reference_density)
+
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
     oc_flux_v = surface_flux(sim.ocean.model.velocities.v)
     set_from_extrinsic_vector!(

@@ -1235,3 +1235,60 @@ function aggregate_fluxes_to_oc!(oc_fluxes::NamedTuple, flux_state::Intersection
     end
     return nothing
 end
+
+"""
+    scatter_contravariant_momentum_to_oc!(
+        F_u_oc, F_v_oc, ig,
+        flux_τx, flux_τy,
+        ct1_u_int, ct1_v_int, ct2_u_int, ct2_v_int,
+    )
+
+Convert per-polygon contravariant momentum fluxes to extrinsic UV (east-north)
+components using precomputed polygon-level geometry factors, then scatter
+area-averaged values directly to OC cells.
+
+This avoids the `scatter_to_cc!` → `_element_values_to_se_field!` → `CR.regrid!`
+pipeline that reduces every intersection polygon inside a CC element to a single
+area-weighted mean and then broadcasts that constant to all OC cells within the
+element.  By doing the coordinate transformation at polygon resolution, each OC
+cell receives its own area-weighted average over the polygons it contains.
+
+# Arguments
+- `F_u_oc`, `F_v_oc`: output flat OC-cell vectors for U (east) and V (north) stress
+- `ig`: `IntersectionGrid`
+- `flux_τx`, `flux_τy`: per-polygon contravariant CT1/CT2 stress components
+  (from `IntersectionFluxState`)
+- `ct1_u_int`, `ct1_v_int`: per-polygon U and V components of the unit CT1 basis
+  vector (precomputed via [`precompute_intersection_momentum_geometry`](@ref))
+- `ct2_u_int`, `ct2_v_int`: per-polygon U and V components of the unit CT2 basis
+  vector (precomputed via [`precompute_intersection_momentum_geometry`](@ref))
+"""
+function scatter_contravariant_momentum_to_oc!(
+    F_u_oc, F_v_oc,
+    ig::IntersectionGrid,
+    flux_τx, flux_τy,
+    ct1_u_int, ct1_v_int,
+    ct2_u_int, ct2_v_int,
+)
+    FT = eltype(flux_τx)
+    n_int = ig.n_intersections
+
+    τx_h   = host_intersection_vector(flux_τx)
+    τy_h   = host_intersection_vector(flux_τy)
+    ct1_u  = host_intersection_vector(ct1_u_int)
+    ct1_v  = host_intersection_vector(ct1_v_int)
+    ct2_u  = host_intersection_vector(ct2_u_int)
+    ct2_v  = host_intersection_vector(ct2_v_int)
+
+    U_stress = zeros(FT, n_int)
+    V_stress = zeros(FT, n_int)
+
+    @inbounds for k in 1:n_int
+        U_stress[k] = τx_h[k] * ct1_u[k] + τy_h[k] * ct2_u[k]
+        V_stress[k] = τx_h[k] * ct1_v[k] + τy_h[k] * ct2_v[k]
+    end
+
+    scatter_to_oc!(F_u_oc, ig, U_stress)
+    scatter_to_oc!(F_v_oc, ig, V_stress)
+    return nothing
+end

@@ -150,35 +150,29 @@ function precompute_intersection_momentum_geometry(ig::IntersectionGrid, boundar
     FT = CC.Spaces.undertype(boundary_space_cpu)
     CRExt = get_ConservativeRegriddingCCExt()
 
-    # Scratch fields for contravariant→UV evaluation; values are overwritten.
+    # Scratch fields for contravariant→UV evaluation.
     tmp1   = CC.Fields.zeros(boundary_space_cpu)
     tmp2   = CC.Fields.zeros(boundary_space_cpu)
     tmp_uv = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space_cpu)
 
-    # Unit CT1 stress (1,0) → UV at every GLL node
-    tmp1 .= one(FT)
-    tmp2 .= zero(FT)
-    contravariant_to_cartesian!(tmp_uv, tmp1, tmp2)
-    ct1_u_nodal = CRExt.se_field_to_vec(tmp_uv.components.data.:1)
-    ct1_v_nodal = CRExt.se_field_to_vec(tmp_uv.components.data.:2)
-
-    # Unit CT2 stress (0,1) → UV at every GLL node
-    tmp1 .= zero(FT)
-    tmp2 .= one(FT)
-    contravariant_to_cartesian!(tmp_uv, tmp1, tmp2)
-    ct2_u_nodal = CRExt.se_field_to_vec(tmp_uv.components.data.:1)
-    ct2_v_nodal = CRExt.se_field_to_vec(tmp_uv.components.data.:2)
-
-    # Polygon-average the geometry factors with the principled SE-basis weights
     n_int = ig.n_intersections
     ct1_u = zeros(FT, n_int)
     ct1_v = zeros(FT, n_int)
     ct2_u = zeros(FT, n_int)
     ct2_v = zeros(FT, n_int)
-    gather_cc_nodal_to_intersection!(ct1_u, ig, ct1_u_nodal)
-    gather_cc_nodal_to_intersection!(ct1_v, ig, ct1_v_nodal)
-    gather_cc_nodal_to_intersection!(ct2_u, ig, ct2_u_nodal)
-    gather_cc_nodal_to_intersection!(ct2_v, ig, ct2_v_nodal)
+
+    tmp1 .= one(FT)
+    tmp2 .= zero(FT)
+    contravariant_to_cartesian!(tmp_uv, tmp1, tmp2)
+    gather_cc_nodal_to_intersection!(ct1_u, ig, copy(CRExt.se_field_to_vec(tmp_uv.components.data.:1)))
+    gather_cc_nodal_to_intersection!(ct1_v, ig, copy(CRExt.se_field_to_vec(tmp_uv.components.data.:2)))
+
+    # Unit CT2 stress (0,1) → UV at every GLL node.
+    tmp1 .= zero(FT)
+    tmp2 .= one(FT)
+    contravariant_to_cartesian!(tmp_uv, tmp1, tmp2)
+    gather_cc_nodal_to_intersection!(ct2_u, ig, copy(CRExt.se_field_to_vec(tmp_uv.components.data.:1)))
+    gather_cc_nodal_to_intersection!(ct2_v, ig, copy(CRExt.se_field_to_vec(tmp_uv.components.data.:2)))
 
     return (; ct1_u, ct1_v, ct2_u, ct2_v)
 end

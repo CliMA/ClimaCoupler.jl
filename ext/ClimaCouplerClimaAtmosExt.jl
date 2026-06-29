@@ -119,6 +119,8 @@ function ClimaAtmosSimulation(atmos_config)
         @. ᶠradiation_flux = CC.Geometry.WVector(FT(0))
     end
 
+    _OCEAN_ISOLATION_MASK[] = nothing
+
     sim = ClimaAtmosSimulation(integrator.p.params, spaces, integrator, output_writers)
 
     # DSS state to ensure we have continuous fields
@@ -363,6 +365,138 @@ function Interfacer.update_field!(
     field,
 )
     Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.T_sfc, field)
+end
+# Mask field (same axes as ocean_fraction) with 1 on valid ocean cells and 0 on isolated ones.
+# Built once on the first ocean_fraction update via a BFS flood-fill from true-ocean seeds,
+# then uploaded to the device. Every subsequent timestep applies it with a pure on-device broadcast.
+# `nothing` = not yet built.
+const _OCEAN_ISOLATION_MASK = Ref{Any}(nothing)
+
+# BFS flood-fill to identify all ocean-connected cells globally.
+#
+# Three-level threshold design:
+#   seed_thr (0.8) + seed_lat_band (±40°): starting seeds — unambiguously open ocean in the
+#       tropics/subtropics. High threshold + lat restriction keeps the Great Lakes and other
+#       northern freshwater bodies out of the initial set even if they have some ocean_fraction.
+#   strong_thr (0.8): a kept cell can only propagate the frontier if its ocean_fraction >= this.
+#       Coastal/partial cells (e.g. 0.3) are included when reached but do not themselves link
+#       to further neighbours, preventing a chain of marginal cells from leaking into inland areas.
+#   min_thr (0.25): minimum ocean_fraction a cell must have to be included at all.
+#
+# The Mediterranean, Red Sea, Persian Gulf, etc. are reached naturally: the BFS seeds the
+# Atlantic, strong cells carry the frontier through the Strait of Gibraltar and similar narrow
+# passages, and the enclosed basin is flooded from there.
+function _init_ocean_isolation_mask!(
+    ocean_fraction, seed_thr, strong_thr, min_thr, seed_lat_band
+)
+    FT     = eltype(ocean_fraction)
+    coords = CC.Fields.coordinate_field(axes(ocean_fraction))
+    ET     = eltype(coords)
+
+    # No lat/lon available (e.g. flat test space) — skip masking entirely.
+    if !hasfield(ET, :lat) || !hasfield(ET, :long)
+        _OCEAN_ISOLATION_MASK[] = ones(axes(ocean_fraction))
+        return
+    end
+
+    comms_ctx  = ClimaComms.context(axes(ocean_fraction))
+    local_lats = vec(Array(parent(coords.lat)))
+    local_lons = vec(Array(parent(coords.long)))
+    local_vals = vec(Array(parent(ocean_fraction)))
+    n_local    = length(local_vals)
+
+    # Gather global coordinate + value arrays to all ranks so each rank can search
+    # across partition boundaries.
+    if comms_ctx isa ClimaComms.SingletonCommsContext
+        lats        = local_lats
+        lons        = local_lons
+        vals        = local_vals
+        local_start = 1
+        local_end   = n_local
+    else
+        lats = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, local_lats))
+        lons = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, local_lons))
+        vals = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, local_vals))
+        all_counts  = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, [n_local]))
+        my_end      = sum(all_counts[1:ClimaComms.mypid(comms_ctx)])
+        local_start = my_end - n_local + 1
+        local_end   = my_end
+    end
+
+    n           = length(vals)
+    keep        = falses(n)
+    perm        = sortperm(lats)
+    sorted_lats = lats[perm]
+
+    # Derive the BFS adjacency radius from the largest inter-cell gap in latitude.
+    # On a cubed sphere, the equatorial→polar face transition produces a structural
+    # latitude gap (no GLL points between the highest equatorial-face row and the
+    # lowest polar-face row) that exceeds the typical within-face spacing — at
+    # h_elem=8 this gap is ~1.9°. The radius must be able to bridge it, so we base
+    # `r` on the global maximum positive gap with a 1.5× safety factor.
+    lat_gaps      = diff(sorted_lats)
+    positive_gaps = filter(g -> g > 1e-8, lat_gaps)   # only drop truly colocated DOFs
+    max_gap       = isempty(positive_gaps) ? 1.0 : maximum(positive_gaps)
+    r             = 1.5 * Float64(max_gap)
+
+    # Seed: strong ocean cells within the tropical/subtropical band.
+    queue = Int[]
+    for i in 1:n
+        if Float64(vals[i]) > Float64(seed_thr) && abs(Float64(lats[i])) <= Float64(seed_lat_band)
+            keep[i] = true
+            push!(queue, i)
+        end
+    end
+
+    # Flood outward from seeds with no latitude restriction — the ±seed_lat_band limit above
+    # only controls seeding. Only strong cells (>= strong_thr) carry the frontier forward;
+    # weak cells (min_thr < val < strong_thr) are included when reached but do not expand further.
+    while !isempty(queue)
+        i     = pop!(queue)
+        lat_i = Float64(lats[i])
+        lon_i = Float64(lons[i])
+        lo    = searchsortedfirst(sorted_lats, lat_i - r)
+        hi    = searchsortedlast(sorted_lats,  lat_i + r)
+        for k in lo:hi
+            j = perm[k]
+            keep[j] && continue
+            Float64(vals[j]) <= Float64(min_thr) && continue
+            dlon = abs(Float64(lons[j]) - lon_i)
+            dlon > 180.0 && (dlon = 360.0 - dlon)
+            dlat = Float64(sorted_lats[k]) - lat_i
+            if dlat^2 + (dlon * cosd(lat_i))^2 ≤ r^2
+                keep[j] = true
+                if Float64(vals[j]) >= Float64(strong_thr)
+                    push!(queue, j)
+                end
+            end
+        end
+    end
+
+    # Upload the local slice of the mask to the device as a ClimaCore Field.
+    local_keep = FT.(keep[local_start:local_end])
+    mask       = ones(axes(ocean_fraction))
+    copyto!(parent(mask), reshape(local_keep, size(parent(mask))))
+    _OCEAN_ISOLATION_MASK[] = mask
+end
+
+function _apply_ocean_isolation_mask!(ocean_fraction)
+    mask = _OCEAN_ISOLATION_MASK[]
+    isnothing(mask) && return
+    ocean_fraction .= ocean_fraction .* mask
+end
+
+function Interfacer.update_field!(
+    sim::ClimaAtmosSimulation,
+    ::Val{:ocean_fraction},
+    field,
+)
+    atmos_ocean_fraction = sim.integrator.p.ocean_fraction
+    Interfacer.remap!(atmos_ocean_fraction, field)
+    if isnothing(_OCEAN_ISOLATION_MASK[])
+        _init_ocean_isolation_mask!(atmos_ocean_fraction, 0.8, 0.8, 0.25, 40.0)
+    end
+    _apply_ocean_isolation_mask!(atmos_ocean_fraction)
 end
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_humidity}, csf)
     # NOTE: This update_field! takes as argument the entire coupler fields struct, instead

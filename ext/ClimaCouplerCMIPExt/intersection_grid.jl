@@ -1130,6 +1130,13 @@ end
 
 Area-average polygon flux densities onto CC elements and broadcast to boundary-space
 Fields for `update_flux_fields!`.
+
+After broadcasting per-element scalar averages to GLL nodes, a `weighted_dss!`
+op produces a C0-continuous SE field. 
+
+Note: scalar fluxes (SH, LH, evaporation) are pushed to the OC grid directly from
+the intersection polygons via [`scatter_to_oc!`](@ref) and do not go through this
+CC detour, so they do not exhibit the same artifact.
 """
 function intersection_fluxes_to_boundary_fields(
     boundary_space,
@@ -1161,6 +1168,13 @@ function intersection_fluxes_to_boundary_fields(
     _element_values_to_se_field!(F_turb_ρτxz, cc_F_τx, boundary_space)
     _element_values_to_se_field!(F_turb_ρτyz, cc_F_τy, boundary_space)
     _element_values_to_se_field!(F_turb_moisture, cc_F_evap, boundary_space)
+
+    dss_buffer = CC.Spaces.create_dss_buffer(F_sh)
+    CC.Spaces.weighted_dss!(F_sh, dss_buffer)
+    CC.Spaces.weighted_dss!(F_lh, dss_buffer)
+    CC.Spaces.weighted_dss!(F_turb_ρτxz, dss_buffer)
+    CC.Spaces.weighted_dss!(F_turb_ρτyz, dss_buffer)
+    CC.Spaces.weighted_dss!(F_turb_moisture, dss_buffer)
 
     return (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
 end

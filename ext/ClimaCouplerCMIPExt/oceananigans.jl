@@ -249,7 +249,7 @@ function OceananigansSimulation(
         ocean_properties,
         remapping,
         ice_concentration,
-        ocean.Δt,
+        dt,
     )
 
     add_ocean_diagnostics!(

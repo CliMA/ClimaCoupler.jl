@@ -86,6 +86,56 @@ function tripolar_ocean_simulation(arch;
 end
 
 """
+    ocean_simulation(arch, ocean_grid; simple_ocean, closure, clock, kwargs...)
+
+Build an Oceananigans `Simulation` on either the standard one-degree tripolar grid
+or the NEMO eORCA1 mesh (`orca`).
+"""
+function ocean_simulation(
+    arch,
+    ocean_grid::Symbol;
+    simple_ocean,
+    closure,
+    clock,
+    kwargs...,
+)
+    substeps = simple_ocean ? 70 : 150
+
+    if ocean_grid == :orca
+        if simple_ocean
+            @info "simple_ocean=true: using standard_tripolar grid instead of orca"
+            ocean_grid = :standard_tripolar
+        else
+            @info "Using ORCA1 ocean grid"
+            return CO.OceanConfigurations.orca_ocean(
+                arch;
+                closure,
+                clock,
+                substeps,
+                kwargs...,
+            )
+        end
+    end
+
+    @info "Using standard one-degree tripolar ocean grid"
+    active_cells_map = !simple_ocean
+    zstar = !simple_ocean
+
+    return tripolar_ocean_simulation(
+        arch;
+        zstar,
+        active_cells_map,
+        clock,
+        depth = 5500,
+        Nz = 32,
+        closure,
+        substeps,
+        kwargs...,
+    )
+>>>>>>> origin/as/orca-longruns
+end
+
+"""
     OceananigansSimulation(; kwargs...)
 
 Creates an OceananigansSimulation object containing a model, an integrator, and
@@ -119,6 +169,7 @@ function OceananigansSimulation(
     tspan,
     output_dir,
     simple_ocean = false,
+    ocean_grid = :standard_tripolar,
     dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
@@ -383,8 +434,6 @@ function construct_remapper(
 
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
-    # Intersection-grid flux pipeline: element×cell polygons via CR
-    # `intersection_areas` (distinct from node-indexed `remapper_*` matrices).
     # Build the CPU intersection grid explicitly so we can:
     #  1. Precompute per-polygon contravariant→UV geometry factors (static, mesh-only).
     #  2. Move it to the device exactly once, without a redundant second extraction.

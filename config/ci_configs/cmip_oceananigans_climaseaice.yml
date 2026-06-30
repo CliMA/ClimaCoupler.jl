@@ -7,25 +7,26 @@ coupler_toml: ["toml/amip_edonly.toml"]
 dt_atmos: "120secs" # 2 minutes
 dt_cpl: "360secs" # 6 minutes
 dt_land: "360secs" # 6 minutes
-dt_ocean: "1800secs" # 30 minutes
-dt_seaice: "1800secs" # 30 minutes
+dt_ocean: "360secs" # 30 minutes
+dt_seaice: "360secs" # 30 minutes
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8
 ice_model: "clima_seaice"
-land_diagnostics_period: "1hours"
+land_diagnostics_period: "10days"
 land_diagnostics_reduction: "instantaneous"
 land_model: "integrated"
 land_spun_up_ic: false
 mode_name: "cmip"
 netcdf_output_at_levels: true
-ocean_diagnostic_interval: "1hours"
+ocean_diagnostic_interval: "1days"
 ocean_diagnostic_mode: "instantaneous"
 ocean_model: "oceananigans"
+ocean_grid: "orca"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 rayleigh_sponge: true
-seaice_diagnostic_interval: "1hours"
+seaice_diagnostic_interval: "1days"
 seaice_diagnostic_mode: "instantaneous"
 simple_ocean: true
 start_date: "20100101"

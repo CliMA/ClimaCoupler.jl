@@ -271,6 +271,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use a simpler ocean model setup with Oceananigans [`false` (default), `true`]"
         arg_type = Bool
         default = false
+        "--ocean_grid"
+        help = "Horizontal grid for Oceananigans ocean model. [`standard_tripolar` (default), `orca`]"
+        arg_type = String
+        default = "standard_tripolar"
         "--sst_adjustment"
         help = "Adjustment to add to prescribed SST after conversion to Kelvin (default: 0.0)"
         arg_type = Float64
@@ -586,6 +590,7 @@ function get_coupler_args(config_dict::Dict)
     # Ocean model-specific information
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
     simple_ocean = config_dict["simple_ocean"]
+    ocean_grid = Symbol(lowercase(config_dict["ocean_grid"]))
     sst_adjustment = FT(config_dict["sst_adjustment"])
     progress_interval = config_dict["ocean_progress_interval"]
     ocean_diagnostic_interval = config_dict["ocean_diagnostic_interval"]
@@ -675,6 +680,7 @@ function get_coupler_args(config_dict::Dict)
         era5_filepaths,
         ocean_model,
         simple_ocean,
+        ocean_grid,
         sst_adjustment,
         progress_interval,
         ocean_diagnostic_interval,

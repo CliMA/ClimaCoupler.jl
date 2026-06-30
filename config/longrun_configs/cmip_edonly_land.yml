@@ -31,6 +31,7 @@ output_default_diagnostics: true
 rmse_check: true
 seaice_diagnostic_interval: "10days"
 seaice_diagnostic_mode: "instantaneous"
+ocean_grid: "orca"
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "188days"

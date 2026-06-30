@@ -14,7 +14,7 @@ env:
   CONFIG_PATH: "config/ci_configs"
   SWEEP_CONFIG_PATH: "config/sweep_configs"
 
-timeout_in_minutes: 1440
+timeout_in_minutes: 10080
 
 steps:
   - label: "init environment :computer:"

@@ -22,6 +22,7 @@ netcdf_output_at_levels: true
 ocean_diagnostic_interval: "1days"
 ocean_diagnostic_mode: "instantaneous"
 ocean_model: "oceananigans"
+ocean_grid: "orca"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 rayleigh_sponge: true

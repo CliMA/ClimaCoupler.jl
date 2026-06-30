@@ -46,7 +46,7 @@ steps:
     concurrency: 1
     concurrency_group: 'depot/climacoupler-ci'
     agents:
-      slurm_gres: "gpu:nvidia_l40s:1"
+      slurm_gres: gpu:nvidia_l40s:1
       slurm_cpus_per_task: 12
       slurm_gpus: 1
     env:
@@ -408,7 +408,7 @@ steps:
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
     
@@ -420,7 +420,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -432,7 +432,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -444,7 +444,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -456,7 +456,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -468,7 +468,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -480,7 +480,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -492,7 +492,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -504,7 +504,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -516,7 +516,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -528,7 +528,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -540,7 +540,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -552,7 +552,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -564,7 +564,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -576,7 +576,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -588,7 +588,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -600,7 +600,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -612,7 +612,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -624,7 +624,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -636,7 +636,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -648,7 +648,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 
@@ -660,7 +660,7 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
-          slurm_gres: "gpu:nvidia_l40s:1"
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_mem: 20GB
           slurm_gpus: 1
 

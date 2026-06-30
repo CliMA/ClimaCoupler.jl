@@ -1,0 +1,39 @@
+FLOAT_TYPE: "Float64"
+atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
+checkpoint_dt: "1months"
+coupler_diagnostics_period: "1months"
+coupler_diagnostics_reduction: "average"
+dt_atmos: "120secs" # 2 minutes
+dt_cloud_fraction: "1hours"
+dt_cpl: "360secs" # 6 minutes
+dt_land: "360secs" # 6 minutes
+dt_ocean: "720secs" # 12 minutes
+dt_rad: "1hours"
+dt_seaice: "720secs" # 12 minutes
+energy_check: false
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: 1months
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
+ice_model: "clima_seaice"
+insolation: "timevarying"
+land_diagnostics_period: "1months"
+land_diagnostics_reduction: "average"
+land_model: "integrated"
+land_spun_up_ic: false
+mode_name: "cmip"
+ocean_model: "oceananigans"
+ocean_diagnostic_interval: "1months"
+ocean_diagnostic_mode: "average"
+output_default_diagnostics: true
+rmse_check: true
+seaice_diagnostic_interval: "1months"
+seaice_diagnostic_mode: "average"
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+# t_end: "366days"
+t_end: "183days"
+topo_smoothing: true
+topography: "Earth"

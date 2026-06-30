@@ -41,7 +41,7 @@ function Interfacer.OceanSimulation(::Type{FT}, ::Val{:oceananigans}; kwargs...)
 end
 
 """
-    tripolar_ocean_simulation(arch; active_cells_map, kwargs...)
+    tripolar_ocean_simulation(arch; clock, stop_time, active_cells_map, kwargs...)
 
 One-degree tripolar ocean setup matching
 `ClimaOcean.OceanConfigurations.one_degree_tripolar_ocean`, but exposing
@@ -49,9 +49,14 @@ One-degree tripolar ocean setup matching
 exceed the 4 KiB CUDA kernel parameter limit on sm_60 (P100) even with a
 minimal closure; disabling the map keeps the tripolar grid while staying
 within the limit.
+
+`clock` and `stop_time` are required and forwarded to `ClimaOcean.ocean_simulation`;
+the coupler builds them from `tspan` so the ocean steps in calendar time when coupled.
 """
 function tripolar_ocean_simulation(
     arch;
+    clock,
+    stop_time,
     active_cells_map = true,
     zstar = true,
     Nz = 32,
@@ -79,6 +84,8 @@ function tripolar_ocean_simulation(
 
     return CO.ocean_simulation(
         grid;
+        clock,
+        stop_time,
         momentum_advection,
         tracer_advection,
         free_surface,
@@ -158,10 +165,10 @@ function OceananigansSimulation(
 
     if tspan[1] isa ITime
         # create a model clock that uses DateTime, for compatibility with ITime.
-        model_clock = OC.TimeSteppers.Clock(time = start_date)
+        clock = OC.TimeSteppers.Clock(time = start_date)
         stop_time = Dates.DateTime(tspan[2])
     elseif tspan[1] isa Float64
-        model_clock = OC.TimeSteppers.Clock{Float64}(time = tspan[1])
+        clock = OC.TimeSteppers.Clock{Float64}(time = tspan[1])
         stop_time = tspan[2]
     else
         error("Unsupported time type: $(typeof(tspan[1]))")
@@ -169,15 +176,15 @@ function OceananigansSimulation(
 
     ocean = tripolar_ocean_simulation(
         arch;
+        clock,
+        stop_time,
         zstar,
         active_cells_map,
-        clock = model_clock,
         depth = 5500,
         Nz = 32,
         closure,
         substeps = simple_ocean ? 70 : 150,
     )
-    ocean.stop_time = stop_time
     ocean.Δt = float(dt)
 
     wall_time = Ref(time_ns())
@@ -249,7 +256,7 @@ function OceananigansSimulation(
         ocean_properties,
         remapping,
         ice_concentration,
-        ocean.Δt,
+        dt,
     )
 
     add_ocean_diagnostics!(

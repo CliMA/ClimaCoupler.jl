@@ -48,7 +48,7 @@ steps:
     agents:
       slurm_gres: gpu:nvidia_l40s:1
       slurm_cpus_per_task: 12
-      slurm_gpus: 1
+      # slurm_gpus: 1
     env:
       JULIA_NUM_PRECOMPILE_TASKS: 12
       JULIA_MAX_NUM_PRECOMPILE_FILES: 50

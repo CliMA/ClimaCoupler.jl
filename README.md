@@ -1,139 +1,122 @@
-# ClimaCoupler.jl
+# DeveloperGuides
 
-ClimaCoupler.jl provides coupled system time stepping control and support for mapping import and export
-boundary information between components. It can handle atmosphere, ocean, land, and sea ice component models,
-and the source code is agnostic to the internals of these component models.
+Shared engineering standards, architectural patterns, and development guidelines for human and AI developers across the [CliMA](https://clima.caltech.edu) ecosystem.
 
-ClimaCoupler.jl targets global, long-term climate simulations, specifically for the
-[Coupled Model Intercomparison Project (CMIP)](https://wcrp-cmip.org) and
-[Atmospheric Model Intercomparison Project (AMIP)](https://pcmdi.llnl.gov/mips/amip/home/overview.html).
-With these objectives in mind, this coupler is also designed to be flexible and modular,
-so it supports simpler slabplanet-type setups as well.
+## Guides
 
-The `experiments/` directory contains run scripts
-for CMIP, AMIP, and slabplanet setups. A few simple component models are implemented
-within `src/`, while more complex component models extend the ClimaCoupler interface
-in `ext/`.
+Every guide applies across the CliMA ecosystem unless it says otherwise.
 
-<!-- Links and shortcuts -->
-[docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
-[docs-dev-url]: https://CliMA.github.io/ClimaCoupler.jl/dev/
+### Architecture
 
-[docs-bld-img]: https://github.com/CliMA/ClimaCoupler.jl/workflows/Documentation/badge.svg
-[docs-bld-url]: https://github.com/CliMA/ClimaCoupler.jl/actions?query=workflow%3ADocumentation
+- [repo_structure.md](architecture/repo_structure.md): how to navigate any CliMA Julia package.
+- [ecosystem_conventions.md](architecture/ecosystem_conventions.md): module aliases, `Y`/`Yₜ`/`p` state layout, `ᶜ`/`ᶠ` notation, CI structure, reproducibility, diagnostics.
+- [architectural_boundaries.md](architecture/architectural_boundaries.md): layered architecture and boundary rules.
+- [cross_repo_contracts.md](architecture/cross_repo_contracts.md): call-site conventions for ecosystem packages.
+- [dependency_management.md](architecture/dependency_management.md): runtime vs dev dependencies, compat bounds.
 
-[unit-tests-img]: https://github.com/CliMA/ClimaCoupler.jl/actions/workflows/ci.yml/badge.svg
-[unit-tests-url]: https://github.com/CliMA/ClimaCoupler.jl/actions?query=workflow%3Aci
+### Performance
 
-[codecov-img]: https://codecov.io/gh/CliMA/ClimaCoupler.jl/branch/main/graph/badge.svg
-[codecov-url]: https://codecov.io/gh/CliMA/ClimaCoupler.jl
+- [gpu_performance.md](performance/gpu_performance.md): GPU kernel rules, broadcast patterns, allocation avoidance.
+- [branchless_code.md](performance/branchless_code.md): avoiding warp divergence with `ifelse`, evaluate-both-cases splits, and fixed-iteration solvers chosen by offline tests.
+- [type_stability.md](performance/type_stability.md): Float32 compatibility, inference checks, struct field rules.
+- [numerical_robustness.md](performance/numerical_robustness.md): denominator regularization, clamping, NaN/Inf avoidance.
+- [ad_compatibility.md](performance/ad_compatibility.md): AD-safe patterns for ForwardDiff and Enzyme.
+- [allocation_debugging.md](performance/allocation_debugging.md): locating heap allocations with `Profile.Allocs`, JET, `@code_warntype`, flame graphs.
 
-[downloads-img]: https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Ftotal_downloads%2FClimaCoupler&query=total_requests&suffix=%2Ftotal&label=Downloads
-[downloads-url]: http://juliapkgstats.com/pkg/ClimaCoupler
+### Code Quality
 
-|||
-|---------------------:|:-----------------------------------------------|
-| **Documentation**    | [![dev][docs-dev-img]][docs-dev-url] [![docs build][docs-bld-img]][docs-bld-url]|
-| **Unit Tests**       | [![unit tests][unit-tests-img]][unit-tests-url] [![codecov][codecov-img]][codecov-url]|
-| **Downloads**        | [![downloads][downloads-img]][downloads-url]|
-|||
+- [getting_started.md](code-quality/getting_started.md): orienting newcomers to writing pointwise code compatible with ClimaCore `Field`s and broadcasting.
+- [code_style.md](code-quality/code_style.md): formatting, variable locality, Git workflow, feature removal, naming conventions.
+- [documentation_policy.md](code-quality/documentation_policy.md): docstrings, repository-level docs, minimally viable documentation.
+- [changelogs_and_versions.md](code-quality/changelogs_and_versions.md): `NEWS.md` format, SemVer rules, and the release/tagging flow.
+- [variable_list.md](code-quality/variable_list.md): standardized CliMA variable naming conventions.
+- [glossary.md](code-quality/glossary.md): general CliMA software and simulation terminology.
+- [software_design_patterns.md](code-quality/software_design_patterns.md): numbered SDPs for branchless logic, functors, parameter extraction, and more.
 
-Recommended Julia Version: Stable release v1.12.x, CI tests Julia v1.10 and 1.12.
+### Infrastructure
 
-# Running AMIP
-Here we will focus on the AMIP experiment, which uses the environment in the `experiments/AMIP/` subdirectory of ClimaCoupler.jl
-The first step to do this is to install all required packages for the environment using the following Julia command:
-```julia
-julia --project=experiments/AMIP -E "using Pkg; Pkg.instantiate(); Pkg.build()"
+- [testing_and_validation.md](infrastructure/testing_and_validation.md): type-stability checks, Aqua.jl, allocation regression, AD tests.
+- [clima_comms.md](infrastructure/clima_comms.md): device-agnostic and MPI-distributed code patterns.
+
+### Workflow
+
+- [onboarding.md](workflow/onboarding.md): install Julia, clone a CliMA repo, set up Revise/Infiltrator/JuliaFormatter, first PR loop.
+- [running_on_gpu.md](workflow/running_on_gpu.md): run a model on GPU — install Julia, add `CUDA.jl`, CUDA runtime compatibility, `CLIMACOMMS_DEVICE`, verify the device.
+- [agent_autonomy.md](workflow/agent_autonomy.md): actions that require explicit user approval.
+- [debugging.md](workflow/debugging.md): interactive debugging recipes for numerical instabilities, dispatch, and `Field` plotting.
+- [review.md](workflow/review.md): PR review instructions and checklist.
+- [ci_triage.md](workflow/ci_triage.md): checklist for "passes locally, fails on CI" failure modes.
+- [cross_repo_issue_pr_search.md](workflow/cross_repo_issue_pr_search.md): org-scoped GitHub search to find and filter issues/PRs across CliMA.
+
+---
+
+## About DeveloperGuides
+
+These guides are maintained in [CliMA/DeveloperGuides](https://github.com/CliMA/DeveloperGuides) and vendored into consumer repos as a Git subtree at the standardized path `docs/dev-guides/`. The material below is for maintaining and consuming that subtree; readers looking for engineering guidance want the [Guides](#guides) overview above.
+
+### Using the guides in a consumer repo
+
+A consumer repo keeps its own `AGENTS.md` at the root, which references `docs/dev-guides/AGENTS.md` (the agent entry point) plus a repo-specific guide (e.g. `docs/clima_atmos_specific.md`). See [`templates/`](templates/) for ready-to-copy starter files: a root `AGENTS.md`, a repo-specific guide skeleton, and the monthly sync workflow.
+
+```bash
+# Add the subtree to a new consumer repo
+git subtree add --prefix docs/dev-guides \
+    https://github.com/CliMA/DeveloperGuides.git main --squash
+
+# Pull the latest guides manually (most repos automate this monthly via update_dev_guides.yml)
+git subtree pull --prefix docs/dev-guides \
+    https://github.com/CliMA/DeveloperGuides.git main --squash \
+    -m "chore: sync dev guides from central repo"
 ```
 
-Now you're ready to run the experiment, which uses the `run_simulation.jl` driver. To run interactively:
-```
-julia --project=experiments/AMIP
-julia> include("experiments/AMIP/run_simulation.jl")
-```
+> [!NOTE]
+> **Subtree pitfalls.**
+>
+> - DeveloperGuides ships its own `AGENTS.md`, `LICENSE`, and `README.md` at the repo root, which conflict with the consumer's own root files during `git subtree add`. Resolve by keeping the consumer's versions: `git checkout --ours AGENTS.md LICENSE README.md && git add … && git rebase --continue`.
+> - `git subtree pull` exits with an error when there are no new commits upstream. In an automated workflow, append `|| true` so the step does not fail on months with no DeveloperGuides changes.
 
-Or to run from the terminal:
-```julia
-julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl
-```
+### Contributing
 
-When running from the terminal, you can also specify a configuration file to use for the simulation setup, and a job ID to keep track of this run's output.
-Existing configuration files are specified in the `config/` directory within ClimaCoupler.jl.
-For example, to run the default AMIP configuration, you could use the following command:
-```julia
-julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl --config_file config/ci_configs/amip_default.yml --job_id amip_default
-```
+Edits to shared guidelines belong in [CliMA/DeveloperGuides](https://github.com/CliMA/DeveloperGuides), not in the vendored copy inside a consumer repo. Open PRs there; once merged, the next subtree pull propagates them to every consumer.
 
-Output from your run will be saved in the folder `output/<job_id>/`.
-If no configuration file is specified, the default
-`amip_default.yml` will be used, and output will be saved in `output/amip_default/`.
+- Each guide has a **Self-correction** section: if you discover a guide is stale or missing a pattern, update it directly.
+- New guides go in the appropriate category directory and are added to this overview and to [AGENTS.md](AGENTS.md).
+- Cross-references between guides use relative paths (e.g. `../performance/gpu_performance.md`).
 
-The output will take up approximately 1GB of space, and the simulation will take around 10 minutes to run on a single CPU, or less time on multiple CPUs or GPU.
+### Repository layout
 
-Note: If you want to set the configuration file to something other than the default
-while running the driver interactively, you'll need to
-manually set the value for `config_file`.
-
-For example, to use the configuration file found at `config/ci_configs/amip_default.yml`, you would set `config_file`
-as follows in the `run_simulation.jl` driver:
-```
-config_file = "config/ci_configs/amip_default.yml"
+```text
+├── AGENTS.md                  # Agent entry point: autonomy gate + guide index
+├── README.md                  # This file: guide overview + repo info
+├── architecture/              # System design, layering, contracts
+├── performance/               # GPU, type stability, numerics, AD
+├── code-quality/              # Style, docstrings, changelogs, naming
+├── infrastructure/            # Testing, device abstraction
+├── workflow/                  # Onboarding, debugging, review, CI triage
+└── templates/                 # Starter files for consumer repos
 ```
 
-### A Note about ClimaComms and MPI
-If you don't intend to run your simulation using MPI, but you see an error about MPI and your simulation crashes,
-ClimaComms may be incorrectly selecting the configuration for your run.
-In this case, you can force ClimaComms to ignore MPI with
-```
-export CLIMACOMMS_CONTEXT="SINGLETON"
-```
-from the terminal, or
-```
-ENV["CLIMACOMMS_CONTEXT"]="SINGLETON"
-```
-from within the Julia environment before running the experiment.
+### CliMA ecosystem
 
-Sometimes this happens when you are running in an interactive SLURM session.
+These guides are the central source of engineering standards across [CliMA](https://github.com/CliMA), including:
 
-## Running on GPU or with MPI
+- [ClimaAtmos](https://github.com/CliMA/ClimaAtmos.jl)
+- [ClimaCore](https://github.com/CliMA/ClimaCore.jl)
+- [ClimaLand](https://github.com/CliMA/ClimaLand.jl)
+- [ClimaOcean](https://github.com/CliMA/ClimaOcean.jl)
+- [ClimaCoupler](https://github.com/CliMA/ClimaCoupler.jl)
+- [Thermodynamics](https://github.com/CliMA/Thermodynamics.jl)
+- [CloudMicrophysics](https://github.com/CliMA/CloudMicrophysics.jl)
+- [SurfaceFluxes](https://github.com/CliMA/SurfaceFluxes.jl)
+- [ClimaTimeSteppers](https://github.com/CliMA/ClimaTimeSteppers.jl)
 
-### Environment variables
-Additionally, there are some environment variables we must set in these cases.
+### License
 
-To run on GPU, we need to run `export CLIMACOMMS_DEVICE="CUDA"` in the terminal, or
-`ENV["CLIMACOMMS_DEVICE"]="CUDA"` within the Julia environment _before_ running the experiment.
+[![license][license-img]][license-url] Apache 2.0; see [LICENSE](LICENSE).
 
-To run with MPI, we need to run `export CLIMACOMMS_CONTEXT="MPI"` in the terminal, or
-`ENV["CLIMACOMMS_CONTEXT"]="MPI"` within the Julia environment _before_ running the experiment.
+[license-img]: https://img.shields.io/github/license/CliMA/DeveloperGuides
+[license-url]: https://github.com/CliMA/DeveloperGuides/blob/main/LICENSE
 
-## Caltech users: Running AMIP remotely
-The main difference between running code locally vs running remotely is
-the module loading step. CliMA uses [ClimaModules](https://github.com/CliMA/ClimaModules?tab=readme-ov-file#clima-modules-for-new-central) to coordinate the modules
-needed to run CliMA code on Caltech's clusters.
+### Getting help
 
-On Central, you can load the appropriate module package by running the following in the terminal:
-```
-export MODULEPATH="/resnick/groups/esm/modules:$MODULEPATH"
-module load climacommon
-```
-
-> Remember: This should be done _after_ requesting a compute node, using the command `srun --pty -t 01:00:00 -p expansion bash` or similar
-
-On `clima`, you can load the appropriate module package by running the following in the terminal:
-```
-module load common
-```
-
-For additional information about these clusters, including how to gain access for the first time,
-see our slurm-buildkite wiki pages for [Central](https://github.com/CliMA/slurm-buildkite/wiki/Central) and [clima](https://github.com/CliMA/slurm-buildkite/wiki/clima).
-
-# Running Slabplanet
-The `run_simulation.jl` driver contains two modes: the full AMIP mode and a Slabplanet mode, where all surfaces are thermal slabs. Since AMIP is not a closed system, the Slabplanet mode is useful for checking conservation properties of the coupling.
-
-Running a Slabplanet simulation is the same as running an AMIP simulation, except for the specifics of the configuration file provided, so all information from the `Running AMIP` section will apply here too. Note that the default configuration used by `run_simulation.jl` specifies an AMIP simulation, so a configuration file must be specified to run a Slabplanet simulation. This can be done as follows:
-```julia
-julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl --config_file config/ci_configs/slabplanet_default.yml --job_id slabplanet_default
-```
-
-To ensure that conservation is tracked throughout the experiment, the `energy_check` field of the configuration file must be set to true.
+For questions or suggestions, open an issue on [GitHub](https://github.com/CliMA/DeveloperGuides/issues).

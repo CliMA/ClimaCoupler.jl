@@ -399,7 +399,11 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_humi
     ρ_sfc = csf.scalar_temp4
 
     thermo_params = get_thermo_params(sim)
-    csf.scalar_temp1 .= TD.q_vap_saturation.(thermo_params, csf.T_sfc, ρ_sfc, 0, 0)
+    if :q_sfc in propertynames(csf)
+        csf.scalar_temp1 .= csf.q_sfc
+    else
+        csf.scalar_temp1 .= TD.q_vap_saturation.(thermo_params, csf.T_sfc, ρ_sfc, 0, 0)
+    end
 
     # Remap surface temperature and humidity to atmosphere surface space
     q_sfc_atmos = Interfacer.remap(atmos_surface_space, csf.scalar_temp1)

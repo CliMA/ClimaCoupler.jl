@@ -10,5 +10,6 @@ module Models
 include("Models/slab_ocean.jl")
 include("Models/prescr_ocean.jl")
 include("Models/prescr_seaice.jl")
+include("Models/eisenman_seaice.jl")
 
 end # module Models

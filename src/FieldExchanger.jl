@@ -200,6 +200,9 @@ function import_combined_surface_fields!(csf, model_sims)
     combine_surfaces!(csf, model_sims, Val(:surface_temperature))
     combine_surfaces!(csf, model_sims, Val(:surface_direct_albedo))
     combine_surfaces!(csf, model_sims, Val(:surface_diffuse_albedo))
+    if :q_sfc in propertynames(csf)
+        combine_surfaces!(csf, model_sims, Val(:surface_specific_humidity))
+    end
     return nothing
 end
 
@@ -385,7 +388,7 @@ is computed from the combined upward longwave radiation.
 """
 function combine_surfaces!(csf, sims, field_name_val::Val{field_name}) where {field_name}
     # Extract the coupler field we are updating
-    combined_field = getproperty(csf, field_name)
+    combined_field = getproperty(csf, field_name == :surface_specific_humidity ? :q_sfc : field_name)
     FT = eltype(combined_field)
     combined_field .= zero(FT)
 

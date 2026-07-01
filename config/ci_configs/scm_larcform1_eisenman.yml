@@ -1,0 +1,43 @@
+# Larcform1 Arctic winter SCM (Pithan et al. 2016) with Eisenman-Zhang sea ice.
+# Requires ClimaAtmos with the Larcform1 setup (CliMA/ClimaAtmos.jl PR #4616).
+domain_type: "column"
+column_latlon: [80.0, 0.0]
+scm_surface_type: "sea_ice"
+ice_model: "eisenman"
+mode_name: "amip"
+initial_condition: "Larcform1"
+rayleigh_sponge: true
+surface_setup: "PrescribedSurface"
+dt: "30secs"
+dt_cpl: "30secs"
+t_end: "5days"
+start_date: "20100101"
+FLOAT_TYPE: "Float32"
+rad: "allskywithclear"
+insolation: "larcform1"
+microphysics_model: "1M"
+cloud_model: "quadrature"
+turbconv: "prognostic_edmfx"
+implicit_diffusion: true
+edmfx_entr_model: "Generalized"
+edmfx_detr_model: "Generalized"
+edmfx_sgs_mass_flux: true
+edmfx_sgs_diffusive_flux: true
+edmfx_nh_pressure: true
+edmfx_vertical_diffusion: true
+edmfx_filter: true
+prognostic_tke: true
+hyperdiff: ~
+z_max: 9000.0
+z_elem: 90
+z_stretch: true
+dz_bottom: 10.0
+approximate_linear_solve_iters: 2
+ode_algo: "ARS222"
+dt_rad: "60secs"
+toml: ["toml/larcform1_1M_prognostic_edmfx.toml"]
+check_nan_every: 1
+log_to_file: true
+check_conservation: false
+netcdf_output_at_levels: true
+output_default_diagnostics: false

@@ -769,7 +769,7 @@ FT is passed to all sea ice models, though some may ignore it.
 SeaIceSimulation(::Type{FT}, ::Val{:nothing}; kwargs...) where {FT} = nothing
 function SeaIceSimulation(::Type{FT}, ::Val{model_type}; kwargs...) where {FT, model_type}
     error(
-        "Unknown sea ice model type: $model_type. Valid options are: :clima_seaice, :prescribed, or :nothing",
+        "Unknown sea ice model type: $model_type. Valid options are: :clima_seaice, :eisenman, :prescribed, or :nothing",
     )
 end
 

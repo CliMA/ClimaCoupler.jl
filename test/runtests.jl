@@ -51,6 +51,9 @@ end
 @safetestset "Prescribed sea ice model tests" begin
     include("models/prescr_seaice_tests.jl")
 end
+@safetestset "Eisenman sea ice model tests" begin
+    include("models/eisenman_seaice_tests.jl")
+end
 @safetestset "Calibration tools" begin
     include("calibration_tools_tests.jl")
 end

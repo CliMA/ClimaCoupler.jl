@@ -293,7 +293,7 @@ function argparse_settings()
         default = "average"
         # Ice model specific
         "--ice_model"
-        help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`, `nothing`]"
+        help = "Sea ice model to use. [`prescribed` (default), `eisenman`, `clima_seaice`, `nothing`]"
         arg_type = String
         default = "prescribed"
         "--seaice_diagnostic_interval"
@@ -1032,7 +1032,7 @@ function _apply_scm_surface_type(scm_surface_type, ocean_model, ice_model, land_
     if ice_model == Val(:clima_seaice)
         error(
             "ClimaSeaIce model is not supported with domain_type=\"column\". " *
-            "Use ice_model=\"prescribed\", or a different surface type instead.",
+            "Use ice_model=\"prescribed\", ice_model=\"eisenman\", or a different surface type instead.",
         )
     end
     return ocean_model, ice_model, land_model

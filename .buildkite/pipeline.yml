@@ -185,6 +185,14 @@ steps:
         agents:
           slurm_mem: 20GB
 
+      - label: "SCM: Eisenman sea ice (atmos + prognostic Eisenman ice column)"
+        key: "scm_eisenman"
+        command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/scm_eisenman.yml --job_id scm_eisenman"
+        retry: *retry_policy
+        artifact_paths: "output/scm_eisenman/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
   - group: "Integration Tests (global)"
     steps:
       # SLABPLANET EXPERIMENTS

@@ -102,10 +102,10 @@ function ocean_simulation(
     substeps = simple_ocean ? 70 : 150
 
     if ocean_grid == :orca
-        if simple_ocean
-            @info "simple_ocean=true: using standard_tripolar grid instead of orca"
-            ocean_grid = :standard_tripolar
-        else
+    #    if simple_ocean
+    #        @info "simple_ocean=true: using standard_tripolar grid instead of orca"
+    #        ocean_grid = :standard_tripolar
+    #    else
             @info "Using ORCA1 ocean grid"
             return CO.OceanConfigurations.orca_ocean(
                 arch;
@@ -114,7 +114,7 @@ function ocean_simulation(
                 substeps,
                 kwargs...,
             )
-        end
+    #    end
     end
 
     @info "Using standard one-degree tripolar ocean grid"

@@ -297,6 +297,25 @@ function update_model_sims!(model_sims, csf)
 end
 
 """
+    _dss_coupler_flux_fields!(coupler_fields)
+
+Apply `weighted_dss!` to the five turbulent flux fields in `coupler_fields`
+(`F_lh`, `F_sh`, `F_turb_moisture`, `F_turb_ρτxz`, `F_turb_ρτyz`) using a
+single shared DSS buffer. This is called once per coupling step, after all
+surface contributions have been area-weighted and accumulated into
+`coupler_fields`, and before the atmosphere reads them in
+`update_turbulent_fluxes!`.
+"""
+function _dss_coupler_flux_fields!(coupler_fields)
+    dss_buffer = Utilities.init_dss_buffer(coupler_fields.F_lh)
+    isnothing(dss_buffer) && return nothing
+    for name in (:F_lh, :F_sh, :F_turb_moisture, :F_turb_ρτxz, :F_turb_ρτyz)
+        Utilities.apply_dss!(getproperty(coupler_fields, name), dss_buffer)
+    end
+    return nothing
+end
+
+"""
     step_model_sims!(model_sims, t, coupler_fields, thermo_params)
     step_model_sims!(cs::CoupledSimulation)
 
@@ -323,6 +342,13 @@ function step_model_sims!(model_sims, t, coupler_fields, thermo_params)
                 thermo_params,
             )
     end
+
+    # DSS pass: enforce C0 continuity on the fully-accumulated, area-weighted flux
+    # fields before handing them to the atmosphere. Applying DSS here — after all
+    # surface contributions have been summed into csf.F_* — avoids the corruption
+    # that would occur if DSS were applied per-surface before the area_fraction mask
+    # (which would average flux values with unmasked zeros from adjacent land elements).
+    _dss_coupler_flux_fields!(coupler_fields)
 
     # Update the atmosphere with the fluxes across all surface models
     # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`,

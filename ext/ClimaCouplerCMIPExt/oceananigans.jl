@@ -110,6 +110,8 @@ function ocean_simulation(
             return CO.OceanConfigurations.orca_ocean(
                 arch;
                 closure,
+                depth = 5500,
+                Nz = 32,
                 clock,
                 substeps,
                 kwargs...,

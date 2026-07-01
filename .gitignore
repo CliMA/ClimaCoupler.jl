@@ -54,3 +54,6 @@ slurm-*.out
 *.vscode
 *.DS
 *.qodo
+
+# Local scripts and plotting (branch-independent, not committed)
+local/

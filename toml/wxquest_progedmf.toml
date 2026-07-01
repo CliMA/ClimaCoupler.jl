@@ -59,7 +59,7 @@ value = 0
 type = "float"
 
 [detr_massflux_vertdiv_coeff]
-value = 1
+value = 0.1
 type = "float"
 
 [max_area_limiter_scale]

@@ -30,6 +30,133 @@ function _is_latlon_ocean_grid(grid)
     return _underlying_ocean_grid(grid) isa OC.LatitudeLongitudeGrid
 end
 
+"""
+    _is_curvilinear_ocean_grid(grid)
+
+Return `true` for tripolar / ORCA grids (`OrthogonalSphericalShellGrid`).
+These are plotted in native model-index space with geographic tick hints.
+"""
+function _is_curvilinear_ocean_grid(grid)
+    return _underlying_ocean_grid(grid) isa OC.OrthogonalSphericalShellGrid
+end
+
+"""
+    _ocean_grid_location(loc)
+
+Normalize an Oceananigans grid location for `λnodes` / `φnodes`.
+"""
+function _ocean_grid_location(loc)
+    if loc isa DataType || loc isa Function
+        return loc()
+    else
+        return loc
+    end
+end
+
+"""
+    _ocean_grid_label(grid)
+
+Short human-readable label for plot titles (includes horizontal resolution).
+
+Distinguishes the production ``standard_tripolar`` mesh (360×180, 32 levels) from the
+NEMO eORCA1 ``orca_ocean`` mesh (~362×297 after row cropping, 60 levels by default).
+Both serialize as `OrthogonalSphericalShellGrid`, so the label uses grid size.
+"""
+function _ocean_grid_label(grid)
+    g = _underlying_ocean_grid(grid)
+    Nx, Ny, Nz = size(g)
+    if _is_curvilinear_ocean_grid(grid)
+        if Nx == 360 && Ny == 180
+            return "standard tripolar grid, $(Nx)×$(Ny)×$(Nz)"
+        elseif Ny > 200
+            return "NEMO ORCA1 grid, $(Nx)×$(Ny)×$(Nz)"
+        else
+            return "tripolar grid, $(Nx)×$(Ny)×$(Nz)"
+        end
+    elseif g isa OC.LatitudeLongitudeGrid
+        return "latitude–longitude grid, $(Nx)×$(Ny)×$(Nz)"
+    else
+        return "$(nameof(typeof(g))), $(Nx)×$(Ny)×$(Nz)"
+    end
+end
+
+"""
+    _ocean_index_map_title(title, grid)
+
+Append the ocean grid label to a flat index-space plot title.
+"""
+_ocean_index_map_title(title, grid) = "$(title) [$(_ocean_grid_label(grid))]"
+
+"""
+    _ocean_index_axis_ticks(grid, dim::Symbol; n_ticks = 6)
+
+Return `(positions, labels)` for model-index axes annotated with geographic
+coordinates from the underlying ORCA / tripolar ``(λ, φ)`` nodes.
+"""
+function _ocean_index_axis_ticks(grid, dim::Symbol; n_ticks = 6)
+    underlying = _underlying_ocean_grid(grid)
+    Nx, Ny = size(underlying)[1:2]
+    ℓ = OC.Center
+    longitude, latitude = _ocean_grid_longitude_latitude(grid, ℓ, ℓ)
+
+    if dim == :i
+        n = Nx
+        j_ref = clamp(round(Int, Ny / 2), 1, Ny)
+        indices = unique(round.(Int, range(1, n, length = n_ticks)))
+        positions = float.(indices)
+        labels = [
+            @sprintf("%d\n%.0f°E", i, longitude[i, j_ref] > 180 ? longitude[i, j_ref] - 360 : longitude[i, j_ref]) for
+            i in indices
+        ]
+    elseif dim == :j
+        n = Ny
+        i_ref = clamp(round(Int, Nx / 2), 1, Nx)
+        indices = unique(round.(Int, range(1, n, length = n_ticks)))
+        positions = float.(indices)
+        labels = [@sprintf("%d\n%.0f°N", j, latitude[i_ref, j]) for j in indices]
+    else
+        error("dim must be :i or :j")
+    end
+    return positions, labels
+end
+
+"""
+    _configure_ocean_index_map_axis!(ax, grid)
+
+Label a flat ``i``/``j`` axis using model indices plus ORCA / tripolar ``(λ, φ)`` hints.
+"""
+function _configure_ocean_index_map_axis!(ax, grid)
+    underlying = _underlying_ocean_grid(grid)
+    Nx, Ny = size(underlying)[1:2]
+    xticks, xlabels = _ocean_index_axis_ticks(grid, :i)
+    yticks, ylabels = _ocean_index_axis_ticks(grid, :j)
+    ax.xticks = (xticks, xlabels)
+    ax.yticks = (yticks, ylabels)
+    ax.xlabel = "i (zonal index, 1:$Nx)"
+    ax.ylabel = "j (meridional index, 1:$Ny)"
+    return ax
+end
+
+"""
+    _ocean_index_map_axis(parent, grid, plot_title; axis_type = CairoMakie.Axis, kwargs...)
+
+Create a model-index axis for tripolar / ORCA diagnostics on `parent[1, 1]`.
+"""
+function _ocean_index_map_axis(
+    parent,
+    grid,
+    plot_title;
+    axis_type = CairoMakie.Axis,
+    kwargs...,
+)
+    ax = axis_type(
+        parent[1, 1];
+        title = _ocean_index_map_title(plot_title, grid),
+        kwargs...,
+    )
+    return _configure_ocean_index_map_axis!(ax, grid)
+end
+
 const DEFAULT_OCEAN_SURFACE_MOVIE_FIELDS = [
     ("sea_surface_temperature", "Sea surface temperature"),
     ("sea_surface_salinity", "Sea surface salinity"),
@@ -167,7 +294,7 @@ Return `(longitude, latitude)` matrices in degrees on the ocean model grid.
 Longitudes are normalized to ``[-180, 180]``.
 """
 function _ocean_grid_coordinates(grid)
-    longitude, latitude = _ocean_grid_longitude_latitude(grid, OC.Center(), OC.Center())
+    longitude, latitude = _ocean_grid_longitude_latitude(grid, OC.Center, OC.Center)
     longitude = copy(longitude)
     longitude[longitude .> 180] .-= 360
     return longitude, latitude
@@ -178,14 +305,37 @@ end
 
 Return raw `(longitude, latitude)` node matrices in degrees at field location
 `(ℓx, ℓy)`, without normalizing longitude.
+
+For regular `LatitudeLongitudeGrid` grids, ``λ(i)`` and ``φ(j)`` are separable.
+For tripolar / ORCA grids the nodes are stored as full ``(Nx, Ny)`` matrices.
 """
 function _ocean_grid_longitude_latitude(grid, ℓx, ℓy)
     underlying_grid = _underlying_ocean_grid(grid)
-    λ = vec(Array(OC.λnodes(underlying_grid, ℓx(), ℓy(), OC.Center())))
-    φ = vec(Array(OC.φnodes(underlying_grid, ℓx(), ℓy(), OC.Center())))
-    longitude = repeat(λ, 1, length(φ))
-    latitude = repeat(φ', length(λ), 1)
-    return longitude, latitude
+    Nx, Ny = size(underlying_grid)[1:2]
+    ℓx = _ocean_grid_location(ℓx)
+    ℓy = _ocean_grid_location(ℓy)
+    ℓz = _ocean_grid_location(OC.Center)
+    λ = Array(OC.λnodes(underlying_grid, ℓx, ℓy, ℓz))
+    φ = Array(OC.φnodes(underlying_grid, ℓx, ℓy, ℓz))
+
+    if ndims(λ) == 2 && ndims(φ) == 2
+        size(λ) == (Nx, Ny) || error("longitude nodes have size $(size(λ)), expected ($Nx, $Ny)")
+        size(φ) == (Nx, Ny) || error("latitude nodes have size $(size(φ)), expected ($Nx, $Ny)")
+        return λ, φ
+    end
+
+    if ndims(λ) == 1 && ndims(φ) == 1 && length(λ) == Nx && length(φ) == Ny
+        return repeat(λ, 1, Ny), repeat(φ', Nx, 1)
+    end
+
+    if ndims(λ) == 1 && ndims(φ) == 1 && length(λ) == Nx * Ny && length(φ) == Nx * Ny
+        return reshape(λ, Nx, Ny), reshape(φ, Nx, Ny)
+    end
+
+    error(
+        "Cannot build (λ, φ) coordinate matrices for $(typeof(underlying_grid)); " *
+        "got λ of size $(size(λ)) and φ of size $(size(φ)) on a ($Nx, $Ny) grid",
+    )
 end
 
 """
@@ -242,7 +392,7 @@ Longitudes are unwrapped along the periodic dimension when needed.
 function _ocean_globe_coordinates(field; land_mask)
     data = _field_to_heatmap_array(field; land_mask)
     ℓx, ℓy, _ = OC.location(field)
-    longitude, latitude = _ocean_grid_longitude_latitude(field.grid, ℓx(), ℓy())
+    longitude, latitude = _ocean_grid_longitude_latitude(field.grid, ℓx, ℓy)
     longitude, latitude = _prepare_globe_surface_coordinates(longitude, latitude, field.grid)
     return longitude, latitude, data
 end
@@ -471,12 +621,7 @@ function _plot_ocean_surface_snapshot!(
         )
         hm = CairoMakie.surface!(ax, longitude, latitude, data; plot_kwargs...)
     else
-        ax = CairoMakie.Axis(
-            fig[1, 1];
-            title,
-            xlabel = "i",
-            ylabel = "j",
-        )
+        ax = _ocean_index_map_axis(fig, grid, title)
         hm = CairoMakie.heatmap!(ax, data; plot_kwargs...)
     end
     CairoMakie.Colorbar(fig[1, 2], hm; label = colorbar_label)
@@ -685,11 +830,11 @@ function make_ocean_bathymetry_overlay_plot(
             ylabel = "Latitude (°)",
         )
     else
-        ax = CairoMakie.Axis(
-            fig[1, 1];
-            title = fields.plot_title,
-            xlabel = "i",
-            ylabel = "j",
+        ax = _ocean_index_map_axis(
+            fig,
+            fields.grid,
+            fields.plot_title;
+            axis_type = CairoMakie.Axis,
         )
     end
 
@@ -778,11 +923,11 @@ function Plotting.view_ocean_bathymetry_overlay(
             ylabel = "Latitude (°)",
         )
     else
-        ax = GLM.Axis(
-            fig[1, 1];
-            title = fields.plot_title,
-            xlabel = "i",
-            ylabel = "j",
+        ax = _ocean_index_map_axis(
+            fig,
+            fields.grid,
+            fields.plot_title;
+            axis_type = GLM.Axis,
         )
     end
 
@@ -853,8 +998,10 @@ for example `joinpath(output_dir, "ocean_surface")`.
 Colormap and color-range style default to values in `OCEAN_MOVIE_PLOT_STYLES` for the
 given `variable_name`, but can be overridden with `colormap` and `range_style`.
 
-Tripolar and other curvilinear grids are plotted in native model-index space
-(`heatmap!` with ``i``/``j`` axes). Regular latitude-longitude grids use
+Tripolar and ORCA grids are plotted in native model-index space (`heatmap!` with
+``i``/``j`` axes). Tick labels show the corresponding ``(λ, φ)`` node coordinates
+from the underlying grid, and the title includes the grid resolution
+(e.g. ``tripolar/ORCA grid, 360×180``). Regular latitude-longitude grids use
 `GeoMakie.GeoAxis` with `surface!`. For an interactive 3D globe view of the same data, use `Plotting.view_ocean_field_globe` or
 `experiments/CMIP/view_ocean_globe.jl`. All ocean diagnostic plots mask land
 in black and include a colorbar.
@@ -908,12 +1055,7 @@ function make_ocean_field_movie(
             _ocean_surface_plot_kwargs(colormap, vmin, vmax)...,
         )
     else
-        ax = CairoMakie.Axis(
-            fig[1, 1];
-            title = plot_title,
-            xlabel = "i",
-            ylabel = "j",
-        )
+        ax = _ocean_index_map_axis(fig, fts.grid, plot_title)
         hm = CairoMakie.heatmap!(
             ax,
             data;
@@ -932,7 +1074,9 @@ function make_ocean_field_movie(
         format,
     ) do i
         data[] = _field_to_heatmap_array(fts[i]; land_mask)
-        ax.title[] = "$title, t = $(_format_simulation_time(fts.times[i]))"
+        time_title = "$title, t = $(_format_simulation_time(fts.times[i]))"
+        ax.title[] = _is_curvilinear_ocean_grid(fts.grid) ?
+                     _ocean_index_map_title(time_title, fts.grid) : time_title
     end
 
     return output_file
@@ -1350,12 +1494,7 @@ function _surface_overlay_axis(fig, grid, plot_title; dest = DEFAULT_OCEAN_MOVIE
             ylabel = "Latitude (°)",
         )
     else
-        return Axis(
-            fig[1, 1];
-            title = plot_title,
-            xlabel = "i",
-            ylabel = "j",
-        )
+        return _ocean_index_map_axis(fig, grid, plot_title; axis_type = Axis)
     end
 end
 

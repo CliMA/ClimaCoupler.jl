@@ -133,8 +133,9 @@ The `ClimaCouplerCMIPExt` extension adds support for:
   for temperature, `:haline` for salinity, `:balance` for velocities and SSH, `:curl` for wind
   stress, `:RdBu` / `:BrBG` for heat and salinity fluxes), with symmetric color limits for
   divergent quantities. Continents are masked using the ocean immersed-boundary grid and drawn
-  in black. Tripolar output is shown in native model-index space in saved movies; for an
-  interactive 3D globe use `Plotting.view_ocean_field_globe` or
+  in black. Tripolar and ORCA output is shown in native model-index space with axis
+  ticks annotated by the grid's ``(λ, φ)`` nodes; for an interactive 3D globe use
+  `Plotting.view_ocean_field_globe` or
   `experiments/CMIP/view_ocean_globe.jl` with `GLMakie`.
 
 These extensions enable the debug plotting system to automatically handle Oceananigans fields

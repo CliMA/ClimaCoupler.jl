@@ -25,6 +25,7 @@ rayleigh_sponge: true
 simple_ocean: true
 save_cache: true
 start_date: "20100101"
+use_itime: false
 surface_setup: "PrescribedSurface"
 t_end: "480secs"
 topo_smoothing: true

@@ -1131,12 +1131,17 @@ end
 Area-average polygon flux densities onto CC elements and broadcast to boundary-space
 Fields for `update_flux_fields!`.
 
-After broadcasting per-element scalar averages to GLL nodes, a `weighted_dss!`
-op produces a C0-continuous SE field. 
+Returns piecewise-constant SE fields (one scalar per CC element broadcast to all
+its GLL nodes). DSS to enforce C0 continuity is intentionally deferred to
+`step_model_sims!`, which applies it to the fully-accumulated `csf.F_*` fields
+after all surface contributions (ocean, sea ice, land) have been area-weighted
+and summed. Applying DSS here — before the `area_fraction` mask in
+`update_flux_fields!` — would corrupt boundary nodes at land-ocean element edges
+by averaging flux values with the unmasked zero from the adjacent land element.
 
 Note: scalar fluxes (SH, LH, evaporation) are pushed to the OC grid directly from
 the intersection polygons via [`scatter_to_oc!`](@ref) and do not go through this
-CC detour, so they do not exhibit the same artifact.
+CC detour.
 """
 function intersection_fluxes_to_boundary_fields(
     boundary_space,
@@ -1168,13 +1173,6 @@ function intersection_fluxes_to_boundary_fields(
     _element_values_to_se_field!(F_turb_ρτxz, cc_F_τx, boundary_space)
     _element_values_to_se_field!(F_turb_ρτyz, cc_F_τy, boundary_space)
     _element_values_to_se_field!(F_turb_moisture, cc_F_evap, boundary_space)
-
-    dss_buffer = CC.Spaces.create_dss_buffer(F_sh)
-    CC.Spaces.weighted_dss!(F_sh, dss_buffer)
-    CC.Spaces.weighted_dss!(F_lh, dss_buffer)
-    CC.Spaces.weighted_dss!(F_turb_ρτxz, dss_buffer)
-    CC.Spaces.weighted_dss!(F_turb_ρτyz, dss_buffer)
-    CC.Spaces.weighted_dss!(F_turb_moisture, dss_buffer)
 
     return (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
 end

@@ -5,10 +5,10 @@ coupler_diagnostics_period: "1hours"
 coupler_diagnostics_reduction: "instantaneous"
 coupler_toml: ["toml/amip_edonly.toml"]
 dt_atmos: "120secs" # 2 minutes
-dt_cpl: "1800secs" # 6 minutes
-dt_land: "1800secs" # 6 minutes
-dt_ocean: "1800secs" # 30 minutes
-dt_seaice: "1800secs" # 30 minutes
+dt_cpl: "1200secs" # 6 minutes
+dt_land: "1200secs" # 6 minutes
+dt_ocean: "1200secs" # 30 minutes
+dt_seaice: "1200secs" # 30 minutes
 dz_bottom: 100.0
 energy_check: false
 h_elem: 8

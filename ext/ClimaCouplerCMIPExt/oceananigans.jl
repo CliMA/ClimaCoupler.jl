@@ -204,9 +204,6 @@ function OceananigansSimulation(
         CO.OceanConfigurations.default_one_degree_closure()
     end
 
-    # Tripolar active_cells_map kernels exceed the 4 KiB sm_60 limit on P100.
-    active_cells_map = !simple_ocean
-
     if tspan[1] isa ITime
         # create a model clock that uses DateTime, for compatibility with ITime.
         model_clock = OC.TimeSteppers.Clock(time = start_date)
@@ -218,14 +215,12 @@ function OceananigansSimulation(
         error("Unsupported time type: $(typeof(tspan[1]))")
     end
 
-    ocean = tripolar_ocean_simulation(
-        arch;
-        active_cells_map,
-        clock = model_clock,
-        depth = 5500,
-        Nz = 32,
+    ocean = ocean_simulation(
+        arch,
+        ocean_grid;
+        simple_ocean,
         closure,
-        substeps = simple_ocean ? 70 : 150,
+        clock = model_clock,
     )
     ocean.stop_time = stop_time
     ocean.Δt = float(dt)

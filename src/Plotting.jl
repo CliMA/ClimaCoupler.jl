@@ -135,20 +135,46 @@ function postprocess(
     # Plot all model states and coupler fields (useful for debugging)
     ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext && debug(cs, artifacts_dir)
 
+    # Helper function to find a tuple of (short_name, reduction, period, coord_type)
+    # whose period is "1M".
+    function find_first_1M_tuple(simdir)
+        for short_name in CAN.available_vars(simdir)
+            for reduction in CAN.available_reductions(simdir; short_name)
+                for period in CAN.available_periods(simdir; short_name, reduction)
+                    period == "1M" || continue
+                    for coord_type in
+                        CAN.available_coord_types(simdir; short_name, reduction, period)
+                        return (short_name, reduction, period, coord_type)
+                    end
+                end
+            end
+        end
+        return nothing
+    end
+
     # Leaderboard requires global spatial data; skip in column / SCM mode.
     if !Interfacer.is_column_mode(cs)
         simdir = CAN.SimDir(atmos_output_dir)
-        if !isempty(simdir)
+        first_1M_tuple = find_first_1M_tuple(simdir)
+        if !isempty(simdir) && !isnothing(first_1M_tuple)
             # We need pressure to compute the leaderboard.
             pressure_in_output = "pfull" in CAN.available_vars(simdir)
-            t_end = float(cs.t[])
+
             # Make sure we have enough data to compute the leaderboard.
-            if t_end > 84600 * 31 * 3 # 3 months for spin up
+            short_name, reduction, period, coord_type = first_1M_tuple
+            var_1M = get(simdir; short_name, reduction, period, coord_type)
+            start_date = first(CAN.dates(var_1M))
+            end_date = last(CAN.dates(var_1M))
+            spinup = 3
+            if end_date >= start_date + Dates.Month(spinup)
                 leaderboard_base_path = artifacts_dir
-                compute_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
-                rmse_check && SimOutput.test_rmse_thresholds(atmos_output_dir, 3)
-                pressure_in_output &&
-                    compute_pfull_leaderboard(leaderboard_base_path, atmos_output_dir, 3)
+                compute_leaderboard(leaderboard_base_path, atmos_output_dir, spinup)
+                rmse_check && SimOutput.test_rmse_thresholds(atmos_output_dir, spinup)
+                pressure_in_output && compute_pfull_leaderboard(
+                    leaderboard_base_path,
+                    atmos_output_dir,
+                    spinup,
+                )
             end
         end
     end

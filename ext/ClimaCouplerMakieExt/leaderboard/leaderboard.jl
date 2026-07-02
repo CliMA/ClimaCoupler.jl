@@ -52,9 +52,9 @@ function Plotting.compute_leaderboard(
         obs_var = obs_var_dict[short_name](sim_var.attributes["start_date"])
 
         # Remove first spin_up_months from simulation
-        spinup_cutoff = spinup * 31 * 86400.0
-        ClimaAnalysis.times(sim_var)[end] >= spinup_cutoff &&
-            (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff))
+        spinup_cutoff_date = first(ClimaAnalysis.dates(sim_var)) + spinup * Dates.Month(1)
+        ClimaAnalysis.dates(sim_var)[end] >= spinup_cutoff_date &&
+            (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff_date))
 
         obs_var = ClimaAnalysis.resampled_as(obs_var, sim_var)
         obs_var_seasons = ClimaAnalysis.split_by_season(obs_var)
@@ -105,9 +105,7 @@ function Plotting.compute_leaderboard(
                 sim_var.attributes["short_name"] = "mean $(ClimaAnalysis.short_name(sim_var))"
                 cmap_extrema = get(compare_vars_biases_plot_extrema, short_name) do
                     extrema(
-                        ClimaAnalysis.bias(
-                            sim_obs_comparsion_dict[short_name]["ANN"]...,
-                        ).data,
+                        ClimaAnalysis.bias(sim_obs_comparsion_dict[short_name]["ANN"]...).data,
                     )
                 end
                 ClimaAnalysis.Visualize.plot_bias_on_globe!(

@@ -402,9 +402,9 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaInterpolations", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "Flux", "ForwardDiff", "Insolation", "Interpolations", "JLD2", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SparseMatrixColorings", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "9d33b920664ed33aef0442f1b21040b959124ae0"
+git-tree-sha1 = "15ebdf3429877433d75f62037bd1566099cfc119"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.41.3"
+version = "0.42.0"
 
     [deps.ClimaAtmos.extensions]
     ClimaAtmosMusica = "Musica"
@@ -560,9 +560,9 @@ version = "0.1.29"
 
 [[deps.CloudMicrophysics]]
 deps = ["ClimaParams", "DocStringExtensions", "FastGaussQuadrature", "ForwardDiff", "InteractiveUtils", "LazyArtifacts", "LogExpFunctions", "RootSolvers", "SpecialFunctions", "StaticArrays", "Thermodynamics", "UnrolledUtilities"]
-git-tree-sha1 = "17147bb18407c173e1da69b68517931bafaa585f"
+git-tree-sha1 = "df0677f50e4ad62d521bea3ca35c72bbf92e3443"
 uuid = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
-version = "0.37.0"
+version = "0.37.1"
 
     [deps.CloudMicrophysics.extensions]
     EmulatorModelsExt = ["DataFrames", "MLJ"]
@@ -640,9 +640,9 @@ uuid = "1fbeeb36-5f17-413c-809b-666fb144f157"
 version = "0.4.4"
 
 [[deps.CommonSolve]]
-git-tree-sha1 = "0e2079d07d7cdebb948e00a1383b706f27dcbd2f"
+git-tree-sha1 = "eeaad7cef88554c2fa56b5a3f71cfd5cb708c662"
 uuid = "38540f10-b2f7-11e9-35d8-d573e4eb0ff2"
-version = "0.2.10"
+version = "0.2.11"
 
 [[deps.CommonSubexpressions]]
 deps = ["MacroTools"]
@@ -783,9 +783,9 @@ version = "1.16.0"
 
 [[deps.DifferentiationInterface]]
 deps = ["ADTypes", "LinearAlgebra"]
-git-tree-sha1 = "2348cf722e74ef177e165986c765b61217f7433a"
+git-tree-sha1 = "dbd46a5cd0e79a97438b0ebbec42e744e8f436fe"
 uuid = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
-version = "0.7.19"
+version = "0.7.20"
 
     [deps.DifferentiationInterface.extensions]
     DifferentiationInterfaceChainRulesCoreExt = "ChainRulesCore"
@@ -980,9 +980,9 @@ version = "1.3.0"
 
 [[deps.FileIO]]
 deps = ["Pkg", "Requires", "UUIDs"]
-git-tree-sha1 = "8e9c059d6857607253e837730dbf780b6b151acd"
+git-tree-sha1 = "6621fef488e496356c9c9625d0562c12a6070819"
 uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
-version = "1.19.0"
+version = "1.20.0"
 
     [deps.FileIO.extensions]
     HTTPExt = "HTTP"
@@ -1036,9 +1036,9 @@ weakdeps = ["PDMats", "SparseArrays", "StaticArrays", "Statistics"]
 
 [[deps.FiniteDiff]]
 deps = ["ArrayInterface", "LinearAlgebra", "Setfield"]
-git-tree-sha1 = "2e5742cda07276e1834281ada4cc71b6bfc87586"
+git-tree-sha1 = "07e98e3f332ee60179813dd9cdf21412e3c0a96a"
 uuid = "6a86dc24-6348-571c-b903-95158fe2bd41"
-version = "2.31.1"
+version = "2.32.0"
 
     [deps.FiniteDiff.extensions]
     FiniteDiffBandedMatricesExt = "BandedMatrices"
@@ -1624,9 +1624,9 @@ version = "4.1.0+0"
 
 [[deps.LLVM]]
 deps = ["CEnum", "LLVMExtra_jll", "Libdl", "PrecompileTools", "Preferences", "Printf", "Unicode"]
-git-tree-sha1 = "f74a9668f02e33399baa5ed3a092b3f7a93f192e"
+git-tree-sha1 = "24af42ea221a14a04283e362d83d2cdcb115cd12"
 uuid = "929cbde3-209d-540e-8aea-75f648917ca0"
-version = "9.10.0"
+version = "9.10.1"
 weakdeps = ["BFloat16s"]
 
     [deps.LLVM.extensions]
@@ -1645,9 +1645,9 @@ version = "1.0.0"
 
 [[deps.LLVMOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "3ac157462e1e800777cc97d0eafd1bdb5356a470"
+git-tree-sha1 = "b7970cef8ae1c990ba0c09cd8bdc1145e006632f"
 uuid = "1d63c593-3942-5779-bab2-d838dc0a180e"
-version = "21.1.8+0"
+version = "22.1.7+0"
 
 [[deps.LRUCache]]
 git-tree-sha1 = "5519b95a490ff5fe629c4a7aa3b3dfc9160498b3"
@@ -2465,10 +2465,10 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 version = "1.11.0"
 
 [[deps.RRTMGP]]
-deps = ["Adapt", "Artifacts", "ClimaComms", "DocStringExtensions", "Random"]
-git-tree-sha1 = "15dadb8385d653fa661a3269b3c6262ddedea01d"
+deps = ["Adapt", "Artifacts", "ClimaComms", "Random", "Serialization"]
+git-tree-sha1 = "3d9478c07e05aba9f1b97a5b94f3655f4d2e006c"
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
-version = "0.21.9"
+version = "0.22.2"
 weakdeps = ["CUDA", "ClimaParams", "NCDatasets"]
 
     [deps.RRTMGP.extensions]
@@ -2593,9 +2593,9 @@ version = "1.0.3"
 
 [[deps.Roots]]
 deps = ["Accessors", "CommonSolve", "Printf"]
-git-tree-sha1 = "4ff67dc0de22331b65e1867e77285836b79bdc82"
+git-tree-sha1 = "7fb25a964849d90a0446366cdefca822e0e84900"
 uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
-version = "3.0.3"
+version = "3.0.6"
 
     [deps.Roots.extensions]
     RootsChainRulesCoreExt = "ChainRulesCore"
@@ -2620,9 +2620,9 @@ version = "0.2.1"
 
 [[deps.RuntimeGeneratedFunctions]]
 deps = ["ExprTools", "SHA", "Serialization"]
-git-tree-sha1 = "bd9d6c153d0c8a120b504bfb2f3be42308cc857a"
+git-tree-sha1 = "0e3eba2ca347b001baade9fb830623e04da64b38"
 uuid = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
-version = "0.5.21"
+version = "0.5.22"
 
 [[deps.SCS]]
 deps = ["LinearAlgebra", "MathOptInterface", "OpenBLAS32_jll", "PrecompileTools", "SCS_jll", "SparseArrays"]
@@ -2666,9 +2666,9 @@ uuid = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 version = "0.1.0"
 
 [[deps.SciMLPublic]]
-git-tree-sha1 = "2b1b64add566435a768abdb3b053cac17d19ff3c"
+git-tree-sha1 = "24ff31136f3f991b74fbef71d5c638e2881d29d2"
 uuid = "431bcebd-1456-4ced-9d72-93c2757fff0b"
-version = "1.2.1"
+version = "1.2.3"
 
 [[deps.ScopedValues]]
 deps = ["HashArrayMappedTries", "Logging"]
@@ -2801,9 +2801,9 @@ version = "0.1.2"
 
 [[deps.Static]]
 deps = ["CommonWorldInvalidations", "IfElse", "PrecompileTools", "SciMLPublic"]
-git-tree-sha1 = "7bb73fed956c3df5dc3afd629ba3fac6fc92c953"
+git-tree-sha1 = "5ef96deaf82834d64e1456c6a6665ca4188afd48"
 uuid = "aedffcd0-7271-4cad-89d0-dc628f76c6d3"
-version = "1.4.3"
+version = "1.4.4"
 
 [[deps.StaticArrayInterface]]
 deps = ["ArrayInterface", "Compat", "IfElse", "LinearAlgebra", "PrecompileTools", "SciMLPublic", "Static"]
@@ -2938,9 +2938,9 @@ weakdeps = ["ClimaParams"]
 
 [[deps.SymbolicIndexingInterface]]
 deps = ["Accessors", "ArrayInterface", "RuntimeGeneratedFunctions", "StaticArraysCore"]
-git-tree-sha1 = "72d6d882fa1e59c699f1b22d846db94c5600295c"
+git-tree-sha1 = "73048fd086b7a169bbd7232bf60bfd43240691eb"
 uuid = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
-version = "0.3.50"
+version = "0.3.51"
 weakdeps = ["PrettyTables"]
 
     [deps.SymbolicIndexingInterface.extensions]

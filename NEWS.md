@@ -4,6 +4,11 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Adapt to the redesigned RRTMGP 0.22 / ClimaAtmos 0.42 radiation API.
+The atmosphere radiation cache now holds an `RRTMGP.RRTMGPSolver`; coupler flux and albedo
+accesses go through `RRTMGP` getters (e.g. `RRTMGP.sw_flux_dn`, `RRTMGP.surface_emissivity`),
+and the radiation method is queried via `RRTMGP.radiation_method`.
+
 #### Update to use ClimaOcean#0.10.0. [#1971](https://github.com/CliMA/ClimaCoupler.jl/pull/1971)
 Enables the 1 deg. TripolarGrid configuration as the default, with the updated spectral element <-> finite-volume regridding method (ConservativeRegridding0.2.5).
 

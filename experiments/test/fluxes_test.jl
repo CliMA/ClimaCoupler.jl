@@ -49,7 +49,7 @@ import ClimaCoupler: FluxCalculator
     @test maximum(abs.(err_lwd)) < 1e-10
 
     atmos_albedo = CC.Fields.array2field(
-        atmos_sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo,
+        CA.RRTMGP.direct_sw_surface_albedo(atmos_sim.integrator.p.radiation.rrtmgp_solver),
         boundary_space,
     )
     land_albedo =
@@ -68,7 +68,7 @@ import ClimaCoupler: FluxCalculator
     @test maximum(abs.(err_temp)) < 1e-6
 
     atmos_emissivity = CC.Fields.array2field(
-        atmos_sim.integrator.p.radiation.rrtmgp_model.surface_emissivity,
+        CA.RRTMGP.surface_emissivity(atmos_sim.integrator.p.radiation.rrtmgp_solver),
         boundary_space,
     )
     land_emissivity = Interfacer.get_field(boundary_space, land_sim, Val(:emissivity))

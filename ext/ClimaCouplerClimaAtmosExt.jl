@@ -186,8 +186,11 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy
         face_space = axes(sim.integrator.u.f)
         nz_faces = length(CC.Spaces.vertical_topology(face_space).mesh.faces)
 
-        (; face_lw_flux_dn, face_lw_flux_up, face_sw_flux_dn, face_sw_flux_up) =
-            sim.integrator.p.radiation.rrtmgp_model
+        rrtmgp_model = sim.integrator.p.radiation.rrtmgp_model
+        face_lw_flux_dn = CA.RRTMGP.lw_flux_dn(rrtmgp_model)
+        face_lw_flux_up = CA.RRTMGP.lw_flux_up(rrtmgp_model)
+        face_sw_flux_dn = CA.RRTMGP.sw_flux_dn(rrtmgp_model)
+        face_sw_flux_up = CA.RRTMGP.sw_flux_up(rrtmgp_model)
 
         LWd_TOA = CC.Fields.level(
             CC.Fields.array2field(FT.(face_lw_flux_dn), face_space),
@@ -300,12 +303,12 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:diffuse_fraction
 
     radiation_model = sim.integrator.p.radiation.rrtmgp_model
     # only take the first level
-    total_flux_dn = radiation_model.face_sw_flux_dn[1, :]
+    total_flux_dn = CA.RRTMGP.sw_flux_dn(radiation_model)[1, :]
     lowest_face_space = CC.Spaces.level(axes(sim.integrator.u.f), CC.Utilities.half)
     if radiation_model.radiation_mode isa CA.RRTMGPInterface.GrayRadiation
         diffuse_fraction = zero(total_flux_dn)
     else
-        direct_flux_dn = radiation_model.face_sw_direct_flux_dn[1, :]
+        direct_flux_dn = CA.RRTMGP.sw_direct_flux_dn(radiation_model)[1, :]
         FT = eltype(total_flux_dn)
         diffuse_fraction =
             clamp.(
@@ -327,7 +330,7 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d})
 
     return CC.Fields.level(
         CC.Fields.array2field(
-            sim.integrator.p.radiation.rrtmgp_model.face_lw_flux_dn,
+            CA.RRTMGP.lw_flux_dn(sim.integrator.p.radiation.rrtmgp_model),
             axes(sim.integrator.u.f),
         ),
         CC.Utilities.half,
@@ -348,7 +351,7 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})
 
     return CC.Fields.level(
         CC.Fields.array2field(
-            sim.integrator.p.radiation.rrtmgp_model.face_sw_flux_dn,
+            CA.RRTMGP.sw_flux_dn(sim.integrator.p.radiation.rrtmgp_model),
             axes(sim.integrator.u.f),
         ),
         CC.Utilities.half,
@@ -431,7 +434,7 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:emissivity},
         temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
         Interfacer.remap!(temp_field_surface, field)
         # Set each row (band) of the emissivity matrix by transposing the vector returned from `field2array`
-        sim.integrator.p.radiation.rrtmgp_model.surface_emissivity .=
+        CA.RRTMGP.surface_emissivity(sim.integrator.p.radiation.rrtmgp_model) .=
             CC.Fields.field2array(temp_field_surface)'
     end
     return nothing
@@ -446,7 +449,7 @@ function Interfacer.update_field!(
         temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
         Interfacer.remap!(temp_field_surface, field)
         # Set each row (band) of the albedo matrix by transposing the vector returned from `field2array`
-        sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo .=
+        CA.RRTMGP.direct_sw_surface_albedo(sim.integrator.p.radiation.rrtmgp_model) .=
             CC.Fields.field2array(temp_field_surface)'
     end
     return nothing
@@ -462,7 +465,7 @@ function Interfacer.update_field!(
         temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
         Interfacer.remap!(temp_field_surface, field)
         # Set each row (band) of the albedo matrix by transposing the vector returned from `field2array`
-        sim.integrator.p.radiation.rrtmgp_model.diffuse_sw_surface_albedo .=
+        CA.RRTMGP.diffuse_sw_surface_albedo(sim.integrator.p.radiation.rrtmgp_model) .=
             CC.Fields.field2array(temp_field_surface)'
     end
     return nothing

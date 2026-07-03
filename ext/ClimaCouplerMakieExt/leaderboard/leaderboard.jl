@@ -52,9 +52,9 @@ function Plotting.compute_leaderboard(
         obs_var = obs_var_dict[short_name](sim_var.attributes["start_date"])
 
         # Remove first spin_up_months from simulation
-        spinup_cutoff = spinup * 31 * 86400.0
-        ClimaAnalysis.times(sim_var)[end] >= spinup_cutoff &&
-            (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff))
+        spinup_cutoff_date = first(ClimaAnalysis.dates(sim_var)) + spinup * Dates.Month(1)
+        ClimaAnalysis.dates(sim_var)[end] >= spinup_cutoff_date &&
+            (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff_date))
 
         obs_var = ClimaAnalysis.resampled_as(obs_var, sim_var)
         obs_var_seasons = ClimaAnalysis.split_by_season(obs_var)

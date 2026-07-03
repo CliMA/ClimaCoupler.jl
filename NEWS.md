@@ -4,11 +4,23 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+v0.2.2
+-------
+
+#### Add model run number and commit hash as global NetCDF attributes PR[#1985](https://github.com/CliMA/ClimaCoupler.jl/pull/1985)
+Diagnostic NetCDF files now carry `start_date`, and, when available,
+`buildkite_build_number` and `commit_hash` as global (file-level) attributes,
+making it easier to trace output back to the run and code version that
+produced it.
+
 #### Update to use ClimaOcean#0.10.0. [#1971](https://github.com/CliMA/ClimaCoupler.jl/pull/1971)
 Enables the 1 deg. TripolarGrid configuration as the default, with the updated spectral element <-> finite-volume regridding method (ConservativeRegridding0.2.5).
 
 #### Remove all diagnostic EDMF jobs PR[#1988](https://github.com/CliMA/ClimaCoupler.jl/pull/1988)
 ClimaAtmos.jl v0.39.5 is the last one to support `turbconv_model: diagnostic_edmfx`.
+
+v0.2.0
+-------
 
 #### Turbulent flux time-averaging for slow surface models PR[#1945](https://github.com/CliMA/ClimaCoupler.jl/pull/1945)
 For surface simulations whose own timestep is larger than the coupling

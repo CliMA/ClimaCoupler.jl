@@ -35,5 +35,6 @@ start_date: "20100101"
 surface_setup: "PrescribedSurface"
 # t_end: "366days"
 t_end: "6months"
+use_itime: false
 topo_smoothing: true
 topography: "Earth"

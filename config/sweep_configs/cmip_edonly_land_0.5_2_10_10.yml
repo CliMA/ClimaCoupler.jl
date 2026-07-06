@@ -1,7 +1,7 @@
 FLOAT_TYPE: "Float64"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 checkpoint_dt: "1months"
-coupler_diagnostics_period: "1months"
+coupler_diagnostics_period: "30days"
 coupler_diagnostics_reduction: "average"
 dt_atmos: "30secs" # 0.5 minutes
 dt_cloud_fraction: "1hours"

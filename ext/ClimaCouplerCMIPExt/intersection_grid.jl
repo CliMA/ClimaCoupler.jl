@@ -1126,58 +1126,6 @@ function _gather_cc_atmos_to_intersection!(flux_state, ig::IntersectionGrid, cc_
 end
 
 """
-    intersection_fluxes_to_boundary_fields(boundary_space, intersection_grid, intersection_flux_state)
-
-Area-average polygon flux densities onto CC elements and broadcast to boundary-space
-Fields for `update_flux_fields!`.
-
-Returns piecewise-constant SE fields (one scalar per CC element broadcast to all
-its GLL nodes). DSS to enforce C0 continuity is intentionally deferred to
-`step_model_sims!`, which applies it to the fully-accumulated `csf.F_*` fields
-after all surface contributions (ocean, sea ice, land) have been area-weighted
-and summed. Applying DSS here — before the `area_fraction` mask in
-`update_flux_fields!` — would corrupt boundary nodes at land-ocean element edges
-by averaging flux values with the unmasked zero from the adjacent land element.
-
-Note: scalar fluxes (SH, LH, evaporation) are pushed to the OC grid directly from
-the intersection polygons via [`scatter_to_oc!`](@ref) and do not go through this
-CC detour.
-"""
-function intersection_fluxes_to_boundary_fields(
-    boundary_space,
-    intersection_grid,
-    intersection_flux_state,
-)
-    FT = CC.Spaces.undertype(boundary_space)
-    n_cc = intersection_grid.n_cc
-
-    cc_F_sh = zeros(FT, n_cc)
-    cc_F_lh = zeros(FT, n_cc)
-    cc_F_τx = zeros(FT, n_cc)
-    cc_F_τy = zeros(FT, n_cc)
-    cc_F_evap = zeros(FT, n_cc)
-    aggregate_fluxes_to_cc!(
-        (; F_sh = cc_F_sh, F_lh = cc_F_lh, F_τx = cc_F_τx, F_τy = cc_F_τy, F_evap = cc_F_evap),
-        intersection_flux_state,
-        intersection_grid,
-    )
-
-    F_sh = CC.Fields.zeros(boundary_space)
-    F_lh = CC.Fields.zeros(boundary_space)
-    F_turb_ρτxz = CC.Fields.zeros(boundary_space)
-    F_turb_ρτyz = CC.Fields.zeros(boundary_space)
-    F_turb_moisture = CC.Fields.zeros(boundary_space)
-
-    _element_values_to_se_field!(F_sh, cc_F_sh, boundary_space)
-    _element_values_to_se_field!(F_lh, cc_F_lh, boundary_space)
-    _element_values_to_se_field!(F_turb_ρτxz, cc_F_τx, boundary_space)
-    _element_values_to_se_field!(F_turb_ρτyz, cc_F_τy, boundary_space)
-    _element_values_to_se_field!(F_turb_moisture, cc_F_evap, boundary_space)
-
-    return (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
-end
-
-"""
     _element_values_to_se_field!(field, element_values, boundary_space)
 
 Broadcast per-SE-element scalars to all GLL nodes of each element.

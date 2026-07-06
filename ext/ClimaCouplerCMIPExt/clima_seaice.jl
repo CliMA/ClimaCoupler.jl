@@ -445,7 +445,7 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
 
     fluxes = intersection_fluxes_to_boundary_fields(
         boundary_space,
-        sim.remapping.intersection_grid,
+        sim.remapping,
         sim.remapping.ice_intersection_flux_state,
     )
 

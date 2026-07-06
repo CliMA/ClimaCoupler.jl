@@ -91,6 +91,32 @@ function contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz)
     return nothing
 end
 
+"""
+    cartesian_to_contravariant_momentum!(ρτxz, ρτyz, u_field, v_field)
+
+Convert extrinsic east-north momentum-flux components on the boundary space to
+contravariant CT1/CT2 scalars. Inverse of [`contravariant_to_cartesian!`](@ref).
+"""
+function cartesian_to_contravariant_momentum!(ρτxz, ρτyz, u_field, v_field)
+    local_geometry = CC.Fields.local_geometry_field(ρτxz)
+    xz_uv = @. CC.Geometry.UVVector(
+        CT12(CT1(unit_basis_vector_data(CT1, local_geometry)), local_geometry),
+        local_geometry,
+    )
+    yz_uv = @. CC.Geometry.UVVector(
+        CT12(CT2(unit_basis_vector_data(CT2, local_geometry)), local_geometry),
+        local_geometry,
+    )
+    xz_u = xz_uv.components.data.:1
+    xz_v = xz_uv.components.data.:2
+    yz_u = yz_uv.components.data.:1
+    yz_v = yz_uv.components.data.:2
+    det = @. xz_u * yz_v - xz_v * yz_u
+    @. ρτxz = (u_field * yz_v - v_field * yz_u) / det
+    @. ρτyz = (v_field * xz_u - u_field * xz_v) / det
+    return nothing
+end
+
 const CT1 = CC.Geometry.Contravariant1Vector
 const CT2 = CC.Geometry.Contravariant2Vector
 const CT12 = CC.Geometry.Contravariant12Vector
@@ -351,4 +377,98 @@ function Checkpointer.restart_model_cache!(
     @warn "$(nameof(sim)) does not support restoring the model cache from a checkpoint. " *
           "The simulation cache will not be restored."
     return nothing
+end
+
+"""
+    _scatter_intersection_flux_to_oc_scratch!(oc_scratch, ig, intersection_flux)
+
+Area-average per-polygon `intersection_flux` onto the OC grid layout of `oc_scratch`.
+"""
+function _scatter_intersection_flux_to_oc_scratch!(
+    oc_scratch::OC.Field,
+    ig::IntersectionGrid,
+    intersection_flux,
+)
+    grid = oc_scratch.grid
+    arch = OC.Architectures.architecture(grid)
+    Nx, Ny, _ = size(grid)
+    n_oc_layout = Nx * Ny
+    FT = eltype(intersection_flux)
+    F_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
+    scatter_to_oc!(F_oc, ig, intersection_flux)
+    OC.interior(oc_scratch, :, :, 1) .= reshape(F_oc, Nx, Ny)
+    return nothing
+end
+
+"""
+    intersection_fluxes_to_boundary_fields(boundary_space, remapping, intersection_flux_state)
+
+Scatter per-polygon flux densities to the OC grid, then conservatively regrid onto
+SEM GLL nodes via `remapping.remapper_oc_to_cc` (`ConservativeRegridding.jl` FV→SE
+L2 projection with `weighted_dss!`).
+
+DSS on the accumulated `csf.F_*` fields is still deferred to `step_model_sims!` so
+land/ocean element boundaries are not averaged before the `area_fraction` mask.
+
+Scalar fluxes pushed to ocean/sea-ice models still use the intersection polygons
+directly via [`scatter_to_oc!`](@ref) in `push_intersection_fluxes_to_ocean!` /
+`push_intersection_fluxes_to_ice!`.
+"""
+function intersection_fluxes_to_boundary_fields(
+    boundary_space,
+    remapping,
+    intersection_flux_state::IntersectionFluxState,
+)
+    (;
+        intersection_grid,
+        momentum_geom,
+        scratch_field_oc1,
+        scratch_field_oc2,
+        temp_uv_vec,
+    ) = remapping
+    ig = intersection_grid
+    fs = intersection_flux_state
+
+    F_sh = CC.Fields.zeros(boundary_space)
+    F_lh = CC.Fields.zeros(boundary_space)
+    F_turb_ρτxz = CC.Fields.zeros(boundary_space)
+    F_turb_ρτyz = CC.Fields.zeros(boundary_space)
+    F_turb_moisture = CC.Fields.zeros(boundary_space)
+
+    for (target, flux) in (
+        (F_sh, fs.flux_sh),
+        (F_lh, fs.flux_lh),
+        (F_turb_moisture, fs.flux_evap),
+    )
+        _scatter_intersection_flux_to_oc_scratch!(scratch_field_oc1, ig, flux)
+        Interfacer.remap!(target, scratch_field_oc1, remapping)
+    end
+
+    grid = scratch_field_oc1.grid
+    arch = OC.Architectures.architecture(grid)
+    Nx, Ny, _ = size(grid)
+    n_oc_layout = Nx * Ny
+    FT = eltype(fs.flux_sh)
+    F_u_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
+    F_v_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
+    scatter_contravariant_momentum_to_oc!(
+        F_u_oc,
+        F_v_oc,
+        ig,
+        fs.flux_τx,
+        fs.flux_τy,
+        momentum_geom.ct1_u,
+        momentum_geom.ct1_v,
+        momentum_geom.ct2_u,
+        momentum_geom.ct2_v,
+    )
+    OC.interior(scratch_field_oc1, :, :, 1) .= reshape(F_u_oc, Nx, Ny)
+    OC.interior(scratch_field_oc2, :, :, 1) .= reshape(F_v_oc, Nx, Ny)
+    u_cc = temp_uv_vec.components.data.:1
+    v_cc = temp_uv_vec.components.data.:2
+    Interfacer.remap!(u_cc, scratch_field_oc1, remapping)
+    Interfacer.remap!(v_cc, scratch_field_oc2, remapping)
+    cartesian_to_contravariant_momentum!(F_turb_ρτxz, F_turb_ρτyz, u_cc, v_cc)
+
+    return (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
 end

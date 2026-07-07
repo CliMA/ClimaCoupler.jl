@@ -590,6 +590,41 @@ function Interfacer.set_cache!(sim::ClimaLandSimulation, csf)
     return nothing
 end
 
+"""
+    Interfacer.progress(land_sim::ClimaLandSimulation, cs)
+
+Extension of `Interfacer.progress` for the integrated ClimaLand model.
+
+Output some useful stats with a frequency determined by the `land_progress_interval` 
+config option.
+"""
+function Interfacer.progress(land_sim::ClimaLandSimulation, cs)
+    p = land_sim.integrator.p
+
+    F_turb_snow =
+        (p.snow.turbulent_fluxes.lhf .+ p.snow.turbulent_fluxes.shf) .*
+        p.snow.snow_cover_fraction
+    F_turb_soil =
+        p.bare_soil_fraction .* (p.soil.turbulent_fluxes.lhf .+ p.soil.turbulent_fluxes.shf)
+    F_turb_canopy = p.canopy.turbulent_fluxes.shf .+ p.canopy.turbulent_fluxes.lhf
+
+    (snow_min, snow_max) = (minimum(F_turb_snow), maximum(F_turb_snow))
+    (soil_min, soil_max) = (minimum(F_turb_soil), maximum(F_turb_soil))
+    (canopy_min, canopy_max) = (minimum(F_turb_canopy), maximum(F_turb_canopy))
+    (LW_u_min, LW_u_max) = (minimum(p.LW_u), maximum(p.LW_u))
+    (SW_u_min, SW_u_max) = (minimum(p.SW_u), maximum(p.SW_u))
+
+    if ClimaComms.iamroot(ClimaComms.context(cs))
+        @info "Land | time: $(Interfacer.current_date(cs, land_sim.integrator.t)), iteration: $(land_sim.integrator.step), " *
+              "extrema(F_turb_snow): ($(round(snow_min, sigdigits = 3)), $(round(snow_max, sigdigits = 3))) W/m², " *
+              "extrema(F_turb_soil): ($(round(soil_min, sigdigits = 3)), $(round(soil_max, sigdigits = 3))) W/m², " *
+              "extrema(F_turb_canopy): ($(round(canopy_min, sigdigits = 3)), $(round(canopy_max, sigdigits = 3))) W/m², " *
+              "extrema(LW_u): ($(round(LW_u_min, sigdigits = 3)), $(round(LW_u_max, sigdigits = 3))) W/m², " *
+              "extrema(SW_u): ($(round(SW_u_min, sigdigits = 3)), $(round(SW_u_max, sigdigits = 3))) W/m²"
+    end
+    return nothing
+end
+
 # Additional ClimaLand getter methods for plotting debug fields
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_water}) =
     sim.integrator.u.soil.ϑ_l

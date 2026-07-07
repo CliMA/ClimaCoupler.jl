@@ -102,13 +102,19 @@ end
 
 """
     current_date(cs::CoupledSimulation)
+    current_date(cs::CoupledSimulation, t)
 
-Return the model date at the current timestep.
-# Arguments
-- `cs`: [CoupledSimulation] containing info about the simulation
+Return the model date at time `t` (default: current coupler time `cs.t[]`).
+
+`t` may be an `ITime`, a number of seconds since the start date, or
+a `Dates.DateTime` (returned unchanged). Passing a component model's own
+integrator or clock time is useful because the component models generally step
+at different paces than the coupler.
 """
-current_date(cs::CoupledSimulation) =
-    cs.t[] isa ITime ? date(cs.t[]) : cs.start_date + Dates.Second(cs.t[])
+current_date(cs::CoupledSimulation) = current_date(cs, cs.t[])
+current_date(cs::CoupledSimulation, t) =
+    t isa ITime ? date(t) : cs.start_date + Dates.Second(t)
+current_date(_cs::CoupledSimulation, t::Dates.DateTime) = t
 
 """
     is_column_mode(cs::Interfacer.CoupledSimulation)
@@ -458,6 +464,25 @@ timestep since the component last stepped.
 """
 function will_step(sim::AbstractComponentSimulation, t)
     return (Float64(float(t)) - Float64(float(sim.integrator.t))) >= sim_dt(sim)
+end
+
+"""
+    progress(sim::AbstractComponentSimulation, cs)
+
+Print progress statistics from the given component model simulation.
+
+This is called by a coupler callback with a frequency controlled by the
+`<component>_progress_interval` config options (e.g. `atmos_progress_interval`,
+`ocean_progress_interval`). Component models can extend this function to print
+whatever information is useful; methods for `ClimaAtmosSimulation` and
+`OceananigansSimulation` are provided by the `ClimaCouplerClimaAtmosExt` and
+`ClimaCouplerCMIPExt` extensions, respectively. If no method is defined for a
+component model, a warning is raised once and no progress is printed.
+"""
+function progress(sim::AbstractComponentSimulation, _cs)
+    @warn "`progress` is not extended for $(nameof(typeof(sim))); skipping progress report" maxlog =
+        1
+    return nothing
 end
 
 """

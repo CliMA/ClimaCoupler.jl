@@ -1,5 +1,7 @@
+atmos_progress_interval: "120secs"
 domain_type: "column"
 column_latlon: [35.0, 97.0]
+land_progress_interval: "120secs"
 scm_surface_type: "land"
 mode_name: "slabplanet_terra"
 bucket_albedo_type: "function"

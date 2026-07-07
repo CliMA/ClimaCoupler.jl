@@ -161,6 +161,7 @@ specific timesteps should be specified, rather than only `dt`.
 | `--surface_setup` | String | `"PrescribedSurface"` | `PrescribedSurface`, `DefaultMoninObukhov` | Triggers ClimaAtmos into coupled mode |
 | `--atmos_config_file` | String | `nothing` | Any valid file path | Optional YAML file used to overwrite default model parameters |
 | `--atmos_log_progress` | Bool | `false` | `true`, `false` | Use ClimaAtmos walltime logging callback instead of default ClimaCoupler one |
+| `--atmos_progress_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for printing atmosphere progress information. Set to `"never"` to disable. |
 | `--albedo_model` | String | `"CouplerAlbedo"` | `ConstantAlbedo`, `RegressionFunctionAlbedo`, `CouplerAlbedo` | Type of albedo model |
 | `--extra_atmos_diagnostics` | Vector{Dict{Any, Any}} | `[]` | List of dictionaries | List of dictionaries containing information about additional atmosphere diagnostics to output |
 
@@ -171,6 +172,7 @@ specific timesteps should be specified, rather than only `dt`.
 | `--land_model` | String | `"bucket"` | `bucket`, `integrated` | Land model to use |
 | `--land_temperature_anomaly` | String | `"aquaplanet"` | `amip`, `aquaplanet`, `nothing` | Type of temperature anomaly for land model |
 | `--use_land_diagnostics` | Bool | `true` | `true`, `false` | Whether to compute and output land model diagnostics |
+| `--land_progress_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for printing land progress information. Set to `"never"` to disable. |
 | `--land_diagnostics_period` | String | `"1months"` | `"30mins"`, `"1hours"`, `"1days"`, `"10days"`, `"1months"` | Time interval between land diagnostic outputs. ClimaLand's diagnostics API only accepts a fixed set of periods, so the values listed here are the only supported options. |
 | `--land_diagnostics_reduction` | String | `"average"` | `average`, `instantaneous`, `max`, `min` | Reduction type for land diagnostic outputs |
 | `--land_spun_up_ic` | Bool | `false` | `true`, `false` | Whether to use integrated land initial conditions from spun up state |
@@ -186,6 +188,7 @@ specific timesteps should be specified, rather than only `dt`.
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
 | `--ice_model` | String | `"prescribed"` | `prescribed`, `clima_seaice` | Sea ice model to use |
+| `--seaice_progress_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for printing sea-ice progress information (ClimaSeaIce only). Set to `"never"` to disable. |
 
 
 #### Ocean model specific
@@ -193,6 +196,7 @@ specific timesteps should be specified, rather than only `dt`.
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
 | `--evolving_ocean` | Bool | `true` | `true`, `false` | Whether to use a dynamic slab ocean model, as opposed to constant surface temperatures |
+| `--ocean_progress_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for printing ocean progress information. Set to `"never"` to disable. |
 
 #### Single-column model (SCM) settings
 

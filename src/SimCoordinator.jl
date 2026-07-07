@@ -216,6 +216,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         h_elem_coupler,
         saveat,
         checkpoint_dt,
+        atmos_progress_interval,
         detect_restart_files,
         restart_dir,
         restart_t,
@@ -224,6 +225,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         use_land_diagnostics,
         land_diagnostics_period,
         land_diagnostics_reduction,
+        land_progress_interval,
         evolving_ocean,
         land_model,
         land_temperature_anomaly,
@@ -241,12 +243,13 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         simple_ocean,
         ocean_grid,
         sst_adjustment,
-        progress_interval,
+        ocean_progress_interval,
         ocean_diagnostic_interval,
         ocean_diagnostic_mode,
         ice_model,
         seaice_diagnostic_interval,
         seaice_diagnostic_mode,
+        seaice_progress_interval,
         land_fraction_source,
         binary_area_fraction,
         domain_type,
@@ -363,7 +366,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         coupled_param_dict,
         thermo_params,
         comms_ctx,
-        progress_interval,
         boundary_space,
         output_dir = dir_paths.ocean_output_dir,
         simple_ocean,
@@ -461,16 +463,40 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     end
 
     ## Callbacks
+    # TODO: Move callbacks code somewhere else (maybe in TimeManager?) so that it doesn't clutter up the constructor
+
+    # checkpoint
     schedule_checkpoint =
         EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date)
     checkpoint_cb =
         TimeManager.Callback(schedule_checkpoint, sim -> Checkpointer.checkpoint_sims(sim))
 
+    # walltime reporting
     if config_dict["atmos_log_progress"]
         callbacks = (checkpoint_cb,)
     else
         walltime_cb = TimeManager.capped_geometric_walltime_cb(t_start, t_end, Δt_cpl)
         callbacks = (checkpoint_cb, walltime_cb)
+    end
+
+    # component model progress reporting
+    progress_intervals = (;
+        atmos_sim = atmos_progress_interval,
+        ocean_sim = ocean_progress_interval,
+        land_sim = land_progress_interval,
+        ice_sim = seaice_progress_interval,
+    )
+    for (sim_name, interval) in pairs(progress_intervals)
+        (haskey(model_sims, sim_name) && interval != "never") || continue
+        schedule_progress =
+            EveryCalendarDtSchedule(TimeManager.time_to_period(interval); start_date)
+        progress_cb = TimeManager.Callback(
+            schedule_progress,
+            let sim_name = sim_name
+                cs -> Interfacer.progress(cs.model_sims[sim_name], cs)
+            end,
+        )
+        callbacks = (callbacks..., progress_cb)
     end
 
     ## Coupler diagnostics

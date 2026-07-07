@@ -184,6 +184,32 @@ function ClimaSeaIceSimulation(
     return sim
 end
 
+"""
+    Interfacer.progress(ice_sim::ClimaSeaIceSimulation, cs)
+
+Extension of `Interfacer.progress` for ClimaSeaIce.
+
+Output some sea-ice stats at a frequency determined by the `seaice_progress_interval` config option.
+"""
+function Interfacer.progress(ice_sim::ClimaSeaIceSimulation, cs)
+    ice = ice_sim.ice
+    model = ice.model
+
+    h_max = maximum(model.ice_thickness)
+    a_max = maximum(model.ice_concentration)
+    (T_sfc_min, T_sfc_max) = extrema(model.ice_thermodynamics.top_surface_temperature)
+    u_max = maximum(abs, model.velocities.u)
+    v_max = maximum(abs, model.velocities.v)
+
+    if ClimaComms.iamroot(ClimaComms.context(cs))
+        @info "Sea ice | time: $(Interfacer.current_date(cs, model.clock.time)), iteration: $(OC.iteration(ice)), " *
+              "maximum(h): $(round(h_max, digits = 2)) m, maximum(a): $(round(a_max, digits = 2)), " *
+              "extrema(T_sfc): ($(round(T_sfc_min, digits = 2)), $(round(T_sfc_max, digits = 2))) ᵒC, " *
+              "maximum(u): ($(round(u_max, sigdigits = 2)), $(round(v_max, sigdigits = 2))) m/s"
+    end
+    return nothing
+end
+
 ###############################################################################
 ### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###############################################################################

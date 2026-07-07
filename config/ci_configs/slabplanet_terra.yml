@@ -1,3 +1,4 @@
+atmos_progress_interval: "200secs"
 bucket_albedo_type: "function"
 conservation_softfail: true
 dt: "200secs"

@@ -1,6 +1,7 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
+atmos_progress_interval: "30secs"
 bucket_albedo_type: "map_temporal"
 coupler_toml: ["toml/amip_progedmf.toml"]
 dt: "30secs"

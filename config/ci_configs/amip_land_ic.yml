@@ -1,10 +1,12 @@
 apply_limiter: false
+atmos_progress_interval: "150secs"
 dt: "150secs"
 dt_cpl: "150secs"
 dt_rad: "1hours"
 dz_bottom: 30
 h_elem: 4
 land_model: "integrated"
+land_progress_interval: "150secs"
 land_spun_up_ic: false
 mode_name: "amip"
 rad: "allskywithclear"

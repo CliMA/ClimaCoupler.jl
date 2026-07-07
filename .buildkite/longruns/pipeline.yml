@@ -44,7 +44,7 @@ steps:
       - label: "GPU CMIP: ED only + integrated land"
         key: "cmip_edonly_land"
         command:
-            - "julia --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice --job_id cmip_oceananigans_climaseaice"
+            - "julia --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice.yml --job_id cmip_oceananigans_climaseaice"
         artifact_paths: "output/cmip_oceananigans_climaseaice/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"

@@ -34,7 +34,7 @@ seaice_diagnostic_mode: "average"
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 # t_end: "366days"
-t_end: "6months"
+t_end: "183days"
 use_itime: false
 opo_smoothing: true
 topography: "Earth"

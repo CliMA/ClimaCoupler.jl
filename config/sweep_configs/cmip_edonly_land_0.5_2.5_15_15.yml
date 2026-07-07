@@ -3,10 +3,10 @@ atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 checkpoint_dt: "30days"
 coupler_diagnostics_period: "30days"
 coupler_diagnostics_reduction: "average"
-dt_atmos: "300secs" # 5 minutes
+dt_atmos: "30secs" # 0.5 minutes
 dt_cloud_fraction: "1hours"
-dt_cpl: "600secs" # 10 minutes
-dt_land: "600secs" # 10 minutes
+dt_cpl: "180secs" # 2.5 minutes
+dt_land: "180secs" # 2.5 minutes
 dt_ocean: "900secs" # 15 minutes
 dt_rad: "1hours"
 dt_seaice: "900secs" # 15 minutes

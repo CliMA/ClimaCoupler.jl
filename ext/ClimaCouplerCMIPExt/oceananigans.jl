@@ -636,10 +636,10 @@ coupler fields.
 
 One `SurfaceFluxes` call is made per intersection polygon using per-SE-node atmosphere
 state from `csf` and per-OC-cell surface state from the live ocean tracers.  The polygon
-flux densities are scattered to the OC grid and regridded onto SEM GLL nodes via
-[`intersection_fluxes_to_boundary_fields`](@ref) (`ConservativeRegridding.jl` FV→SE),
-then handed to [`FluxCalculator.update_flux_fields!`](@ref), which weights them by the
-ocean area fraction and adds them to `csf.F_*`.  The per-polygon fluxes remain in
+flux densities are scattered to CC elements via [`intersection_fluxes_to_boundary_fields`](@ref)
+(`scatter_to_cc!` + `_element_values_to_se_field!`), which gives the wet-area-normalised
+flux density per element. [`FluxCalculator.update_flux_fields!`](@ref) then weights by the
+ocean area fraction and adds the result to `csf.F_*`.  The per-polygon fluxes remain in
 `sim.remapping.intersection_flux_state` for the subsequent
 [`FluxCalculator.update_turbulent_fluxes!`](@ref) call, which scatters them directly to the
 OC model boundary conditions without any additional regridding.

@@ -260,8 +260,8 @@ arch = OC.CPU()
         # Positive evaporation (ocean evaporating)
         @test all(flux_state.flux_evap .> 0)
 
-        @testset "SEM nodal remapping via ConservativeRegridding" begin
-            # Constant polygon flux → constant at every GLL node.
+        @testset "CC boundary field mapping from intersection fluxes" begin
+            # Constant polygon flux → same constant at every GLL node.
             flux_state_const = CMIPExt.IntersectionFluxState(FT, ig.n_intersections)
             const_flux = FT(42.0)
             fill!(flux_state_const.flux_sh, const_flux)
@@ -273,7 +273,7 @@ arch = OC.CPU()
             nodal_const = CRExt.se_field_to_vec(fluxes_const.F_sh)
             @test all(isapprox.(nodal_const, const_flux; rtol = 0, atol = 1e-8))
 
-            # Spatially varying fluxes → nodal structure within SE elements.
+            # Per-element broadcast: all GLL nodes within each element have the same value.
             fluxes = CMIPExt.intersection_fluxes_to_boundary_fields(
                 boundary_space,
                 remapping,
@@ -281,9 +281,9 @@ arch = OC.CPU()
             )
             p = parent(CC.Fields.field_values(fluxes.F_sh))
             intra_element_std = [std(vec(p[:, :, 1, e])) for e in 1:size(p, 4)]
-            @test any(intra_element_std .> FT(0.01))
+            @test all(intra_element_std .== FT(0))
 
-            # Differs from the legacy per-element constant broadcast.
+            # Matches aggregate_fluxes_to_cc! + _element_values_to_se_field! exactly.
             cc_F_sh = zeros(FT, ig.n_cc)
             CMIPExt.aggregate_fluxes_to_cc!(
                 (; F_sh = cc_F_sh, F_lh = zeros(FT, ig.n_cc), F_τx = zeros(FT, ig.n_cc),
@@ -291,9 +291,9 @@ arch = OC.CPU()
                 flux_state,
                 ig,
             )
-            F_sh_legacy = CC.Fields.zeros(boundary_space)
-            CMIPExt._element_values_to_se_field!(F_sh_legacy, cc_F_sh, boundary_space)
-            @test maximum(abs.(fluxes.F_sh .- F_sh_legacy)) > FT(1e-6)
+            F_sh_reference = CC.Fields.zeros(boundary_space)
+            CMIPExt._element_values_to_se_field!(F_sh_reference, cc_F_sh, boundary_space)
+            @test maximum(abs.(fluxes.F_sh .- F_sh_reference)) < FT(1e-10)
         end
     end
 

@@ -380,95 +380,54 @@ function Checkpointer.restart_model_cache!(
 end
 
 """
-    _scatter_intersection_flux_to_oc_scratch!(oc_scratch, ig, intersection_flux)
-
-Area-average per-polygon `intersection_flux` onto the OC grid layout of `oc_scratch`.
-"""
-function _scatter_intersection_flux_to_oc_scratch!(
-    oc_scratch::OC.Field,
-    ig::IntersectionGrid,
-    intersection_flux,
-)
-    grid = oc_scratch.grid
-    arch = OC.Architectures.architecture(grid)
-    Nx, Ny, _ = size(grid)
-    n_oc_layout = Nx * Ny
-    FT = eltype(intersection_flux)
-    F_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
-    scatter_to_oc!(F_oc, ig, intersection_flux)
-    OC.interior(oc_scratch, :, :, 1) .= reshape(F_oc, Nx, Ny)
-    return nothing
-end
-
-"""
     intersection_fluxes_to_boundary_fields(boundary_space, remapping, intersection_flux_state)
 
-Scatter per-polygon flux densities to the OC grid, then conservatively regrid onto
-SEM GLL nodes via `remapping.remapper_oc_to_cc` (`ConservativeRegridding.jl` FV→SE
-L2 projection with `weighted_dss!`).
+Scatter per-polygon flux densities directly to CC elements via `scatter_to_cc!`, then
+broadcast the per-element averages to all GLL nodes with `_element_values_to_se_field!`.
 
-DSS on the accumulated `csf.F_*` fields is still deferred to `step_model_sims!` so
-land/ocean element boundaries are not averaged before the `area_fraction` mask.
+`scatter_to_cc!` normalises by `cc_areas` (the total wet-polygon area per CC element),
+so the result is the flux density over the wet-ocean fraction of each element, not an
+area-weighted value. The subsequent multiplication by `area_fraction_ocean` in
+`update_flux_fields!` then correctly contributes `f_ocean × F̄_ocean` to `csf.F_*`.
 
-Scalar fluxes pushed to ocean/sea-ice models still use the intersection polygons
-directly via [`scatter_to_oc!`](@ref) in `push_intersection_fluxes_to_ocean!` /
-`push_intersection_fluxes_to_ice!`.
+The previous path routed scalar fluxes through an OC intermediate (`scatter_to_oc!`
+followed by the `remapper_oc_to_cc` L2 projection). Because the L2 projection is
+partition-of-unity and dry OC cells carry zero flux, the projected CC field is already
+implicitly weighted by the local ocean fraction; the subsequent `area_fraction`
+multiplication in `update_flux_fields!` then double-counted it. The direct
+`scatter_to_cc!` path avoids this.
+
+Momentum fluxes (CT1/CT2 contravariant components) are aggregated in the CC coordinate
+system directly, without the CT1/CT2 → UV → OC → CC → CT1/CT2 round-trip that was
+previously used. Fluxes pushed to the ocean/sea-ice models continue to use intersection
+polygons directly via `scatter_to_oc!` in `push_intersection_fluxes_to_ocean!`.
 """
 function intersection_fluxes_to_boundary_fields(
     boundary_space,
     remapping,
     intersection_flux_state::IntersectionFluxState,
 )
-    (;
-        intersection_grid,
-        momentum_geom,
-        scratch_field_oc1,
-        scratch_field_oc2,
-        temp_uv_vec,
-    ) = remapping
-    ig = intersection_grid
+    ig = remapping.intersection_grid
     fs = intersection_flux_state
+    FT = eltype(fs.flux_sh)
 
-    F_sh = CC.Fields.zeros(boundary_space)
-    F_lh = CC.Fields.zeros(boundary_space)
-    F_turb_ρτxz = CC.Fields.zeros(boundary_space)
-    F_turb_ρτyz = CC.Fields.zeros(boundary_space)
+    F_sh           = CC.Fields.zeros(boundary_space)
+    F_lh           = CC.Fields.zeros(boundary_space)
+    F_turb_ρτxz    = CC.Fields.zeros(boundary_space)
+    F_turb_ρτyz    = CC.Fields.zeros(boundary_space)
     F_turb_moisture = CC.Fields.zeros(boundary_space)
 
+    cc_vals = zeros(FT, ig.n_cc)
     for (target, flux) in (
-        (F_sh, fs.flux_sh),
-        (F_lh, fs.flux_lh),
+        (F_sh,            fs.flux_sh),
+        (F_lh,            fs.flux_lh),
         (F_turb_moisture, fs.flux_evap),
+        (F_turb_ρτxz,     fs.flux_τx),
+        (F_turb_ρτyz,     fs.flux_τy),
     )
-        _scatter_intersection_flux_to_oc_scratch!(scratch_field_oc1, ig, flux)
-        Interfacer.remap!(target, scratch_field_oc1, remapping)
+        scatter_to_cc!(cc_vals, ig, flux)
+        _element_values_to_se_field!(target, cc_vals, boundary_space)
     end
-
-    grid = scratch_field_oc1.grid
-    arch = OC.Architectures.architecture(grid)
-    Nx, Ny, _ = size(grid)
-    n_oc_layout = Nx * Ny
-    FT = eltype(fs.flux_sh)
-    F_u_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
-    F_v_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
-    scatter_contravariant_momentum_to_oc!(
-        F_u_oc,
-        F_v_oc,
-        ig,
-        fs.flux_τx,
-        fs.flux_τy,
-        momentum_geom.ct1_u,
-        momentum_geom.ct1_v,
-        momentum_geom.ct2_u,
-        momentum_geom.ct2_v,
-    )
-    OC.interior(scratch_field_oc1, :, :, 1) .= reshape(F_u_oc, Nx, Ny)
-    OC.interior(scratch_field_oc2, :, :, 1) .= reshape(F_v_oc, Nx, Ny)
-    u_cc = temp_uv_vec.components.data.:1
-    v_cc = temp_uv_vec.components.data.:2
-    Interfacer.remap!(u_cc, scratch_field_oc1, remapping)
-    Interfacer.remap!(v_cc, scratch_field_oc2, remapping)
-    cartesian_to_contravariant_momentum!(F_turb_ρτxz, F_turb_ρτyz, u_cc, v_cc)
 
     return (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
 end

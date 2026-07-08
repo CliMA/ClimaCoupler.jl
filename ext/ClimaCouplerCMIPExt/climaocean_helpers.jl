@@ -382,52 +382,80 @@ end
 """
     intersection_fluxes_to_boundary_fields(boundary_space, remapping, intersection_flux_state)
 
-Scatter per-polygon flux densities directly to CC elements via `scatter_to_cc!`, then
-broadcast the per-element averages to all GLL nodes with `_element_values_to_se_field!`.
+Scatter per-polygon flux densities to the CC SEM grid using a hybrid approach:
 
-`scatter_to_cc!` normalises by `cc_areas` (the total wet-polygon area per CC element),
-so the result is the flux density over the wet-ocean fraction of each element, not an
-area-weighted value. The subsequent multiplication by `area_fraction_ocean` in
+**Scalar fluxes** (sensible heat, latent heat, moisture evaporation): scatter directly
+to CC elements via `scatter_to_cc!`, then broadcast per-element averages to all GLL
+nodes with `_element_values_to_se_field!`. `scatter_to_cc!` normalises by `cc_areas`
+(wet-polygon area per CC element), giving the flux density over the ocean fraction;
 `update_flux_fields!` then correctly contributes `f_ocean × F̄_ocean` to `csf.F_*`.
 
-The previous path routed scalar fluxes through an OC intermediate (`scatter_to_oc!`
-followed by the `remapper_oc_to_cc` L2 projection). Because the L2 projection is
-partition-of-unity and dry OC cells carry zero flux, the projected CC field is already
-implicitly weighted by the local ocean fraction; the subsequent `area_fraction`
-multiplication in `update_flux_fields!` then double-counted it. The direct
-`scatter_to_cc!` path avoids this.
+The previous path routed scalars through an OC intermediate (`scatter_to_oc!` + L2
+projection), which double-counted the ocean area fraction. The direct path avoids this.
 
-Momentum fluxes (CT1/CT2 contravariant components) are aggregated in the CC coordinate
-system directly, without the CT1/CT2 → UV → OC → CC → CT1/CT2 round-trip that was
-previously used. Fluxes pushed to the ocean/sea-ice models continue to use intersection
-polygons directly via `scatter_to_oc!` in `push_intersection_fluxes_to_ocean!`.
+**Momentum fluxes** (CT1/CT2 contravariant stress): CT1/CT2 basis vectors rotate
+across the sphere, so averaging polygon CT1/CT2 values as scalars is physically
+incorrect. Instead, each polygon's stress is first projected to geographic (east, north) components, scattered to the OC grid, remapped to CC via L2 projection, then converted back to
+the CC contravariant basis.
+
+Fluxes pushed to the ocean/sea-ice models use intersection polygons directly via
+`scatter_to_oc!` in `push_intersection_fluxes_to_ocean!`.
 """
 function intersection_fluxes_to_boundary_fields(
     boundary_space,
     remapping,
     intersection_flux_state::IntersectionFluxState,
 )
-    ig = remapping.intersection_grid
+    (;
+        intersection_grid,
+        momentum_geom,
+        scratch_field_oc1,
+        scratch_field_oc2,
+        temp_uv_vec,
+    ) = remapping
+    ig = intersection_grid
     fs = intersection_flux_state
     FT = eltype(fs.flux_sh)
 
-    F_sh           = CC.Fields.zeros(boundary_space)
-    F_lh           = CC.Fields.zeros(boundary_space)
-    F_turb_ρτxz    = CC.Fields.zeros(boundary_space)
-    F_turb_ρτyz    = CC.Fields.zeros(boundary_space)
-    F_turb_moisture = CC.Fields.zeros(boundary_space)
+    F_sh            = CC.Fields.zeros(boundary_space)
+    F_lh            = CC.Fields.zeros(boundary_space)
+    F_turb_ρτxz     = CC.Fields.zeros(boundary_space)
+    F_turb_ρτyz     = CC.Fields.zeros(boundary_space)
+    F_turb_moisture  = CC.Fields.zeros(boundary_space)
 
+    # Scalar fluxes: direct polygon → CC element scatter avoids OC-intermediate
+    # double-counting of area_fraction.
     cc_vals = zeros(FT, ig.n_cc)
     for (target, flux) in (
         (F_sh,            fs.flux_sh),
         (F_lh,            fs.flux_lh),
         (F_turb_moisture, fs.flux_evap),
-        (F_turb_ρτxz,     fs.flux_τx),
-        (F_turb_ρτyz,     fs.flux_τy),
     )
         scatter_to_cc!(cc_vals, ig, flux)
         _element_values_to_se_field!(target, cc_vals, boundary_space)
     end
+
+    # Momentum fluxes: CT1/CT2 basis varies across the sphere, so transform to
+    # geographic UV at each polygon, scatter to OC, remap to CC, then back to CT1/CT2.
+    grid = scratch_field_oc1.grid
+    arch = OC.Architectures.architecture(grid)
+    Nx, Ny, _ = size(grid)
+    n_oc_layout = Nx * Ny
+    F_u_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
+    F_v_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
+    scatter_contravariant_momentum_to_oc!(
+        F_u_oc, F_v_oc, ig,
+        fs.flux_τx, fs.flux_τy,
+        momentum_geom.ct1_u, momentum_geom.ct1_v,
+        momentum_geom.ct2_u, momentum_geom.ct2_v,
+    )
+    OC.interior(scratch_field_oc1, :, :, 1) .= reshape(F_u_oc, Nx, Ny)
+    OC.interior(scratch_field_oc2, :, :, 1) .= reshape(F_v_oc, Nx, Ny)
+    u_cc = temp_uv_vec.components.data.:1
+    v_cc = temp_uv_vec.components.data.:2
+    Interfacer.remap!(u_cc, scratch_field_oc1, remapping)
+    Interfacer.remap!(v_cc, scratch_field_oc2, remapping)
+    cartesian_to_contravariant_momentum!(F_turb_ρτxz, F_turb_ρτyz, u_cc, v_cc)
 
     return (; F_turb_ρτxz, F_turb_ρτyz, F_lh, F_sh, F_turb_moisture)
 end

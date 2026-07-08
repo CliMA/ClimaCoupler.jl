@@ -74,10 +74,15 @@ if abspath(PROGRAM_FILE) == @__FILE__
     era5_pl_data_loader = CalibrationTools.ERA5PressureLevelDataLoader()
     ceres_data_loader = CalibrationTools.CERESDataLoader()
     modis_data_loader = CalibrationTools.ModisDataLoader()
+    mac_data_loader = CalibrationTools.MACDataLoader()
+    # Both MODIS and MAC provide `lwp`, so disambiguate to get `lwp` from MAC.
+    # MODIS is kept for its ice water path (`clivi`).
     data_loader = CalibrationTools.CompositeDataLoader(
         era5_pl_data_loader,
         ceres_data_loader,
         modis_data_loader,
+        mac_data_loader;
+        varname_to_loader = Dict("lwp" => mac_data_loader),
     )
 
     (; short_names) = CALIBRATE_CONFIG

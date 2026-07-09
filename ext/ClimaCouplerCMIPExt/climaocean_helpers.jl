@@ -380,25 +380,43 @@ function Checkpointer.restart_model_cache!(
 end
 
 """
+    _scatter_intersection_flux_to_oc_scratch!(oc_scratch, ig, intersection_flux)
+
+Area-average per-polygon `intersection_flux` onto the OC grid layout of `oc_scratch`.
+"""
+function _scatter_intersection_flux_to_oc_scratch!(
+    oc_scratch::OC.Field,
+    ig::IntersectionGrid,
+    intersection_flux,
+)
+    grid = oc_scratch.grid
+    arch = OC.Architectures.architecture(grid)
+    Nx, Ny, _ = size(grid)
+    n_oc_layout = Nx * Ny
+    FT = eltype(intersection_flux)
+    F_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
+    scatter_to_oc!(F_oc, ig, intersection_flux)
+    OC.interior(oc_scratch, :, :, 1) .= reshape(F_oc, Nx, Ny)
+    return nothing
+end
+
+"""
     intersection_fluxes_to_boundary_fields(boundary_space, remapping, intersection_flux_state)
 
-Scatter per-polygon flux densities to the CC SEM grid using a hybrid approach:
+Scatter per-polygon flux densities to the CC SEM grid.
 
-**Scalar fluxes** (sensible heat, latent heat, moisture evaporation): scatter directly
-to CC elements via `scatter_to_cc!`, then broadcast per-element averages to all GLL
-nodes with `_element_values_to_se_field!`. `scatter_to_cc!` normalises by `cc_areas`
-(wet-polygon area per CC element), giving the flux density over the ocean fraction;
-`update_flux_fields!` then correctly contributes `f_ocean × F̄_ocean` to `csf.F_*`.
-
-The previous path routed scalars through an OC intermediate (`scatter_to_oc!` + L2
-projection), which double-counted the ocean area fraction. The direct path avoids this.
+**Scalar fluxes** (sensible heat, latent heat, moisture evaporation): area-average
+per-polygon values onto the OC grid via `_scatter_intersection_flux_to_oc_scratch!`,
+then conservatively regrid onto SEM GLL nodes via `remapping.remapper_oc_to_cc`
+(ConservativeRegridding.jl FV→SE L2 projection with `weighted_dss!`).
 
 **Momentum fluxes** (CT1/CT2 contravariant stress): CT1/CT2 basis vectors rotate
-across the sphere, so averaging polygon CT1/CT2 values as scalars is physically
-incorrect. Instead, each polygon's stress is first projected to geographic (east, north) components, scattered to the OC grid, remapped to CC via L2 projection, then converted back to
-the CC contravariant basis.
+across the sphere, so each polygon's stress is first projected to geographic (east,
+north) UV components via the precomputed `momentum_geom` basis vectors, scattered to
+the OC grid, remapped to CC, then converted back to the CC contravariant basis via
+`cartesian_to_contravariant_momentum!`.
 
-Fluxes pushed to the ocean/sea-ice models use intersection polygons directly via
+Fluxes pushed to ocean/sea-ice models use intersection polygons directly via
 `scatter_to_oc!` in `push_intersection_fluxes_to_ocean!`.
 """
 function intersection_fluxes_to_boundary_fields(
@@ -415,7 +433,6 @@ function intersection_fluxes_to_boundary_fields(
     ) = remapping
     ig = intersection_grid
     fs = intersection_flux_state
-    FT = eltype(fs.flux_sh)
 
     F_sh            = CC.Fields.zeros(boundary_space)
     F_lh            = CC.Fields.zeros(boundary_space)
@@ -423,24 +440,20 @@ function intersection_fluxes_to_boundary_fields(
     F_turb_ρτyz     = CC.Fields.zeros(boundary_space)
     F_turb_moisture  = CC.Fields.zeros(boundary_space)
 
-    # Scalar fluxes: direct polygon → CC element scatter avoids OC-intermediate
-    # double-counting of area_fraction.
-    cc_vals = zeros(FT, ig.n_cc)
     for (target, flux) in (
         (F_sh,            fs.flux_sh),
         (F_lh,            fs.flux_lh),
         (F_turb_moisture, fs.flux_evap),
     )
-        scatter_to_cc!(cc_vals, ig, flux)
-        _element_values_to_se_field!(target, cc_vals, boundary_space)
+        _scatter_intersection_flux_to_oc_scratch!(scratch_field_oc1, ig, flux)
+        Interfacer.remap!(target, scratch_field_oc1, remapping)
     end
 
-    # Momentum fluxes: CT1/CT2 basis varies across the sphere, so transform to
-    # geographic UV at each polygon, scatter to OC, remap to CC, then back to CT1/CT2.
     grid = scratch_field_oc1.grid
     arch = OC.Architectures.architecture(grid)
     Nx, Ny, _ = size(grid)
     n_oc_layout = Nx * Ny
+    FT = eltype(fs.flux_sh)
     F_u_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
     F_v_oc = OC.on_architecture(arch, zeros(FT, n_oc_layout))
     scatter_contravariant_momentum_to_oc!(

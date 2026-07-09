@@ -99,6 +99,50 @@ arch = OC.CPU()
         @test length(ig.node_gather_polygon) == length(ig.node_gather_weight)
     end
 
+    @testset "Nodal wet-ocean fraction (OC wet-mask remap)" begin
+        import ClimaOcean as CO
+
+        # Bathymetry with real land/ocean contrast (not the all-wet flat bottom above).
+        bottom_height = CO.regrid_bathymetry(
+            underlying_grid;
+            minimum_depth = 30,
+            interpolation_passes = 2,
+            major_basins = 1,
+        )
+        continent_grid = OC.ImmersedBoundaryGrid(
+            underlying_grid,
+            OC.GridFittedBottom(bottom_height);
+            active_cells_map = false,
+        )
+        continent_remapping = CMIPExt.construct_remapper(continent_grid, boundary_space)
+
+        wet_nodal = CC.Fields.zeros(boundary_space)
+        CMIPExt.wet_ocean_fraction_field!(wet_nodal, continent_remapping)
+
+        FT = CC.Spaces.undertype(boundary_space)
+        @test all(zero(FT) .<= parent(wet_nodal) .<= one(FT))
+
+        # Nodal projection differs from the old per-element broadcast path.
+        ig = continent_remapping.intersection_grid
+        wet_element = CC.Fields.zeros(boundary_space)
+        CMIPExt._element_values_to_se_field!(
+            wet_element,
+            CMIPExt.wet_ocean_cc_fractions(ig),
+            boundary_space,
+        )
+        @test maximum(abs.(parent(wet_nodal) .- parent(wet_element))) > FT(1e-4)
+
+        # At least one CC element has intra-element nodal variation.
+        Nq = 4
+        CRExt = CMIPExt.get_ConservativeRegriddingCCExt()
+        nodal = CRExt.se_field_to_vec(wet_nodal)
+        has_intra_element_variation = any(1:ig.n_cc) do e
+            block = nodal[((e - 1) * Nq^2 + 1):(e * Nq^2)]
+            maximum(block) - minimum(block) > FT(1e-4)
+        end
+        @test has_intra_element_variation
+    end
+
     @testset "Nodal polygon gather (sin-cos SEM field)" begin
         ig = remapping.intersection_grid
         CRExt = CMIPExt.get_ConservativeRegriddingCCExt()

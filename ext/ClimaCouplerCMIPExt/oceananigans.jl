@@ -341,6 +341,34 @@ is unaware of the immersed mask. Raw grids pass through unchanged so that
 underlying_grid(grid::OC.ImmersedBoundaryGrid) = grid.underlying_grid
 underlying_grid(grid) = grid
 
+"""
+    fill_oc_wet_mask_field!(wet_field)
+
+Fill a 2D `Center, Center` OC field with `1` on wet cells and `0` on immersed
+(dry/land) cells. Non-`ImmersedBoundaryGrid` inputs are treated as fully wet.
+"""
+function fill_oc_wet_mask_field!(wet_field::OC.Field)
+    grid_cpu = OC.on_architecture(OC.CPU(), wet_field.grid)
+    wet_cpu = OC.Field{OC.Center, OC.Center, Nothing}(grid_cpu)
+    Nx, Ny, Nz = size(grid_cpu)
+    interior = OC.interior(wet_cpu, :, :, 1)
+    FT = eltype(wet_cpu)
+    if grid_cpu isa OC.ImmersedBoundaryGrid
+        @inbounds for j in 1:Ny, i in 1:Nx
+            interior[i, j] =
+                OC.ImmersedBoundaries.immersed_cell(i, j, Nz, grid_cpu) ? zero(FT) : one(FT)
+        end
+    else
+        interior .= one(FT)
+    end
+    arch = OC.Architectures.architecture(wet_field)
+    if arch isa OC.CPU
+        copyto!(OC.interior(wet_field, :, :, 1), interior)
+    else
+        OC.set!(wet_field, wet_cpu)
+    end
+    return nothing
+end
 
 """
     construct_remapper(grid_oc, boundary_space)
@@ -377,6 +405,9 @@ intersection-grid flux pipeline used by `compute_intersection_grid_fluxes!`:
   `extract_cc_atmos_state!` from the coupler fields (flat GLL layout).
 * `oc_surface_temp::NamedTuple` — per-OC-cell scratch written by
   `extract_oc_surface_state!` from the live ocean state.
+* `wet_mask_oc::OC.Field` — static `1`/`0` wet/dry mask on the OC surface,
+  used by [`wet_ocean_fraction_field!`](@ref) for nodal bathymetry-aligned
+  surface fractions.
 
 All four are allocated on the architecture of `grid_oc` so they can be
 written in place from device-resident `OC.interior(...)` views and
@@ -468,6 +499,10 @@ function construct_remapper(
     flux_scratch =
         allocate_intersection_flux_scratch(FT, arch, intersection_grid, n_oc_layout)
 
+    # Static wet/dry mask for nodal bathymetry-aligned surface fractions.
+    wet_mask_oc = OC.Field{OC.Center, OC.Center, Nothing}(grid_oc)
+    fill_oc_wet_mask_field!(wet_mask_oc)
+
     return (;
         remapper_oc_to_cc,
         remapper_cc_to_oc,
@@ -477,6 +512,7 @@ function construct_remapper(
         temp_uv_vec,
         intersection_grid,
         momentum_geom,
+        wet_mask_oc,
         flux_scratch...,
         align_surface_fractions_with_ocean_bathymetry,
     )
@@ -488,9 +524,9 @@ end
 
 Ocean-bathymetry-authoritative surface fractions (Option A).
 
-Wet-ocean area on each boundary column is taken from the intersection grid
-(`cc_areas / cc_total_areas`, both from CR polygon areas). Ice and open-ocean
-fractions are subsets of that wet area; land fills the remainder.
+Wet-ocean area on each boundary GLL node is the FV→SE L2 projection of the OC
+immersed wet mask (`remapper_oc_to_cc` on `remapping.wet_mask_oc`). Ice and
+open-ocean fractions are subsets of that wet area; land fills the remainder.
 
 Requires `align_surface_fractions_with_ocean_bathymetry = true` in the ocean
 remapping bundle (the default for `OceananigansSimulation`).
@@ -507,9 +543,8 @@ function FieldExchanger.align_surface_fractions!(
 
     boundary_space = Interfacer.boundary_space(cs)
     FT = CC.Spaces.undertype(boundary_space)
-    ig = ocean_sim.remapping.intersection_grid
 
-    wet_ocean_fraction_field!(cs.fields.scalar_temp1, ig, boundary_space)
+    wet_ocean_fraction_field!(cs.fields.scalar_temp1, ocean_sim.remapping)
     wet_ocean_fraction = cs.fields.scalar_temp1
 
     if haskey(cs.model_sims, :ice_sim)

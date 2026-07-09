@@ -563,17 +563,20 @@ function wet_ocean_cc_fractions(ig::IntersectionGrid)
 end
 
 """
-    wet_ocean_fraction_field!(field, ig::IntersectionGrid, boundary_space)
+    wet_ocean_fraction_field!(field, remapping)
 
-Broadcast per-element wet-ocean fractions (see [`wet_ocean_cc_fractions`](@ref))
-onto all GLL nodes of `field`.
+Project the OC immersed wet mask onto the boundary-space GLL nodes via
+`remapper_oc_to_cc` (FV→SE L2 projection with DSS). The result is a nodal
+wet-ocean coverage fraction in `[0, 1]`, giving sub-element coastline structure
+rather than a single constant per CC element.
+
+Requires `remapping.wet_mask_oc`, precomputed in [`construct_remapper`](@ref).
 """
-function wet_ocean_fraction_field!(field, ig::IntersectionGrid, boundary_space)
-    return _element_values_to_se_field!(
-        field,
-        wet_ocean_cc_fractions(ig),
-        boundary_space,
-    )
+function wet_ocean_fraction_field!(field, remapping)
+    Interfacer.remap!(field, remapping.wet_mask_oc, remapping)
+    FT = eltype(field)
+    @. field = clamp(field, zero(FT), one(FT))
+    return field
 end
 
 """

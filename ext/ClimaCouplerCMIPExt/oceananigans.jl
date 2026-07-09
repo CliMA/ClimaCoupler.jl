@@ -88,12 +88,22 @@ function tripolar_ocean_simulation(
 end
 
 """
-    ocean_simulation(arch, ocean_grid; simple_ocean, closure, clock, kwargs...)
+    ocean_simulation(arch, ocean_grid; simple_ocean, closure, clock, depth, kwargs...)
 
 Build an Oceananigans `Simulation` on either the standard one-degree tripolar grid
 or the NEMO eORCA1 mesh (`orca`).
+
+`depth` defaults to 5500 m, matching the EN4 vertical extent.
 """
-function ocean_simulation(arch, ocean_grid::Symbol; simple_ocean, closure, clock, kwargs...)
+function ocean_simulation(
+    arch,
+    ocean_grid::Symbol;
+    simple_ocean,
+    closure,
+    clock,
+    depth = 5500,
+    kwargs...,
+)
     substeps = simple_ocean ? 70 : 150
 
     if ocean_grid == :orca
@@ -106,6 +116,7 @@ function ocean_simulation(arch, ocean_grid::Symbol; simple_ocean, closure, clock
                 arch;
                 closure,
                 clock,
+                depth,
                 substeps,
                 kwargs...,
             )
@@ -121,7 +132,7 @@ function ocean_simulation(arch, ocean_grid::Symbol; simple_ocean, closure, clock
         zstar,
         active_cells_map,
         clock,
-        depth = 5500,
+        depth,
         Nz = 32,
         closure,
         substeps,
@@ -150,6 +161,7 @@ dispatch in coupling.
 - `coupled_param_dict`: Coupled parameter dictionary (default: created from `area_fraction`)
 - `progress_interval`: iteration interval for printing progress information (default: `nothing`)
 - `ocean_grid`: Horizontal grid for Oceananigans (`:one_deg_tripolar` or `:orca`, default: `:one_deg_tripolar`)
+- `depth`: Maximum ocean depth in metres (default: 5500 m for EN4 compatibility)
 
 Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
@@ -162,6 +174,7 @@ function OceananigansSimulation(
     output_dir,
     simple_ocean = false,
     ocean_grid = :one_deg_tripolar,
+    depth = 5500,
     dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     coupled_param_dict = CP.create_toml_dict(FT),
@@ -207,7 +220,14 @@ function OceananigansSimulation(
         error("Unsupported time type: $(typeof(tspan[1]))")
     end
 
-    ocean = ocean_simulation(arch, ocean_grid; simple_ocean, closure, clock = model_clock)
+    ocean = ocean_simulation(
+        arch,
+        ocean_grid;
+        simple_ocean,
+        closure,
+        clock = model_clock,
+        depth,
+    )
     ocean.stop_time = stop_time
     ocean.Δt = float(dt)
 

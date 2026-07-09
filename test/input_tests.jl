@@ -103,6 +103,7 @@ end
         "seaice_diagnostic_interval" => "1days",
         "seaice_diagnostic_mode" => "average",
         "simple_ocean" => false,
+        "ocean_grid" => "one_deg_tripolar",
         "sst_adjustment" => 2.0,
         "ice_model" => "prescribed",
         "ocean_progress_interval" => nothing,
@@ -139,6 +140,7 @@ end
     @test args.ice_model == Val(:prescribed)
     @test args.land_fraction_source == "etopo"
     @test args.sst_adjustment == 2.0
+    @test args.ocean_grid == :one_deg_tripolar
     @test args.domain_type == "global"
     @test args.column_latlon == (0.0, 0.0)
     @test args.scm_surface_type === nothing

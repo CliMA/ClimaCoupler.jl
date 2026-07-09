@@ -1,4 +1,5 @@
 apply_limiter: false
+atmos_progress_interval: "150secs"
 dt: "150secs"
 dt_cpl: "150secs"
 dt_rad: "1hours"

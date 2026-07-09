@@ -212,6 +212,10 @@ function argparse_settings()
         help = "Use the ClimaAtmos walltime logging callback instead of the default ClimaCoupler one [`false` (default), `true`]"
         arg_type = Bool
         default = false
+        "--atmos_progress_interval"
+        help = "Time interval for printing atmosphere progress information [\"never\" (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
+        arg_type = String
+        default = "never"
         "--albedo_model"
         help = "Type of albedo model. [`ConstantAlbedo`, `RegressionFunctionAlbedo`, `CouplerAlbedo` (default)]"
         arg_type = String
@@ -233,6 +237,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to compute and output land model diagnostics [`true` (default), `false`]"
         arg_type = Bool
         default = true
+        "--land_progress_interval"
+        help = "Time interval for printing land progress information [\"never\" (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
+        arg_type = String
+        default = "never"
         "--land_diagnostics_period"
         help = "Time interval between land diagnostic outputs. ClimaLand only supports a fixed set of periods: [`1months` (default), `10days`, `1days`, `1hours`, `30mins`]"
         arg_type = String
@@ -280,9 +288,9 @@ function argparse_settings()
         arg_type = Float64
         default = 0.0
         "--ocean_progress_interval"
-        help = "Iteration interval for printing progress information [`nothing`, `<:Integer`] (default: nothing)"
-        arg_type = Integer
-        default = nothing
+        help = "Time interval for printing ocean progress information [\"never\" (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
+        arg_type = String
+        default = "never"
         "--ocean_diagnostic_interval"
         help = "Time interval between ocean diagnostic outputs [\"1days\" (default), allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\"]"
         arg_type = String
@@ -304,6 +312,10 @@ function argparse_settings()
         help = "Reduction mode for sea-ice diagnostic outputs. [`average` (default) uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval`]"
         arg_type = String
         default = "average"
+        "--seaice_progress_interval"
+        help = "Time interval for printing sea-ice progress information [\"never\" (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
+        arg_type = String
+        default = "never"
         "--land_fraction_source"
         help = "Source for land fraction data. [`etopo` (default) uses ETOPO-derived landsea_mask artifact, `era5` uses ERA5 land fraction artifact]"
         arg_type = String
@@ -531,6 +543,9 @@ function get_coupler_args(config_dict::Dict)
     # Checkpointing information
     checkpoint_dt = config_dict["checkpoint_dt"]
 
+    # Atmos progress reporting information
+    atmos_progress_interval = config_dict["atmos_progress_interval"]
+
     # Restart information
     detect_restart_files = config_dict["detect_restart_files"]
     restart_dir = config_dict["restart_dir"]
@@ -571,6 +586,7 @@ function get_coupler_args(config_dict::Dict)
     land_diagnostics_period =
         land_diagnostics_period_to_symbol(config_dict["land_diagnostics_period"])
     land_diagnostics_reduction = Symbol(config_dict["land_diagnostics_reduction"])
+    land_progress_interval = config_dict["land_progress_interval"]
 
     # Initial condition setting
     era5_initial_condition_dir = config_dict["era5_initial_condition_dir"]
@@ -588,7 +604,7 @@ function get_coupler_args(config_dict::Dict)
     simple_ocean = config_dict["simple_ocean"]
     ocean_grid = Symbol(lowercase(config_dict["ocean_grid"]))
     sst_adjustment = FT(config_dict["sst_adjustment"])
-    progress_interval = config_dict["ocean_progress_interval"]
+    ocean_progress_interval = config_dict["ocean_progress_interval"]
     ocean_diagnostic_interval = config_dict["ocean_diagnostic_interval"]
     ocean_diagnostic_mode = Symbol(config_dict["ocean_diagnostic_mode"])
 
@@ -596,6 +612,7 @@ function get_coupler_args(config_dict::Dict)
     ice_model = Val(Symbol(config_dict["ice_model"]))
     seaice_diagnostic_interval = config_dict["seaice_diagnostic_interval"]
     seaice_diagnostic_mode = Symbol(config_dict["seaice_diagnostic_mode"])
+    seaice_progress_interval = config_dict["seaice_progress_interval"]
 
     # SCM settings
     domain_type = config_dict["domain_type"]
@@ -648,6 +665,7 @@ function get_coupler_args(config_dict::Dict)
         h_elem_coupler,
         saveat,
         checkpoint_dt,
+        atmos_progress_interval,
         detect_restart_files,
         restart_dir,
         restart_t,
@@ -668,6 +686,7 @@ function get_coupler_args(config_dict::Dict)
         use_land_diagnostics,
         land_diagnostics_period,
         land_diagnostics_reduction,
+        land_progress_interval,
         bucket_albedo_type,
         parameter_files,
         era5_filepaths,
@@ -675,12 +694,13 @@ function get_coupler_args(config_dict::Dict)
         simple_ocean,
         ocean_grid,
         sst_adjustment,
-        progress_interval,
+        ocean_progress_interval,
         ocean_diagnostic_interval,
         ocean_diagnostic_mode,
         ice_model,
         seaice_diagnostic_interval,
         seaice_diagnostic_mode,
+        seaice_progress_interval,
         land_fraction_source,
         binary_area_fraction,
         domain_type,

@@ -155,6 +155,12 @@ own steps. The default implementation compares `t` against
 flux to a slow surface before it steps. Component models that need different
 step-boundary detection logic can override this method.
 
+- `progress(sim::AbstractComponentSimulation, cs)`: Print progress statistics
+from the component model simulation. This is called by a coupler callback with
+a frequency controlled by the `<component>_progress_interval` config options.
+If this function is not extended for a component model, a warning is raised
+once and no progress is printed.
+
 ### AbstractAtmosSimulation - required functions
 In addition to the functions required for a general
 `AbstractComponentSimulation`, an `AbstractAtmosSimulation` requires the

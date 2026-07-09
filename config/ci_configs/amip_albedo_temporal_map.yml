@@ -1,4 +1,5 @@
 apply_limiter: false
+atmos_progress_interval: "150secs"
 bucket_albedo_type: "map_temporal"
 dt: "150secs"
 dt_cpl: "150secs"

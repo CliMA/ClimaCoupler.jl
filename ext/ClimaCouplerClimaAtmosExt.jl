@@ -21,6 +21,7 @@ import Thermodynamics as TD
 import Insolation
 import Insolation.Parameters: InsolationParameters
 import LinearAlgebra
+import Statistics
 import ClimaCoupler:
     Checkpointer,
     FieldExchanger,
@@ -592,6 +593,30 @@ function Interfacer.set_cache!(sim::ClimaAtmosSimulation, csf)
     if hasradiation(sim.integrator)
         CA.rrtmgp_model_callback!(sim.integrator)
         CA.nogw_model_callback!(sim.integrator)
+    end
+    return nothing
+end
+
+"""
+    Interfacer.progress(atmos_sim::ClimaAtmosSimulation, cs)
+
+Extension of `Interfacer.progress` for ClimaAtmos.
+
+Print some statistics with a frequency determined by the `atmos_progress_interval` config option.
+"""
+function Interfacer.progress(atmos_sim::ClimaAtmosSimulation, cs)
+    T_air = Interfacer.get_field(atmos_sim, Val(:air_temperature))
+    T_min = minimum(T_air)
+    T_max = maximum(T_air)
+    T_mean = Statistics.mean(T_air) # this is area-weighted thanks to ClimaCore
+    T_std = sqrt(Statistics.mean((T_air .- T_mean) .^ 2))
+    u_max = maximum(abs, Interfacer.get_field(atmos_sim, Val(:u_int)))
+    v_max = maximum(abs, Interfacer.get_field(atmos_sim, Val(:v_int)))
+    if ClimaComms.iamroot(ClimaComms.context(cs))
+        @info "Atmos | time: $(Interfacer.current_date(cs, atmos_sim.integrator.t)), iteration: $(atmos_sim.integrator.step), " *
+              "extrema(T_sfc): ($(round(T_min, digits = 2)), $(round(T_max, digits = 2))) K, " *
+              "mean(T_sfc): $(round(T_mean, digits = 2)) K, std(T_sfc): $(round(T_std, digits = 2)) K, " *
+              "maximum(u_sfc): ($(round(u_max, sigdigits = 2)), $(round(v_max, sigdigits = 2))) m/s"
     end
     return nothing
 end

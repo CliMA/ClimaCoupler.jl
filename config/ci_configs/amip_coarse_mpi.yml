@@ -1,4 +1,5 @@
 apply_limiter: false
+atmos_progress_interval: "400secs"
 energy_check: false
 h_elem: 4
 mode_name: "amip"

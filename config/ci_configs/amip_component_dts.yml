@@ -1,4 +1,5 @@
 apply_limiter: false
+atmos_progress_interval: "30secs"
 dt_atmos: "30secs"
 dt_cpl: "30secs"
 dt_land: "60secs"

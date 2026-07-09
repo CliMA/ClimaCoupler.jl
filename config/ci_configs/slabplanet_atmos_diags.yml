@@ -1,4 +1,5 @@
 apply_limiter: false
+atmos_progress_interval: "200secs"
 dt: "200secs"
 dt_cpl: "200secs"
 energy_check: true

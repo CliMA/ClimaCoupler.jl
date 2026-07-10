@@ -249,12 +249,11 @@ function make_plots_generic(
     end
 
     # Standardizes grid layout
-    gridlayout() =
-        map(1:MAX_PLOTS_PER_PAGE) do i
-            row = mod(div(i - 1, MAX_NUM_COLS), MAX_NUM_ROWS) + 1
-            col = mod(i - 1, MAX_NUM_COLS) + 1
-            return fig[row, col] = CairoMakie.GridLayout()
-        end
+    gridlayout() = map(1:MAX_PLOTS_PER_PAGE) do i
+        row = mod(div(i - 1, MAX_NUM_COLS), MAX_NUM_ROWS) + 1
+        col = mod(i - 1, MAX_NUM_COLS) + 1
+        return fig[row, col] = CairoMakie.GridLayout()
+    end
 
     fig = makefig()
     grid = gridlayout()

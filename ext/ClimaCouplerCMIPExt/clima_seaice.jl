@@ -351,23 +351,25 @@ function write_diagnosed_ice_T_sfc_to_model!(sim::ClimaSeaIceSimulation)
     n_oc_layout = Nx_oc * Ny_oc
     FT = eltype(ice_intersection_flux_state.surface_T)
 
-    C_to_K = sim.ice_properties.C_to_K
-    top_sfc_T = sim.ice.model.ice_thermodynamics.top_surface_temperature
-
-    # Seed T_oc from the current field (in K) so that OC cells with no intersection
-    # polygon coverage retain their previous temperature rather than reverting to 0 K,
-    # which would produce the unphysical top_surface_temperature = 0 - C_to_K = -273.15°C.
-    T_oc = OC.on_architecture(
-        OC.architecture(grid),
-        vec(OC.interior(top_sfc_T, :, :, 1)) .+ C_to_K,
-    )
+    T_oc = OC.on_architecture(OC.architecture(grid), zeros(FT, n_oc_layout))
     scatter_to_oc!(T_oc, intersection_grid, ice_intersection_flux_state.surface_T)
     T_oc_2d = reshape(T_oc, Nx_oc, Ny_oc)
 
+    C_to_K = sim.ice_properties.C_to_K
     ice_concentration = OC.interior(sim.ice.model.ice_concentration, :, :, 1)
+    top_sfc_T = sim.ice.model.ice_thermodynamics.top_surface_temperature
+
+    # scatter_to_oc! accumulates into its own internal buffer and overwrites T_oc via
+    # sync_intersection_vector!. OC cells with no intersection polygon coverage are left
+    # at exactly 0 K, which after subtracting C_to_K gives top_surface_temperature =
+    # -273.15°C. Fall back to the previous top_surface_temperature for those cells so
+    # uncovered ice cells retain a physically meaningful temperature.
+    prev_T_K = OC.interior(top_sfc_T, :, :, 1) .+ C_to_K
+    T_oc_safe = ifelse.(T_oc_2d .== 0, prev_T_K, T_oc_2d)
+
     OC.interior(top_sfc_T, :, :, 1) .= ifelse.(
         ice_concentration .> 0,
-        T_oc_2d .- C_to_K,
+        T_oc_safe .- C_to_K,
         OC.interior(top_sfc_T, :, :, 1),
     )
     return nothing

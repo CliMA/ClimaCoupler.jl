@@ -308,14 +308,14 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:diffuse_fraction
     else
         direct_flux_dn = radiation_model.face_sw_direct_flux_dn[1, :]
         FT = eltype(total_flux_dn)
-        diffuse_fraction =
-            clamp.(
-                (
-                    (x, y) -> y > zero(y) ? x / y : zero(y)
-                ).(total_flux_dn .- direct_flux_dn, total_flux_dn),
-                zero(FT),
-                one(FT),
-            )
+        diffuse_fraction = clamp.(
+            ((x, y) -> y > zero(y) ? x / y : zero(y)).(
+                total_flux_dn .- direct_flux_dn,
+                total_flux_dn,
+            ),
+            zero(FT),
+            one(FT),
+        )
     end
     return CC.Fields.array2field(diffuse_fraction, lowest_face_space)
 end
@@ -386,17 +386,16 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_humi
 
     # TODO: Is csf.height_int .- csf.height_sfc allocating?
     # TODO: Add two scratch fields for q_liq_atmos and q_ice_atmos
-    csf.scalar_temp4 .=
-        SF.surface_density.(
-            surface_fluxes_params,
-            T_atmos,
-            ρ_atmos,
-            csf.T_sfc,
-            csf.height_int .- csf.height_sfc,
-            q_tot_atmos,
-            0, # q_liq
-            0, # q_ice
-        )
+    csf.scalar_temp4 .= SF.surface_density.(
+        surface_fluxes_params,
+        T_atmos,
+        ρ_atmos,
+        csf.T_sfc,
+        csf.height_int .- csf.height_sfc,
+        q_tot_atmos,
+        0, # q_liq
+        0, # q_ice
+    )
     ρ_sfc = csf.scalar_temp4
 
     thermo_params = get_thermo_params(sim)
@@ -495,8 +494,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
     Interfacer.remap!(temp_field_surface, F_turb_ρτxz) # F_turb_ρτxz_atmos
     F_turb_ρτyz_atmos = Interfacer.remap(atmos_surface_space, F_turb_ρτyz) # F_turb_ρτyz_atmos
     sim.integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ .= (
-        surface_normal .⊗
-        CA.C12.(
+        surface_normal .⊗ CA.C12.(
             temp_field_surface .* vec_ct12_ct1 .+ F_turb_ρτyz_atmos .* vec_ct12_ct2,
             surface_local_geometry,
         )
@@ -826,13 +824,12 @@ function Interfacer.set_albedos!(sim::Models.PrescribedOceanSimulation, t)
 
     # Get the atmospheric wind vector and the cosine of the zenith angle
     surface_coords = CC.Fields.coordinate_field(axes(sim.cache.T_sfc))
-    insolation_tuple =
-        Insolation.insolation.(
-            current_date,
-            surface_coords.lat,
-            surface_coords.long,
-            insolation_params,
-        )
+    insolation_tuple = Insolation.insolation.(
+        current_date,
+        surface_coords.lat,
+        surface_coords.long,
+        insolation_params,
+    )
     cos_zenith_angle = insolation_tuple.μ
     wind_atmos = LinearAlgebra.norm.(CC.Geometry.Covariant12Vector.(p.u_int, p.v_int)) # wind vector from components
     λ = FT(0) # spectral wavelength (not used for now)

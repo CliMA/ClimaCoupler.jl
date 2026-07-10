@@ -12,7 +12,6 @@ implicit_diffusion: true
 insolation: "timevarying"
 netcdf_output_at_levels: true
 ode_algo: ARS343
-max_newton_iters_ode: 3
 prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05", "OC1", "OC2", "SO4", "SSLT01", "SSLT02", "SSLT03", "SSLT04", "SSLT05"]
 rad: "allskywithclear"
 rayleigh_sponge: true

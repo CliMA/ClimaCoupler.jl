@@ -1,6 +1,5 @@
 agents:
-  queue: central
-  slurm_time: 30:00:00
+  queue: clima
   modules: climacommon/2025_05_15
 
 env:
@@ -10,45 +9,38 @@ env:
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100
   GKSwstype: 100
   SLURM_KILL_BAD_EXIT: 1
-  CONFIG_PATH: "config/ci_configs"
-
-timeout_in_minutes: 1800 # 30 hours
 
 steps:
-  - label: "init clima :computer:"
-    key: "init_cpu_env_clima"
+  - label: "init CMIP env :computer:"
+    key: "init_cmip_env"
     command:
-      - "echo $$JULIA_DEPOT_PATH"
-
-      - echo "--- Instantiate AMIP env"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
-
       - echo "--- Instantiate CMIP env"
       - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
-
     agents:
       queue: clima
+      slurm_time: 01:00:00
+      slurm_mem: 32GB
     env:
       JULIA_NUM_PRECOMPILE_TASKS: 8
       JULIA_MAX_NUM_PRECOMPILE_FILES: 50
 
   - wait
-  
-  - group: "CMIP simulations"
-    
-    steps: 
-      - label: "GPU CMIP: ED only + integrated land"
-        key: "cmip_edonly_land"
-        command:
-            - "julia --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice.yml --job_id cmip_oceananigans_climaseaice"
-        artifact_paths: "output/cmip_oceananigans_climaseaice/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          queue: clima
-          slurm_mem: 32GB
-          slurm_gpus: 1
+
+  - label: "GPU CMIP stability diagnostics"
+    key: "stability_diagnostics"
+    command:
+      - "julia --color=yes --project=experiments/CMIP/ experiments/CMIP/stability_diagnostics.jl"
+    artifact_paths: "output/stability_diagnostics/artifacts/*"
+    timeout_in_minutes: 1440  # 24 hours; Test 1 runs up to 300 coupling steps
+    env:
+      CLIMACOMMS_DEVICE: "CUDA"
+      STABILITY_CONFIG: "config/ci_configs/cmip_oceananigans_climaseaice.yml"
+      STABILITY_N_STEPS: "500"
+      STABILITY_JOB_ID: "stability_diagnostics"
+    agents:
+      queue: clima
+      slurm_time: 24:00:00
+      slurm_mem: 32GB
+      slurm_gpus: 1

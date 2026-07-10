@@ -791,7 +791,7 @@ struct MACDataLoader <: AbstractDataLoader
     available_vars::Set{String}
 end
 
-const MAC_TO_CLIMA_NAMES = ["lwp" => "lwp", "iwp" => "iwp"]
+const MAC_TO_CLIMA_NAMES = ["cloudlwp" => "lwp"]
 
 """
     MACDataLoader(;
@@ -805,8 +805,8 @@ MAC data on single levels in `OutputVar`, where
 - the times are at the start of the time period (e.g. the time average of
   January is on the first of January instead of January 15th).
 
-For `lwp` and `iwp`, there are `NaN`s in the data. These `NaN`s was imputted
-with mean of the non-`NaN` data for the dataset.
+The dataset contains missing values (the file's `_FillValue`). Unlike the
+MODIS and CALIPSO loaders, these are left in place and not imputed.
 
 The MAC data comes from the `mac_lwp` artifact. See
 [ClimaArtifacts](https://github.com/CliMA/ClimaArtifacts/tree/main/mac_lwp/)

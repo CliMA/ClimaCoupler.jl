@@ -59,14 +59,17 @@ function run!(
     ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
     GC.gc()
 
-    #=
     ## Solving and Timing the Full Simulation
 
-    This is where the full coupling loop, `solve_coupler!` is called for the full timespan of the simulation.
-    We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU, and use this
-    value to calculate the simulated years per day (SYPD) of the simulation.
-    =#
+    # This is where the full coupling loop is called for the full timespan of the simulation.
+    # We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU and use this
+    # value to calculate the simulated years per day (SYPD) of the simulation.
     @info "Starting coupling loop"
+    # The precompilation steps above already advanced `cs.t[]`, so the timed loop only covers
+    # `t_timed_start` to `cs.tspan[end]`. Snapshot the start so timing metrics reflect the
+    # simulated time actually spanned during timing (this equals `cs.tspan[begin]` when no
+    # precompilation ran).
+    t_timed_start = float(cs.t[])
     walltime = ClimaComms.@elapsed ClimaComms.device(cs) begin
         while cs.t[] < cs.tspan[end]
             step!(cs)
@@ -74,11 +77,7 @@ function run!(
     end
     @info "Simulation took $(walltime) seconds"
 
-    sypd = simulated_years_per_day(cs, walltime)
-    walltime_per_step = walltime_per_coupling_step(cs, walltime)
-    @info "SYPD: $sypd"
-    @info "Walltime per coupling step: $(walltime_per_step)"
-    save_sypd_walltime_to_disk(cs, walltime)
+    save_sypd_walltime_to_disk(cs, walltime, t_timed_start)
 
     # Close all diagnostics file writers
     isnothing(cs.diags_handler) ||
@@ -129,37 +128,18 @@ function step!(cs::Interfacer.CoupledSimulation)
 end
 
 """
-    simulated_years_per_day(cs, walltime)
+    save_sypd_walltime_to_disk(cs, walltime, t_timed_start = cs.tspan[begin])
 
-Compute the simulated years per walltime day for the given coupled simulation `cs`, assuming
-that the simulation took `walltime`.
+Save the computed `sypd`, `walltime_per_coupling_step`, and memory usage to text files 
+in the `artifacts` directory. `t_timed_start` is the simulated time (in seconds) at which 
+the timed portion of the run began (see the `precompile` flag in [run!](@ref)). 
 """
-function simulated_years_per_day(cs, walltime)
-    simulated_seconds_per_second = float(cs.tspan[end] - cs.tspan[begin]) / walltime
-    return simulated_seconds_per_second / 365.25
-end
-
-"""
-    walltime_per_coupling_step(cs, walltime)
-
-Compute the average walltime needed to take one step for the given coupled simulation `cs`,
-assuming that the simulation took `walltime`. The result is in seconds.
-"""
-function walltime_per_coupling_step(cs, walltime)
-    n_coupling_steps = (cs.tspan[end] - cs.tspan[begin]) / cs.Δt_cpl
-    return walltime / n_coupling_steps
-end
-
-"""
-    save_sypd_walltime_to_disk(cs, walltime)
-
-Save the computed `sypd`, `walltime_per_coupling_step`,
-and memory usage to text files in the `artifacts` directory.
-"""
-function save_sypd_walltime_to_disk(cs, walltime)
+function save_sypd_walltime_to_disk(cs, walltime, t_timed_start = cs.tspan[begin])
     if ClimaComms.iamroot(ClimaComms.context(cs))
-        sypd = simulated_years_per_day(cs, walltime)
-        walltime_per_step = walltime_per_coupling_step(cs, walltime)
+        sypd = TimeManager.simulated_years_per_day(t_timed_start, cs.tspan[end], walltime)
+        walltime_per_step = walltime / ((cs.tspan[end] - t_timed_start) / cs.Δt_cpl)
+        @info "SYPD: $sypd"
+        @info "Walltime per coupling step: $(walltime_per_step)"
 
         open(joinpath(cs.dir_paths.artifacts_dir, "sypd.txt"), "w") do sypd_filename
             println(sypd_filename, "$sypd")
@@ -216,6 +196,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         h_elem_coupler,
         saveat,
         checkpoint_dt,
+        walltime_dt,
         atmos_progress_interval,
         detect_restart_files,
         restart_dir,
@@ -472,10 +453,13 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         TimeManager.Callback(schedule_checkpoint, sim -> Checkpointer.checkpoint_sims(sim))
 
     # walltime reporting
-    if config_dict["atmos_log_progress"]
+    if walltime_dt == "never"
         callbacks = (checkpoint_cb,)
     else
-        walltime_cb = TimeManager.capped_geometric_walltime_cb(t_start, t_end, Δt_cpl)
+        schedule_walltime =
+            EveryCalendarDtSchedule(TimeManager.time_to_period(walltime_dt); start_date)
+        walltime_cb =
+            TimeManager.Callback(schedule_walltime, TimeManager.WalltimeReporter())
         callbacks = (checkpoint_cb, walltime_cb)
     end
 

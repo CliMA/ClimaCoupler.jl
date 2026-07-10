@@ -94,8 +94,8 @@ how to customise the root path via the `coupler_output_dir` configuration option
 `cs.callbacks` is a `NamedTuple` of `TimeManager.Callback` objects, which each execute
 some operation at predetermined times throughout a simulation. Each callback
 wraps a schedule and a function, and is triggered at the appropriate time during
-`step!`. The default callbacks include a walltime progress reporter and, if enabled,
-a checkpointing callback. See [TimeManager](@ref) for the `Callback` API and
+`step!`. The default callbacks include a checkpointing callback, a walltime reporter,
+and, if enabled, component model progress-reporting callbacks. See [TimeManager](@ref) for the `Callback` API and
 [Checkpointer](@ref) for how to add a checkpointing callback.
 
 ## Conservation checks (`cs.conservation_checks`)

@@ -9,7 +9,6 @@ module TimeManager
 import Dates
 import ..Interfacer
 import ..Utilities: time_to_seconds
-import ClimaUtilities.OnlineLogging: WallTimeInfo, report_walltime
 
 """
     time_to_period(s::String)
@@ -49,6 +48,16 @@ function time_to_period(s::String)
         return Dates.Millisecond(1000 * time_to_seconds(s))
     end
 end
+
+"""
+    simulated_years_per_day(t_start, t_end, walltime)
+
+Compute the simulated years per walltime day for a simulation spanning from
+`t_start` to `t_end` (in seconds), assuming that the simulation took `walltime`
+(in seconds) to run.
+"""
+simulated_years_per_day(t_start, t_end, walltime) =
+    float(t_end - t_start) / walltime / 365.25
 
 """
     Callback
@@ -102,27 +111,86 @@ function (::NeverSchedule)(args...)
 end
 
 """
-    capped_geometric_walltime_cb(t_start, t_end, Δt_cpl)
+    WalltimeReporter()
 
-Create a callback that reports walltime at when the number of steps taken is a power of 2, or
-when the percent of the simulation that is completed is a multiple of 5. This skips the
-first two steps to avoid compilation time noise.
+A callable object that logs the progress of a coupled simulation.
+
+A `WalltimeReporter` is meant to be used as the function of a `Callback`: it is
+called with the `CoupledSimulation` as its only argument and reads the current
+time, start date, time span, and coupling time step from it.
+
+The wall time of the first call is dominated by compilation, so it is not
+measured; instead, the first measurement (between the first and second calls) is 
+scaled up to estimate the compilation-free wall time of the steps before it.
 """
-function capped_geometric_walltime_cb(t_start, t_end, Δt_cpl)
-    tot_steps = Int(ceil(float(t_end - t_start) / float(Δt_cpl)))
-    five_percent_steps = ceil(Int, 0.05 * tot_steps)
-    steps_taken = (integrator) -> float(integrator.t - t_start) / float(Δt_cpl)
-    walltime_report_cond =
-        (integrator) -> begin
-            nsteps = steps_taken(integrator)
-            # skip first two steps for compilation
-            (nsteps <= 2) && return false
-            return nsteps % five_percent_steps == 0 || ispow2(nsteps)
+struct WalltimeReporter
+    n_calls::Base.RefValue{Int}
+    wall_time_last::Base.RefValue{Float64}
+    sim_time_last::Base.RefValue{Float64}
+    wall_time_elapsed::Base.RefValue{Float64}
+end
+WalltimeReporter() = WalltimeReporter(Ref(0), Ref(0.0), Ref(0.0), Ref(0.0))
+
+function (reporter::WalltimeReporter)(cs)
+    # t, t_start, t_end, Δt_cpl, and date from the coupled simulation
+    t = float(cs.t[])
+    t_start, t_end = float.(cs.tspan)
+    Δt_cpl = float(cs.Δt_cpl)
+    date = cs.start_date + Dates.Second(round(Int, t))
+
+    # compute the number of steps completed, total number of steps, and percent complete
+    n_steps = max(1, round(Int, (t - t_start) / Δt_cpl))
+    n_steps_total = ceil(Int, (t_end - t_start) / Δt_cpl) #TODO: This doesn't support t_end = Inf
+    percent_complete = round(100 * (t - t_start) / (t_end - t_start); digits = 1)
+
+    # begin info message
+    msg = """
+        Progress
+          time = $date ($(compact_time_str(t - t_start)))
+          step = $n_steps ($percent_complete%)"""
+
+    reporter.n_calls[] += 1
+    if reporter.n_calls[] > 1
+        Δt_wall = time() - reporter.wall_time_last[]
+        if reporter.wall_time_elapsed[] == 0
+            # Scale the first measurement to also cover the steps before the
+            # previous call, whose wall time was discarded as compilation
+            Δt_wall *= (t - t_start) / (t - reporter.sim_time_last[])
         end
-    walltime_affect! = let wt = WallTimeInfo()
-        (coupled_sim) -> report_walltime(wt, coupled_sim.model_sims.atmos_sim.integrator)
+        reporter.wall_time_elapsed[] += Δt_wall
+
+        wall_time_remaining =
+            reporter.wall_time_elapsed[] / n_steps * (n_steps_total - n_steps)
+        finish_date =
+            trunc(Dates.now() + Dates.Second(round(Int, wall_time_remaining)), Dates.Second)
+        sypd = simulated_years_per_day(t_start, t, reporter.wall_time_elapsed[])
+        msg *= "\n  walltime remaining ≈ $(compact_time_str(wall_time_remaining)) ($finish_date)"
+        msg *= "\n  sypd ≈ $(round(sypd; sigdigits = 4))"
     end
-    return TimeManager.Callback(walltime_report_cond, walltime_affect!)
+    reporter.sim_time_last[] = t
+    reporter.wall_time_last[] = time()
+    @info msg
+    return nothing
+end
+
+"""
+    compact_time_str(seconds)
+
+Return a compact string for a duration given in `seconds` using the two largest nonzero units. 
+
+Example: `compact_time_str(59580.0) == "16 h 33 m"`.
+"""
+function compact_time_str(seconds)
+    remaining = round(Int, seconds)
+    remaining < 1 && return "0 s"
+    parts = String[]
+    for (unit, unit_length) in
+        (("y", 31557600), ("d", 86400), ("h", 3600), ("m", 60), ("s", 1))
+        n, remaining = divrem(remaining, unit_length)
+        n > 0 && push!(parts, "$n $unit")
+        length(parts) == 2 && break
+    end
+    return join(parts, " ")
 end
 
 end

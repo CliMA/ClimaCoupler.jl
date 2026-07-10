@@ -121,6 +121,10 @@ function argparse_settings()
         help = "Time interval for checkpointing [\"90days\" (default)]"
         arg_type = String
         default = "90days"
+        "--walltime_dt"
+        help = "Time interval for walltime reporting [nothing (default): a tenth of the simulation length, at most 1 day and at least one coupling step; allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
+        arg_type = String
+        default = nothing
         # Space information
         "--h_elem"
         help = "Number of horizontal elements to use for the atmosphere horizontal space [16 (default)]"
@@ -208,10 +212,6 @@ function argparse_settings()
         help = "An optional YAML file used to overwrite the default model parameters."
         arg_type = String
         default = nothing
-        "--atmos_log_progress"
-        help = "Use the ClimaAtmos walltime logging callback instead of the default ClimaCoupler one [`false` (default), `true`]"
-        arg_type = Bool
-        default = false
         "--atmos_progress_interval"
         help = "Time interval for printing atmosphere progress information [\"never\" (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
         arg_type = String
@@ -543,6 +543,15 @@ function get_coupler_args(config_dict::Dict)
     # Checkpointing information
     checkpoint_dt = config_dict["checkpoint_dt"]
 
+    # Walltime reporting information
+    walltime_dt = get(config_dict, "walltime_dt", nothing)
+    if isnothing(walltime_dt)
+        # default to a tenth of the simulation length (capped at one day, but never
+        # shorter than one coupling step)
+        walltime_dt_secs = max(min(float(t_end - t_start) / 10, 86400.0), float(Δt_cpl))
+        walltime_dt = "$(walltime_dt_secs)secs"
+    end
+
     # Atmos progress reporting information
     atmos_progress_interval = config_dict["atmos_progress_interval"]
 
@@ -665,6 +674,7 @@ function get_coupler_args(config_dict::Dict)
         h_elem_coupler,
         saveat,
         checkpoint_dt,
+        walltime_dt,
         atmos_progress_interval,
         detect_restart_files,
         restart_dir,

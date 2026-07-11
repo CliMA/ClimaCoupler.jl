@@ -257,9 +257,9 @@ function Plotting.compute_pfull_leaderboard(
             error("Units of pressure should be hPa for $short_name simulation data")
 
         # Remove first spin_up_months from simulation
-        spinup_cutoff = spinup * 31 * 86400.0
-        ClimaAnalysis.times(sim_var)[end] >= spinup_cutoff &&
-            (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff))
+        spinup_cutoff_date = first(ClimaAnalysis.dates(sim_var)) + spinup * Dates.Month(1)
+        ClimaAnalysis.dates(sim_var)[end] >= spinup_cutoff_date &&
+            (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff_date))
 
         # Restrain the pressure levels so we can resample
         min_pfull = ClimaAnalysis.pressures(obs_var)[1]

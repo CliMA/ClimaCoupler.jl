@@ -183,12 +183,8 @@ steps:
 
       - label: ":thermometer: Cess climate sensitivity approximation from p2K runs"
         key: "cess_from_p2k"
-        command: >-
-          julia --color=yes --project=experiments/AMIP/
-            test/cess_climate_sensitivity.jl
-            output/amip_progedmf_land
-            output/amip_progedmf_land_p2k
-            output/ecs_analysis
+        command:
+          - "julia --color=yes --project=experiments/AMIP/ test/cess_climate_sensitivity.jl output/amip_progedmf_land output/amip_progedmf_land_p2k output/ecs_analysis"
         artifact_paths: "output/ecs_analysis/*"
         agents:
           queue: clima

@@ -5,11 +5,11 @@ checkpoint_dt: "30days"
 coupler_diagnostics_period: "30days"
 coupler_diagnostics_reduction: "average"
 coupler_toml: ["toml/amip_progedmf.toml"]
-dt_atmos: "450secs" # 7.5 minutes
-dt_cpl: "900secs" # 15 minutes
-dt_land: "900secs" # 15 minutes
-dt_ocean: "900secs" # 15 minutes
-dt_seaice: "900secs" # 15 minutes
+dt_atmos: "120secs" # 2 minutes
+dt_cpl: "960secs" # 16 minutes
+dt_land: "960secs" # 16 minutes
+dt_ocean: "960secs" # 16 minutes
+dt_seaice: "960secs" # 16 minutes
 dt_cloud_fraction: "1hours"
 dt_rad: "1hours"
 energy_check: false

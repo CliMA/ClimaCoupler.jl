@@ -175,10 +175,11 @@ for FT in (Float32, Float64)
         # Compute expected fluxes
         # Get atmosphere properties
         height_int = Interfacer.get_field(atmos_sim, Val(:height_int))
-        uv_int = StaticArrays.SVector.(
-            Interfacer.get_field(atmos_sim, Val(:u_int)),
-            Interfacer.get_field(atmos_sim, Val(:v_int)),
-        )
+        uv_int =
+            StaticArrays.SVector.(
+                Interfacer.get_field(atmos_sim, Val(:u_int)),
+                Interfacer.get_field(atmos_sim, Val(:v_int)),
+            )
         surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
 
         # Get surface properties
@@ -189,39 +190,42 @@ for FT in (Float32, Float64)
 
         T_sfc = Interfacer.get_field(ocean_sim, Val(:surface_temperature))
         q_sfc = zeros(boundary_space)
-        ρ_sfc = SF.surface_density.(
-            surface_fluxes_params,
-            fields.T_atmos,
-            fields.ρ_atmos,
-            T_sfc,
-            height_int .- height_sfc,
-            fields.q_tot_atmos,
-            0, # q_liq
-            0, # q_ice
-        )
+        ρ_sfc =
+            SF.surface_density.(
+                surface_fluxes_params,
+                fields.T_atmos,
+                fields.ρ_atmos,
+                T_sfc,
+                height_int .- height_sfc,
+                fields.q_tot_atmos,
+                0, # q_liq
+                0, # q_ice
+            )
         q_sfc .= TD.q_vap_saturation.(thermo_params, T_sfc, ρ_sfc, 0, 0)
 
-        config = SF.SurfaceFluxConfig.(
-            SF.ConstantRoughnessParams.(z0m, z0b),
-            SF.ConstantGustinessSpec.(gustiness),
-        )
+        config =
+            SF.SurfaceFluxConfig.(
+                SF.ConstantRoughnessParams.(z0m, z0b),
+                SF.ConstantGustinessSpec.(gustiness),
+            )
 
-        fluxes_expected = FluxCalculator.get_surface_fluxes.(
-            surface_fluxes_params,
-            uv_int,
-            atmos_sim.integrator.T,
-            atmos_sim.integrator.q,
-            0, # q_liq
-            0, # q_ice
-            atmos_sim.integrator.ρ,
-            height_int,
-            StaticArrays.SVector.(0, 0), # uv_sfc
-            T_sfc,
-            q_sfc,
-            height_sfc,
-            0, # d
-            Ref(config),
-        )
+        fluxes_expected =
+            FluxCalculator.get_surface_fluxes.(
+                surface_fluxes_params,
+                uv_int,
+                atmos_sim.integrator.T,
+                atmos_sim.integrator.q,
+                0, # q_liq
+                0, # q_ice
+                atmos_sim.integrator.ρ,
+                height_int,
+                StaticArrays.SVector.(0, 0), # uv_sfc
+                T_sfc,
+                q_sfc,
+                height_sfc,
+                0, # d
+                Ref(config),
+            )
 
         # Compare expected and computed fluxes
         @test fields.F_turb_ρτxz ≈ fluxes_expected.F_turb_ρτxz

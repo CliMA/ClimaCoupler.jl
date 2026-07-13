@@ -315,10 +315,11 @@ end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:air_velocity}, u_int, v_int)
     Interfacer.remap!(sim.integrator.p.bucket.scratch1, u_int)
     Interfacer.remap!(sim.integrator.p.bucket.scratch2, v_int)
-    sim.integrator.p.drivers.u .= StaticArrays.SVector.(
-        sim.integrator.p.bucket.scratch1,
-        sim.integrator.p.bucket.scratch2,
-    )
+    sim.integrator.p.drivers.u .=
+        StaticArrays.SVector.(
+            sim.integrator.p.bucket.scratch1,
+            sim.integrator.p.bucket.scratch2,
+        )
 end
 function Interfacer.update_field!(sim::BucketSimulation, ::Val{:snow_precipitation}, field)
     ρ_liq = LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
@@ -406,25 +407,26 @@ function FluxCalculator.compute_surface_fluxes!(
     momentum_fluxes = Val(CL.return_momentum_fluxes(coupled_atmos))
     gustiness = SF.ConstantGustinessSpec(coupled_atmos.gustiness)
 
-    bucket_dest .= CL.turbulent_fluxes_at_a_point.(
-        momentum_fluxes,
-        p.drivers.P,
-        p.drivers.T,
-        p.drivers.q,
-        p.drivers.u,
-        coupled_atmos.h,
-        T_sfc,
-        q_sfc,
-        roughness_model,
-        update_T_sfc,
-        update_q_sfc,
-        h_sfc,
-        displ,
-        update_∂T_sfc∂T,
-        update_∂q_sfc∂T,
-        gustiness,
-        earth_param_set,
-    )
+    bucket_dest .=
+        CL.turbulent_fluxes_at_a_point.(
+            momentum_fluxes,
+            p.drivers.P,
+            p.drivers.T,
+            p.drivers.q,
+            p.drivers.u,
+            coupled_atmos.h,
+            T_sfc,
+            q_sfc,
+            roughness_model,
+            update_T_sfc,
+            update_q_sfc,
+            h_sfc,
+            displ,
+            update_∂T_sfc∂T,
+            update_∂q_sfc∂T,
+            gustiness,
+            earth_param_set,
+        )
 
     # Per-component: remap bucket-space src into `csf.scalar_temp1`, area-mask, add the
     # area-weighted contribution to `csf.F_*`, and (slow case) also add the masked value

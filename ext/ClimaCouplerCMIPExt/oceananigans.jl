@@ -151,16 +151,17 @@ dispatch in coupling.
 # Required keyword arguments
 - `boundary_space`: The boundary space of the coupled simulation
 - `start_date`: Start date for the simulation
-- `stop_date`: Stop date for the simulation
 - `output_dir`: Directory for output files
-- `simple_ocean`: Whether to use a simple ocean model setup
 
 # Optional keyword arguments
-- `dt`: Time step (default: `nothing`)
-- `comms_ctx`: Communication context (default: `ClimaComms.context()`)
-- `coupled_param_dict`: Coupled parameter dictionary (default: created from `area_fraction`)
+- `simple_ocean`: Whether to use a simple ocean model setup (default: `false`)
 - `ocean_grid`: Horizontal grid for Oceananigans (`:one_deg_tripolar` or `:orca`, default: `:one_deg_tripolar`)
 - `depth`: Maximum ocean depth in metres (default: 5500 m for EN4 compatibility)
+- `dt`: Time step (default: `1800.0` seconds, or 30 minutes)
+- `comms_ctx`: Communication context (default: `ClimaComms.context()`)
+- `coupled_param_dict`: Coupled parameter dictionary (default: created from `ClimaParams.create_toml_dict(FT)`)
+- `ocean_diagnostic_interval`: Interval for ocean diagnostics (default: `"1days"`)
+- `ocean_diagnostic_mode`: Mode for ocean diagnostics (default: `:average`)
 
 Specific details about the default model configuration
 can be found in the documentation for `ClimaOcean.ocean_simulation`.
@@ -184,20 +185,9 @@ function OceananigansSimulation(
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
     OC.Oceananigans.defaults.FloatType = FT
 
-    # Compute stop_date for oceananigans (needed for EN4 data retrieval)
-    stop_date = start_date + Dates.Second(float(tspan[2]))
-
     # Use Float64 for the ocean to avoid precision issues
     FT_ocean = Float64
     OC.Oceananigans.defaults.FloatType = FT_ocean
-
-    # Retrieve EN4 data (monthly)
-    # (It requires username and password)
-    dates = range(start_date, step = Dates.Month(1), stop = stop_date)
-    en4_temperature = CO.Metadata(:temperature; dates, dataset = CO.EN4Monthly())
-    en4_salinity = CO.Metadata(:salinity; dates, dataset = CO.EN4Monthly())
-    CO.download_with_fallback(en4_temperature)
-    CO.download_with_fallback(en4_salinity)
 
     # Create ocean simulation
     closure = if simple_ocean
@@ -229,7 +219,13 @@ function OceananigansSimulation(
     ocean.stop_time = stop_time
     ocean.Δt = float(dt)
 
-    # Set initial condition to EN4 state estimate at start_date
+    # Set initial condition to EN4 state estimate at start_date (monthly)
+    # (username and password required)
+    dates = [start_date]
+    en4_temperature = CO.Metadata(:temperature; dates, dataset = CO.EN4Monthly())
+    en4_salinity = CO.Metadata(:salinity; dates, dataset = CO.EN4Monthly())
+    CO.download_with_fallback(en4_temperature)
+    CO.download_with_fallback(en4_salinity)
     OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
 
     # Construct the remapper object and allocate scratch space

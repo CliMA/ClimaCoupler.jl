@@ -225,15 +225,8 @@ function OceananigansSimulation(
         error("Unsupported time type: $(typeof(tspan[1]))")
     end
 
-    ocean = ocean_simulation(
-        arch,
-        ocean_grid;
-        clock,
-        stop_time,
-        simple_ocean,
-        closure,
-        depth,
-    )
+    ocean =
+        ocean_simulation(arch, ocean_grid; clock, stop_time, simple_ocean, closure, depth)
     ocean.Δt = float(dt)
 
     # Set initial condition to EN4 state estimate at start_date

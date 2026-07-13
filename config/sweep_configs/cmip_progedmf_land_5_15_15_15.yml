@@ -1,0 +1,49 @@
+FLOAT_TYPE: "Float64"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
+checkpoint_dt: "30days"
+coupler_diagnostics_period: "30days"
+coupler_diagnostics_reduction: "average"
+coupler_toml: ["toml/amip_progedmf.toml"]
+dt_atmos: "300secs" # 5 minutes
+dt_cpl: "900secs" # 15 minutes
+dt_land: "900secs" # 15 minutes
+dt_ocean: "900secs" # 15 minutes
+dt_seaice: "900secs" # 15 minutes
+dt_cloud_fraction: "1hours"
+dt_rad: "1hours"
+energy_check: false
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: 30days
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
+ice_model: "clima_seaice"
+insolation: "timevarying"
+land_diagnostics_period: "10days"
+land_diagnostics_reduction: "average"
+land_model: "integrated"
+land_spun_up_ic: false
+mode_name: "cmip"
+ocean_model: "oceananigans"
+ocean_grid: "orca"
+ocean_diagnostic_interval: "30days"
+ocean_diagnostic_mode: "average"
+output_default_diagnostics: true
+atmos_log_progress: false
+atmos_progress_interval: "1days"
+land_progress_interval: "1days"
+ocean_progress_interval: "1days"
+seaice_progress_interval: "1days"
+
+rmse_check: true
+seaice_diagnostic_interval: "30days"
+seaice_diagnostic_mode: "average"
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+# t_end: "366days"
+t_end: "60days"
+topo_smoothing: true
+topography: "Earth"
+use_itime: false

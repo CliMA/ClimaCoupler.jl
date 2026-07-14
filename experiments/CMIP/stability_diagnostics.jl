@@ -112,12 +112,12 @@ try
         last_step = ii
         day = Float64(cs_ref.t[]) / 86400
 
-        T_oc      = @view Oceananigans.interior(ocean_model.tracers.T,       :, :, Nz)
-        S_oc      = @view Oceananigans.interior(ocean_model.tracers.S,       :, :, Nz)
-        u_oc      = @view Oceananigans.interior(ocean_model.velocities.u,    :, :, Nz)
-        sic       = @view Oceananigans.interior(ice_model.ice_concentration, :, :, 1)
-        h_ice     = @view Oceananigans.interior(ice_model.ice_thickness,     :, :, 1)
-        T_ice_top = @view Oceananigans.interior(ice_model.ice_thermodynamics.top_surface_temperature, :, :, 1)
+        T_oc      = Oceananigans.interior(ocean_model.tracers.T,       :, :, Nz)
+        S_oc      = Oceananigans.interior(ocean_model.tracers.S,       :, :, Nz)
+        u_oc      = Oceananigans.interior(ocean_model.velocities.u,    :, :, Nz)
+        sic       = Oceananigans.interior(ice_model.ice_concentration, :, :, 1)
+        h_ice     = Oceananigans.interior(ice_model.ice_thickness,     :, :, 1)
+        T_ice_top = Oceananigans.interior(ice_model.ice_thermodynamics.top_surface_temperature, :, :, 1)
 
         @info @sprintf(
             "step %4d  day %6.2f | " *
@@ -207,8 +207,8 @@ try
         last_step_2c = ii
         day = Float64(cs_2b.t[]) / 86400
 
-        T_oc_2b      = @view Oceananigans.interior(ocean_model_2b.tracers.T,       :, :, Nz_2b)
-        T_ice_top_2b = @view Oceananigans.interior(ice_model_2b.ice_thermodynamics.top_surface_temperature, :, :, 1)
+        T_oc_2b      = Oceananigans.interior(ocean_model_2b.tracers.T,       :, :, Nz_2b)
+        T_ice_top_2b = Oceananigans.interior(ice_model_2b.ice_thermodynamics.top_surface_temperature, :, :, 1)
 
         @info @sprintf(
             "2C step %4d  day %6.2f | " *

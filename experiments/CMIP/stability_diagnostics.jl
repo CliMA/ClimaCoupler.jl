@@ -120,16 +120,7 @@ try
         T_ice_top = Oceananigans.interior(ice_model.ice_thermodynamics.top_surface_temperature, :, :, 1)
 
         @info @sprintf(
-            "step %4d  day %6.2f | " *
-            "T_oc [%7.2f, %7.2f] °C  " *
-            "S_oc [%5.2f, %5.2f] psu  " *
-            "u_oc_max %7.3f m/s | " *
-            "SIC [%.3f, %.3f]  " *
-            "h_ice [%.3f, %.3f] m | " *
-            "T_ice_top [%7.2f, %7.2f] °C | " *
-            "T_sfc [%6.2f, %6.2f] K  " *
-            "F_sh [%8.2f, %8.2f] W/m²  " *
-            "F_lh [%8.2f, %8.2f] W/m²",
+            "step %4d  day %6.2f | T_oc [%7.2f, %7.2f] °C  S_oc [%5.2f, %5.2f] psu  u_oc_max %7.3f m/s | SIC [%.3f, %.3f]  h_ice [%.3f, %.3f] m | T_ice_top [%7.2f, %7.2f] °C | T_sfc [%6.2f, %6.2f] K  F_sh [%8.2f, %8.2f] W/m²  F_lh [%8.2f, %8.2f] W/m²",
             ii, day,
             minimum(T_oc),      maximum(T_oc),
             minimum(S_oc),      maximum(S_oc),
@@ -211,11 +202,7 @@ try
         T_ice_top_2b = Oceananigans.interior(ice_model_2b.ice_thermodynamics.top_surface_temperature, :, :, 1)
 
         @info @sprintf(
-            "2C step %4d  day %6.2f | " *
-            "T_oc [%7.2f, %7.2f] °C | " *
-            "T_ice_top [%7.2f, %7.2f] °C | " *
-            "T_sfc [%6.2f, %6.2f] K | " *
-            "F_sh [%8.2f, %8.2f] W/m²",
+            "2C step %4d  day %6.2f | T_oc [%7.2f, %7.2f] °C | T_ice_top [%7.2f, %7.2f] °C | T_sfc [%6.2f, %6.2f] K | F_sh [%8.2f, %8.2f] W/m²",
             ii, day,
             minimum(T_oc_2b),      maximum(T_oc_2b),
             minimum(T_ice_top_2b), maximum(T_ice_top_2b),

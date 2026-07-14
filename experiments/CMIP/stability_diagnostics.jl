@@ -186,157 +186,164 @@ let
     @info "Format smoke-test OK"
 end
 
-# ─── Construct reference cs (baseline for Test 1 and Test 2B) ─────────────────
+# All runtime state lives inside `main` so assignments in `try`/`for` are ordinary
+# locals (top-level soft-scope would otherwise leave nan_step/last_step stuck).
+function main()
+    # ─── Construct reference cs (baseline for Test 1 and Test 2B) ─────────────
 
-@info "──────────────────────────────────────────────────────────────────────"
-@info "Constructing reference CoupledSimulation..."
-cs_ref        = CoupledSimulation(CONFIG_FILE)
-snap_ref_init = snapshot_state(cs_ref)   # saved before any stepping
+    @info "──────────────────────────────────────────────────────────────────────"
+    @info "Constructing reference CoupledSimulation..."
+    cs_ref        = CoupledSimulation(CONFIG_FILE)
+    snap_ref_init = snapshot_state(cs_ref)   # saved before any stepping
 
-# ─── Test 2A: back-to-back construction ───────────────────────────────────────
+    # ─── Test 2A: back-to-back construction ───────────────────────────────────
 
-@info "══════ TEST 2A: back-to-back construction ══════"
-cs_2a   = CoupledSimulation(CONFIG_FILE)
-snap_2a = snapshot_state(cs_2a)
+    @info "══════ TEST 2A: back-to-back construction ══════"
+    cs_2a   = CoupledSimulation(CONFIG_FILE)
+    snap_2a = snapshot_state(cs_2a)
 
-open(joinpath(ARTIFACT_DIR, "test2A_comparison.txt"), "w") do io
-    write_comparison(io,
+    open(joinpath(ARTIFACT_DIR, "test2A_comparison.txt"), "w") do io
+        write_comparison(io,
+            "Test 2A — back-to-back construction (expect all 0.0)",
+            snap_ref_init, snap_2a)
+    end
+    write_comparison(stdout,
         "Test 2A — back-to-back construction (expect all 0.0)",
         snap_ref_init, snap_2a)
-end
-write_comparison(stdout,
-    "Test 2A — back-to-back construction (expect all 0.0)",
-    snap_ref_init, snap_2a)
 
-# ─── Test 1: step-by-step extrema monitoring ──────────────────────────────────
+    # ─── Test 1: step-by-step extrema monitoring ──────────────────────────────
 
-@info "══════ TEST 1: step-by-step extrema (N_MONITOR=$N_MONITOR) ══════"
+    @info "══════ TEST 1: step-by-step extrema (N_MONITOR=$N_MONITOR) ══════"
 
-nan_step  = nothing
-last_step = 0
-test1_log = joinpath(ARTIFACT_DIR, "test1_extrema.txt")
-log_io_1  = open(test1_log, "w")
+    nan_step  = nothing
+    last_step = 0
+    test1_log = joinpath(ARTIFACT_DIR, "test1_extrema.txt")
+    log_io_1  = open(test1_log, "w")
 
-try
-    ocean_model = cs_ref.model_sims.ocean_sim.ocean.model
-    ice_model   = cs_ref.model_sims.ice_sim.ice.model
-    Nz          = size(ocean_model.grid, 3)
+    try
+        ocean_model = cs_ref.model_sims.ocean_sim.ocean.model
+        ice_model   = cs_ref.model_sims.ice_sim.ice.model
+        Nz          = size(ocean_model.grid, 3)
 
-    for ii in 1:N_MONITOR
-        step!(cs_ref)
-        last_step = ii
-        day = Float64(cs_ref.t[]) / 86400
+        for ii in 1:N_MONITOR
+            step!(cs_ref)
+            last_step = ii
+            day = Float64(cs_ref.t[]) / 86400
 
-        s = monitor_state_test1(ocean_model, ice_model, cs_ref, Nz)
-        line = format_test1_line(ii, day, s)
-        println(log_io_1, line)
-        flush(log_io_1)
-        @info line
+            s = monitor_state_test1(ocean_model, ice_model, cs_ref, Nz)
+            line = format_test1_line(ii, day, s)
+            println(log_io_1, line)
+            flush(log_io_1)
+            @info line
 
-        if monitor_has_nan_test1(s)
-            nan_step = ii
-            @warn "NaN/Inf detected at step $ii (day $(round(day, digits=3))) — stopping Test 1"
-            break
+            if monitor_has_nan_test1(s)
+                nan_step = ii
+                @warn "NaN/Inf detected at step $ii (day $(round(day, digits=3))) — stopping Test 1"
+                break
+            end
         end
+    catch e
+        crashed_day = round(Float64(cs_ref.t[]) / 86400, digits = 3)
+        @error "Test 1 threw at step $last_step (day $crashed_day)" exception = e
+    finally
+        close(log_io_1)
     end
-catch e
-    crashed_day = round(Float64(cs_ref.t[]) / 86400, digits = 3)
-    @error "Test 1 threw at step $last_step (day $crashed_day)" exception = e
-finally
-    close(log_io_1)
-end
 
-if isnothing(nan_step)
-    @info "Test 1: completed $last_step steps with no NaN detected"
-else
-    @info "Test 1: NaN first detected at step $nan_step  (day $(round(Float64(cs_ref.t[])/86400, digits=3)))"
-end
-
-# ─── Test 2B: fresh cs constructed after cs_ref has run or crashed ────────────
-
-ref_day = round(Float64(cs_ref.t[]) / 86400, digits = 3)
-@info "══════ TEST 2B: fresh cs after Test 1 (cs_ref reached day $ref_day) ══════"
-cs_2b   = CoupledSimulation(CONFIG_FILE)
-snap_2b = snapshot_state(cs_2b)
-
-label_2b = "Test 2B — fresh cs after run (nonzero → global-state pollution; zero → same ICs, divergence is inside step!)"
-open(joinpath(ARTIFACT_DIR, "test2B_comparison.txt"), "w") do io
-    println(io, "cs_ref ran to: day $ref_day")
-    isnothing(nan_step) || println(io, "NaN first detected at step: $nan_step")
-    write_comparison(io, label_2b, snap_ref_init, snap_2b)
-end
-write_comparison(stdout, label_2b, snap_ref_init, snap_2b)
-
-# ─── Test 2C: step cs_2b to see if it also crashes ───────────────────────────
-#
-# Interpretation matrix:
-#   cs_ref crashes, cs_2b crashes at same step → crash is deterministic; if
-#     Test 2B ICs differ the IC difference is a red herring (crash is fundamental)
-#   cs_ref crashes, cs_2b crashes at different step → non-determinism inside step!
-#   cs_ref crashes, cs_2b stable → if Test 2B ICs differ: IC pollution explains
-#     divergence; if ICs same: non-determinism inside step!
-#   neither crashes → neither run is unstable at N_MONITOR steps (increase limit)
-
-@info "══════ TEST 2C: step cs_2b for N_MONITOR=$N_MONITOR steps ══════"
-
-nan_step_2c  = nothing
-last_step_2c = 0
-test2c_log = joinpath(ARTIFACT_DIR, "test2C_extrema.txt")
-log_io_2c  = open(test2c_log, "w")
-
-try
-    ocean_model_2b = cs_2b.model_sims.ocean_sim.ocean.model
-    ice_model_2b   = cs_2b.model_sims.ice_sim.ice.model
-    Nz_2b          = size(ocean_model_2b.grid, 3)
-
-    for ii in 1:N_MONITOR
-        step!(cs_2b)
-        last_step_2c = ii
-        day = Float64(cs_2b.t[]) / 86400
-
-        s = monitor_state_test2c(ocean_model_2b, ice_model_2b, cs_2b, Nz_2b)
-        line = format_test2c_line(ii, day, s)
-        println(log_io_2c, line)
-        flush(log_io_2c)
-        @info line
-
-        if monitor_has_nan_test2c(s)
-            nan_step_2c = ii
-            @warn "Test 2C: NaN/Inf detected at step $ii (day $(round(day, digits=3))) — stopping"
-            break
-        end
-    end
-catch e
-    crashed_day_2c = round(Float64(cs_2b.t[]) / 86400, digits = 3)
-    @error "Test 2C threw at step $last_step_2c (day $crashed_day_2c)" exception = e
-finally
-    close(log_io_2c)
-end
-
-open(joinpath(ARTIFACT_DIR, "test2C_summary.txt"), "w") do io
-    ref_result = isnothing(nan_step)    ? "stable for $last_step steps"  : "NaN at step $nan_step"
-    new_result = isnothing(nan_step_2c) ? "stable for $last_step_2c steps" : "NaN at step $nan_step_2c"
-    println(io, "Test 1  (cs_ref): $ref_result")
-    println(io, "Test 2C (cs_2b):  $new_result")
-    println(io)
-    verdict = if isnothing(nan_step) && isnothing(nan_step_2c)
-        "BOTH STABLE — crash not reproduced; increase N_MONITOR"
-    elseif !isnothing(nan_step) && !isnothing(nan_step_2c) && nan_step == nan_step_2c
-        "BOTH CRASH at same step — crash is deterministic and reproducible"
-    elseif !isnothing(nan_step) && !isnothing(nan_step_2c)
-        "BOTH CRASH but at different steps — non-determinism inside step! (same ICs, different crash steps)"
-    elseif !isnothing(nan_step) && isnothing(nan_step_2c)
-        "cs_ref crashes; cs_2b stable — if Test 2B ICs differ: IC pollution explains divergence; if ICs same: non-determinism inside step!"
+    if isnothing(nan_step)
+        @info "Test 1: completed $last_step steps with no NaN detected"
     else
-        "cs_ref stable; cs_2b crashes — unexpected ordering; check for measurement error"
+        @info "Test 1: NaN first detected at step $nan_step  (day $(round(Float64(cs_ref.t[])/86400, digits=3)))"
     end
-    println(io, "Interpretation: $verdict")
-    flush(io)
+
+    # ─── Test 2B: fresh cs constructed after cs_ref has run or crashed ────────
+
+    ref_day = round(Float64(cs_ref.t[]) / 86400, digits = 3)
+    @info "══════ TEST 2B: fresh cs after Test 1 (cs_ref reached day $ref_day) ══════"
+    cs_2b   = CoupledSimulation(CONFIG_FILE)
+    snap_2b = snapshot_state(cs_2b)
+
+    label_2b = "Test 2B — fresh cs after run (nonzero → global-state pollution; zero → same ICs, divergence is inside step!)"
+    open(joinpath(ARTIFACT_DIR, "test2B_comparison.txt"), "w") do io
+        println(io, "cs_ref ran to: day $ref_day")
+        isnothing(nan_step) || println(io, "NaN first detected at step: $nan_step")
+        write_comparison(io, label_2b, snap_ref_init, snap_2b)
+    end
+    write_comparison(stdout, label_2b, snap_ref_init, snap_2b)
+
+    # ─── Test 2C: step cs_2b to see if it also crashes ───────────────────────
+    #
+    # Interpretation matrix:
+    #   cs_ref crashes, cs_2b crashes at same step → crash is deterministic; if
+    #     Test 2B ICs differ the IC difference is a red herring (crash is fundamental)
+    #   cs_ref crashes, cs_2b crashes at different step → non-determinism inside step!
+    #   cs_ref crashes, cs_2b stable → if Test 2B ICs differ: IC pollution explains
+    #     divergence; if ICs same: non-determinism inside step!
+    #   neither crashes → neither run is unstable at N_MONITOR steps (increase limit)
+
+    @info "══════ TEST 2C: step cs_2b for N_MONITOR=$N_MONITOR steps ══════"
+
+    nan_step_2c  = nothing
+    last_step_2c = 0
+    test2c_log = joinpath(ARTIFACT_DIR, "test2C_extrema.txt")
+    log_io_2c  = open(test2c_log, "w")
+
+    try
+        ocean_model_2b = cs_2b.model_sims.ocean_sim.ocean.model
+        ice_model_2b   = cs_2b.model_sims.ice_sim.ice.model
+        Nz_2b          = size(ocean_model_2b.grid, 3)
+
+        for ii in 1:N_MONITOR
+            step!(cs_2b)
+            last_step_2c = ii
+            day = Float64(cs_2b.t[]) / 86400
+
+            s = monitor_state_test2c(ocean_model_2b, ice_model_2b, cs_2b, Nz_2b)
+            line = format_test2c_line(ii, day, s)
+            println(log_io_2c, line)
+            flush(log_io_2c)
+            @info line
+
+            if monitor_has_nan_test2c(s)
+                nan_step_2c = ii
+                @warn "Test 2C: NaN/Inf detected at step $ii (day $(round(day, digits=3))) — stopping"
+                break
+            end
+        end
+    catch e
+        crashed_day_2c = round(Float64(cs_2b.t[]) / 86400, digits = 3)
+        @error "Test 2C threw at step $last_step_2c (day $crashed_day_2c)" exception = e
+    finally
+        close(log_io_2c)
+    end
+
+    open(joinpath(ARTIFACT_DIR, "test2C_summary.txt"), "w") do io
+        ref_result = isnothing(nan_step)    ? "stable for $last_step steps"  : "NaN at step $nan_step"
+        new_result = isnothing(nan_step_2c) ? "stable for $last_step_2c steps" : "NaN at step $nan_step_2c"
+        println(io, "Test 1  (cs_ref): $ref_result")
+        println(io, "Test 2C (cs_2b):  $new_result")
+        println(io)
+        verdict = if isnothing(nan_step) && isnothing(nan_step_2c)
+            "BOTH STABLE — crash not reproduced; increase N_MONITOR"
+        elseif !isnothing(nan_step) && !isnothing(nan_step_2c) && nan_step == nan_step_2c
+            "BOTH CRASH at same step — crash is deterministic and reproducible"
+        elseif !isnothing(nan_step) && !isnothing(nan_step_2c)
+            "BOTH CRASH but at different steps — non-determinism inside step! (same ICs, different crash steps)"
+        elseif !isnothing(nan_step) && isnothing(nan_step_2c)
+            "cs_ref crashes; cs_2b stable — if Test 2B ICs differ: IC pollution explains divergence; if ICs same: non-determinism inside step!"
+        else
+            "cs_ref stable; cs_2b crashes — unexpected ordering; check for measurement error"
+        end
+        println(io, "Interpretation: $verdict")
+        flush(io)
+    end
+
+    if isnothing(nan_step_2c)
+        @info "Test 2C: completed $last_step_2c steps with no NaN"
+    else
+        @info "Test 2C: NaN at step $nan_step_2c"
+    end
+    @info "Stability diagnostics complete. Artifacts written to $ARTIFACT_DIR"
+    return nothing
 end
 
-if isnothing(nan_step_2c)
-    @info "Test 2C: completed $last_step_2c steps with no NaN"
-else
-    @info "Test 2C: NaN at step $nan_step_2c"
-end
-@info "Stability diagnostics complete. Artifacts written to $ARTIFACT_DIR"
+main()

@@ -7,6 +7,8 @@ import ClimaCore as CC
 import Oceananigans as OC
 import ClimaSeaIce as CSI
 using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions: IceWaterThermalEquilibrium
+using Oceananigans.Architectures: on_architecture, CPU
+import OffsetArrays
 import NCDatasets
 
 """
@@ -144,7 +146,14 @@ function _compare(pass, v1::T, v2::T; name, ignore) where {T <: CC.DataLayouts.A
     return pass && _compare(parent(v1), parent(v2); name, ignore)
 end
 
-# Handle views
+#### Handle views ####
+# The underlying storage may be a `SubArray` of an `OffsetArray` of a `CuArray` 
+# (e.g. `IceWaterThermalEquilibrium.salinity`, which is a view of the coupled
+# ocean's surface salinity `Field` when the sea-ice sim is built with an ocean). 
+# - `on_architecture(CPU(), ...)` moves the data off the GPU
+# - `no_offset_view` normalizes to 1-based indexing 
+# The second step is necessary because the two runs' fields can differ in whether 
+# their storage carries halo offsets.
 function _compare(
     pass,
     v1::SubArray{FT},
@@ -152,7 +161,9 @@ function _compare(
     name,
     ignore,
 ) where {FT <: AbstractFloat}
-    return pass && _compare(collect(v1), collect(v2); name, ignore)
+    h1 = OffsetArrays.no_offset_view(on_architecture(CPU(), v1))
+    h2 = OffsetArrays.no_offset_view(on_architecture(CPU(), v2))
+    return pass && _compare(h1, h2; name, ignore)
 end
 
 function _compare(

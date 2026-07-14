@@ -385,17 +385,16 @@ NVTX.@annotate function compute_surface_fluxes!(
     T_sfc = csf.scalar_temp1
 
     # TODO: This is not accurate - we shouldn't assume condensate is 0.
-    ρ_sfc =
-        SF.surface_density.(
-            surface_fluxes_params,
-            csf.T_atmos,
-            csf.ρ_atmos,
-            T_sfc,
-            csf.height_int .- csf.height_sfc,
-            csf.q_tot_atmos,
-            0, # q_liq
-            0, # q_ice
-        )
+    ρ_sfc = SF.surface_density.(
+        surface_fluxes_params,
+        csf.T_atmos,
+        csf.ρ_atmos,
+        T_sfc,
+        csf.height_int .- csf.height_sfc,
+        csf.q_tot_atmos,
+        0, # q_liq
+        0, # q_ice
+    )
 
     csf.scalar_temp2 .= TD.q_vap_saturation.(thermo_params, T_sfc, ρ_sfc, 0, 0)
     q_sfc = csf.scalar_temp2
@@ -407,23 +406,22 @@ NVTX.@annotate function compute_surface_fluxes!(
 
     # Set surface velocity to zero for now
     uv_sfc = @lazy @. (uv_int * FT(0))
-    fluxes =
-        FluxCalculator.get_surface_fluxes.(
-            surface_fluxes_params,
-            uv_int,
-            csf.T_atmos,
-            csf.q_tot_atmos,
-            csf.q_liq_atmos,
-            csf.q_ice_atmos,
-            csf.ρ_atmos,
-            csf.height_int, # h_int
-            uv_sfc,
-            T_sfc,
-            q_sfc,
-            csf.height_sfc, # h_sfc
-            FT(0), # d
-            config,
-        )
+    fluxes = FluxCalculator.get_surface_fluxes.(
+        surface_fluxes_params,
+        uv_int,
+        csf.T_atmos,
+        csf.q_tot_atmos,
+        csf.q_liq_atmos,
+        csf.q_ice_atmos,
+        csf.ρ_atmos,
+        csf.height_int, # h_int
+        uv_sfc,
+        T_sfc,
+        q_sfc,
+        csf.height_sfc, # h_sfc
+        FT(0), # d
+        config,
+    )
 
     # Update the coupler fields and surface simulation with the fluxes
     update_flux_fields!(csf, sim, fluxes, accumulator)

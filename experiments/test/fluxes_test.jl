@@ -129,8 +129,7 @@ import ClimaCoupler: FluxCalculator
 
     # Combine component fluxes by area-weighted sum (incl. bucket sign convention):
     combined_fluxes =
-        .-land_fraction .* land_flux .+ ice_fraction .* ice_rad_flux .+
-        ocean_fraction .* ocean_rad_flux
+        .-land_fraction .* land_flux .+ ice_fraction .* ice_rad_flux .+ ocean_fraction .* ocean_rad_flux
 
     @info "Combined fluxes: $(combined_fluxes)"
     @info "Atmos flux: $(atmos_flux)"

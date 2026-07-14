@@ -106,18 +106,21 @@ function ClimaSeaIceSimulation(
             dir_kw = (;)
         end
 
-        sic_metadata = CO.DataWrangling.Metadatum(
+        sic_metadata = CO.Metadatum(
             :sea_ice_concentration,
-            dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
+            dataset = CO.ECCO4Monthly(),
             date = start_date;
             dir_kw...,
         )
-        h_metadata = CO.DataWrangling.Metadatum(
+        h_metadata = CO.Metadatum(
             :sea_ice_thickness,
-            dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
+            dataset = CO.ECCO4Monthly(),
             date = start_date;
             dir_kw...,
         )
+
+        @info "ECCOv4 sea-ice concentration data path: $(CO.DataWrangling.metadata_path(sic_metadata))"
+        @info "ECCOv4 sea-ice thickness data path: $(CO.DataWrangling.metadata_path(h_metadata))"
 
         OC.set!(ice.model.ice_concentration, sic_metadata)
         OC.set!(ice.model.ice_thickness, h_metadata)
@@ -328,17 +331,16 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     T_sfc = csf.scalar_temp1
 
     # Surface humidity
-    ρ_sfc =
-        SF.surface_density.(
-            surface_fluxes_params,
-            csf.T_atmos,
-            csf.ρ_atmos,
-            T_sfc,
-            csf.height_int .- csf.height_sfc,
-            csf.q_tot_atmos,
-            0,
-            0,
-        )
+    ρ_sfc = SF.surface_density.(
+        surface_fluxes_params,
+        csf.T_atmos,
+        csf.ρ_atmos,
+        T_sfc,
+        csf.height_int .- csf.height_sfc,
+        csf.q_tot_atmos,
+        0,
+        0,
+    )
     csf.scalar_temp2 .= TD.q_vap_saturation.(thermo_params, T_sfc, ρ_sfc, 0, 0)
     q_sfc = csf.scalar_temp2
 
@@ -347,46 +349,43 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     roughness_params = FluxCalculator.get_roughness_params(csf, sim)
     config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
 
-    fluxes =
-        FluxCalculator.get_surface_fluxes.(
-            surface_fluxes_params,
-            uv_int,
-            csf.T_atmos,
-            csf.q_tot_atmos,
-            csf.q_liq_atmos,
-            csf.q_ice_atmos,
-            csf.ρ_atmos,
-            csf.height_int,
-            uv_int .* FT(0),
-            T_sfc,
-            q_sfc,
-            csf.height_sfc,
-            FT(0),
-            config,
-            update_T_sfc_cb,
-        )
+    fluxes = FluxCalculator.get_surface_fluxes.(
+        surface_fluxes_params,
+        uv_int,
+        csf.T_atmos,
+        csf.q_tot_atmos,
+        csf.q_liq_atmos,
+        csf.q_ice_atmos,
+        csf.ρ_atmos,
+        csf.height_int,
+        uv_int .* FT(0),
+        T_sfc,
+        q_sfc,
+        csf.height_sfc,
+        FT(0),
+        config,
+        update_T_sfc_cb,
+    )
 
     FluxCalculator.update_flux_fields!(csf, sim, fluxes, accumulator)
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
-    csf.scalar_temp2 .=
-        ifelse.(
-            area_fraction .≈ 0,
-            zero(FT),
-            fluxes.T_sfc_new .- FT(sim.ice_properties.C_to_K),
-        )
+    csf.scalar_temp2 .= ifelse.(
+        area_fraction .≈ 0,
+        zero(FT),
+        fluxes.T_sfc_new .- FT(sim.ice_properties.C_to_K),
+    )
     Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.scalar_temp2, sim.remapping)
     remapped_T_sfc = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
 
     ice_concentration = sim.ice.model.ice_concentration
     top_sfc_T = top_thermodynamics(sim).top_surface_temperature
-    OC.interior(top_sfc_T, :, :, 1) .=
-        ifelse.(
-            OC.interior(ice_concentration, :, :, 1) .> 0,
-            remapped_T_sfc,
-            OC.interior(top_sfc_T, :, :, 1),
-        )
+    OC.interior(top_sfc_T, :, :, 1) .= ifelse.(
+        OC.interior(ice_concentration, :, :, 1) .> 0,
+        remapped_T_sfc,
+        OC.interior(top_sfc_T, :, :, 1),
+    )
 
     return nothing
 end

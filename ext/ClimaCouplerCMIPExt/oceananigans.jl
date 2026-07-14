@@ -3,6 +3,7 @@ import NVTX
 import SurfaceFluxes as SF
 import Thermodynamics as TD
 import ClimaUtilities.TimeManager: ITime, date, counter, period
+import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Dates
 
 """
@@ -220,10 +221,23 @@ function OceananigansSimulation(
 
     # Set initial condition to EN4 state estimate at start_date (monthly)
     date = start_date
-    en4_temperature = CO.Metadatum(:temperature; date, dataset = CO.EN4Monthly())
-    en4_salinity = CO.Metadatum(:salinity; date, dataset = CO.EN4Monthly())
-    CO.download_with_fallback(en4_temperature)
-    CO.download_with_fallback(en4_salinity)
+    # set up the `dir` keyword argument for `Metadatum`
+    if date == Dates.Date(2010, 1, 1)
+        # we have a ClimaArtifact saved for January 1, 2010 (so that CI can always run)
+        dir_kw = (; dir = @clima_artifact("en4_temperature_salinity_2010_01"))
+        @info "Using $(dir_kw.dir) ClimaArtifact for ocean initialization on $(date)"
+    else
+        # otherwise, download the data
+        # (or load from scratchspace; ClimaOcean will automatically handle this)
+        dir_kw = (;)
+    end
+
+    en4_temperature = CO.Metadatum(:temperature; date, dataset = CO.EN4Monthly(), dir_kw...)
+    en4_salinity = CO.Metadatum(:salinity; date, dataset = CO.EN4Monthly(), dir_kw...)
+
+    @info "EN4 temperature data path: $(CO.DataWrangling.metadata_path(en4_temperature))"
+    @info "EN4 salinity data path: $(CO.DataWrangling.metadata_path(en4_salinity))"
+
     OC.set!(ocean.model, T = en4_temperature, S = en4_salinity)
 
     # Construct the remapper object and allocate scratch space

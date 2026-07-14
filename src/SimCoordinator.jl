@@ -422,9 +422,9 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     slow_surface_keys = Tuple(
         name for (name, sim) in pairs(model_sims) if
         sim isa Interfacer.AbstractSurfaceSimulation &&
-            !(sim isa Interfacer.AbstractImplicitFluxSimulation) &&
-            !(sim isa Interfacer.AbstractSurfaceStub) &&
-            Interfacer.sim_dt(sim) > Δt_cpl_secs
+        !(sim isa Interfacer.AbstractImplicitFluxSimulation) &&
+        !(sim isa Interfacer.AbstractSurfaceStub) &&
+        Interfacer.sim_dt(sim) > Δt_cpl_secs
     )
     flux_accumulators = NamedTuple{slow_surface_keys}(
         Tuple(FluxCalculator.FluxAccumulator(boundary_space) for _ in slow_surface_keys),

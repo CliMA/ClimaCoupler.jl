@@ -2,7 +2,6 @@ import ClimaComms
 import NVTX
 import SurfaceFluxes as SF
 import Thermodynamics as TD
-import ClimaOcean.EN4: download_dataset
 import ClimaUtilities.TimeManager: ITime, date, counter, period
 import Dates
 
@@ -220,13 +219,12 @@ function OceananigansSimulation(
     ocean.Δt = float(dt)
 
     # Set initial condition to EN4 state estimate at start_date (monthly)
-    # (username and password required)
-    dates = [start_date]
-    en4_temperature = CO.Metadata(:temperature; dates, dataset = CO.EN4Monthly())
-    en4_salinity = CO.Metadata(:salinity; dates, dataset = CO.EN4Monthly())
+    date = start_date
+    en4_temperature = CO.Metadatum(:temperature; date, dataset = CO.EN4Monthly())
+    en4_salinity = CO.Metadatum(:salinity; date, dataset = CO.EN4Monthly())
     CO.download_with_fallback(en4_temperature)
     CO.download_with_fallback(en4_salinity)
-    OC.set!(ocean.model, T = en4_temperature[1], S = en4_salinity[1])
+    OC.set!(ocean.model, T = en4_temperature, S = en4_salinity)
 
     # Construct the remapper object and allocate scratch space
     grid = ocean.model.grid

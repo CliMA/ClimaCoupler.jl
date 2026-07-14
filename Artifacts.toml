@@ -88,3 +88,10 @@ git-tree-sha1 = "edd3265e3be0938821451c24d411f4dc066bbf0e"
     [[mac_lwp.download]]
     sha256 = "fd24ea0d4491ef95b0a3a362d9f5faf320e5dd6caf3f4fb8683e9ab71357c13f"
     url = "https://caltech.box.com/shared/static/4ukyc2pn5mq3zou5f7g2mjfkr86s7vdr.gz"
+
+[en4_temperature_salinity_2010_01]
+git-tree-sha1 = "7fb52a88a1d34e491a302aa4da4e07efae5d8b08"
+
+    [[en4_temperature_salinity_2010_01.download]]
+    sha256 = "5359c8f9d224a98ec7f34fa07c9f555de00f7e2adfe473efe6a2191f0318e201"
+    url = "https://caltech.box.com/shared/static/9tbapu65ibnlafgoikzdffwa2qudojlk.gz"

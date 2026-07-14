@@ -41,19 +41,42 @@ mkpath(ARTIFACT_DIR)
 @info "Artifact dir: $ARTIFACT_DIR"
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
+#
+# Oceananigans.interior / ClimaCore Fields may live on GPU; always materialize
+# with Array(...) before extrema / NaN checks so diagnostics work on CPU and GPU.
+# @sprintf requires a *literal* format string (no "a" * "b"); keep formats here.
+
+# Materialize an Oceananigans interior slice to a CPU Vector.
+function interior_vec(field, i, j, k)
+    return vec(Array(Oceananigans.interior(field, i, j, k)))
+end
+
+# Materialize a ClimaCore coupler field to a CPU Vector.
+function field_vec(field)
+    return vec(Array(parent(field)))
+end
+
+function finite_extrema(x)
+    xmin, xmax = extrema(x)
+    return (Float64(xmin), Float64(xmax))
+end
+
+function has_nan(x)
+    return any(!isfinite, x)
+end
 
 function snapshot_state(cs)
     ocean = cs.model_sims.ocean_sim.ocean.model
     ice   = cs.model_sims.ice_sim.ice.model
     Nz    = size(ocean.grid, 3)
     return (;
-        T_oc      = copy(vec(Oceananigans.interior(ocean.tracers.T,       :, :, Nz))),
-        S_oc      = copy(vec(Oceananigans.interior(ocean.tracers.S,       :, :, Nz))),
-        u_oc      = copy(vec(Oceananigans.interior(ocean.velocities.u,    :, :, Nz))),
-        SIC       = copy(vec(Oceananigans.interior(ice.ice_concentration, :, :, 1))),
-        h_ice     = copy(vec(Oceananigans.interior(ice.ice_thickness,     :, :, 1))),
-        T_ice_top = copy(vec(Oceananigans.interior(ice.ice_thermodynamics.top_surface_temperature, :, :, 1))),
-        T_sfc     = copy(Array(parent(cs.fields.T_sfc))),
+        T_oc      = interior_vec(ocean.tracers.T,       :, :, Nz),
+        S_oc      = interior_vec(ocean.tracers.S,       :, :, Nz),
+        u_oc      = interior_vec(ocean.velocities.u,    :, :, Nz),
+        SIC       = interior_vec(ice.ice_concentration, :, :, 1),
+        h_ice     = interior_vec(ice.ice_thickness,     :, :, 1),
+        T_ice_top = interior_vec(ice.ice_thermodynamics.top_surface_temperature, :, :, 1),
+        T_sfc     = field_vec(cs.fields.T_sfc),
         t         = Float64(cs.t[]),
     )
 end
@@ -64,13 +87,103 @@ function write_comparison(io, label, s1, s2)
     for f in (:T_oc, :S_oc, :u_oc, :SIC, :h_ice, :T_ice_top, :T_sfc)
         d = maximum(abs, getproperty(s1, f) .- getproperty(s2, f))
         all_zero &= iszero(d)
-        println(io, @sprintf("  max |Δ%-6s| = %g", f, d))
+        # Symbol → String so %-width formatting is unambiguous
+        println(io, @sprintf("  max |Δ%-9s| = %g", String(f), d))
     end
     verdict = all_zero ? "IDENTICAL  (construction is deterministic)" :
                          "DIFFER     (global-state pollution or non-determinism)"
     println(io, "  → $verdict")
     flush(io)
     return all_zero
+end
+
+# Collect Test-1 extrema from already-materialized arrays / coupler fields.
+function monitor_state_test1(ocean_model, ice_model, cs, Nz)
+    T_oc      = interior_vec(ocean_model.tracers.T,       :, :, Nz)
+    S_oc      = interior_vec(ocean_model.tracers.S,       :, :, Nz)
+    u_oc      = interior_vec(ocean_model.velocities.u,    :, :, Nz)
+    sic       = interior_vec(ice_model.ice_concentration, :, :, 1)
+    h_ice     = interior_vec(ice_model.ice_thickness,     :, :, 1)
+    T_ice_top = interior_vec(ice_model.ice_thermodynamics.top_surface_temperature, :, :, 1)
+    T_sfc     = field_vec(cs.fields.T_sfc)
+    F_sh      = field_vec(cs.fields.F_sh)
+    F_lh      = field_vec(cs.fields.F_lh)
+    return (; T_oc, S_oc, u_oc, sic, h_ice, T_ice_top, T_sfc, F_sh, F_lh)
+end
+
+function monitor_state_test2c(ocean_model, ice_model, cs, Nz)
+    T_oc      = interior_vec(ocean_model.tracers.T, :, :, Nz)
+    T_ice_top = interior_vec(ice_model.ice_thermodynamics.top_surface_temperature, :, :, 1)
+    T_sfc     = field_vec(cs.fields.T_sfc)
+    F_sh      = field_vec(cs.fields.F_sh)
+    return (; T_oc, T_ice_top, T_sfc, F_sh)
+end
+
+function format_test1_line(ii, day, s)
+    T_oc_lo, T_oc_hi           = finite_extrema(s.T_oc)
+    S_oc_lo, S_oc_hi           = finite_extrema(s.S_oc)
+    u_max                      = Float64(maximum(abs, s.u_oc))
+    sic_lo, sic_hi             = finite_extrema(s.sic)
+    h_lo, h_hi                 = finite_extrema(s.h_ice)
+    T_ice_lo, T_ice_hi         = finite_extrema(s.T_ice_top)
+    T_sfc_lo, T_sfc_hi         = finite_extrema(s.T_sfc)
+    F_sh_lo, F_sh_hi           = finite_extrema(s.F_sh)
+    F_lh_lo, F_lh_hi           = finite_extrema(s.F_lh)
+    # Literal format only — do not concatenate format pieces with *.
+    return @sprintf(
+        "step %4d  day %6.2f | T_oc [%7.2f, %7.2f] C  S_oc [%5.2f, %5.2f] psu  u_oc_max %7.3f m/s | SIC [%.3f, %.3f]  h_ice [%.3f, %.3f] m | T_ice_top [%7.2f, %7.2f] C | T_sfc [%6.2f, %6.2f] K  F_sh [%8.2f, %8.2f] W/m2  F_lh [%8.2f, %8.2f] W/m2",
+        ii, day,
+        T_oc_lo, T_oc_hi,
+        S_oc_lo, S_oc_hi,
+        u_max,
+        sic_lo, sic_hi,
+        h_lo, h_hi,
+        T_ice_lo, T_ice_hi,
+        T_sfc_lo, T_sfc_hi,
+        F_sh_lo, F_sh_hi,
+        F_lh_lo, F_lh_hi,
+    )
+end
+
+function format_test2c_line(ii, day, s)
+    T_oc_lo, T_oc_hi     = finite_extrema(s.T_oc)
+    T_ice_lo, T_ice_hi   = finite_extrema(s.T_ice_top)
+    T_sfc_lo, T_sfc_hi   = finite_extrema(s.T_sfc)
+    F_sh_lo, F_sh_hi     = finite_extrema(s.F_sh)
+    return @sprintf(
+        "2C step %4d  day %6.2f | T_oc [%7.2f, %7.2f] C | T_ice_top [%7.2f, %7.2f] C | T_sfc [%6.2f, %6.2f] K | F_sh [%8.2f, %8.2f] W/m2",
+        ii, day,
+        T_oc_lo, T_oc_hi,
+        T_ice_lo, T_ice_hi,
+        T_sfc_lo, T_sfc_hi,
+        F_sh_lo, F_sh_hi,
+    )
+end
+
+function monitor_has_nan_test1(s)
+    return has_nan(s.T_oc) || has_nan(s.S_oc) || has_nan(s.u_oc) ||
+           has_nan(s.sic) || has_nan(s.h_ice) || has_nan(s.T_ice_top) ||
+           has_nan(s.T_sfc) || has_nan(s.F_sh) || has_nan(s.F_lh)
+end
+
+function monitor_has_nan_test2c(s)
+    return has_nan(s.T_oc) || has_nan(s.T_ice_top) ||
+           has_nan(s.T_sfc) || has_nan(s.F_sh)
+end
+
+# Smoke-test formatting before constructing CoupledSimulation (cheap catch for
+# arg-count / literal-format mistakes that would otherwise burn a GPU node).
+let
+    dummy = fill(0.0, 4)
+    s1 = (;
+        T_oc = dummy, S_oc = dummy, u_oc = dummy, sic = dummy, h_ice = dummy,
+        T_ice_top = dummy, T_sfc = dummy, F_sh = dummy, F_lh = dummy,
+    )
+    s2c = (; T_oc = dummy, T_ice_top = dummy, T_sfc = dummy, F_sh = dummy)
+    line1 = format_test1_line(1, 0.0, s1)
+    line2 = format_test2c_line(1, 0.0, s2c)
+    @assert occursin("step", line1) && occursin("2C step", line2)
+    @info "Format smoke-test OK"
 end
 
 # ─── Construct reference cs (baseline for Test 1 and Test 2B) ─────────────────
@@ -101,6 +214,8 @@ write_comparison(stdout,
 
 nan_step  = nothing
 last_step = 0
+test1_log = joinpath(ARTIFACT_DIR, "test1_extrema.txt")
+log_io_1  = open(test1_log, "w")
 
 try
     ocean_model = cs_ref.model_sims.ocean_sim.ocean.model
@@ -112,39 +227,23 @@ try
         last_step = ii
         day = Float64(cs_ref.t[]) / 86400
 
-        T_oc      = Oceananigans.interior(ocean_model.tracers.T,       :, :, Nz)
-        S_oc      = Oceananigans.interior(ocean_model.tracers.S,       :, :, Nz)
-        u_oc      = Oceananigans.interior(ocean_model.velocities.u,    :, :, Nz)
-        sic       = Oceananigans.interior(ice_model.ice_concentration, :, :, 1)
-        h_ice     = Oceananigans.interior(ice_model.ice_thickness,     :, :, 1)
-        T_ice_top = Oceananigans.interior(ice_model.ice_thermodynamics.top_surface_temperature, :, :, 1)
+        s = monitor_state_test1(ocean_model, ice_model, cs_ref, Nz)
+        line = format_test1_line(ii, day, s)
+        println(log_io_1, line)
+        flush(log_io_1)
+        @info line
 
-        @info @sprintf(
-            "step %4d  day %6.2f | T_oc [%7.2f, %7.2f] °C  S_oc [%5.2f, %5.2f] psu  u_oc_max %7.3f m/s | SIC [%.3f, %.3f]  h_ice [%.3f, %.3f] m | T_ice_top [%7.2f, %7.2f] °C | T_sfc [%6.2f, %6.2f] K  F_sh [%8.2f, %8.2f] W/m²  F_lh [%8.2f, %8.2f] W/m²",
-            ii, day,
-            minimum(T_oc),      maximum(T_oc),
-            minimum(S_oc),      maximum(S_oc),
-            maximum(abs, u_oc),
-            minimum(sic),       maximum(sic),
-            minimum(h_ice),     maximum(h_ice),
-            minimum(T_ice_top), maximum(T_ice_top),
-            minimum(cs_ref.fields.T_sfc), maximum(cs_ref.fields.T_sfc),
-            minimum(cs_ref.fields.F_sh),  maximum(cs_ref.fields.F_sh),
-            minimum(cs_ref.fields.F_lh),  maximum(cs_ref.fields.F_lh),
-        )
-
-        if any(isnan, T_oc) || any(isnan, S_oc) ||
-           any(isnan, T_ice_top) ||
-           any(isnan, parent(cs_ref.fields.T_sfc)) ||
-           any(isnan, parent(cs_ref.fields.F_sh))
+        if monitor_has_nan_test1(s)
             nan_step = ii
-            @warn "NaN detected at step $ii (day $(round(day, digits=3))) — stopping Test 1"
+            @warn "NaN/Inf detected at step $ii (day $(round(day, digits=3))) — stopping Test 1"
             break
         end
     end
 catch e
     crashed_day = round(Float64(cs_ref.t[]) / 86400, digits = 3)
     @error "Test 1 threw at step $last_step (day $crashed_day)" exception = e
+finally
+    close(log_io_1)
 end
 
 if isnothing(nan_step)
@@ -160,18 +259,13 @@ ref_day = round(Float64(cs_ref.t[]) / 86400, digits = 3)
 cs_2b   = CoupledSimulation(CONFIG_FILE)
 snap_2b = snapshot_state(cs_2b)
 
+label_2b = "Test 2B — fresh cs after run (nonzero → global-state pollution; zero → same ICs, divergence is inside step!)"
 open(joinpath(ARTIFACT_DIR, "test2B_comparison.txt"), "w") do io
     println(io, "cs_ref ran to: day $ref_day")
     isnothing(nan_step) || println(io, "NaN first detected at step: $nan_step")
-    write_comparison(io,
-        "Test 2B — fresh cs after run " *
-        "(nonzero → global-state pollution; zero → same ICs, divergence is inside step!)",
-        snap_ref_init, snap_2b)
+    write_comparison(io, label_2b, snap_ref_init, snap_2b)
 end
-write_comparison(stdout,
-    "Test 2B — fresh cs after run " *
-    "(nonzero → global-state pollution; zero → same ICs, divergence is inside step!)",
-    snap_ref_init, snap_2b)
+write_comparison(stdout, label_2b, snap_ref_init, snap_2b)
 
 # ─── Test 2C: step cs_2b to see if it also crashes ───────────────────────────
 #
@@ -187,6 +281,8 @@ write_comparison(stdout,
 
 nan_step_2c  = nothing
 last_step_2c = 0
+test2c_log = joinpath(ARTIFACT_DIR, "test2C_extrema.txt")
+log_io_2c  = open(test2c_log, "w")
 
 try
     ocean_model_2b = cs_2b.model_sims.ocean_sim.ocean.model
@@ -198,29 +294,23 @@ try
         last_step_2c = ii
         day = Float64(cs_2b.t[]) / 86400
 
-        T_oc_2b      = Oceananigans.interior(ocean_model_2b.tracers.T,       :, :, Nz_2b)
-        T_ice_top_2b = Oceananigans.interior(ice_model_2b.ice_thermodynamics.top_surface_temperature, :, :, 1)
+        s = monitor_state_test2c(ocean_model_2b, ice_model_2b, cs_2b, Nz_2b)
+        line = format_test2c_line(ii, day, s)
+        println(log_io_2c, line)
+        flush(log_io_2c)
+        @info line
 
-        @info @sprintf(
-            "2C step %4d  day %6.2f | T_oc [%7.2f, %7.2f] °C | T_ice_top [%7.2f, %7.2f] °C | T_sfc [%6.2f, %6.2f] K | F_sh [%8.2f, %8.2f] W/m²",
-            ii, day,
-            minimum(T_oc_2b),      maximum(T_oc_2b),
-            minimum(T_ice_top_2b), maximum(T_ice_top_2b),
-            minimum(cs_2b.fields.T_sfc), maximum(cs_2b.fields.T_sfc),
-            minimum(cs_2b.fields.F_sh),  maximum(cs_2b.fields.F_sh),
-        )
-
-        if any(isnan, T_oc_2b) || any(isnan, T_ice_top_2b) ||
-           any(isnan, parent(cs_2b.fields.T_sfc)) ||
-           any(isnan, parent(cs_2b.fields.F_sh))
+        if monitor_has_nan_test2c(s)
             nan_step_2c = ii
-            @warn "Test 2C: NaN detected at step $ii (day $(round(day, digits=3))) — stopping"
+            @warn "Test 2C: NaN/Inf detected at step $ii (day $(round(day, digits=3))) — stopping"
             break
         end
     end
 catch e
     crashed_day_2c = round(Float64(cs_2b.t[]) / 86400, digits = 3)
     @error "Test 2C threw at step $last_step_2c (day $crashed_day_2c)" exception = e
+finally
+    close(log_io_2c)
 end
 
 open(joinpath(ARTIFACT_DIR, "test2C_summary.txt"), "w") do io
@@ -244,5 +334,9 @@ open(joinpath(ARTIFACT_DIR, "test2C_summary.txt"), "w") do io
     flush(io)
 end
 
-@info "Test 2C: $(isnothing(nan_step_2c) ? "completed $last_step_2c steps with no NaN" : "NaN at step $nan_step_2c")"
+if isnothing(nan_step_2c)
+    @info "Test 2C: completed $last_step_2c steps with no NaN"
+else
+    @info "Test 2C: NaN at step $nan_step_2c"
+end
 @info "Stability diagnostics complete. Artifacts written to $ARTIFACT_DIR"

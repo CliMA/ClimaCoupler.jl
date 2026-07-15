@@ -34,9 +34,21 @@ include("code_loading.jl")
 # Get the configuration file from the command line (or manually set it here)
 config_file = Input.parse_commandline(Input.argparse_settings())["config_file"]
 
+# Makie loading strategy:
+# - Default: defer until after `run!` so package/compilation cost does not
+#   delay time-to-first-timestep (postprocess still gets plots).
+# - Mid-run / callback plots: set CLIMACOUPLER_PLOTS_DURING_RUN=true (or
+#   include `../load_plotting.jl` yourself before constructing callbacks)
+#   so ClimaCouplerMakieExt is available during the coupling loop.
+plots_during_run = get(ENV, "CLIMACOUPLER_PLOTS_DURING_RUN", "false") == "true"
+plots_during_run && include(joinpath(@__DIR__, "..", "load_plotting.jl"))
+
 # Set up and run the coupled simulation
 cs = CoupledSimulation(config_file)
 run!(cs)
+
+# Ensure plotting is available for postprocess when it was deferred past run!.
+plots_during_run || include(joinpath(@__DIR__, "..", "load_plotting.jl"))
 
 # Postprocessing
 conservation_softfail = Input.get_coupler_config_dict(config_file)["conservation_softfail"]

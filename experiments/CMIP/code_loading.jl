@@ -17,9 +17,6 @@ to set up and run a simulation interactively.
 
 using ClimaCoupler
 
-# Trigger ClimaCouplerMakieExt
-using CairoMakie, ClimaCoreMakie, GeoMakie, Makie, Poppler_jll, Printf
-
 # Trigger ClimaCouplerCMIPExt
 import Oceananigans,
     ClimaOcean, ClimaSeaIce, KernelAbstractions, ConservativeRegridding, Adapt

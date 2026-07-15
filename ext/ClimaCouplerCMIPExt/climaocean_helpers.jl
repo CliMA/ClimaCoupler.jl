@@ -76,43 +76,26 @@ Fields to Face/Center and Center/Face coordinates, respectively.
     end
 end
 
+# Momentum remapping helpers (CT types / basis fields are defined in oceananigans.jl)
+
 """
-    contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz)
+    contravariant_to_cartesian!(remapping, ρτxz, ρτyz)
 
 Convert the covariant vector components `ρτxz` and `ρτyz` from the
 contravariant basis (as they are output by the surface flux calculation)
-to the Cartesian basis. These are now in an extrinsic coordinate system
-that can be rotated onto the ocean/sea ice grid by `_rotate_vector!`.
+to the Cartesian basis, writing into `remapping.temp_uv_vec`. These are now
+in an extrinsic coordinate system that can be rotated onto the ocean/sea ice
+grid by `_rotate_vector!`.
+
+Uses precomputed `ct12_xz` / `ct12_yz` stored in `remapping` to avoid
+allocating basis fields every coupling step.
 """
-function contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz)
-    # Get the local geometry of the boundary space
+function contravariant_to_cartesian!(remapping, ρτxz, ρτyz)
+    (; temp_uv_vec, ct12_xz, ct12_yz) = remapping
     local_geometry = CC.Fields.local_geometry_field(ρτxz)
-
-    # Get the vector components in the CT1 and CT2 directions
-    xz = @. CT12(CT1(unit_basis_vector_data(CT1, local_geometry)), local_geometry)
-    yz = @. CT12(CT2(unit_basis_vector_data(CT2, local_geometry)), local_geometry)
-
-    # Convert the vector components to a UVVector on the Cartesian basis
-    @. ρτ_flux_uv = CC.Geometry.UVVector(ρτxz * xz + ρτyz * yz, local_geometry)
+    @. temp_uv_vec =
+        CC.Geometry.UVVector(ρτxz * ct12_xz + ρτyz * ct12_yz, local_geometry)
     return nothing
-end
-
-# Define shorthands for ClimaCore types
-const CT1 = CC.Geometry.Contravariant1Vector
-const CT2 = CC.Geometry.Contravariant2Vector
-const CT12 = CC.Geometry.Contravariant12Vector
-
-"""
-    unit_basis_vector_data(type, local_geometry)
-
-The component of the vector of the specified type with length 1 in physical units.
-The type should correspond to a vector with only one component, i.e., a basis vector.
-
-Helper function used only in `contravariant_to_cartesian!`.
-"""
-function unit_basis_vector_data(::Type{V}, local_geometry) where {V}
-    FT = CC.Geometry.undertype(typeof(local_geometry))
-    return FT(1) / CC.Geometry._norm(V(FT(1)), local_geometry)
 end
 
 # Non-allocating ClimaCore -> Oceananigans remap.
@@ -161,7 +144,10 @@ function Interfacer.remap(
     return target_field
 end
 
-# Non-allocating Oceananigans operation -> ClimaCore remap
+# Oceananigans operation -> ClimaCore remap.
+# Prefer specialized `get_field!` methods (e.g. `:surface_temperature`) that
+# evaluate Celsius→Kelvin into remapping scratch. This generic path still
+# allocates a temporary `Field` for arbitrary operations.
 function Interfacer.remap!(
     target_field::CC.Fields.Field,
     operation::OC.AbstractOperations.AbstractOperation,
@@ -193,6 +179,65 @@ function Interfacer.get_field!(
     Interfacer.remap!(target_field, Interfacer.get_field(sim, quantity), sim.remapping)
     return nothing
 end
+
+"""
+    Interfacer.get_field!(target_field, sim::OceananigansSimulation, ::Val{:surface_temperature})
+
+Write ocean surface temperature in Kelvin into `target_field` without allocating
+a temporary 3D `Field` for the Celsius→Kelvin conversion (see #1377 / #1384).
+"""
+function Interfacer.get_field!(
+    target_field,
+    sim::OceananigansSimulation,
+    ::Val{:surface_temperature},
+)
+    T = sim.ocean.model.tracers.T
+    Nz = size(T, 3)
+    scratch = sim.remapping.scratch_field_oc1
+    C_to_K = sim.ocean_properties.C_to_K
+    OC.interior(scratch, :, :, 1) .= OC.interior(T, :, :, Nz) .+ C_to_K
+    Interfacer.remap!(target_field, scratch, sim.remapping)
+    return nothing
+end
+
+"""
+    Interfacer.get_field!(target_field, sim::ClimaSeaIceSimulation, ::Val{:surface_temperature})
+
+Write ice surface temperature in Kelvin into `target_field` using remapping
+scratch so the Celsius→Kelvin broadcast does not allocate each coupling step.
+"""
+function Interfacer.get_field!(
+    target_field,
+    sim::ClimaSeaIceSimulation,
+    ::Val{:surface_temperature},
+)
+    T_c = top_thermodynamics(sim).top_surface_temperature
+    scratch = sim.remapping.scratch_field_oc1
+    C_to_K = sim.ice_properties.C_to_K
+    OC.interior(scratch, :, :, 1) .= OC.interior(T_c, :, :, 1) .+ C_to_K
+    Interfacer.remap!(target_field, scratch, sim.remapping)
+    return nothing
+end
+
+"""
+    Interfacer.get_field!(target_field, sim::ClimaSeaIceSimulation, ::Val{:internal_temperature})
+
+Write ocean–ice interface temperature in Kelvin into `target_field` using
+remapping scratch to avoid per-call operation-field allocation.
+"""
+function Interfacer.get_field!(
+    target_field,
+    sim::ClimaSeaIceSimulation,
+    ::Val{:internal_temperature},
+)
+    T_c = sim.ocean_ice_interface.temperature
+    scratch = sim.remapping.scratch_field_oc1
+    C_to_K = sim.ice_properties.C_to_K
+    OC.interior(scratch, :, :, 1) .= OC.interior(T_c, :, :, 1) .+ C_to_K
+    Interfacer.remap!(target_field, scratch, sim.remapping)
+    return nothing
+end
+
 # TODO see if we can remove this allocating version
 function Interfacer.get_field(
     target_space::CC.Spaces.AbstractSpace,

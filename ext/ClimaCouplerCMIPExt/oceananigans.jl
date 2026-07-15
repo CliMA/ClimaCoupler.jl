@@ -339,6 +339,35 @@ is unaware of the immersed mask. Raw grids pass through unchanged so that
 underlying_grid(grid::OC.ImmersedBoundaryGrid) = grid.underlying_grid
 underlying_grid(grid) = grid
 
+# ClimaCore contravariant basis types for momentum remapping
+const CT1 = CC.Geometry.Contravariant1Vector
+const CT2 = CC.Geometry.Contravariant2Vector
+const CT12 = CC.Geometry.Contravariant12Vector
+
+"""
+    unit_basis_vector_data(type, local_geometry)
+
+The component of the vector of the specified type with length 1 in physical units.
+"""
+function unit_basis_vector_data(::Type{V}, local_geometry) where {V}
+    FT = CC.Geometry.undertype(typeof(local_geometry))
+    return FT(1) / CC.Geometry._norm(V(FT(1)), local_geometry)
+end
+
+"""
+    momentum_basis_fields(boundary_space)
+
+Precompute Contravariant12 basis fields for converting surface momentum fluxes
+from the contravariant basis to Cartesian UV. Geometry is fixed, so this is
+built once in `construct_remapper` (#1384).
+"""
+function momentum_basis_fields(boundary_space)
+    local_geometry = CC.Fields.local_geometry_field(boundary_space)
+    ct12_xz = @. CT12(CT1(unit_basis_vector_data(CT1, local_geometry)), local_geometry)
+    ct12_yz = @. CT12(CT2(unit_basis_vector_data(CT2, local_geometry)), local_geometry)
+    return ct12_xz, ct12_yz
+end
+
 
 """
     construct_remapper(grid_oc, boundary_space)
@@ -406,6 +435,10 @@ function construct_remapper(grid_oc, boundary_space)
     # Allocate space for a Field of UVVectors, which we need for remapping momentum fluxes
     temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
 
+    # Precompute CT12 basis fields once; used every coupling step in
+    # `contravariant_to_cartesian!` (#1384).
+    ct12_xz, ct12_yz = momentum_basis_fields(boundary_space)
+
     # `TripolarGrid` covers the full sphere by construction, so no polar
     # masking is needed on either the OC or CC side. The FV → SE projection
     # has no structural-zero "no-data" nodes to repair, and `weighted_dss!`
@@ -417,6 +450,8 @@ function construct_remapper(grid_oc, boundary_space)
         scratch_field_oc2,
         scratch_field_oc3,
         temp_uv_vec,
+        ct12_xz,
+        ct12_yz,
     )
 end
 
@@ -514,7 +549,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     ice_concentration_field = sim.ice_concentration
 
     # Convert the momentum fluxes from contravariant to Cartesian basis
-    contravariant_to_cartesian!(sim.remapping.temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz)
+    contravariant_to_cartesian!(sim.remapping, F_turb_ρτxz, F_turb_ρτyz)
     F_turb_ρτxz_uv = sim.remapping.temp_uv_vec.components.data.:1
     F_turb_ρτyz_uv = sim.remapping.temp_uv_vec.components.data.:2
 
@@ -525,14 +560,12 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     F_turb_ρτxz_oc = sim.remapping.scratch_field_oc1
     F_turb_ρτyz_oc = sim.remapping.scratch_field_oc2
 
-    # Weight by (1 - sea ice concentration)
+    # Weight by (1 - sea ice concentration); fuse into destination to avoid temps
     ice_concentration = OC.interior(ice_concentration_field, :, :, 1)
-    OC.interior(F_turb_ρτxz_oc, :, :, 1) .=
-        OC.interior(F_turb_ρτxz_oc, :, :, 1) .* (1.0 .- ice_concentration) ./
-        reference_density
-    OC.interior(F_turb_ρτyz_oc, :, :, 1) .=
-        OC.interior(F_turb_ρτyz_oc, :, :, 1) .* (1.0 .- ice_concentration) ./
-        reference_density
+    τx = OC.interior(F_turb_ρτxz_oc, :, :, 1)
+    τy = OC.interior(F_turb_ρτyz_oc, :, :, 1)
+    @. τx = τx * (1 - ice_concentration) / reference_density
+    @. τy = τy * (1 - ice_concentration) / reference_density
 
     # Set the momentum flux BCs at the correct locations using the remapped scratch fields
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
@@ -555,20 +588,21 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     # TODO: Note, SW radiation penetrates the surface. Right now, we just put
     # everything on the surface, but later we will need to account for this.
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
-    OC.interior(oc_flux_T, :, :, 1) .+=
-        (1.0 .- ice_concentration) .* (remapped_F_lh .+ remapped_F_sh) ./
+    flux_T = OC.interior(oc_flux_T, :, :, 1)
+    @. flux_T +=
+        (1 - ice_concentration) * (remapped_F_lh + remapped_F_sh) /
         (reference_density * heat_capacity)
 
     # Add the part of the salinity flux that comes from the moisture flux, we also need to
     # add the component due to precipitation (that was done with the radiative fluxes)
     Interfacer.remap!(sim.remapping.scratch_field_oc1, F_turb_moisture, sim.remapping) # moisture flux
-    moisture_fresh_water_flux =
-        OC.interior(sim.remapping.scratch_field_oc1, :, :, 1) ./ reference_density
 
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
-    OC.interior(oc_flux_S, :, :, 1) .-=
-        (1.0 .- ice_concentration) .* surface_salinity .* moisture_fresh_water_flux
+    remapped_moisture = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
+    flux_S = OC.interior(oc_flux_S, :, :, 1)
+    @. flux_S -=
+        (1 - ice_concentration) * surface_salinity * remapped_moisture / reference_density
     return nothing
 end
 
@@ -623,15 +657,14 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
 
     # Compute radiative contribution.
     rad_T_flux = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
-    rad_T_flux .=
-        (1.0 .- ice_concentration) .* (
-            -(1 - α) .* remapped_SW_d .-
-            ϵ * (
-                remapped_LW_d .-
-                σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T, :, :, Nz)) .^ 4
-            )
-        ) ./ (reference_density * heat_capacity)
-    OC.interior(oc_flux_T, :, :, 1) .+= rad_T_flux
+    T_surface = OC.interior(sim.ocean.model.tracers.T, :, :, Nz)
+    @. rad_T_flux =
+        (1 - ice_concentration) * (
+            -(1 - α) * remapped_SW_d -
+            ϵ * (remapped_LW_d - σ * (C_to_K + T_surface)^4)
+        ) / (reference_density * heat_capacity)
+    flux_T = OC.interior(oc_flux_T, :, :, 1)
+    @. flux_T += rad_T_flux
 
     # Remap precipitation fields onto scratch arrays; rename for clarity
     Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.P_liq, sim.remapping) # liquid precipitation
@@ -641,9 +674,11 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     remapped_P_snow = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
 
     # Note the negative sign here to account for the sign change from precipitation to salinity flux
-    OC.interior(oc_flux_S, :, :, 1) .-=
-        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
-        (remapped_P_liq .+ remapped_P_snow) ./ reference_density
+    S_surface = OC.interior(sim.ocean.model.tracers.S, :, :, Nz)
+    flux_S = OC.interior(oc_flux_S, :, :, 1)
+    @. flux_S -=
+        S_surface * (1 - ice_concentration) * (remapped_P_liq + remapped_P_snow) /
+        reference_density
     return nothing
 end
 

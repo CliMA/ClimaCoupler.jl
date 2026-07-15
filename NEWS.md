@@ -4,6 +4,14 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Reduce allocations in OceananigansSimulation remapping paths
+This change avoids per-coupling-step heap allocations when exchanging Oceananigans /
+ClimaSeaIce fields: `get_field!` for surface (and ice internal) temperature
+converts Celsius→Kelvin into remapping scratch before regridding,
+momentum remapping reuses precomputed CT12 basis fields, and flux updates
+fuse ice-weighted broadcasts into destination arrays rather than allocating
+RHS temporaries. See [#1384](https://github.com/CliMA/ClimaCoupler.jl/issues/1384).
+
 v0.2.2
 -------
 

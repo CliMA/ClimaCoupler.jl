@@ -418,7 +418,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     # We only need to provide momentum fluxes if the sea ice model has dynamics
     if !isnothing(sim.ice.model.dynamics)
         # Convert the momentum fluxes from contravariant to Cartesian basis
-        contravariant_to_cartesian!(sim.remapping.temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz)
+        contravariant_to_cartesian!(sim.remapping, F_turb_ρτxz, F_turb_ρτyz)
         F_turb_ρτxz_uv = sim.remapping.temp_uv_vec.components.data.:1
         F_turb_ρτyz_uv = sim.remapping.temp_uv_vec.components.data.:2
 

@@ -19,6 +19,7 @@ orographic_gravity_wave: ~
 rayleigh_sponge: true
 reproducible_restart: true
 start_date: "20100101"
+use_itime: true
 surface_setup: "PrescribedSurface"
 t_end: "540secs"
 topo_smoothing: true

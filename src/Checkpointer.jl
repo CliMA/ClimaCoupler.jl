@@ -828,6 +828,13 @@ function get_cache_ignore(::Interfacer.AbstractAtmosSimulation)
         :data_handler,
         :graph_context,
         :dt,
+        # RRTMGP 0.22 working buffers allocated with `undef` and rewritten on every
+        # radiation solve. Persisting them would save GPU garbage, not meaningful state;
+        # `rrtmgp_solver_callback!` (called from `set_cache!`) rebuilds the solver outputs.
+        :fluxb,      # band-by-band intermediate fluxes
+        :src,        # source-function workspace (includes sfc_source)
+        :lon,        # "required but unused" per RRTMGP source comment
+        :aero_size,  # partially filled; unused size slots remain undef
     ])
 end
 

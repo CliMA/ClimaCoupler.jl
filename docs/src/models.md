@@ -118,9 +118,6 @@ atmospheric models.
 
 ## Eisenman-Zhang Sea Ice Model
 
-### TODO:
-- [ ] Check if Q fluxes are included in current formulation.
-
 The Eisenman-Zhang sea ice model (`EisenmanIceSimulation`) is a thermodynamic
 0-layer sea ice model over a slab ocean mixed layer, based on the
 [Semtner (1976)](https://doi.org/10.1175/1520-0485(1976)006<0379:AMFTTG>2.0.CO;2)
@@ -145,7 +142,7 @@ Ice cover is a binary mask: the surface is ice-covered wherever ``h_i > 0``.
 In ice-covered conditions the **ice thickness** ``h_i`` evolves as
 
 ```math
-L_i \frac{dh_i}{dt} = F_{atm} - F_{base}
+L_i \frac{dh_i}{dt} = F_{atm} - F_{base} - Q
 ```
 
 where:
@@ -153,6 +150,7 @@ where:
 - ``t`` is model time in seconds
 - ``F_{atm}`` is the total energy flux from the surface to the atmosphere (positive upwards)
 - ``F_{base}`` is the basal heat flux from the ocean mixed layer into the ice
+- ``Q`` is the prescribed lateral ocean heat flux (positive toward the local column)
 
 The energy flux into the atmosphere can be expanded as:
 ```math
@@ -201,7 +199,7 @@ turbulent flux is treated explicitly in the Newton update.
 in ice-free conditions, the mixed layer assumes the standard slab representation
 
 ```math
-\rho_w c_w h_{ml} \frac{dT_{ml}}{dt} = -F_{atm}
+\rho_w c_w h_{ml} \frac{dT_{ml}}{dt} = -F_{atm} + Q
 ```
 
 and ``T_s = T_{ml}``.

@@ -77,7 +77,7 @@ function tripolar_ocean_simulation(
 
     free_surface = OC.SplitExplicitFreeSurface(grid; substeps)
 
-    return CO.ocean_simulation(
+    return ocean_simulation(
         grid;
         momentum_advection,
         tracer_advection,
@@ -202,9 +202,9 @@ function OceananigansSimulation(
     # Create ocean simulation
     closure = if simple_ocean
         @info "Using simpler ocean setup; to be used for software testing only."
-        CO.OceanConfigurations.simplified_ocean_closure()
+        simplified_ocean_closure()
     else
-        CO.OceanConfigurations.default_one_degree_closure()
+        default_one_degree_closure()
     end
 
     if tspan[1] isa ITime

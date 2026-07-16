@@ -85,9 +85,9 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
 
     advection = ocean.ocean.model.advection.T
-    ice = CO.SeaIces.sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection)
+    ice = sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection)
 
-    ocean_ice_flux_formulation = CO.InterfaceComputations.ThreeEquationHeatFlux(ice)
+    ocean_ice_flux_formulation = ThreeEquationHeatFlux(ice)
     interface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     interface_salinity = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
@@ -180,7 +180,7 @@ function ClimaSeaIceSimulation(
     )
 
     # Ensure ocean temperature is above freezing where there is sea ice
-    CO.EarthSystemModels.above_freezing_ocean_temperature!(ocean.ocean, grid, ice)
+    above_freezing_ocean_temperature!(ocean.ocean, grid, ice)
     return sim
 end
 
@@ -546,11 +546,12 @@ function FluxCalculator.ocean_seaice_fluxes!(
     ocean_sim.ice_concentration .= ice_concentration
 
     # Compute the fluxes and store them in the both simulations
-    CO.InterfaceComputations.compute_sea_ice_ocean_fluxes!(
+    compute_sea_ice_ocean_fluxes!(
         ice_sim.ocean_ice_interface,
         ocean_sim.ocean,
         ice_sim.ice,
-        ocean_properties,
+        ocean_properties;
+        Δt = ice_sim.ice.Δt,
     )
 
     ## Update the internals of the sea ice model

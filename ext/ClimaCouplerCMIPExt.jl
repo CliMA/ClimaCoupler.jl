@@ -48,6 +48,12 @@ include("ClimaCouplerCMIPExt/climaocean_helpers.jl")
 # Include skin temperature utilities
 include("ClimaCouplerCMIPExt/skin_temperature.jl")
 
+# Include Ocean and sea ice helpers
+include("ClimaCouplerCMIPExt/ocean_closures.jl")
+include("ClimaCouplerCMIPExt/ocean_simulation.jl")
+include("ClimaCouplerCMIPExt/sea_ice_ocean_fluxes.jl")
+include("ClimaCouplerCMIPExt/sea_ice_simulation.jl")
+
 include("ClimaCouplerCMIPExt/ocean_diagnostics.jl")
 include("ClimaCouplerCMIPExt/seaice_diagnostics.jl")
 

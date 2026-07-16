@@ -67,6 +67,11 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
             time = calib_start,
         )
         cmap_extrema = get(bias_plot_extrema, sn, extrema(sim_var_t.data))
+        # `lwp` (MAC) is an ocean-only retrieval with NaNs over land. The bias
+        # plot's internal resampling is not NaN-aware, which previously errored
+        # ("bias plot error: lwp"). Masking the ocean aligns the NaN pattern of
+        # both fields so the bias can be computed and plotted.
+        plot_mask = sn == "lwp" ? ClimaAnalysis.Visualize.oceanmask() : nothing
         try
             if ClimaAnalysis.has_pressure(sim_var_t)
                 for (j, pressure) in enumerate(ClimaAnalysis.pressures(sim_var_t))
@@ -96,10 +101,12 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
                     sim_var_t,
                     era5_var_t;
                     cmap_extrema,
+                    mask = plot_mask,
                 )
             end
         catch e
-            @error "bias plot error: $(ClimaAnalysis.short_name(sim_var_t))"
+            @error "bias plot error: $(ClimaAnalysis.short_name(sim_var_t))" exception =
+                (e, catch_backtrace())
         end
     end
 

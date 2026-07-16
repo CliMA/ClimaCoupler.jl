@@ -115,6 +115,7 @@ struct IntersectionGrid{FT, IT, VFT <: AbstractVector{FT}, VIT <: AbstractVector
     node_gather_polygon::VIT
     node_gather_node::VIT
     node_gather_weight::VFT
+    nodal_gather_scratch::Vector{FT}
 end
 
 function Base.show(io::IO, ig::IntersectionGrid{FT}) where {FT}
@@ -352,6 +353,7 @@ function extract_intersection_grid(
         node_gather_polygon,
         node_gather_node,
         node_gather_weight,
+        zeros(FT, n_intersections),
     )
 end
 
@@ -389,6 +391,7 @@ function extract_intersection_grid(
         to_arch(ig_cpu.node_gather_polygon),
         to_arch(ig_cpu.node_gather_node),
         to_arch(ig_cpu.node_gather_weight),
+        ig_cpu.nodal_gather_scratch,
     )
 end
 
@@ -630,7 +633,8 @@ function gather_cc_nodal_to_intersection!(
     ig::IntersectionGrid,
     nodal_values,
 )
-    iv_host = zeros(eltype(intersection_values), length(intersection_values))
+    iv_host = ig.nodal_gather_scratch
+    fill!(iv_host, zero(eltype(iv_host)))
 
     node_gather_polygon = host_intersection_vector(ig.node_gather_polygon)
     node_gather_node = host_intersection_vector(ig.node_gather_node)

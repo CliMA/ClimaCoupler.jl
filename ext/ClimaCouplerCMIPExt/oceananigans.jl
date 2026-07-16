@@ -489,6 +489,7 @@ function construct_remapper(
             to_arch(ig_cpu.node_gather_polygon),
             to_arch(ig_cpu.node_gather_node),
             to_arch(ig_cpu.node_gather_weight),
+            ig_cpu.nodal_gather_scratch,
         )
         momentum_geom = NamedTuple{keys(momentum_geom_cpu)}(
             map(to_arch, values(momentum_geom_cpu))

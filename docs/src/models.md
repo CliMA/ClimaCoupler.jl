@@ -116,6 +116,95 @@ These simulation types use prescribed sea ice concentration along with
 prescribed ocean SSTs to provide realistic surface boundary conditions for
 atmospheric models.
 
+## Eisenman-Zhang Sea Ice Model
+
+The Eisenman-Zhang sea ice model (`EisenmanIceSimulation`) is a thermodynamic
+0-layer sea ice model over a slab ocean mixed layer, based on the
+[Semtner (1976)](https://journals.ametsoc.org/view/journals/phoc/6/3/1520-0485_1976_006_0379_amfttg_2_0_co_2.xml)
+model and later refined by
+[Eisenman & Wettlaufer (2009)](https://www.pnas.org/doi/full/10.1073/pnas.0806887106) and
+[Zhang et al. (2021)](https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1029/2021MS002671)
+(whose implementation can be found on
+[GitHub](https://github.com/sally-xiyue/fms-idealized/blob/sea_ice_v1.0/exp/sea_ice/srcmods/mixed_layer.f90)).
+Unlike the prescribed sea ice model, the ice thickness evolves prognostically,
+with ice growing or melting in response to the surface energy imbalance, and
+the surface can transition between ice-covered and ice-free states. The model
+assumes no snow coverage.
+
+The prognostic variables are the ice thickness ``h_i``, the ocean mixed layer
+temperature ``T_{ml}``, and the surface temperature ``T_s`` (plus an
+accumulated basal energy used for energy bookkeeping). Ice cover is a binary
+mask: the surface is ice-covered wherever ``h_i > 0``.
+
+### Formulation
+
+The net upward atmospheric flux is assembled from the coupler-provided
+turbulent flux and downwelling radiation, and the surface emission:
+
+```math
+F_{atm} = F_{\text{turb\_energy}} + \epsilon (\sigma T_s^4 - LW_d) - (1 - \alpha) SW_d
+```
+
+In ice-covered conditions the ice thickness evolves as
+
+```math
+L_i \frac{dh_i}{dt} = F_{atm} - F_{base} - Q
+```
+
+with the density-weighted latent heat of fusion ``L_i = 3 \times 10^8`` J m⁻³,
+the basal flux
+
+```math
+F_{base} = F_0 (T_{ml} - T_{melt})
+```
+
+where ``T_{melt} = 273.16`` K is the freezing temperature and
+``F_0 = 120`` W m⁻² K⁻¹ is the basal heat coefficient, and a prescribed
+lateral oceanic heat flux ``Q``.
+
+The ice surface temperature is obtained by balancing ``F_{atm}(T_s)`` against
+the conductive heat flux through the ice slab,
+``F_{ice} = k_i (T_{melt} - T_s) / h_i`` with ``k_i = 2`` W m⁻¹ K⁻¹,
+using one Newton iteration (sufficient at the current spatial and temporal
+resolution — see Semtner, 1976):
+
+```math
+T_s^{t+1} = T_s^{t} + \frac{- F_{atm}^t + F_{ice}^{t+1}}{k_i/h_i^{t+1} + \partial F_{atm}^t / \partial T_s^t}
+```
+
+capped at the freezing point (the ice surface stores no energy). The
+derivative ``\partial F_{atm} / \partial T_s = 4 \epsilon \sigma T_s^3``
+contains only the radiative contribution: the turbulent flux derivative
+``\partial F_{\text{turb}} / \partial T_s`` is no longer provided by the
+coupler (its finite-difference machinery was removed in
+[#1284](https://github.com/CliMA/ClimaCoupler.jl/pull/1284)), so the
+turbulent flux is treated explicitly in the Newton update.
+
+**Warm surface**: in ice-free conditions, the mixed layer assumes the standard
+slab representation
+
+```math
+\rho_w c_w h_{ml} \frac{dT_{ml}}{dt} = -F_{atm} + Q
+```
+
+and ``T_s = T_{ml}``.
+
+**Frazil ice formation**: the mixed layer is not allowed to cool below
+``T_{melt}``; the energy deficit is instead used to grow ice.
+
+**Transition to ice-free conditions**: if the updated ``h_i`` would be
+negative, the ice thickness is set to zero and the surplus energy warms the
+mixed layer.
+
+**Usage**: select with `ice_model: "eisenman"`. Since the model carries its
+own mixed layer, it should not be paired with a separate ocean model
+overlapping the same surface area.
+
+### Potential extensions
+
+- add an `ice_area_fraction` adjustment (e.g., assuming a minimal thickness of
+  sea ice, below which the grid area becomes part ice and part ocean)
+
 
 ## Models in Extensions
 

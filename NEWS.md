@@ -13,6 +13,11 @@ selectable with `ice_model: "eisenman"`. The turbulent flux derivative
 with the model) is dropped from the surface Newton solve, which now treats
 the turbulent flux explicitly and retains only the radiative derivative.
 
+#### Adapt to the redesigned RRTMGP 0.22 / ClimaAtmos 0.42 radiation API.
+The atmosphere radiation cache now holds an `RRTMGP.RRTMGPSolver`; coupler flux and albedo
+accesses go through `RRTMGP` getters (e.g. `RRTMGP.sw_flux_dn`, `RRTMGP.surface_emissivity`),
+and the radiation method is queried via `RRTMGP.radiation_method`.
+
 v0.2.2
 -------
 

@@ -25,36 +25,73 @@ include(
 )
 
 """
-    make_scalar_covariance_observation_vector(
+    make_data_informed_observation_vector(
         vars,
-        sample_date_ranges;
-        scalar = 1.0,
+        sample_date_ranges,
+        covariance_date_ranges;
+        model_error_scale = 0.1,
+        regularization = ClimaCalibrate.ObservationRecipe.QuantileRegularization(0.05),
         use_latitude_weights = true,
         min_cosd_lat = 0.1,
+        rank = nothing,
     )
 
-Make a scalar covariance matrix using `vars` for each sample corresponding to
-the dates in `sample_date_ranges`.
+Make one `EKP.Observation` per calibration target in `sample_date_ranges`, all
+sharing a single data-informed `SVDplusDCovariance` estimated from the
+(independent) `covariance_date_ranges`.
+
+The two date lists are deliberately separate: `sample_date_ranges` defines *what
+is being calibrated against* (the target samples), while `covariance_date_ranges`
+defines the realizations used to *estimate the noise*. This lets us broaden the
+covariance sample (e.g. the same month across many years) without changing the
+calibration target. Each `sample_date_ranges` entry must be contained in
+`covariance_date_ranges` (SVDplusD requires the sampled date to be one of the
+covariance dates).
+
+Unlike `ScalarCovariance(1.0)`, which asserts a uniform, physically meaningless
+unit noise, `SVDplusDCovariance` estimates the observational + internal
+variability directly from the interannual spread of `vars`. This is what tells
+EKP how much of the model–obs mismatch is signal versus noise; with the scalar
+covariance the parameter signal was drowned and the error stayed flat.
+
+Keyword arguments
+=================
+- `model_error_scale`: structural model-error term added to the diagonal, as
+  `(model_error_scale * mean_sample)^2`. This sets the irreducible error floor a
+  perfect parameter set is expected to leave (e.g. 0.1 ⇒ 10% of the field mean).
+- `regularization`: floor added to the covariance for conditioning. A
+  `QuantileRegularization` is used because it scales per-variable, which matters
+  now that variables are in physical (unnormalized) units of very different
+  magnitudes (ta ~ 100s K vs lwp ~ 0.1 kg m⁻²).
+- `rank`: SVD rank; `nothing` infers it (≤ number of covariance dates − 1).
 """
-function make_scalar_covariance_observation_vector(
+function make_data_informed_observation_vector(
     vars,
-    sample_date_ranges;
-    scalar = 1.0,
+    sample_date_ranges,
+    covariance_date_ranges;
+    model_error_scale = 0.1,
+    regularization = ClimaCalibrate.ObservationRecipe.QuantileRegularization(0.05),
     use_latitude_weights = true,
     min_cosd_lat = 0.1,
+    rank = nothing,
 )
+    @info "Using SVDplusD data-informed covariance with"
+    @info "Model error scale: $model_error_scale"
+    @info "Latitude weighting: $use_latitude_weights"
+    @info "Covariance estimated from $(length(covariance_date_ranges)) dates"
+    # The covariance is built once from the interannual spread across the
+    # covariance dates and reused for every calibration target.
+    covar_estimator = ClimaCalibrate.ObservationRecipe.SVDplusDCovariance(
+        covariance_date_ranges;
+        model_error_scale,
+        regularization,
+        use_latitude_weights,
+        min_cosd_lat,
+        rank,
+    )
     obs_vec = map(sample_date_ranges) do sample_date_range
         start_date = first(sample_date_range)
         end_date = last(sample_date_range)
-        @info "Using scalar covariance matrix with"
-        @info "Scalar: $scalar"
-        @info "Latitude weighting: $use_latitude_weights"
-        @info "Min cosd lat: $min_cosd_lat"
-        covar_estimator = ClimaCalibrate.ObservationRecipe.ScalarCovariance(;
-            scalar,
-            use_latitude_weights,
-            min_cosd_lat,
-        )
         ClimaCalibrate.ObservationRecipe.observation(
             covar_estimator,
             vars,
@@ -104,19 +141,28 @@ if abspath(PROGRAM_FILE) == @__FILE__
     lat_right = 90
     vars = apply_lat_window.(vars, lat_left, lat_right)
 
-    # Normalize data
-    normalization_stats = Dict()
-    compute_normalization!.(Ref(normalization_stats), vars)
-    apply_normalization!.(Ref(normalization_stats), vars)
-    (; output_dir) = CALIBRATE_CONFIG
-    JLD2.save_object(NORMALIZATION_STATS_FP, normalization_stats)
+    # Harmonize each variable's NaN pattern across the covariance dates so all
+    # SVDplusD samples have equal length. Satellite lwp coverage varies by year;
+    # without this the interannual samples drop different numbers of points and
+    # SVDplusDCovariance errors ("Length of all the samples are not the same").
+    foreach(v -> harmonize_nan_mask_over_dates!(v, COVARIANCE_DATE_RANGES), vars)
 
-    # Create observation vector
+    # NOTE: Normalization is intentionally NOT applied. The SVDplusD covariance
+    # below carries each variable's physical scale, and normalization is
+    # unsupported with it. `preprocess_sim_vars` skips normalization when
+    # NORMALIZATION_STATS_FP is absent, so the sim side stays consistent as long
+    # as no stale normalization_stats.jld2 is left in output_dir.
+    (; output_dir) = CALIBRATE_CONFIG
+    isfile(NORMALIZATION_STATS_FP) && rm(NORMALIZATION_STATS_FP)
+
+    # Create observation vector: calibration targets from sample_date_ranges, with
+    # a data-informed covariance estimated from the independent COVARIANCE_DATE_RANGES.
     (; sample_date_ranges) = CALIBRATE_CONFIG
-    observation_vec = make_scalar_covariance_observation_vector(
+    observation_vec = make_data_informed_observation_vector(
         vars,
-        sample_date_ranges;
-        scalar = 1.0,
+        sample_date_ranges,
+        COVARIANCE_DATE_RANGES;
+        model_error_scale = 0.1,
         use_latitude_weights = true,
         min_cosd_lat = 0.1,
     )

@@ -66,6 +66,52 @@ function get_lonlat_regridder(config_file)
 end
 
 """
+    harmonize_nan_mask_over_dates!(var, date_ranges)
+
+Force `var` to share a single spatial NaN pattern across all dates in
+`date_ranges`: any location that is NaN at ANY of those dates is set to NaN at
+every time slice.
+
+This is required by `SVDplusDCovariance`, whose per-sample flattening drops NaNs
+(`ClimaAnalysis.flatten(...; ignore_nan = true)`) and errors when the samples
+differ in length. Satellite `lwp` (MAC) has coverage that varies year to year, so
+without this each covariance year would drop a different number of points.
+Variables with a time-invariant NaN pattern (e.g. ERA5 below-ground points) are
+unaffected. The cost is that the calibration sample uses only locations with
+complete coverage across all `date_ranges`.
+"""
+function harmonize_nan_mask_over_dates!(var, date_ranges)
+    tname = ClimaAnalysis.time_name(var)
+    isnothing(tname) && return var
+    tidx = var.dim2index[tname]
+    all_dates = ClimaAnalysis.dates(var)
+
+    # Time indices covered by the requested date ranges (inclusive), mirroring
+    # how ObservationRecipe windows each sample.
+    sel = Int[]
+    for (s, e) in date_ranges
+        idxs = findall(d -> s <= d <= e, all_dates)
+        isempty(idxs) && error(
+            "Date range ($s, $e) not found in $(ClimaAnalysis.short_name(var)); " *
+            "check COVARIANCE_DATE_RANGES against the observational data.",
+        )
+        append!(sel, idxs)
+    end
+
+    # Union of NaN locations across the selected time slices (spatial dims only).
+    nanmask = falses(size(selectdim(var.data, tidx, first(sel)))...)
+    for i in sel
+        nanmask .|= isnan.(selectdim(var.data, tidx, i))
+    end
+
+    # Apply that union mask to every time slice.
+    for i in axes(var.data, tidx)
+        selectdim(var.data, tidx, i)[nanmask] .= NaN
+    end
+    return var
+end
+
+"""
     set_unitless_units!(var)
 
 Set the units of `var` to "unitless" if the units is the empty string.
@@ -85,8 +131,13 @@ Generate normalization statistics by computing a single mean and standard
 deviation for `var`.
 """
 function compute_mean_and_stddev(var::ClimaAnalysis.OutputVar)
-    mean_of_var = Statistics.mean(var.data)
-    std_of_var = Statistics.std(var.data)
+    # NaN-aware: variables such as `lwp` (satellite retrieval) have missing
+    # points. `Statistics.mean`/`std` propagate NaN, which would make the
+    # normalization constants NaN and turn the entire normalized field into NaN.
+    finite_data = filter(isfinite, var.data)
+    isempty(finite_data) && error("No finite data to normalize; check your data")
+    mean_of_var = Statistics.mean(finite_data)
+    std_of_var = Statistics.std(finite_data)
     std_of_var ≈ 0.0 && error("Standard deviation is zero; check your data")
     return (mean_of_var, std_of_var)
 end

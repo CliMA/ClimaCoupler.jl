@@ -165,9 +165,9 @@ version = "1.11.0"
 
 [[deps.AtmosphericProfilesLibrary]]
 deps = ["ClimaInterpolations", "Interpolations", "LinearAlgebra", "StaticArrays"]
-git-tree-sha1 = "3e053ef899873642ac6a87b4a43be4a26333d376"
+git-tree-sha1 = "838b796d9057600e9f5abcebea6d6dab2db58d4c"
 uuid = "86bc3604-9858-485a-bdbe-831ec50de11d"
-version = "0.1.9"
+version = "0.1.10"
 
 [[deps.Atomix]]
 deps = ["UnsafeAtomics"]
@@ -2867,9 +2867,9 @@ version = "0.5.1+0"
 
 [[deps.RootSolvers]]
 deps = ["ForwardDiff", "Printf"]
-git-tree-sha1 = "cb118a120361be967f172791efb2ee4badacd7c8"
+git-tree-sha1 = "d4c63e1165df602d9392b9dab37504dd97eaba71"
 uuid = "7181ea78-2dcb-4de3-ab41-2b8ab5a31e74"
-version = "1.0.3"
+version = "1.1.0"
 
 [[deps.Roots]]
 deps = ["Accessors", "CommonSolve", "Printf"]
@@ -2916,9 +2916,9 @@ version = "0.5.22"
 
 [[deps.SCS]]
 deps = ["LinearAlgebra", "MathOptInterface", "OpenBLAS32_jll", "PrecompileTools", "SCS_jll", "SparseArrays"]
-git-tree-sha1 = "cd27f0cfefd06c7b2bd0343e08edbd9a3d2e1869"
+git-tree-sha1 = "2c62bab6468c6d8ec6e1fac4a203a80d5a0dfc67"
 uuid = "c946c3f1-0d1f-5ce8-9dea-7daa1f7e2d13"
-version = "2.6.3"
+version = "2.6.4"
 
     [deps.SCS.extensions]
     SCSSCS_GPU_jllExt = ["SCS_GPU_jll"]
@@ -3190,9 +3190,9 @@ version = "0.3.7"
 
 [[deps.StringManipulation]]
 deps = ["PrecompileTools"]
-git-tree-sha1 = "d05693d339e37d6ab134c5ab53c29fce5ee5d7d5"
+git-tree-sha1 = "6a73aec31c56a0c2833e8efa637d10b532cb2f0c"
 uuid = "892a3eda-7b42-436c-8928-eab12a02cf0e"
-version = "0.4.4"
+version = "0.4.5"
 
 [[deps.StructArrays]]
 deps = ["ConstructionBase", "DataAPI", "Tables"]
@@ -3245,9 +3245,9 @@ version = "7.7.0+0"
 
 [[deps.SurfaceFluxes]]
 deps = ["RootSolvers", "Thermodynamics"]
-git-tree-sha1 = "5ff62d4697789b88aef8e52f05a43d77d6fe439a"
+git-tree-sha1 = "fdd6e6a5678c4f81a46a55d03c24a1755817e95a"
 uuid = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
-version = "1.0.1"
+version = "1.1.0"
 weakdeps = ["ClimaParams"]
 
     [deps.SurfaceFluxes.extensions]

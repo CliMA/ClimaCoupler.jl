@@ -37,7 +37,7 @@ surface_setup: "PrescribedSurface"
 t_end: "3hours"
 topo_smoothing: true
 topography: "Earth"
-use_itime: false
+use_itime: true
 viscous_sponge: true
 z_elem: 39
 z_max: 60000.0

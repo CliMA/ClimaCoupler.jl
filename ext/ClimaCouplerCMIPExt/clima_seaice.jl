@@ -84,7 +84,15 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
 
     advection = ocean.ocean.model.advection.T
-    ice = CO.SeaIces.sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection)
+
+    ice = CO.SeaIces.sea_ice_simulation(
+        grid,
+        ocean.ocean;
+        clock = deepcopy(ocean.ocean.model.clock),
+        stop_time = ocean.ocean.stop_time,
+        Δt = float(dt),
+        advection,
+    )
 
     ocean_ice_flux_formulation = CO.InterfaceComputations.ThreeEquationHeatFlux(ice)
     interface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)

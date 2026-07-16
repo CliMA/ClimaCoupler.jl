@@ -2330,9 +2330,9 @@ version = "0.1.0"
 
 [[deps.NumericalEarth]]
 deps = ["Accessors", "Adapt", "CFTime", "ClimaSeaIce", "CubedSphere", "DataDeps", "Dates", "Distances", "DocStringExtensions", "Downloads", "GPUArraysCore", "Glob", "ImageMorphology", "JLD2", "KernelAbstractions", "LibCURL", "MeshArrays", "NCDatasets", "Oceananigans", "OffsetArrays", "PrecompileTools", "Printf", "Scratch", "SeawaterPolynomials", "StaticArrays", "Statistics", "Thermodynamics", "ZipFile"]
-git-tree-sha1 = "d410ee4867ae58c46f7743853cf5db336e51eb65"
+git-tree-sha1 = "de52db579690f3f896199f1670c4894309cf412e"
 uuid = "904d977b-046a-4731-8b86-9235c0d1ef02"
-version = "0.5.8"
+version = "0.5.9"
 
     [deps.NumericalEarth.extensions]
     NumericalEarthArchGDALExt = "ArchGDAL"
@@ -2340,6 +2340,8 @@ version = "0.5.8"
     NumericalEarthCDSAPIExt = "CDSAPI"
     NumericalEarthCopernicusClimateDataStoreExt = "CopernicusClimateDataStore"
     NumericalEarthCopernicusMarineExt = "CopernicusMarine"
+    NumericalEarthMakieExt = "Makie"
+    NumericalEarthNaturalEarthExt = ["NaturalEarth", "GeoInterface"]
     NumericalEarthReactantExt = "Reactant"
     NumericalEarthSpeedyWeatherExt = ["SpeedyWeather", "ConservativeRegridding"]
     NumericalEarthVerosExt = ["PythonCall", "CondaPkg"]
@@ -2354,6 +2356,9 @@ version = "0.5.8"
     ConservativeRegridding = "8e50ac2c-eb48-49bc-a402-07c87b949343"
     CopernicusClimateDataStore = "bce3f73f-acea-4481-bd86-df89ecc2cb46"
     CopernicusMarine = "cd43e856-93a3-40c8-bc9e-6146cdce14fa"
+    GeoInterface = "cf35fbd7-0cd7-5166-be24-54bfbe79505f"
+    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+    NaturalEarth = "436b0209-26ab-4e65-94a9-6526d86fea76"
     PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
     RRTMGP = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
     Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"

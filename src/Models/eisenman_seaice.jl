@@ -240,7 +240,8 @@ function solve_eisenman_model!(Y, Ya, p, Δt)
         -(F_base - ocean_qflux) * Δt / hρc_ml,
         -(F_atm - ocean_qflux) * Δt / hρc_ml,
     )
-    Δh_ice = @. ifelse(ice_covered, (F_atm - F_base - ocean_qflux) * Δt / L_ice, zero(F_atm))
+    Δh_ice =
+        @. ifelse(ice_covered, (F_atm - F_base - ocean_qflux) * Δt / L_ice, zero(F_atm))
     @. Y.e_base += F_base * Δt
 
     # T_ml is not allowed to be below freezing; the energy deficit forms frazil ice
@@ -254,11 +255,8 @@ function solve_eisenman_model!(Y, Ya, p, Δt)
 
     # adjust ocean temperature if transition to ice-free
     transition_to_icefree = @. ice_covered & ((h_ice + Δh_ice) <= 0)
-    @. ΔT_ml = ifelse(
-        transition_to_icefree,
-        ΔT_ml - (h_ice + Δh_ice) * L_ice / hρc_ml,
-        ΔT_ml,
-    )
+    @. ΔT_ml =
+        ifelse(transition_to_icefree, ΔT_ml - (h_ice + Δh_ice) * L_ice / hρc_ml, ΔT_ml)
     @. Δh_ice = ifelse(transition_to_icefree, -h_ice, Δh_ice)
 
     # solve for T_sfc
@@ -267,13 +265,9 @@ function solve_eisenman_model!(Y, Ya, p, Δt)
     # the surface temperature is capped at freezing (NB: T_sfc not storing energy).
     # `h_safe` avoids dividing by zero where the surface is ice-free (the value is unused there).
     h_safe = @. ifelse(remains_ice_covered, h_ice + Δh_ice, one(h_ice))
-    δT_sfc = @. (-F_atm + k_ice / h_safe * (T_base - T_sfc)) /
-       (k_ice / h_safe + ∂F_atm∂T_sfc)
-    @. Y.T_sfc = ifelse(
-        remains_ice_covered,
-        min(T_sfc + δT_sfc, T_freeze),
-        T_ml + ΔT_ml,
-    )
+    δT_sfc =
+        @. (-F_atm + k_ice / h_safe * (T_base - T_sfc)) / (k_ice / h_safe + ∂F_atm∂T_sfc)
+    @. Y.T_sfc = ifelse(remains_ice_covered, min(T_sfc + δT_sfc, T_freeze), T_ml + ΔT_ml)
 
     @. Y.T_ml += ΔT_ml
     @. Y.h_ice += Δh_ice
@@ -299,8 +293,11 @@ function eisenman_ice_rhs!(dY, Y, p, t)
 end
 
 # binary ice mask, used to blend ice and ocean surface properties
-ice_mask(sim::EisenmanIceSimulation) =
-    @. ifelse(sim.integrator.u.h_ice > 0, one(sim.integrator.u.h_ice), zero(sim.integrator.u.h_ice))
+ice_mask(sim::EisenmanIceSimulation) = @. ifelse(
+    sim.integrator.u.h_ice > 0,
+    one(sim.integrator.u.h_ice),
+    zero(sim.integrator.u.h_ice),
+)
 
 # extensions required by Interfacer
 Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:area_fraction}) =
@@ -318,9 +315,8 @@ Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:roughness_momentum}) =
 Interfacer.get_field(
     sim::EisenmanIceSimulation,
     ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}},
-) =
-    @. sim.integrator.p.params.p_i.α * $(ice_mask(sim)) +
-       sim.integrator.p.params.p_o.α * (1 - $(ice_mask(sim)))
+) = @. sim.integrator.p.params.p_i.α * $(ice_mask(sim)) +
+   sim.integrator.p.params.p_o.α * (1 - $(ice_mask(sim)))
 Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:roughness_model}) = :constant
 Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:surface_temperature}) =
     sim.integrator.u.T_sfc
@@ -340,9 +336,9 @@ function Interfacer.get_field(sim::EisenmanIceSimulation, ::Val{:energy})
     hρc_ml = p_o.h * p_o.ρ * p_o.c
     t = FT(float(sim.integrator.t))
     return @. hρc_ml * u.T_ml +
-       p_i.L_ice * u.h_ice +
-       sim.integrator.p.ocean_qflux * t +
-       u.e_base
+              p_i.L_ice * u.h_ice +
+              sim.integrator.p.ocean_qflux * t +
+              u.e_base
 end
 
 function Interfacer.update_field!(

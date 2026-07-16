@@ -1,0 +1,55 @@
+# Low-resolution copy of amip_calibration.yml for the Buildkite pipeline
+# smoke test (TEST_CALIBRATION). Production calibration keeps h_elem: 12.
+FLOAT_TYPE: "Float32"
+
+### Grid ###
+h_elem: 4
+z_max: 60000.0
+z_elem: 63
+dz_bottom: 30.0
+topo_smoothing: true
+topography: "Earth"
+
+### Time and Simulation ###
+start_date: "20100101"
+initial_condition: "WeatherModel"
+t_end: "39days"
+dt: "180secs"
+dt_cpl: "180secs"
+dt_seaice: "180secs"
+checkpoint_dt: "900days"
+
+### Coupler ###
+mode_name: "subseasonal"
+binary_area_fraction: false
+atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
+coupler_toml: ["toml/wxquest_progedmf.toml"]
+energy_check: false
+
+### Atmosphere ###
+radiation_reset_rng_seed: true
+albedo_model: "CouplerAlbedo"
+surface_setup: "PrescribedSurface"
+strict_params: false
+
+### Land ###
+lai_source: "modis_monthly_climatology"
+land_fraction_source: "era5"
+land_model: "integrated"
+land_spun_up_ic: false
+land_temperature_anomaly: "nothing"
+
+### Diagnostics ###
+netcdf_output_at_levels: true
+output_default_diagnostics: false
+use_coupler_diagnostics: false
+use_land_diagnostics: false
+extra_atmos_diagnostics:
+  - short_name: [tas, pr, mslp, rsut, rsutcs, rlut, rlutcs, rsdt, lwp]
+    period: monthly
+    reduction_time: average
+  - short_name: [ta, hur, pfull]
+    period: monthly
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours

@@ -6,7 +6,7 @@ dt: "180secs"
 dt_cpl: "180secs"
 dz_bottom: 100.0
 energy_check: false
-h_elem: 8
+h_elem: 4
 checkpoint_dt: "720hours"
 bucket_albedo_type: "map_temporal"
 land_model: "integrated"

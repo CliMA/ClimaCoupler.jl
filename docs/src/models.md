@@ -118,9 +118,6 @@ atmospheric models.
 
 ## Eisenman-Zhang Sea Ice Model
 
-### TODO:
-- [ ] Check if Q fluxes are included in current formulation.
-
 The Eisenman-Zhang sea ice model (`EisenmanIceSimulation`) is a thermodynamic
 0-layer sea ice model over a slab ocean mixed layer, based on the
 [Semtner (1976)](https://doi.org/10.1175/1520-0485(1976)006<0379:AMFTTG>2.0.CO;2)
@@ -141,18 +138,21 @@ The prognostic variables are:
 (plus an accumulated basal energy used for energy bookkeeping).
 Ice cover is a binary mask: the surface is ice-covered wherever ``h_i > 0``.
 
-## Ice covered
+### Ice covered
+
 In ice-covered conditions the **ice thickness** ``h_i`` evolves as
 
 ```math
-L_i \frac{dh_i}{dt} = F_{atm} - F_{base}
+L_i \frac{dh_i}{dt} = F_{atm} - F_{base} - Q
 ```
 
 where:
-- ``L_i`` is the latent heat of fusion of ice (default: ``3.0e8`` J m^-3
+- ``L_i`` is the volumetric latent heat of fusion of ice (default: ``3.0e8`` J m^-3)
 - ``t`` is model time in seconds
 - ``F_{atm}`` is the total energy flux from the surface to the atmosphere (positive upwards)
 - ``F_{base}`` is the basal heat flux from the ocean mixed layer into the ice
+- ``Q`` is the prescribed ocean q-flux (positive = oceanic heat source; see
+  [Ocean q-flux](@ref) below)
 
 The energy flux into the atmosphere can be expanded as:
 ```math
@@ -165,30 +165,41 @@ and further where:
 F_{rad} = \epsilon (\sigma T_s^4 - LW_d) - (1 - \alpha) SW_d
 ```
 
-Wheras the basal heat flux is taken as:
+whereas the basal heat flux is taken as:
 ```math
-F_{base} = C_0(T_{ml} - T_{melt})
+F_{base} = C_0(T_{ml} - T_{base})
 ```
 
 where:
-- ``C_0`` is the linear thermal coefficient for ice (default: ``120`` W m^-2 K^-1)
-- ``T_{m}`` is the melting point of ice (default: ``273.16`` K, same as for fresh water)
+- ``C_0`` is the linear basal heat transfer coefficient (default: ``120`` W m^-2 K^-1)
+- ``T_{base}`` is the ice base temperature (default: ``273.16`` K, equal to the
+  freezing temperature ``T_{freeze}``)
 
-The **ice surface temperature** ``T_s`` is obtained by balancing the total surface energy flux ``F_{atm}(T_s)`` against the conductive heat flux through the ice slab,
-``F_{ice} = k_i (T_{melt} - T_s) / h_i`` with ``k_i = 2`` W m⁻¹ K⁻¹:
+The **mixed layer temperature** under ice responds to the basal flux and the
+ocean q-flux (the mixed layer only exchanges heat with the atmosphere when
+ice-free):
 
 ```math
-F_{atm} = F_i = k_i \frac{T_{melt} - T_s}{h_i}
+\rho_w c_w h_{ml} \frac{dT_{ml}}{dt} = -(F_{base} - Q)
+```
+
+The **ice surface temperature** ``T_s`` is obtained by balancing the total surface energy flux ``F_{atm}(T_s)`` against the conductive heat flux through the ice slab,
+``F_{ice} = k_i (T_{base} - T_s) / h_i`` with ``k_i = 2`` W m^-1 K^-1 (default):
+
+```math
+F_{atm} = F_{ice} = k_i \frac{T_{base} - T_s}{h_i}
 ```
 
 Solving using one Newton iteration (sufficient at the current spatial and temporal
 resolution — see Semtner, 1976):
 
 ```math
-T_s^{t+1} = T_s^{t} + \frac{- F_{atm}^t + F_{ice}^{t+1}}{k_i/h_i^{t+1} + \partial F_{atm}^t / \partial T_s^t}
+T_s^{t+1} = T_s^{t} + \frac{- F_{atm}^t + k_i (T_{base} - T_s^t) / h_i^{t+1}}{k_i/h_i^{t+1} + \partial F_{atm}^t / \partial T_s^t}
 ```
 
-capped at the freezing point (the ice surface stores no energy). The
+where the conductive flux is evaluated with the updated ice thickness
+``h_i^{t+1}`` and the current surface temperature ``T_s^t``. The updated
+``T_s`` is capped at the freezing point (the ice surface stores no energy). The
 derivative ``\partial F_{atm} / \partial T_s = 4 \epsilon \sigma T_s^3``
 contains only the radiative contribution: the turbulent flux derivative
 ``\partial F_{\text{turb}} / \partial T_s`` is no longer provided by the
@@ -196,22 +207,40 @@ coupler (its finite-difference machinery was removed in
 [#1284](https://github.com/CliMA/ClimaCoupler.jl/pull/1284)), so the
 turbulent flux is treated explicitly in the Newton update.
 
-## Ice free
+### Ice free
 
-in ice-free conditions, the mixed layer assumes the standard slab representation
+In ice-free conditions, the mixed layer assumes the standard slab representation
 
 ```math
-\rho_w c_w h_{ml} \frac{dT_{ml}}{dt} = -F_{atm}
+\rho_w c_w h_{ml} \frac{dT_{ml}}{dt} = -(F_{atm} - Q)
 ```
 
-and ``T_s = T_{ml}``.
+and ``T_s = T_{ml}``. The default mixed layer parameters are depth
+``h_{ml} = 1`` m, density ``\rho_w = 1020`` kg m^-3, and heat capacity
+``c_w = 4000`` J kg^-1 K^-1.
 
 **Frazil ice formation**: the mixed layer is not allowed to cool below
-``T_{melt}``; the energy deficit is instead used to grow ice.
+``T_{freeze}``; the energy deficit is instead used to grow ice.
 
 **Transition to ice-free conditions**: if the updated ``h_i`` would be
 negative, the ice thickness is set to zero and the surplus energy warms the
 mixed layer.
+
+### Ocean q-flux
+
+The forcing term ``Q`` (`ocean_qflux` in the model cache) represents a
+prescribed oceanic heat convergence into the column, with the convention that
+positive ``Q`` is a heat source. In ice-free conditions it enters the
+mixed-layer budget alongside ``F_{atm}`` (warming the mixed layer); in
+ice-covered conditions it both warms the mixed layer (offsetting ``F_{base}``)
+and thins the ice, as in the equations above. The accumulated q-flux
+``Q \, t`` is also included in the column energy bookkeeping returned by
+`Interfacer.get_field(sim, Val(:energy))`.
+
+Note that ``Q`` is currently always zero in coupled runs: it is initialized to
+zero in `eisenman_state_init` and no `Interfacer.update_field!` method or
+coupler exchange pathway sets it, so a nonzero q-flux can only be imposed by
+writing to `sim.integrator.p.ocean_qflux` directly (as the unit tests do).
 
 **Usage**: select with `ice_model: "eisenman"`. Since the model carries its
 own mixed layer, it should not be paired with a separate ocean model

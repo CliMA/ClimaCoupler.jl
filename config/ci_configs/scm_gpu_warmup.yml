@@ -1,0 +1,20 @@
+# Minimal single-column warm-up config for GPU CI init steps.
+# Used to prime GPUCompiler kernel caches after Pkg.precompile().
+# Float32 matches production GPU run precision; SCM keeps build time short.
+FLOAT_TYPE: "Float32"
+atmos_progress_interval: "120secs"
+domain_type: "column"
+column_latlon: [40.0, -140.0]
+scm_surface_type: "ocean"
+mode_name: "slabplanet_aqua"
+dt: "120secs"
+dt_cpl: "120secs"
+t_end: "480secs"
+start_date: "20100101"
+rad: "gray"
+microphysics_model: "0M"
+surface_setup: "PrescribedSurface"
+vert_diff: "DecayWithHeightDiffusion"
+z_elem: 30
+z_max: 30000.0
+z_stretch: false

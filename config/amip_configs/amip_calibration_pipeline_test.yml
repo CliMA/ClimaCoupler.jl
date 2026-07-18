@@ -22,7 +22,7 @@ checkpoint_dt: "900days"
 ### Coupler ###
 mode_name: "subseasonal"
 binary_area_fraction: false
-atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
 coupler_toml: ["toml/wxquest_progedmf.toml"]
 energy_check: false
 

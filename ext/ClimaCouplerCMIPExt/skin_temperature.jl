@@ -24,8 +24,11 @@ a semi-implicit linearization of the LW emission term:
 
 where Jᵃ = σϵTₛⁿ⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh  (positive upward).
 
-The result is capped at the melting temperature T_melt to prevent the surface
-temperature from exceeding the melting point under heating fluxes.
+The update is safeguarded following ClimaOcean's `SkinTemperature` solver:
+a NaN result reverts to the previous iterate, the step is limited to
+±ΔT_iter_max, and the result is capped at the melting
+temperature T_melt to prevent the surface temperature from exceeding the
+melting point under heating fluxes.
 
 # Arguments
 - `R`: Conductive resistance of the column [m² K W⁻¹] (snow and ice in series)
@@ -92,7 +95,14 @@ function update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
         denominator = 1 + 4 * R * σ * ϵ * T_sfc_n^3
         T_sfc_new = numerator / denominator
 
-        # Cap surface temperature at melting temperature 
+        # Safeguards (see SKIN_T_MAX_STEP): NaN reverts to the previous
+        # iterate; the step is limited to the trust region; the result is
+        # capped at the melting temperature.
+        T_sfc_new = ifelse(isnan(T_sfc_new), T_sfc_n, T_sfc_new)
+        ΔT = T_sfc_new - T_sfc_n
+        FT = typeof(T_sfc_n)
+        ΔT_iter_max = FT(5)
+        T_sfc_new = T_sfc_n + min(abs(ΔT),ΔT_iter_max) * sign(ΔT)
         T_sfc_new = min(T_sfc_new, T_melt)
 
         return T_sfc_new

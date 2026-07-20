@@ -23,3 +23,4 @@ surface_setup: "PrescribedSurface"
 t_end: "124days"
 topo_smoothing: true
 topography: "Earth"
+max_newton_iters_ode: 3

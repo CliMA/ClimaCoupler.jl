@@ -300,6 +300,8 @@ end
 ###############################################################################
 
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:area_fraction}) = sim.area_fraction
+Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:area_fraction}, field) =
+    sim.area_fraction .= field
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:emissivity}) = sim.integrator.p.ϵ_sfc
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:energy}) =
     CL.total_energy(sim.integrator.u, sim.integrator.p)

@@ -68,6 +68,21 @@ function Interfacer.update_field!(
 )
     sim.cache.area_fraction .= field
 end
+
+# ocean sim providing its own surface fractions via align_surface_fractions!
+struct TestAligningOceanSimulation{C} <: Interfacer.AbstractSurfaceSimulation
+    cache::C
+end
+Interfacer.get_field(sim::TestAligningOceanSimulation, ::Val{:area_fraction}) =
+    sim.cache.area_fraction
+function FieldExchanger.align_surface_fractions!(
+    ocean_sim::TestAligningOceanSimulation,
+    cs::Interfacer.CoupledSimulation,
+)
+    ocean_sim.cache.area_fraction .= ocean_sim.cache.wet_fraction
+    cs.fields.ocean_area_fraction .= ocean_sim.cache.wet_fraction
+    return true
+end
 # atmos sim
 struct TestAtmosSimulation{C} <: Interfacer.AbstractAtmosSimulation
     cache::C
@@ -240,6 +255,54 @@ for FT in (Float32, Float64)
         # Test that fractions updated correctly (ice and land unchanged, ocean updated)
         @test all(CC.Fields.field2array(ice_fraction)[1:(nelements ÷ 2)] .== FT(0.5))
         @test all(CC.Fields.field2array(ocean_fraction)[1:(nelements ÷ 2)] .== FT(0.5))
+    end
+
+    @testset "test align_surface_fractions! hook" begin
+        test_space = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6.371e6), # in meters
+            n_quad_points = 4,
+            h_elem = 4,
+        )
+        coupler_fields = Interfacer.init_coupler_fields(
+            FT,
+            Interfacer.default_coupler_fields(),
+            test_space,
+        )
+        wet_fraction = CC.Fields.ones(test_space) .* FT(0.7)
+        ocean_sim = TestAligningOceanSimulation((;
+            area_fraction = CC.Fields.zeros(test_space),
+            wet_fraction,
+        ))
+        # No land or ice sims: the legacy update would set the ocean fraction
+        # to 1 everywhere; the aligning ocean sim must take precedence.
+        cs = Interfacer.CoupledSimulation{FT}(
+            nothing, # dates
+            coupler_fields, # fields
+            nothing, # conservation_checks
+            (Int(0), Int(1000)), # tspan
+            Int(200), # Δt_cpl
+            Ref(Int(0)), # t
+            Ref(-1), # prev_checkpoint_t
+            (; ocean_sim), # model_sims
+            (;), # callbacks
+            (;), # dir_paths
+            nothing, # thermo_params
+            nothing, # diags_handler
+            true, # save_cache
+            (;), # flux_accumulators
+        )
+
+        FieldExchanger.update_surface_fractions!(cs)
+        ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
+        @test ocean_fraction == wet_fraction
+        @test cs.fields.ocean_area_fraction == wet_fraction
+
+        # The default hook returns false, leaving fractions untouched
+        @test !FieldExchanger.align_surface_fractions!(
+            Interfacer.SurfaceStub((; area_fraction = CC.Fields.zeros(test_space))),
+            cs,
+        )
     end
 
     @testset "test combine_surfaces" begin

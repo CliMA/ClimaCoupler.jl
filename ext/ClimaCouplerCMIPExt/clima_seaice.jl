@@ -598,6 +598,7 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
         α_albedo,
         T_melt,
     )
+    check_poly_flux_nans(is, eg, "sea-ice")
     fs.n_acc[] += 1
 
     # The ice fluxes apply to the ice-covered part of each polygon.

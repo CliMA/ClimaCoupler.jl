@@ -135,6 +135,71 @@ function average_and_reset_exchange_accumulators!(fs::ExchangeFluxState)
 end
 
 """
+    DEBUG_POLY_FLUX_NANS
+
+Opt-in diagnostic toggle for [`check_poly_flux_nans`](@ref). Off by default
+(the check costs one host `Bool` read per flux evaluation). Enable from the
+REPL with
+
+    Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPExt).DEBUG_POLY_FLUX_NANS[] = true
+"""
+const DEBUG_POLY_FLUX_NANS = Ref(false)
+
+_poly_flux_outputs(fs::ExchangeFluxState) =
+    (; fs.F_sh, fs.F_lh, fs.F_moisture, fs.F_τu, fs.F_τv)
+_poly_flux_outputs(is::IceExchangeState) =
+    merge(_poly_flux_outputs(is.fluxes), (; is.T_sfc_new))
+
+_poly_flux_inputs(fs::ExchangeFluxState) = (;
+    fs.T_atmos,
+    fs.q_tot,
+    fs.q_liq,
+    fs.q_ice,
+    fs.ρ_atmos,
+    fs.u_atmos,
+    fs.v_atmos,
+    fs.height_int,
+    fs.height_sfc,
+    fs.T_sfc,
+    fs.sic,
+)
+_poly_flux_inputs(is::IceExchangeState) =
+    merge(_poly_flux_inputs(is.fluxes), (; is.R, is.T_i, is.SW_d, is.LW_d))
+
+"""
+    check_poly_flux_nans(state, eg::ExchangeGrid, label)
+
+Purely diagnostic NaN guard for the per-polygon flux evaluation (no-op unless
+[`DEBUG_POLY_FLUX_NANS`](@ref) is enabled; never modifies any values). Scans
+the flux outputs of `state` (an [`ExchangeFluxState`](@ref) or
+[`IceExchangeState`](@ref)); if any is NaN, logs — for up to 10 offending
+polygons — the polygon index, its owning FV cell and SE element, all flux
+outputs, and all gathered inputs of the SurfaceFluxes evaluation, then
+`error`s so the NaN is never scattered to the models. The detailed report
+copies the per-polygon vectors to the host, which is fine on this abort path.
+"""
+function check_poly_flux_nans(state, eg::ExchangeGrid, label)
+    DEBUG_POLY_FLUX_NANS[] || return nothing
+    outputs = _poly_flux_outputs(state)
+    any(v -> any(isnan, v), values(outputs)) || return nothing
+
+    outs = map(Array, outputs)
+    inputs = map(Array, _poly_flux_inputs(state))
+    oc_of_poly = Array(eg.oc_of_poly)
+    elem_of_poly = Array(eg.elem_of_poly)
+    bad = findall(k -> any(o -> isnan(o[k]), values(outs)), 1:eg.n_poly)
+    for k in first(bad, 10)
+        out_str = join(("$nm = $(o[k])" for (nm, o) in pairs(outs)), ", ")
+        in_str = join(("$nm = $(v[k])" for (nm, v) in pairs(inputs)), ", ")
+        @error "NaN $label fluxes at polygon $k (FV cell $(oc_of_poly[k]), SE elem $(elem_of_poly[k])): $out_str; inputs: $in_str"
+    end
+    return error(
+        "NaN in $label exchange-grid polygon fluxes at $(length(bad)) polygons" *
+        (length(bad) > 10 ? " (first 10 reported above)" : ""),
+    )
+end
+
+"""
     momentum_basis_fields(boundary_space)
 
 Precompute the per-node 2×2 map between the local CT1/CT2 unit basis and the

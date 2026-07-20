@@ -809,6 +809,7 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
         SF.ConstantGustinessSpec(FT(1)),
     )
     compute_ocean_polygon_fluxes!(fs, surface_fluxes_params, thermo_params, config)
+    check_poly_flux_nans(fs, eg, "ocean")
     fs.n_acc[] += 1
 
     # The ocean fluxes apply to the open-water part of each polygon.

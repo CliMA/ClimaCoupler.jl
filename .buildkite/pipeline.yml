@@ -315,6 +315,23 @@ steps:
 
   - group: "CMIP"
     steps:
+      - label: "CPU exchange (intersection) grid unit tests"
+        key: "cpu_intersection_grid_tests"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/test/intersection_grid_test.jl"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 16GB
+
+      - label: "GPU exchange (intersection) grid unit tests"
+        key: "gpu_intersection_grid_tests"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/test/intersection_grid_test.jl"
+        retry: *retry_policy
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_mem: 16GB
+          slurm_gpus: 1
+
       - label: "GPU CMIP: ClimaAtmos + bucket land + Oceananigans + ClimaSeaIce"
         key: "gpu_cmip_oceananigans_climaseaice_bucket"
         command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice_bucket.yml --job_id gpu_cmip_oceananigans_climaseaice_bucket"

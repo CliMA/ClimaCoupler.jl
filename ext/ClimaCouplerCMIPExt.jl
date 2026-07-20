@@ -40,6 +40,11 @@ import SparseArrays # for converting Regridder element types
 get_ConservativeRegriddingCCExt() =
     Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
 
+# Exchange-grid geometry/weights and per-polygon flux machinery, used by the
+# ocean and sea-ice models below
+include("ClimaCouplerCMIPExt/exchange_grid.jl")
+include("ClimaCouplerCMIPExt/exchange_fluxes.jl")
+
 # Include the model files first so their types are available to climaocean_helpers.jl
 include("ClimaCouplerCMIPExt/oceananigans.jl")
 include("ClimaCouplerCMIPExt/clima_seaice.jl")

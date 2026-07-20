@@ -283,6 +283,14 @@ function argparse_settings()
         help = "Horizontal grid for Oceananigans ocean model. [`one_deg_tripolar` (default), `orca`]"
         arg_type = String
         default = "one_deg_tripolar"
+        "--use_intersection_grid"
+        help = "Boolean flag indicating whether to use the atmosphere-ocean intersection (exchange) grid for surface fractions and ocean/sea-ice fluxes with Oceananigans. Automatically disabled for unsupported setups (column mode, distributed runs). [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
+        "--topography_damping_factor"
+        help = "Damping factor of the atmosphere's orography smoothing, used to filter the intersection-grid surface fractions consistently with the atmosphere's smoothed topography. Must match the ClimaAtmos `topography_damping_factor`. [5 (default)]"
+        arg_type = Float64
+        default = 5.0
         "--sst_adjustment"
         help = "Adjustment to add to prescribed SST after conversion to Kelvin (default: 0.0)"
         arg_type = Float64
@@ -603,6 +611,8 @@ function get_coupler_args(config_dict::Dict)
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
     simple_ocean = config_dict["simple_ocean"]
     ocean_grid = Symbol(lowercase(config_dict["ocean_grid"]))
+    use_intersection_grid = config_dict["use_intersection_grid"]
+    topography_damping_factor = config_dict["topography_damping_factor"]
     sst_adjustment = FT(config_dict["sst_adjustment"])
     ocean_progress_interval = config_dict["ocean_progress_interval"]
     ocean_diagnostic_interval = config_dict["ocean_diagnostic_interval"]
@@ -693,6 +703,8 @@ function get_coupler_args(config_dict::Dict)
         ocean_model,
         simple_ocean,
         ocean_grid,
+        use_intersection_grid,
+        topography_damping_factor,
         sst_adjustment,
         ocean_progress_interval,
         ocean_diagnostic_interval,

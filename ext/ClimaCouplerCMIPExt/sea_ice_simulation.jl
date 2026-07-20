@@ -3,7 +3,8 @@
 import ClimaSeaIce.SeaIceThermodynamics: ConductiveFlux, IceWaterThermalEquilibrium
 import Oceananigans.TimeSteppers: SplitRungeKuttaTimeStepper
 
-ocean_reference_density(ocean::OceananigansModelSimulations, FT) = convert(FT, ocean.model.buoyancy.formulation.equation_of_state.reference_density)
+ocean_reference_density(ocean::OceananigansModelSimulations, FT) =
+    convert(FT, ocean.model.buoyancy.formulation.equation_of_state.reference_density)
 ocean_reference_density(::Nothing, FT) = convert(FT, 1026.0)
 
 function default_snow_thermodynamics(grid)
@@ -11,7 +12,11 @@ function default_snow_thermodynamics(grid)
     snow_conductivity = FT(0.31)
     snow_surface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     top_heat_boundary_condition = CSI.PrescribedTemperature(snow_surface_temperature.data)
-    return CSI.snow_slab_thermodynamics(grid; conductivity = snow_conductivity, top_heat_boundary_condition)
+    return CSI.snow_slab_thermodynamics(
+        grid;
+        conductivity = snow_conductivity,
+        top_heat_boundary_condition,
+    )
 end
 
 """
@@ -75,26 +80,31 @@ Keyword Arguments
 - `clock`: clock for the sea ice model. Defaults to `nothing`, in which case the model builds its
            own default clock; pass a `Clock` to control the time type (e.g. when coupling)
 """
-function sea_ice_simulation(grid, ocean = nothing;
-                            Δt = 5minutes,
-                            ice_salinity = 4, # psu
-                            advection = nothing,
-                            tracers = (),
-                            ice_heat_capacity = 2100, # J kg⁻¹ K⁻¹
-                            ice_consolidation_thickness = 0.05, # m
-                            sea_ice_density = 900, # kg m⁻³
-                            snow_density = 330, # kg m⁻³
-                            dynamics = sea_ice_dynamics(grid, ocean),
-                            bottom_heat_boundary_condition = nothing,
-                            top_heat_boundary_condition = nothing,
-                            timestepper = :SplitRungeKutta3,
-                            phase_transitions = CSI.PhaseTransitions(eltype(grid);
-                                                                     heat_capacity = ice_heat_capacity,
-                                                                     density = sea_ice_density),
-                            conductivity = 2, # W m⁻¹ K⁻¹
-                            internal_heat_flux = ConductiveFlux(; conductivity),
-                            snow_thermodynamics = default_snow_thermodynamics(grid),
-                            clock = nothing)
+function sea_ice_simulation(
+    grid,
+    ocean = nothing;
+    Δt = 5minutes,
+    ice_salinity = 4, # psu
+    advection = nothing,
+    tracers = (),
+    ice_heat_capacity = 2100, # J kg⁻¹ K⁻¹
+    ice_consolidation_thickness = 0.05, # m
+    sea_ice_density = 900, # kg m⁻³
+    snow_density = 330, # kg m⁻³
+    dynamics = sea_ice_dynamics(grid, ocean),
+    bottom_heat_boundary_condition = nothing,
+    top_heat_boundary_condition = nothing,
+    timestepper = :SplitRungeKutta3,
+    phase_transitions = CSI.PhaseTransitions(
+        eltype(grid);
+        heat_capacity = ice_heat_capacity,
+        density = sea_ice_density,
+    ),
+    conductivity = 2, # W m⁻¹ K⁻¹
+    internal_heat_flux = ConductiveFlux(; conductivity),
+    snow_thermodynamics = default_snow_thermodynamics(grid),
+    clock = nothing,
+)
 
     # Build consistent boundary conditions for the ice model:
     # - bottom -> flux boundary condition
@@ -102,7 +112,8 @@ function sea_ice_simulation(grid, ocean = nothing;
 
     if isnothing(top_heat_boundary_condition)
         top_surface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-        top_heat_boundary_condition = CSI.PrescribedTemperature(top_surface_temperature.data)
+        top_heat_boundary_condition =
+            CSI.PrescribedTemperature(top_surface_temperature.data)
     end
 
     if isnothing(bottom_heat_boundary_condition)
@@ -115,35 +126,39 @@ function sea_ice_simulation(grid, ocean = nothing;
         bottom_heat_boundary_condition = IceWaterThermalEquilibrium(surface_ocean_salinity)
     end
 
-    ice_thermodynamics = CSI.sea_ice_slab_thermodynamics(grid;
-                                                         internal_heat_flux,
-                                                         top_heat_boundary_condition,
-                                                         bottom_heat_boundary_condition)
+    ice_thermodynamics = CSI.sea_ice_slab_thermodynamics(
+        grid;
+        internal_heat_flux,
+        top_heat_boundary_condition,
+        bottom_heat_boundary_condition,
+    )
 
     bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    top_heat_flux    = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    snowfall         = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    top_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    snowfall = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
     # Only forward `clock` when supplied so the model keeps its own default otherwise.
     clock_kw = isnothing(clock) ? NamedTuple() : (; clock)
 
     # Build the sea ice model
-    sea_ice_model = CSI.SeaIceModel(grid;
-                                    ice_salinity,
-                                    advection,
-                                    tracers,
-                                    ice_consolidation_thickness,
-                                    sea_ice_density,
-                                    snow_density,
-                                    phase_transitions,
-                                    ice_thermodynamics,
-                                    snow_thermodynamics,
-                                    snowfall,
-                                    dynamics,
-                                    timestepper,
-                                    bottom_heat_flux,
-                                    top_heat_flux,
-                                    clock_kw...)
+    sea_ice_model = CSI.SeaIceModel(
+        grid;
+        ice_salinity,
+        advection,
+        tracers,
+        ice_consolidation_thickness,
+        sea_ice_density,
+        snow_density,
+        phase_transitions,
+        ice_thermodynamics,
+        snow_thermodynamics,
+        snowfall,
+        dynamics,
+        timestepper,
+        bottom_heat_flux,
+        top_heat_flux,
+        clock_kw...,
+    )
 
     verbose = false
     sea_ice = OC.Simulation(sea_ice_model; Δt, verbose)
@@ -152,7 +167,8 @@ function sea_ice_simulation(grid, ocean = nothing;
 end
 
 default_coriolis(ocean::OC.Simulation) = ocean.model.coriolis
-default_coriolis(ocean::Nothing) = OC.HydrostaticSphericalCoriolis(; rotation_rate = default_planet_rotation_rate())
+default_coriolis(ocean::Nothing) =
+    OC.HydrostaticSphericalCoriolis(; rotation_rate = default_planet_rotation_rate())
 
 default_solver(grid, ocean) = CSI.SplitExplicitSolver(grid; substeps = 120)
 
@@ -166,12 +182,15 @@ function default_solver(grid, ocean::OC.Simulation)
     return CSI.SplitExplicitSolver(grid; substeps)
 end
 
-function sea_ice_dynamics(grid, ocean = nothing;
-                          sea_ice_ocean_drag_coefficient = 3.24e-3,
-                          rheology = CSI.ElastoViscoPlasticRheology(),
-                          coriolis = default_coriolis(ocean),
-                          free_drift = nothing,
-                          solver = default_solver(grid, ocean))
+function sea_ice_dynamics(
+    grid,
+    ocean = nothing;
+    sea_ice_ocean_drag_coefficient = 3.24e-3,
+    rheology = CSI.ElastoViscoPlasticRheology(),
+    coriolis = default_coriolis(ocean),
+    free_drift = nothing,
+    solver = default_solver(grid, ocean),
+)
 
     # `ocean_surface_velocities(ocean)` is inlined here: the singleton vertical dimension is dropped,
     # unlike the surface salinity slice in `sea_ice_simulation`, which keeps it.
@@ -188,7 +207,12 @@ function sea_ice_dynamics(grid, ocean = nothing;
     sea_ice_ocean_drag_coefficient = convert(FT, sea_ice_ocean_drag_coefficient)
     ρₑ = ocean_reference_density(ocean, FT)
 
-    τo  = CSI.SemiImplicitStress(uₑ = SSU, vₑ = SSV, Cᴰ = sea_ice_ocean_drag_coefficient, ρₑ = ρₑ)
+    τo = CSI.SemiImplicitStress(
+        uₑ = SSU,
+        vₑ = SSV,
+        Cᴰ = sea_ice_ocean_drag_coefficient,
+        ρₑ = ρₑ,
+    )
     τua = OC.Field{OC.Face, OC.Center, Nothing}(grid)
     τva = OC.Field{OC.Center, OC.Face, Nothing}(grid)
 
@@ -196,11 +220,13 @@ function sea_ice_dynamics(grid, ocean = nothing;
         free_drift = CSI.StressBalanceFreeDrift((u = τua, v = τva), τo)
     end
 
-    return CSI.SeaIceMomentumEquation(grid;
-                                      coriolis,
-                                      top_momentum_stress = (u = τua, v = τva),
-                                      bottom_momentum_stress = τo,
-                                      rheology,
-                                      free_drift,
-                                      solver)
+    return CSI.SeaIceMomentumEquation(
+        grid;
+        coriolis,
+        top_momentum_stress = (u = τua, v = τva),
+        bottom_momentum_stress = τo,
+        rheology,
+        free_drift,
+        solver,
+    )
 end

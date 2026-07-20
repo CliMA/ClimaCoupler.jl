@@ -363,7 +363,12 @@ const _KA_WORKGROUP = 256
 @inline _is_cpu(x) = KernelAbstractions.get_backend(x) isa KernelAbstractions.CPU
 
 # dst[r] = Σ_p w[p] src[col[p]] over CSR row r
-@kernel function _csr_matvec_kernel!(dst, @Const(ptr), @Const(col), @Const(w), @Const(src))
+#
+# `src` is deliberately not `@Const`: gathers pass `se_field_to_vec` /
+# `vec(interior(...))` results, which on GPU are `Base.ReshapedArray`s, and
+# KernelAbstractions' `constify` re-runs `reshape` inside the device function
+# (via Adapt), hitting error-string code that is invalid in GPU IR.
+@kernel function _csr_matvec_kernel!(dst, @Const(ptr), @Const(col), @Const(w), src)
     r = @index(Global)
     acc = zero(eltype(dst))
     @inbounds begin
@@ -399,7 +404,9 @@ Rows sum to 1, so constants are preserved exactly.
 gather_nodes_to_polys!(poly_values, eg::ExchangeGrid, nodal_values) =
     _csr_matvec!(poly_values, eg.gpoly_ptr, eg.gnode, eg.gweight, nodal_values)
 
-@kernel function _gather_cells_kernel!(dst, @Const(oc_of_poly), @Const(src))
+# `src` not `@Const` for the same `Base.ReshapedArray` reason as
+# `_csr_matvec_kernel!` (callers pass `vec(interior(...))`).
+@kernel function _gather_cells_kernel!(dst, @Const(oc_of_poly), src)
     k = @index(Global)
     @inbounds dst[k] = src[oc_of_poly[k]]
 end

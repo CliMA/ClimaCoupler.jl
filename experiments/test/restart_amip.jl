@@ -113,12 +113,44 @@ cs_two_steps2 = setup_and_run(two_steps)
             :ghost_buffer,                      # Irrelevant
             :hyperdiffusion_ghost_buffer,       # Irrelevant
             :data_handler,                      # Stateful
-            :face_clear_sw_direct_flux_dn,      # Not filled by RRTGMP
-            :face_sw_direct_flux_dn,            # Not filled by RRTGMP
+            :face_clear_sw_direct_flux_dn,      # Not filled by RRTMGP
+            :face_sw_direct_flux_dn,            # Not filled by RRTMGP
             :rc,                                # CUDA internal object
             :non_orographic_gravity_wave,       # Recomputed every timestep; sensitive to FP accumulation
+            # RRTMGP 0.22 allocates these working buffers with `undef`; they are
+            # rewritten from scratch on every radiation solve and are not restart state.
+            # The meaningful radiation outputs are checked explicitly via the API below.
+            :fluxb,                             # Band-by-band intermediate fluxes (scratch)
+            :src,                               # Source function workspace (includes sfc_source)
+            :lon,                               # "required but unused" per RRTMGP comment
+            :aero_size,                         # Partially filled; unused slots stay undef
         ],
     )
+
+    # Verify radiation restart fidelity via the public RRTMGP accessor API.
+    # These are the fluxes that coupling and the energy tendency actually use.
+    if pkgversion(CA.RRTMGP) ≥ v"0.22"
+        rrtmgp_four =
+            cs_four_steps.model_sims.atmos_sim.integrator.p.radiation.rrtmgp_solver
+        rrtmgp_two2 =
+            cs_two_steps2.model_sims.atmos_sim.integrator.p.radiation.rrtmgp_solver
+        @test compare(
+            (;
+                lw_flux_dn = CA.RRTMGP.lw_flux_dn(rrtmgp_four),
+                lw_flux_up = CA.RRTMGP.lw_flux_up(rrtmgp_four),
+                sw_flux_dn = CA.RRTMGP.sw_flux_dn(rrtmgp_four),
+                sw_flux_up = CA.RRTMGP.sw_flux_up(rrtmgp_four),
+                ᶠradiation_flux = cs_four_steps.model_sims.atmos_sim.integrator.p.radiation.ᶠradiation_flux,
+            ),
+            (;
+                lw_flux_dn = CA.RRTMGP.lw_flux_dn(rrtmgp_two2),
+                lw_flux_up = CA.RRTMGP.lw_flux_up(rrtmgp_two2),
+                sw_flux_dn = CA.RRTMGP.sw_flux_dn(rrtmgp_two2),
+                sw_flux_up = CA.RRTMGP.sw_flux_up(rrtmgp_two2),
+                ᶠradiation_flux = cs_two_steps2.model_sims.atmos_sim.integrator.p.radiation.ᶠradiation_flux,
+            ),
+        )
+    end
 
     @test compare(
         cs_four_steps.model_sims.ice_sim.integrator.u,

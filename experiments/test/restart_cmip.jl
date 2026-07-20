@@ -112,16 +112,15 @@ cs_two_steps_restart_init = Interfacer.CoupledSimulation(restart_init)
         cs_two_steps1.model_sims.land_sim.integrator.u,
         cs_two_steps_restart_init.model_sims.land_sim.integrator.u,
     )
-    # Sea-ice structural compare: see `compare_cmip.jl` (`IceWaterThermalEquilibrium`, `FluxFunction`).
+    # Ice/ocean: compare prognostic Fields only. Walking the full model hits
+    # reconstructed grid/cache internals (not restored from JLD2) and is not a
+    # meaningful restart check. `compare_cmip.jl` compares Field data via `parent`.
     @test compare(
-        cs_two_steps1.model_sims.ice_sim.ice.model,
-        cs_two_steps_restart_init.model_sims.ice_sim.ice.model,
-        ignore = [:clock, :parent, :ptr],
+        OC.prognostic_fields(cs_two_steps1.model_sims.ice_sim.ice.model),
+        OC.prognostic_fields(cs_two_steps_restart_init.model_sims.ice_sim.ice.model),
     )
     @test compare(
-        cs_two_steps1.model_sims.ocean_sim.ocean.model,
-        cs_two_steps_restart_init.model_sims.ocean_sim.ocean.model,
-        # No cache restore from JLD2; timestepper working state (e.g. implicit_solver.t) can differ.
-        ignore = [:clock, :parent, :ptr, :timestepper],
+        OC.prognostic_fields(cs_two_steps1.model_sims.ocean_sim.ocean.model),
+        OC.prognostic_fields(cs_two_steps_restart_init.model_sims.ocean_sim.ocean.model),
     )
 end

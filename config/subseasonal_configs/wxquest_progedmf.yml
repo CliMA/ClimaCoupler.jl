@@ -1,6 +1,6 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
-atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
 coupler_toml: ["toml/amip_progedmf.toml"]
 strict_params: false
 mode_name: "subseasonal"
@@ -10,8 +10,11 @@ checkpoint_dt: "1000days"
 dt: "80secs"
 dt_cpl: "80secs"
 dt_seaice: "80secs"
+divergence_damping_factor: 20.0
 energy_check: false
 h_elem: 16
+z_max: 70000.0
+z_elem: 70
 land_fraction_source: "era5"
 binary_area_fraction: false
 

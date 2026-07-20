@@ -31,7 +31,7 @@ value = 0.1
 type = "float"
 
 [min_area_limiter_scale]
-value = 0.0001
+value = 1e-6
 type = "float"
 
 [min_area_limiter_power]
@@ -39,7 +39,7 @@ value = 1
 type = "float"
 
 [turb_entr_param_vec]
-value = [1e-4, 10]
+value = [1e-6, 10]
 type = "float"
 
 [entr_detr_limit_inv_tau]
@@ -74,14 +74,6 @@ type = "float"
 value = 1
 type = "float"
 
-[pressure_normalmode_drag_coeff]
-value = 40.0
-type = "float"
-
-[mixing_length_eddy_viscosity_coefficient]
-value = 0.56
-type = "float"
-
 [tracer_vertical_diffusion_factor]
 value = 0
 type = "float"
@@ -91,7 +83,7 @@ value = 100
 type = "float"
 
 [sublimation_deposition_timescale]
-value = 100
+value = 500
 type = "float"
 
 [rain_autoconversion_timescale]
@@ -103,5 +95,9 @@ value = 1800
 type = "float"
 
 [cloud_liquid_water_specific_humidity_autoconversion_threshold]
-value = 0
+value = 1.0e-4
+type = "float"
+
+[cloud_fraction_steepness_scale]
+value = 0.5
 type = "float"

@@ -65,7 +65,7 @@ function run!(
     # We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU and use this
     # value to calculate the simulated years per day (SYPD) of the simulation.
     @info "Starting coupling loop"
-    t_timed_start = float(cs.t[]) # get t just before timing (equal to cs.tspan[begin] if `precompile` is false)
+    t_timed_start = cs.t[] # get t just before timing (equal to cs.tspan[begin] if `precompile` is false)
     walltime = ClimaComms.@elapsed ClimaComms.device(cs) begin
         while cs.t[] < cs.tspan[end]
             step!(cs)

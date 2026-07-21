@@ -47,16 +47,6 @@ zero (CPU) or bounded (GPU) per-step allocations.
 
 ## Surface fractions
 
-The wet-ocean fraction on the boundary space is the clamped ratio
-`node_cov / node_cov_total`, made C0-continuous with `weighted_dss!` and then
-**smoothed with the same diffusion recipe ClimaAtmos applies to its Earth
-orography** (`ClimaCore.Hypsography.diffuse_surface_elevation!` with
-``\\kappa = 0.05\\,\\Delta h^2``, ``\\mathrm{maxiter} =
-\\mathrm{round}(\\log(d)/0.05)`` where ``d`` is `topography_damping_factor`).
-The coupler therefore never sees land-sea contrasts sharper than the
-atmosphere's own smoothed topography. The `topography_damping_factor`
-configuration option must match the ClimaAtmos option of the same name
-(default 5).
 
 Each coupling step, `FieldExchanger.align_surface_fractions!` composes
 
@@ -66,7 +56,7 @@ ocean = wet - ice
 land  = 1 - wet
 ```
 
-which sum to 1 identically and supersede the legacy ETOPO-based update.
+which sum to 1 identically (asserted at runtime)
 
 ## Per-polygon fluxes
 

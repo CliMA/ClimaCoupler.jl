@@ -85,7 +85,7 @@ function ClimaSeaIceSimulation(
 
     advection = ocean.ocean.model.advection.T
 
-    ice = CO.SeaIces.sea_ice_simulation(
+    ice = sea_ice_simulation(
         grid,
         ocean.ocean;
         clock = deepcopy(ocean.ocean.model.clock),

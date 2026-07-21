@@ -282,35 +282,14 @@ NVTX.@annotate function compute_ocean_polygon_fluxes!(
     thermo_params,
     config,
 )
-    if _is_cpu(fs.F_sh)
-        for k in eachindex(fs.F_sh)
-            @inbounds out = _polygon_surface_fluxes(
-                surface_fluxes_params,
-                thermo_params,
-                config,
-                fs.T_atmos[k],
-                fs.q_tot[k],
-                fs.q_liq[k],
-                fs.q_ice[k],
-                fs.ρ_atmos[k],
-                fs.u_atmos[k],
-                fs.v_atmos[k],
-                fs.height_int[k],
-                fs.height_sfc[k],
-                fs.T_sfc[k],
-            )
-            _store_ocean_polygon_fluxes!(fs, k, out)
-        end
-    else
-        backend = KernelAbstractions.get_backend(fs.F_sh)
-        _ocean_polygon_fluxes_kernel!(backend, _KA_WORKGROUP)(
-            _kernel_state(fs),
-            surface_fluxes_params,
-            thermo_params,
-            config;
-            ndrange = length(fs.F_sh),
-        )
-    end
+    backend = KernelAbstractions.get_backend(fs.F_sh)
+    _ocean_polygon_fluxes_kernel!(backend, _KA_WORKGROUP)(
+        _kernel_state(fs),
+        surface_fluxes_params,
+        thermo_params,
+        config;
+        ndrange = length(fs.F_sh),
+    )
     return nothing
 end
 
@@ -476,35 +455,18 @@ NVTX.@annotate function compute_ice_polygon_fluxes!(
     α_albedo,
     T_melt,
 )
-    vecs = _kernel_state(is)
-    if _is_cpu(is.fluxes.F_sh)
-        for k in eachindex(is.fluxes.F_sh)
-            _ice_polygon_fluxes_at(
-                vecs,
-                k,
-                surface_fluxes_params,
-                thermo_params,
-                config,
-                σ,
-                ϵ,
-                α_albedo,
-                T_melt,
-            )
-        end
-    else
-        backend = KernelAbstractions.get_backend(is.fluxes.F_sh)
-        _ice_polygon_fluxes_kernel!(backend, _KA_WORKGROUP)(
-            vecs,
-            surface_fluxes_params,
-            thermo_params,
-            config,
-            σ,
-            ϵ,
-            α_albedo,
-            T_melt;
-            ndrange = length(is.fluxes.F_sh),
-        )
-    end
+    backend = KernelAbstractions.get_backend(is.fluxes.F_sh)
+    _ice_polygon_fluxes_kernel!(backend, _KA_WORKGROUP)(
+        _kernel_state(is),
+        surface_fluxes_params,
+        thermo_params,
+        config,
+        σ,
+        ϵ,
+        α_albedo,
+        T_melt;
+        ndrange = length(is.fluxes.F_sh),
+    )
     return nothing
 end
 

@@ -321,16 +321,14 @@ end
 #=
 # Gather/scatter operations
 
-Segmented reductions over the CSR structures above: race-free, deterministic,
-allocation-free. Each wrapper runs a serial loop on the CPU or a
-KernelAbstractions kernel on the GPU, selected by the destination's backend.
+Segmented reductions over the CSR structures above: race-free and
+deterministic. Each wrapper launches a single KernelAbstractions kernel on
+the destination's backend, so the same code path runs on CPU and GPU.
 =#
 
 import KernelAbstractions
 
 const _KA_WORKGROUP = 256
-
-@inline _is_cpu(x) = KernelAbstractions.get_backend(x) isa KernelAbstractions.CPU
 
 # dst[r] = Σ_p w[p] src[col[p]] over CSR row r
 @kernel function _csr_matvec_kernel!(dst, ptr, col, w, src)
@@ -345,18 +343,8 @@ const _KA_WORKGROUP = 256
 end
 
 function _csr_matvec!(dst, ptr, col, w, src)
-    if _is_cpu(dst)
-        @inbounds for r in eachindex(dst)
-            acc = zero(eltype(dst))
-            for p in ptr[r]:(ptr[r + 1] - 1)
-                acc += w[p] * src[col[p]]
-            end
-            dst[r] = acc
-        end
-    else
-        backend = KernelAbstractions.get_backend(dst)
-        _csr_matvec_kernel!(backend, _KA_WORKGROUP)(dst, ptr, col, w, src; ndrange = length(dst))
-    end
+    backend = KernelAbstractions.get_backend(dst)
+    _csr_matvec_kernel!(backend, _KA_WORKGROUP)(dst, ptr, col, w, src; ndrange = length(dst))
     return dst
 end
 
@@ -381,19 +369,13 @@ Copy the owning FV cell's value onto each polygon (direct indexing; each
 polygon lies inside exactly one cell).
 """
 function gather_cells_to_polys!(poly_values, eg::ExchangeGrid, cell_values)
-    if _is_cpu(poly_values)
-        @inbounds for k in eachindex(poly_values)
-            poly_values[k] = cell_values[eg.oc_of_poly[k]]
-        end
-    else
-        backend = KernelAbstractions.get_backend(poly_values)
-        _gather_cells_kernel!(backend, _KA_WORKGROUP)(
-            poly_values,
-            eg.oc_of_poly,
-            cell_values;
-            ndrange = eg.n_poly,
-        )
-    end
+    backend = KernelAbstractions.get_backend(poly_values)
+    _gather_cells_kernel!(backend, _KA_WORKGROUP)(
+        poly_values,
+        eg.oc_of_poly,
+        cell_values;
+        ndrange = eg.n_poly,
+    )
     return poly_values
 end
 
@@ -439,32 +421,17 @@ function scatter_polys_to_nodes_normalized!(
     poly_values,
     cov_cutoff,
 )
-    if _is_cpu(nodal_values)
-        @inbounds for n in eachindex(nodal_values)
-            c = eg.node_cov[n]
-            if c > cov_cutoff
-                acc = zero(eltype(nodal_values))
-                for p in eg.snode_ptr[n]:(eg.snode_ptr[n + 1] - 1)
-                    acc += eg.sweight[p] * poly_values[eg.spoly[p]]
-                end
-                nodal_values[n] = acc / c
-            else
-                nodal_values[n] = 0
-            end
-        end
-    else
-        backend = KernelAbstractions.get_backend(nodal_values)
-        _csr_matvec_normalized_kernel!(backend, _KA_WORKGROUP)(
-            nodal_values,
-            eg.snode_ptr,
-            eg.spoly,
-            eg.sweight,
-            poly_values,
-            eg.node_cov,
-            cov_cutoff;
-            ndrange = eg.n_nodes,
-        )
-    end
+    backend = KernelAbstractions.get_backend(nodal_values)
+    _csr_matvec_normalized_kernel!(backend, _KA_WORKGROUP)(
+        nodal_values,
+        eg.snode_ptr,
+        eg.spoly,
+        eg.sweight,
+        poly_values,
+        eg.node_cov,
+        cov_cutoff;
+        ndrange = eg.n_nodes,
+    )
     return nodal_values
 end
 
@@ -494,32 +461,16 @@ exactly. Cells with zero wet area (dry, fold shadows) are set to 0; run
 [`mirror_fold_partners!`](@ref) afterwards to fill the shadow copies.
 """
 function scatter_polys_to_cells!(cell_values, eg::ExchangeGrid, poly_values)
-    if _is_cpu(cell_values)
-        @inbounds for c in eachindex(cell_values)
-            aw = eg.oc_wet_area[c]
-            if aw > 0
-                acc = zero(eltype(cell_values))
-                for p in eg.soc_ptr[c]:(eg.soc_ptr[c + 1] - 1)
-                    k = eg.soc_poly[p]
-                    acc += eg.area[k] * poly_values[k]
-                end
-                cell_values[c] = acc / aw
-            else
-                cell_values[c] = 0
-            end
-        end
-    else
-        backend = KernelAbstractions.get_backend(cell_values)
-        _scatter_cells_kernel!(backend, _KA_WORKGROUP)(
-            cell_values,
-            eg.soc_ptr,
-            eg.soc_poly,
-            eg.area,
-            eg.oc_wet_area,
-            poly_values;
-            ndrange = eg.n_oc,
-        )
-    end
+    backend = KernelAbstractions.get_backend(cell_values)
+    _scatter_cells_kernel!(backend, _KA_WORKGROUP)(
+        cell_values,
+        eg.soc_ptr,
+        eg.soc_poly,
+        eg.area,
+        eg.oc_wet_area,
+        poly_values;
+        ndrange = eg.n_oc,
+    )
     return cell_values
 end
 
@@ -561,22 +512,15 @@ function mirror_fold_partners!(
     Nh = Nx ÷ 2
     Nquarter = Nx ÷ 4
     fold_offset = (Ny - 1) * Nx
-    if _is_cpu(cell_values)
-        @inbounds for i in 1:(2 * Nquarter)
-            r = ifelse(i <= Nquarter, i, i + Nh - Nquarter)
-            cell_values[Nx + 1 - r + fold_offset] = cell_values[r + fold_offset]
-        end
-    else
-        backend = KernelAbstractions.get_backend(cell_values)
-        _mirror_fold_kernel!(backend, _KA_WORKGROUP)(
-            cell_values,
-            Nx,
-            Nh,
-            Nquarter,
-            fold_offset;
-            ndrange = 2 * Nquarter,
-        )
-    end
+    backend = KernelAbstractions.get_backend(cell_values)
+    _mirror_fold_kernel!(backend, _KA_WORKGROUP)(
+        cell_values,
+        Nx,
+        Nh,
+        Nquarter,
+        fold_offset;
+        ndrange = 2 * Nquarter,
+    )
     return cell_values
 end
 

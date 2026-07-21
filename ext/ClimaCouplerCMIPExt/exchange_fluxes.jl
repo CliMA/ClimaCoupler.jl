@@ -1,26 +1,19 @@
 #=
 # Per-polygon turbulent fluxes on the exchange grid
 
-Turbulent fluxes for the ocean (and sea ice) are computed with one
-`SurfaceFluxes.surface_fluxes` evaluation per exchange-grid polygon, from
-atmospheric state gathered off the SE nodes and surface state read directly
-from the owning FV cell. The per-polygon fluxes are then aggregated
-conservatively to both sides:
+One `SurfaceFluxes.surface_fluxes` evaluation per exchange-grid polygon, from
+atmospheric state gathered off the SE nodes and surface state read from the
+owning FV cell, aggregated conservatively to both sides:
 
-- to the FV grid with per-polygon sea-ice-concentration weighting (the
-  coastline- and ice-edge-resolving improvement over remapping
-  boundary-space fluxes);
-- to the SE boundary space via the L2 scatter followed by `weighted_dss!`.
-  The scatter result is coverage-weighted, so it is divided by the DSS'd
-  nodal wet coverage (`node_cov_dss`), which — unlike normalizing before
-  DSS — does not average real coastal fluxes with no-data zeros from dry
-  neighbor elements. Momentum is handled in the UV (east/north) basis
-  through gather, kernel, scatter and DSS (the UV basis is global, so its
-  components are DSS-safe scalars), and converted to the local CT1/CT2
-  components expected in `csf.F_turb_ρτxz/yz` only at the very end.
+- to the FV grid with per-polygon sea-ice-concentration weighting;
+- to the SE boundary space via the L2 scatter, `weighted_dss!`, then division
+  by the DSS'd nodal wet coverage — dividing only after DSS avoids averaging
+  real coastal fluxes with no-data zeros from dry neighbor elements.
 
-All per-step operations run on the compute device; the only per-step host
-work is kernel launches and small array-view wrappers.
+Momentum is handled in the global UV (east/north) basis — whose components
+are DSS-safe scalars — and converted to the local CT1/CT2 components expected
+in `csf.F_turb_ρτxz/yz` only at the very end. All per-step operations run on
+the compute device.
 =#
 
 import StaticArrays
@@ -35,14 +28,11 @@ const EXCHANGE_COV_CUTOFF = 1e-3
     ExchangeFluxState{FT, VF}
 
 Device-resident per-polygon scratch for the exchange-grid flux computation of
-one surface model (one instance for the ocean, one for sea ice).
-
-Holds the gathered atmospheric state (`T_atmos`, `q_tot`, `q_liq`, `q_ice`,
-`ρ_atmos`, `u_atmos`, `v_atmos` in the UV basis, `height_int`, `height_sfc`),
-the gathered surface state (`T_sfc` [K], `sic`), the flux outputs (`F_sh`,
-`F_lh`, `F_moisture`, `F_τu`, `F_τv` in the UV basis), running time
-accumulators for the slow-surface path (`acc_*`, with `n_acc` counting
-contributions), and two generic per-polygon scratch vectors.
+one surface model (one instance for the ocean, one for sea ice): the gathered
+atmospheric and surface state (momentum in the UV basis; `T_sfc` in [K]), the
+flux outputs (`F_*`), running time accumulators for the slow-surface path
+(`acc_*`, with `n_acc` counting contributions), and two generic scratch
+vectors.
 """
 struct ExchangeFluxState{FT, VF <: AbstractVector{FT}}
     T_atmos::VF
@@ -169,14 +159,11 @@ _poly_flux_inputs(is::IceExchangeState) =
 """
     check_poly_flux_nans(state, eg::ExchangeGrid, label)
 
-Purely diagnostic NaN guard for the per-polygon flux evaluation (no-op unless
-[`DEBUG_POLY_FLUX_NANS`](@ref) is enabled; never modifies any values). Scans
-the flux outputs of `state` (an [`ExchangeFluxState`](@ref) or
-[`IceExchangeState`](@ref)); if any is NaN, logs — for up to 10 offending
-polygons — the polygon index, its owning FV cell and SE element, all flux
-outputs, and all gathered inputs of the SurfaceFluxes evaluation, then
-`error`s so the NaN is never scattered to the models. The detailed report
-copies the per-polygon vectors to the host, which is fine on this abort path.
+Diagnostic NaN guard (no-op unless [`DEBUG_POLY_FLUX_NANS`](@ref) is
+enabled). If any flux output of `state` is NaN, logs the polygon index,
+owning FV cell and SE element, flux outputs, and gathered inputs for up to
+10 offending polygons, then `error`s so the NaN is never scattered to the
+models.
 """
 function check_poly_flux_nans(state, eg::ExchangeGrid, label)
     DEBUG_POLY_FLUX_NANS[] || return nothing
@@ -203,8 +190,7 @@ end
     momentum_basis_fields(boundary_space)
 
 Precompute the per-node 2×2 map between the local CT1/CT2 unit basis and the
-global UV (east/north) basis: `a = UV(ĈT1)`, `b = UV(ĈT2)` and its
-determinant. Enables allocation-free per-step basis conversions
+global UV (east/north) basis, enabling allocation-free per-step conversions
 ([`ct12_to_uv!`](@ref), [`uv_to_ct12!`](@ref)); numerically identical to
 `contravariant_to_cartesian!` and its inverse.
 """
@@ -258,11 +244,10 @@ end
                                  temp_uv_vec, momentum_basis)
 
 Gather the atmospheric near-surface state from the coupler fields (SE nodal)
-onto the exchange-grid polygons. The nodal velocity components `csf.u_int` /
-`csf.v_int` are given in the local CT1/CT2 unit basis; they are converted to
-the global UV (east/north) basis (via `temp_uv_vec` scratch and the
-precomputed `momentum_basis`) before gathering, so that per-polygon wind
-speeds and stresses are basis-consistent across the nodes a polygon touches.
+onto the exchange-grid polygons. `csf.u_int`/`csf.v_int` are converted from
+the local CT1/CT2 basis to the global UV basis before gathering, so
+per-polygon winds and stresses are basis-consistent across the nodes a
+polygon touches.
 """
 NVTX.@annotate function gather_atmos_state_to_polys!(
     fs::ExchangeFluxState,
@@ -684,24 +669,14 @@ end
                                      fs::ExchangeFluxState, weight)
 
 Aggregate per-polygon fluxes onto the SE boundary space as a `weight`-weighted
-average, filling the `remapping.flux_scratch` fields (`F_turb_ρτxz`,
-`F_turb_ρτyz`, `F_sh`, `F_lh`, `F_turb_moisture`) ready for
-`FluxCalculator.update_flux_fields!`.
-
-`weight` is a per-polygon vector selecting the sub-surface the fluxes apply
-to — `1 - sic` for the open ocean, `sic` for sea ice — so the nodal result is
-a per-unit-*weighted*-area flux, consistent with the corresponding area
-fraction the coupler multiplies it by. Steps:
-
-1. raw L2 scatter of `weight * F` for each output (momentum in UV) and of
-   `weight` itself (the nodal weighted coverage);
-2. `weighted_dss!` on each scalar (UV components are DSS-safe; dividing only
-   after DSS avoids averaging real coastal fluxes with no-data zeros);
-3. division by the DSS'd weighted coverage (zero below
-   `EXCHANGE_COV_CUTOFF`);
-4. UV → CT1/CT2 conversion of the momentum pair.
-
-Uses `fs.scratch1` internally; `weight` must not alias it.
+average, filling the `remapping.flux_scratch` fields for
+`FluxCalculator.update_flux_fields!`. `weight` selects the sub-surface the
+fluxes apply to — `1 - sic` for open ocean, `sic` for sea ice — so the nodal
+result is a per-unit-*weighted*-area flux, consistent with the area fraction
+the coupler multiplies it by: L2-scatter `weight * F` (momentum in UV) and
+`weight` itself, `weighted_dss!` each scalar, divide by the DSS'd weighted
+coverage (zero below `EXCHANGE_COV_CUTOFF`), then convert momentum
+UV → CT1/CT2. Uses `fs.scratch1` internally; `weight` must not alias it.
 """
 NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
     remapping,

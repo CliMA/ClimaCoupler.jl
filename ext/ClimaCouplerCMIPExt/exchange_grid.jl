@@ -1,29 +1,22 @@
 #=
 # Exchange (intersection) grid
 
-The exchange grid is the set of polygons formed where the elements of the
-ClimaCore cubed-sphere spectral-element (SE) boundary space overlap the
-finite-volume (FV) cells of an Oceananigans grid. Ocean and sea-ice turbulent
-fluxes are computed per polygon on this grid and aggregated conservatively to
-both sides, so that coastlines are represented at the resolution of the
-intersection geometry rather than of either parent grid, and so that the same
-intersection areas define both the flux weights and the surface area fractions
-(see issue #1838).
-
-Geometry and weights are constructed once on the CPU in `Float64` (polygon
-clipping through ConservativeRegridding.jl); the resulting index and weight
-vectors are cast to the simulation float type and moved to the compute device,
-where all per-step operations are sparse gathers/scatters (see the kernels
-further below).
+The polygons formed where the elements of the ClimaCore spectral-element (SE)
+boundary space overlap the finite-volume (FV) cells of an Oceananigans grid.
+Ocean and sea-ice turbulent fluxes are computed per polygon and aggregated
+conservatively to both sides, so coastlines are resolved at intersection
+resolution and the same areas define both flux weights and surface fractions
+(issue #1838). Geometry and weights are built once on the CPU in `Float64`
+(ConservativeRegridding.jl polygon clipping), cast to the simulation float
+type, and moved to the device, where every per-step operation is a sparse
+gather/scatter.
 =#
 
 """
     PolygonIntersectionOperator{M <: CR.Manifold}
 
-Custom `ConservativeRegridding` intersection operator that assembles a sparse
-matrix of intersection *polygons* rather than scalar areas, via the operator
-API in `ConservativeRegridding.intersection_areas` (`IntersectionReturnStyle`,
-`output_eltype`, `should_store_result`).
+`ConservativeRegridding` intersection operator that assembles a sparse matrix
+of intersection *polygons* rather than scalar areas.
 """
 struct PolygonIntersectionOperator{M <: CR.Manifold}
     manifold::M
@@ -80,52 +73,42 @@ end
     ExchangeGrid{FT, VI, VF}
 
 Sparse coupling between the SE boundary space, the FV (Oceananigans) surface
-cells, and the intersection polygons that tile their overlap. All couplings
-are stored in compressed-sparse-row (CSR) form for the direction they are
-consumed in, so every per-step gather/scatter is a race-free segmented
-reduction (no atomics, deterministic, allocation-free).
+cells, and the intersection polygons that tile their overlap, stored in
+compressed-sparse-row (CSR) form for the direction each coupling is consumed
+in, so every per-step gather/scatter is a race-free segmented reduction.
 
-SE-side weights come from the "principled" SEM basis integrals
+SE-side weights come from the SEM basis integrals
 ``B_{kn} = ∫_{Ω_k} ϕ_n \\, dA`` over each polygon `Ω_k`
 (`ConservativeRegriddingClimaCoreExt.accumulate_principled_b`):
 
   - gather (polygon-major): `f̄_k = Σ_n gweight[k,n] f_n` with
-    `gweight = B_{kn} / Σ_n B_{kn}`, so rows sum to 1 and constants are
-    preserved exactly;
+    `gweight = B_{kn} / Σ_n B_{kn}` (rows sum to 1; constants preserved);
   - scatter (node-major): `F_n = Σ_k sweight[n,k] F_k` with
-    `sweight = B_{kn} / (Jw)_n` — the per-element L2 projection (the same
-    structure as `fv_to_se_l2_projection`), to be followed by `weighted_dss!`;
-  - `node_cov[n] = Σ_{k wet} B_{kn} / (Jw)_n` is the wet-ocean coverage of
-    node `n` (the L2 projection of the wet-mask indicator): scattering a
-    constant yields `constant × node_cov`. It carries Gibbs overshoot at
-    coastlines and systematic geometric deficits (polygon quads only
-    approximate strongly curved FV cells, e.g. along the tripolar fold, and
-    the FV grid may not cover the full sphere), so `node_cov_total` — the
-    same sum over *all* polygons, before the wet-mask filter — is stored
-    alongside it: the ratio `node_cov / node_cov_total` cancels the
-    geometric error and is the quantity to use as a wet fraction (after
-    clamping to [0, 1]).
+    `sweight = B_{kn} / (Jw)_n` — the per-element L2 projection, to be
+    followed by `weighted_dss!`;
+  - `node_cov[n] = Σ_{k wet} B_{kn} / (Jw)_n` — the wet-ocean coverage of
+    node `n`: scattering a constant yields `constant × node_cov`. It carries
+    Gibbs overshoot and systematic geometric deficits, so the quantity to use
+    as a wet fraction is `node_cov / node_cov_total` (clamped to [0, 1]),
+    where `node_cov_total` is the same sum over *all* polygons before the
+    wet-mask filter — the ratio cancels the geometric error.
 
-Flat index conventions: SE node `n = (e-1) Nq² + (j-1) Nq + i` (matches the
-`IJFH` data layout flattened by `data2array`); FV cell `c = (j-1) Nx + i`
-(matches `vec(OC.interior(field, :, :, Nz))` and the CR column index).
+Flat index conventions: SE node `n = (e-1) Nq² + (j-1) Nq + i` (the `IJFH`
+layout flattened by `data2array`); FV cell `c = (j-1) Nx + i`
+(`vec(OC.interior(field, :, :, Nz))` and the CR column index).
 
 # Fields
-- `n_poly`, `n_nodes`, `n_elem`, `n_oc`: counts of polygons, SE nodes, SE
-  elements, and FV surface cells
+- `n_poly`, `n_nodes`, `n_elem`, `n_oc`: entity counts
 - `gpoly_ptr`, `gnode`, `gweight`: polygon-major CSR of the node→polygon gather
 - `snode_ptr`, `spoly`, `sweight`: node-major CSR of the polygon→node scatter
-- `node_cov`: wet-ocean coverage per SE node (retained polygons only)
-- `node_cov_total`: geometric coverage per SE node (all polygons, before the
-  wet-mask filter); zero where the FV grid does not reach
-- `elem_of_poly`: SE element owning each polygon
-- `oc_of_poly`: FV cell owning each polygon (gather is direct indexing)
+- `node_cov`, `node_cov_total`: nodal wet / geometric coverage
+- `elem_of_poly`, `oc_of_poly`: SE element / FV cell owning each polygon
 - `soc_ptr`, `soc_poly`: FV-cell-major CSR of the polygon→cell scatter
 - `area`: geometric polygon areas [m²]
 - `b_area`: SE-side quadrature areas `Σ_n B_{kn}` [m²]; equals `area` up to
   quadrature error and makes SE-side conservation statements exact
-- `oc_wet_area`: total retained (wet) polygon area per FV cell [m²]; zero for
-  dry (immersed) cells and for tripolar fold shadow cells
+- `oc_wet_area`: retained (wet) polygon area per FV cell [m²]; zero for dry
+  (immersed) cells and tripolar fold shadow cells
 """
 struct ExchangeGrid{FT, VI <: AbstractVector{Int32}, VF <: AbstractVector{FT}}
     n_poly::Int
@@ -183,23 +166,13 @@ end
     build_exchange_grid(boundary_space, grid_oc; sliver_rtol = 0.0)
 
 Construct an [`ExchangeGrid`](@ref) between a ClimaCore cubed-sphere
-`boundary_space` and an Oceananigans `grid_oc` (typically a `TripolarGrid`
-wrapped in an `ImmersedBoundaryGrid`; any CR-supported grid works).
-
-Construction runs on the CPU in `Float64`:
-1. `CR.intersection_areas` with a [`PolygonIntersectionOperator`](@ref)
-   assembles the SE-element × FV-cell sparse matrix of intersection polygons.
-   On a `TripolarGrid` the treeify step routes through CR's fold-aware
-   Oceananigans extension, so fold shadow cells never produce polygons.
-2. Polygons over dry (immersed) surface cells are dropped, as are slivers with
-   `area < sliver_rtol * mean(area)` (guards `Float32` weight underflow;
-   disabled by default).
-3. `accumulate_principled_b` integrates the SEM basis over each polygon,
-   producing the gather/scatter weights and the nodal coverages (`node_cov`
-   from wet polygons, `node_cov_total` from all polygons).
-
-The result is on the CPU with the float type of `boundary_space`; move it to
-the compute device with [`on_device`](@ref).
+`boundary_space` and an Oceananigans `grid_oc`, on the CPU in `Float64`:
+intersect SE elements with FV cells (fold-aware on a `TripolarGrid`, so fold
+shadow cells never produce polygons), drop polygons over dry (immersed) cells
+and slivers with `area < sliver_rtol * mean(area)` (guards `Float32` weight
+underflow; disabled by default), then integrate the SEM basis over each
+polygon (`accumulate_principled_b`) to obtain the gather/scatter weights and
+nodal coverages. Move the result to the device with [`on_device`](@ref).
 """
 function build_exchange_grid(boundary_space, grid_oc; sliver_rtol = 0.0)
     CRExt = get_ConservativeRegriddingCCExt()
@@ -348,11 +321,9 @@ end
 #=
 # Gather/scatter operations
 
-All per-step exchange-grid operations are segmented reductions over the CSR
-structures above: race-free, deterministic, and allocation-free. Each wrapper
-runs a serial loop on the CPU (exactly zero allocations) and a
-KernelAbstractions kernel on the GPU, selected by the backend of the
-destination array.
+Segmented reductions over the CSR structures above: race-free, deterministic,
+allocation-free. Each wrapper runs a serial loop on the CPU or a
+KernelAbstractions kernel on the GPU, selected by the destination's backend.
 =#
 
 import KernelAbstractions
@@ -364,10 +335,10 @@ const _KA_WORKGROUP = 256
 
 # dst[r] = Σ_p w[p] src[col[p]] over CSR row r
 #
-# `src` is deliberately not `@Const`: gathers pass `se_field_to_vec` /
-# `vec(interior(...))` results, which on GPU are `Base.ReshapedArray`s, and
-# KernelAbstractions' `constify` re-runs `reshape` inside the device function
-# (via Adapt), hitting error-string code that is invalid in GPU IR.
+# `src` is deliberately not `@Const`: gathers pass `Base.ReshapedArray`s
+# (`se_field_to_vec` / `vec(interior(...))`), and KernelAbstractions'
+# `constify` re-runs `reshape` inside the device function, hitting
+# error-string code that is invalid in GPU IR.
 @kernel function _csr_matvec_kernel!(dst, @Const(ptr), @Const(col), @Const(w), src)
     r = @index(Global)
     acc = zero(eltype(dst))
@@ -541,11 +512,9 @@ end
     scatter_polys_to_cells!(cell_values, eg::ExchangeGrid, poly_values)
 
 Area-weighted average of per-polygon values onto each FV cell:
-`F_c = Σ_{k ∈ c} area_k F_k / oc_wet_area_c`. Dry cells and tripolar fold
-shadow cells (zero wet area) are set to 0; run
+`F_c = Σ_{k ∈ c} area_k F_k / oc_wet_area_c`, conserving the area integral
+exactly. Cells with zero wet area (dry, fold shadows) are set to 0; run
 [`mirror_fold_partners!`](@ref) afterwards to fill the shadow copies.
-The weighting conserves the area integral exactly:
-`Σ_k area_k F_k == Σ_c oc_wet_area_c F_c`.
 """
 function scatter_polys_to_cells!(cell_values, eg::ExchangeGrid, poly_values)
     if _is_cpu(cell_values)
@@ -581,15 +550,12 @@ end
 # Tripolar fold mirroring
 
 On a `RightCenterFolded` `TripolarGrid` the fold-row cell `(i, Ny)` is the
-same physical cell as `(Nx + 1 - i, Ny)`; ConservativeRegridding (and the
-exchange grid built through its treeify) keeps one copy of each pair as a
-real cell and makes the other a degenerate shadow with no polygons. After a
-scatter, shadow slots hold 0 — mirror each primary's value into its partner
-so the flat cell vector shows the same physical value on both copies. The
-real (primary) fold locals are `1..Nx÷4` and `Nx÷2 + 1 .. Nx÷2 + Nx÷4`; the
-partner of local `r` is `Nx + 1 - r`. This replicates
-`mirror_fold_partners!` in `ConservativeRegriddingOceananigansExt` (which is
-internal to that extension).
+same physical cell as `(Nx + 1 - i, Ny)`; the exchange grid keeps one copy as
+a real cell and leaves the other a degenerate shadow with no polygons, so
+shadow slots hold 0 after a scatter. Mirror each primary (fold locals
+`1..Nx÷4` and `Nx÷2 + 1 .. Nx÷2 + Nx÷4`; partner of local `r` is
+`Nx + 1 - r`) into its partner slot. Replicates the internal
+`mirror_fold_partners!` in `ConservativeRegriddingOceananigansExt`.
 =#
 
 @kernel function _mirror_fold_kernel!(dst, Nx, Nh, Nquarter, fold_offset)
@@ -646,22 +612,16 @@ end
                              topography_damping_factor = 5)
 
 Build the wet-ocean surface fraction as a `CC.Fields.Field` on
-`boundary_space` from a CPU-resident [`ExchangeGrid`](@ref).
-
-The nodal fraction is the ratio `node_cov / node_cov_total` (the wet-mask L2
-projection normalized by the geometric coverage, which cancels systematic
-polygon-approximation error), clamped to [0, 1], made C0-continuous with
-`weighted_dss!`, and then smoothed with the same diffusion recipe ClimaAtmos
-applies to its orography (`ClimaCore.Hypsography.diffuse_surface_elevation!`
-with `κ = 0.05 Δh²`, `dt = 1`, `maxiter = round(log(damping_factor)/0.05)`;
-see `ClimaAtmos.make_hybrid_spaces`). This guarantees the coupler never sees
-land-sea contrasts sharper than the atmosphere's own smoothed topography.
-`topography_damping_factor` must match the ClimaAtmos configuration option of
-the same name (default 5).
-
-The complement `1 - wet_ocean_fraction` is the land fraction; sea ice and open
-ocean partition the wet fraction itself (see
-`FieldExchanger.align_surface_fractions!`).
+`boundary_space` from a CPU-resident [`ExchangeGrid`](@ref): the nodal ratio
+`node_cov / node_cov_total` clamped to [0, 1], made continuous with
+`weighted_dss!`, then smoothed with the same diffusion recipe ClimaAtmos
+applies to its orography (`κ = 0.05 Δh²`, `dt = 1`,
+`maxiter = round(log(damping_factor)/0.05)`; see
+`ClimaAtmos.make_hybrid_spaces`), so the coupler never sees land-sea
+contrasts sharper than the atmosphere's smoothed topography.
+`topography_damping_factor` must match the ClimaAtmos option of the same
+name. The complement is the land fraction; sea ice and open ocean partition
+the wet fraction itself (see `FieldExchanger.align_surface_fractions!`).
 """
 function wet_ocean_fraction_field(
     boundary_space,

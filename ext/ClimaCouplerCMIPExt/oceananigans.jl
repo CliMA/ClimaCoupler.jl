@@ -352,34 +352,25 @@ underlying_grid(grid) = grid
                        use_intersection_grid = true,
                        topography_damping_factor = 5)
 
-Given an Oceananigans grid and a ClimaCore boundary space, construct the two
-independent sparse regridders needed to remap between them in both directions,
-and (when supported) the exchange (intersection) grid used for surface
-fractions and per-polygon fluxes.
+Construct the two sparse regridders needed to remap between an Oceananigans
+grid and a ClimaCore boundary space, plus remapping scratch space:
 
-* `remapper_oc_to_cc` — FV → SE, built via the per-element L2 projection
-  (`fv_to_se_l2_projection` in `ConservativeRegriddingClimaCoreExt`). The
-  inverse element mass matrix `Mᵉ⁻¹` is baked into the sparse matrix and the
-  SE finalizer applies `Spaces.weighted_dss!` to reconcile shared nodes.
-* `remapper_cc_to_oc` — SE → FV, built via the principled polygon-intersection
-  operator (`se_to_fv_principled`). Each row integrates the SE basis over the
-  FV intersection polygon and divides by the FV cell area, giving a mean-
-  preserving cell average that preserves constants exactly.
+* `remapper_oc_to_cc` — FV → SE per-element L2 projection
+  (`fv_to_se_l2_projection`); the SE finalizer applies `weighted_dss!`;
+* `remapper_cc_to_oc` — SE → FV polygon-intersection cell averages
+  (`se_to_fv_principled`); mean-preserving, preserves constants exactly.
 
-For low-level use: `CR.regrid!(dst, remapper_oc_to_cc, src)` and
-`CR.regrid!(dst, remapper_cc_to_oc, src)`. The `Interfacer.remap!` methods in
-`climaocean_helpers.jl` accept `CC.Fields.Field` directly as source or
-destination and route through `ConservativeRegriddingClimaCoreExt`'s nodal
-extract / finalize overrides — no per-element scratch buffer is required.
+The `Interfacer.remap!` methods in `climaocean_helpers.jl` accept
+`CC.Fields.Field` directly as source or destination; for low-level use, call
+`CR.regrid!(dst, remapper, src)`.
 
 When `use_intersection_grid = true` and the setup supports it (a
 `SpectralElementSpace2D` boundary space on a single process), the returned
-NamedTuple additionally carries:
-- `exchange_grid`: device-resident [`ExchangeGrid`](@ref);
-- `wet_ocean_fraction`: static boundary-space `CC.Field` from
-  [`wet_ocean_fraction_field`](@ref), filtered consistently with the
-  atmosphere's orography smoothing (`topography_damping_factor`);
-- `use_exchange_grid::Bool`: whether the exchange-grid path is active.
+NamedTuple additionally carries the device-resident [`ExchangeGrid`](@ref),
+the static `wet_ocean_fraction` field (filtered consistently with the
+atmosphere's orography smoothing), the per-polygon flux states and
+boundary-space flux scratch, and `use_exchange_grid::Bool` indicating the
+exchange-grid path is active.
 """
 function construct_remapper(
     grid_oc,

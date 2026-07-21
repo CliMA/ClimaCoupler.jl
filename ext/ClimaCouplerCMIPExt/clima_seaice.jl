@@ -212,7 +212,7 @@ function Interfacer.progress(ice_sim::ClimaSeaIceSimulation, cs)
     v_max = maximum(abs, model.velocities.v)
 
     if ClimaComms.iamroot(ClimaComms.context(cs))
-        @info "Sea ice | time: $(Interfacer.current_date(cs, model.clock.time)), iteration: $(OC.iteration(ice)), " *
+        @info "Sea-ice | time: $(Interfacer.current_date(cs, model.clock.time)), iteration: $(OC.iteration(ice)), " *
               "maximum(h): $(round(h_max, digits = 2)) m, maximum(a): $(round(a_max, digits = 2)), " *
               "extrema(T_sfc): ($(round(T_sfc_min, digits = 2)), $(round(T_sfc_max, digits = 2))) ᵒC, " *
               "maximum(u): ($(round(u_max, sigdigits = 2)), $(round(v_max, sigdigits = 2))) m/s"

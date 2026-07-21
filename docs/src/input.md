@@ -114,6 +114,7 @@ Note: the `mode_name` determines which Julia environment to use. Use `experiment
 | `--dt_ocean` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Ocean simulation time step (alternative to `dt`) |
 | `--dt_seaice` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Sea ice simulation time step (alternative to `dt`) |
 | `--checkpoint_dt` | String | `"90days"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Time interval for checkpointing |
+| `--walltime_dt` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for walltime reporting. Defaults to a quarter of the simulation length, at most 1 day. Set to `"never"` to disable. |
 
 Note: If any component model-specific timestep is specified, _all_ component-model
 specific timesteps should be specified, rather than only `dt`.
@@ -160,7 +161,6 @@ specific timesteps should be specified, rather than only `dt`.
 |----------|------|---------|---------------|-------------|
 | `--surface_setup` | String | `"PrescribedSurface"` | `PrescribedSurface`, `DefaultMoninObukhov` | Triggers ClimaAtmos into coupled mode |
 | `--atmos_config_file` | String | `nothing` | Any valid file path | Optional YAML file used to overwrite default model parameters |
-| `--atmos_log_progress` | Bool | `false` | `true`, `false` | Use ClimaAtmos walltime logging callback instead of default ClimaCoupler one |
 | `--atmos_progress_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for printing atmosphere progress information. Set to `"never"` to disable. |
 | `--albedo_model` | String | `"CouplerAlbedo"` | `ConstantAlbedo`, `RegressionFunctionAlbedo`, `CouplerAlbedo` | Type of albedo model |
 | `--extra_atmos_diagnostics` | Vector{Dict{Any, Any}} | `[]` | List of dictionaries | List of dictionaries containing information about additional atmosphere diagnostics to output |

@@ -152,6 +152,22 @@ end
     @test args.component_dt_dict isa Dict
     @test haskey(args.component_dt_dict, "dt_atmos")
     @test !haskey(args.component_dt_dict, "dt")
+
+    # If unspecified, walltime_dt defaults to a tenth of the simulation length, but
+    # never shorter than one coupling step. Here a tenth of 800secs is 80secs, which is
+    # below dt_cpl (400secs), so it is set to dt_cpl.
+    @test args.walltime_dt == "400.0secs"
+    # ... for a longer simulation, the tenth-of-length rule applies (8000secs / 10)
+    config_dict["t_end"] = "8000secs"
+    @test Input.get_coupler_args(config_dict).walltime_dt == "800.0secs"
+    # ... capped at one day
+    config_dict["t_end"] = "3650days"
+    @test Input.get_coupler_args(config_dict).walltime_dt == "86400.0secs"
+    config_dict["t_end"] = "800secs" # undo
+    # If specified, walltime_dt is passed through unchanged
+    config_dict["walltime_dt"] = "never"
+    @test Input.get_coupler_args(config_dict).walltime_dt == "never"
+    delete!(config_dict, "walltime_dt") # undo
 end
 
 @testset "get_diag_period" begin

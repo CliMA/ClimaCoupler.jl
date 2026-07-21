@@ -19,11 +19,6 @@ the compute device.
 import StaticArrays
 import NVTX
 
-# Relative nodal-coverage cutoff below which the SE-side flux is set to zero
-# (nodes essentially not covered by wet ocean; their area fraction vanishes
-# there too, so they never contribute to the coupler sums).
-const EXCHANGE_COV_CUTOFF = 1e-3
-
 """
     ExchangeFluxState{FT, VF}
 
@@ -125,123 +120,8 @@ function average_and_reset_exchange_accumulators!(fs::ExchangeFluxState)
 end
 
 """
-    DEBUG_POLY_FLUX_NANS
-
-Opt-in diagnostic toggle for [`check_poly_flux_nans`](@ref). Off by default
-(the check costs one host `Bool` read per flux evaluation). Enable from the
-REPL with
-
-    Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPExt).DEBUG_POLY_FLUX_NANS[] = true
-"""
-const DEBUG_POLY_FLUX_NANS = Ref(false)
-
-_poly_flux_outputs(fs::ExchangeFluxState) =
-    (; fs.F_sh, fs.F_lh, fs.F_moisture, fs.F_τu, fs.F_τv)
-_poly_flux_outputs(is::IceExchangeState) =
-    merge(_poly_flux_outputs(is.fluxes), (; is.T_sfc_new))
-
-_poly_flux_inputs(fs::ExchangeFluxState) = (;
-    fs.T_atmos,
-    fs.q_tot,
-    fs.q_liq,
-    fs.q_ice,
-    fs.ρ_atmos,
-    fs.u_atmos,
-    fs.v_atmos,
-    fs.height_int,
-    fs.height_sfc,
-    fs.T_sfc,
-    fs.sic,
-)
-_poly_flux_inputs(is::IceExchangeState) =
-    merge(_poly_flux_inputs(is.fluxes), (; is.R, is.T_i, is.SW_d, is.LW_d))
-
-"""
-    check_poly_flux_nans(state, eg::ExchangeGrid, label)
-
-Diagnostic NaN guard (no-op unless [`DEBUG_POLY_FLUX_NANS`](@ref) is
-enabled). If any flux output of `state` is NaN, logs the polygon index,
-owning FV cell and SE element, flux outputs, and gathered inputs for up to
-10 offending polygons, then `error`s so the NaN is never scattered to the
-models.
-"""
-function check_poly_flux_nans(state, eg::ExchangeGrid, label)
-    DEBUG_POLY_FLUX_NANS[] || return nothing
-    outputs = _poly_flux_outputs(state)
-    any(v -> any(isnan, v), values(outputs)) || return nothing
-
-    outs = map(Array, outputs)
-    inputs = map(Array, _poly_flux_inputs(state))
-    oc_of_poly = Array(eg.oc_of_poly)
-    elem_of_poly = Array(eg.elem_of_poly)
-    bad = findall(k -> any(o -> isnan(o[k]), values(outs)), 1:eg.n_poly)
-    for k in first(bad, 10)
-        out_str = join(("$nm = $(o[k])" for (nm, o) in pairs(outs)), ", ")
-        in_str = join(("$nm = $(v[k])" for (nm, v) in pairs(inputs)), ", ")
-        @error "NaN $label fluxes at polygon $k (FV cell $(oc_of_poly[k]), SE elem $(elem_of_poly[k])): $out_str; inputs: $in_str"
-    end
-    return error(
-        "NaN in $label exchange-grid polygon fluxes at $(length(bad)) polygons" *
-        (length(bad) > 10 ? " (first 10 reported above)" : ""),
-    )
-end
-
-"""
-    momentum_basis_fields(boundary_space)
-
-Precompute the per-node 2×2 map between the local CT1/CT2 unit basis and the
-global UV (east/north) basis, enabling allocation-free per-step conversions
-([`ct12_to_uv!`](@ref), [`uv_to_ct12!`](@ref)); numerically identical to
-`contravariant_to_cartesian!` and its inverse.
-"""
-function momentum_basis_fields(boundary_space)
-    FT = CC.Spaces.undertype(boundary_space)
-    u_ct = CC.Fields.ones(boundary_space)
-    v_ct = CC.Fields.zeros(boundary_space)
-    uv = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
-    contravariant_to_cartesian!(uv, u_ct, v_ct)
-    au = copy(uv.components.data.:1)
-    av = copy(uv.components.data.:2)
-    u_ct .= FT(0)
-    v_ct .= FT(1)
-    contravariant_to_cartesian!(uv, u_ct, v_ct)
-    bu = copy(uv.components.data.:1)
-    bv = copy(uv.components.data.:2)
-    det = @. au * bv - av * bu
-    return (; au, av, bu, bv, det)
-end
-
-"""
-    ct12_to_uv!(uv_field, u_ct, v_ct, basis)
-
-Allocation-free equivalent of `contravariant_to_cartesian!` using the
-precomputed [`momentum_basis_fields`](@ref).
-"""
-function ct12_to_uv!(uv_field, u_ct, v_ct, basis)
-    @. uv_field = CC.Geometry.UVVector(
-        u_ct * basis.au + v_ct * basis.bu,
-        u_ct * basis.av + v_ct * basis.bv,
-    )
-    return nothing
-end
-
-"""
-    uv_to_ct12!(u_ct, v_ct, uv_field, basis)
-
-Allocation-free equivalent of [`cartesian_to_contravariant!`](@ref) using the
-precomputed [`momentum_basis_fields`](@ref).
-"""
-function uv_to_ct12!(u_ct, v_ct, uv_field, basis)
-    u_uv = uv_field.components.data.:1
-    v_uv = uv_field.components.data.:2
-    @. u_ct = (u_uv * basis.bv - v_uv * basis.bu) / basis.det
-    @. v_ct = (basis.au * v_uv - basis.av * u_uv) / basis.det
-    return nothing
-end
-
-"""
     gather_atmos_state_to_polys!(fs::ExchangeFluxState, eg::ExchangeGrid, csf,
-                                 temp_uv_vec, momentum_basis)
+                                 temp_uv_vec)
 
 Gather the atmospheric near-surface state from the coupler fields (SE nodal)
 onto the exchange-grid polygons. `csf.u_int`/`csf.v_int` are converted from
@@ -254,10 +134,9 @@ NVTX.@annotate function gather_atmos_state_to_polys!(
     eg::ExchangeGrid,
     csf,
     temp_uv_vec,
-    momentum_basis,
 )
     CRExt = get_ConservativeRegriddingCCExt()
-    ct12_to_uv!(temp_uv_vec, csf.u_int, csf.v_int, momentum_basis)
+    contravariant_to_cartesian!(temp_uv_vec, csf.u_int, csf.v_int)
     u_uv = temp_uv_vec.components.data.:1
     v_uv = temp_uv_vec.components.data.:2
     gather_nodes_to_polys!(fs.u_atmos, eg, CRExt.se_field_to_vec(u_uv))
@@ -629,44 +508,25 @@ NVTX.@annotate function compute_ice_polygon_fluxes!(
     return nothing
 end
 
-# Inverse of `contravariant_to_cartesian!`: local CT1/CT2 unit-basis
-# components of a UVVector, by exactly inverting the 2×2 forward map
-# `uv = τ1 * UV(ĈT1) + τ2 * UV(ĈT2)`.
-@inline function _uv_to_ct12_components(uv, local_geometry)
-    a = CC.Geometry.UVVector(
-        CT12(CT1(unit_basis_vector_data(CT1, local_geometry)), local_geometry),
-        local_geometry,
-    )
-    b = CC.Geometry.UVVector(
-        CT12(CT2(unit_basis_vector_data(CT2, local_geometry)), local_geometry),
-        local_geometry,
-    )
-    det = a.u * b.v - a.v * b.u
-    τ1 = (uv.u * b.v - uv.v * b.u) / det
-    τ2 = (a.u * uv.v - a.v * uv.u) / det
-    return StaticArrays.SVector(τ1, τ2)
-end
-
-@inline _uv_to_ct1(uv, local_geometry) = _uv_to_ct12_components(uv, local_geometry)[1]
-@inline _uv_to_ct2(uv, local_geometry) = _uv_to_ct12_components(uv, local_geometry)[2]
-
 """
     cartesian_to_contravariant!(ρτxz, ρτyz, uv_field)
 
 Convert a `UVVector` field into the local CT1/CT2 unit-basis components
-expected by the coupler flux fields (`csf.F_turb_ρτxz/yz`). Exact inverse of
-`contravariant_to_cartesian!`.
+expected by the coupler flux fields (`csf.F_turb_ρτxz/yz`), via
+`CA.projected_vector_data` — the same projection that defines `csf.u_int` in
+the ClimaAtmos extension. Exact inverse of `contravariant_to_cartesian!`.
 """
 function cartesian_to_contravariant!(ρτxz, ρτyz, uv_field)
     local_geometry = CC.Fields.local_geometry_field(ρτxz)
-    @. ρτxz = _uv_to_ct1(uv_field, local_geometry)
-    @. ρτyz = _uv_to_ct2(uv_field, local_geometry)
+    @. ρτxz = CA.projected_vector_data(CT1, uv_field, local_geometry)
+    @. ρτyz = CA.projected_vector_data(CT2, uv_field, local_geometry)
     return nothing
 end
 
 """
     scatter_poly_fluxes_to_boundary!(remapping, eg::ExchangeGrid,
-                                     fs::ExchangeFluxState, weight)
+                                     fs::ExchangeFluxState, weight;
+                                     cov_cutoff = 1e-3)
 
 Aggregate per-polygon fluxes onto the SE boundary space as a `weight`-weighted
 average, filling the `remapping.flux_scratch` fields for
@@ -675,14 +535,17 @@ fluxes apply to — `1 - sic` for open ocean, `sic` for sea ice — so the nodal
 result is a per-unit-*weighted*-area flux, consistent with the area fraction
 the coupler multiplies it by: L2-scatter `weight * F` (momentum in UV) and
 `weight` itself, `weighted_dss!` each scalar, divide by the DSS'd weighted
-coverage (zero below `EXCHANGE_COV_CUTOFF`), then convert momentum
-UV → CT1/CT2. Uses `fs.scratch1` internally; `weight` must not alias it.
+coverage, then convert momentum UV → CT1/CT2. Nodes with relative coverage
+below `cov_cutoff` get zero flux (they are essentially not covered by wet
+ocean; their area fraction vanishes there too, so they never contribute to
+the coupler sums). Uses `fs.scratch1` internally; `weight` must not alias it.
 """
 NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
     remapping,
     eg::ExchangeGrid,
     fs::ExchangeFluxState,
-    weight,
+    weight;
+    cov_cutoff = 1e-3,
 )
     CRExt = get_ConservativeRegriddingCCExt()
     fx = remapping.flux_scratch
@@ -702,18 +565,13 @@ NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
 
     Utilities.apply_dss!(cov, remapping.flux_dss_buffer)
     FT = CC.Spaces.undertype(axes(cov))
-    cutoff = FT(EXCHANGE_COV_CUTOFF)
+    cutoff = FT(cov_cutoff)
     for field in values(fx)
         Utilities.apply_dss!(field, remapping.flux_dss_buffer)
         @. field = ifelse(cov > cutoff, field / max(cov, cutoff), FT(0))
     end
 
     @. remapping.temp_uv_vec = CC.Geometry.UVVector(fx.F_turb_ρτxz, fx.F_turb_ρτyz)
-    uv_to_ct12!(
-        fx.F_turb_ρτxz,
-        fx.F_turb_ρτyz,
-        remapping.temp_uv_vec,
-        remapping.momentum_basis,
-    )
+    cartesian_to_contravariant!(fx.F_turb_ρτxz, fx.F_turb_ρτyz, remapping.temp_uv_vec)
     return nothing
 end

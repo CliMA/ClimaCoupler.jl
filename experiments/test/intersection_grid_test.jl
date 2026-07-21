@@ -19,6 +19,7 @@ import ClimaCore as CC
 import Oceananigans as OC
 import ClimaOcean
 import ClimaSeaIce
+import ClimaAtmos
 import KernelAbstractions
 import ConservativeRegridding as CR
 import Adapt
@@ -560,14 +561,12 @@ import ClimaCoupler: FluxCalculator, Utilities
             Utilities.apply_dss!(node_cov_dss, flux_dss_buffer)
             temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
             weight_cov_scratch = CC.Fields.zeros(boundary_space)
-            momentum_basis = CMIPExt.momentum_basis_fields(boundary_space)
             remapping = (;
                 flux_scratch,
                 flux_dss_buffer,
                 node_cov_dss,
                 weight_cov_scratch,
                 temp_uv_vec,
-                momentum_basis,
                 exchange_grid = eg,
             )
 
@@ -687,13 +686,11 @@ end
         flux_dss_buffer = Utilities.init_dss_buffer(flux_scratch.F_sh)
         weight_cov_scratch = CC.Fields.zeros(boundary_space)
         temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
-        momentum_basis = CMIPExt.momentum_basis_fields(boundary_space)
         remapping = (;
             flux_scratch,
             flux_dss_buffer,
             weight_cov_scratch,
             temp_uv_vec,
-            momentum_basis,
             exchange_grid = eg,
         )
         CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg, fs, fs.sic)
@@ -750,7 +747,6 @@ end
         flux_dss_buffer = Utilities.init_dss_buffer(flux_scratch.F_sh),
         weight_cov_scratch = CC.Fields.zeros(boundary_space),
         temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space),
-        momentum_basis = CMIPExt.momentum_basis_fields(boundary_space),
         exchange_grid = eg,
     )
     fs = CMIPExt.ExchangeFluxState{FT}(OC.CPU(), eg.n_poly)
@@ -758,13 +754,7 @@ end
     fs.sic .= 0
 
     function ocean_driver!()
-        CMIPExt.gather_atmos_state_to_polys!(
-            fs,
-            eg,
-            csf,
-            remapping.temp_uv_vec,
-            remapping.momentum_basis,
-        )
+        CMIPExt.gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec)
         CMIPExt.compute_ocean_polygon_fluxes!(
             fs,
             surface_fluxes_params,

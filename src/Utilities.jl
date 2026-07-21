@@ -10,7 +10,6 @@ import ClimaComms
 import ClimaCore as CC
 import Logging
 import ClimaUtilities.OutputPathGenerator: generate_output_path
-import ..Interfacer
 
 export get_device,
     get_comms_context,
@@ -19,8 +18,7 @@ export get_device,
     time_to_seconds,
     integral,
     create_boundary_space,
-    diagnostics_global_attribs,
-    report_nans
+    diagnostics_global_attribs
 
 """
     get_device(config_dict)
@@ -430,79 +428,6 @@ function apply_dss!(field::Union{CC.Fields.Field, CC.Fields.FieldVector}, buffer
     else
         return CC.Spaces.weighted_dss!(field, buffer)
     end
-end
-
-"""
-    report_nans(obj; name = "state") → Int
-
-Scan every scalar leaf field of `obj` (a `ClimaCore.Fields.Field` or
-`FieldVector`, e.g. an atmos integrator state) for NaNs. For each contaminated
-leaf, log an error with the NaN count and the coordinate bounding box
-(lat/long/z, when the space has them) of the NaN locations. Return the total
-NaN count, so a caller can halt with `report_nans(obj) == 0 || error(...)`.
-
-Unlike the ClimaAtmos `check_nans` callback (a bare `any(isnan, parent(u))`),
-this localizes which variable went NaN and roughly where, e.g.
-
-    NaNs in atmos.c.ρe_tot: 12 of 55296 values, lat ∈ [67.3, 71.2], long ∈ [-162.4, -158.0], z ∈ [30.0, 30.0]
-
-Uses only broadcasts and array reductions, so it is GPU-safe; reductions are
-per-process (no MPI reduction). Intended for debugging, not hot loops: the
-bounding box allocates a few temporary fields per contaminated leaf.
-"""
-function report_nans(obj; name = "state")
-    total = 0
-    for chain in CC.Fields.property_chains(obj)
-        # `identity`: index covariant components directly instead of
-        # converting whole vector fields to UVVector/WVector per leaf
-        leaf = CC.Fields.single_field(obj, chain, identity)
-        eltype(leaf) <: AbstractFloat || continue
-        n = count(isnan, parent(leaf))
-        n == 0 && continue
-        total += n
-        label = string(name, join(map(p -> p isa Symbol ? ".$p" : "[$p]", chain)))
-        @error "NaNs in $label: $n of $(length(parent(leaf))) values$(nan_bounding_box(leaf))"
-    end
-    return total
-end
-
-"""
-    report_nans(cs::Interfacer.CoupledSimulation) → Int
-
-Scan the coupler exchange fields and the prognostic state of every component
-simulation with a ClimaCore state (`sim.integrator.u`, i.e. atmos and land;
-Oceananigans-based components are skipped) and log the location of any NaNs.
-Return the total NaN count. Typical use in a manual stepping loop:
-
-    ClimaCoupler.step!(cs)
-    Utilities.report_nans(cs) == 0 || error("NaN at \$(Interfacer.current_date(cs))")
-"""
-function report_nans(cs::Interfacer.CoupledSimulation)
-    total = report_nans(cs.fields; name = "coupler_fields")
-    for (sim_name, sim) in pairs(cs.model_sims)
-        hasproperty(sim, :integrator) || continue
-        u = sim.integrator.u
-        u isa Union{CC.Fields.Field, CC.Fields.FieldVector} || continue
-        total += report_nans(u; name = string(sim_name))
-    end
-    return total
-end
-
-# Coordinate bounding box of the NaN entries of scalar field `leaf`, as a
-# string; empty for spaces without lat/long/z coordinates.
-function nan_bounding_box(leaf)
-    coords = CC.Fields.coordinate_field(axes(leaf))
-    mask = isnan.(leaf)
-    io = IOBuffer()
-    for p in (:lat, :long, :z)
-        p in propertynames(coords) || continue
-        c = getproperty(coords, p)
-        FT = eltype(parent(c))
-        lo = minimum(parent(ifelse.(mask, c, FT(Inf))))
-        hi = maximum(parent(ifelse.(mask, c, FT(-Inf))))
-        print(io, ", $p ∈ [$(round(lo; sigdigits = 6)), $(round(hi; sigdigits = 6))]")
-    end
-    return String(take!(io))
 end
 
 end # module

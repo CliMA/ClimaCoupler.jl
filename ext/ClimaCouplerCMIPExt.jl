@@ -5,8 +5,8 @@ Module containing CMIP component models (Oceananigans and ClimaSeaIce models)
 which extend the ClimaCoupler.jl simulation interface.
 
 This extension is loaded when Oceananigans, ClimaOcean, ClimaSeaIce,
-KernelAbstractions, ConservativeRegridding, and Adapt are loaded with
-either `import` or `using`.
+ClimaAtmos, KernelAbstractions, ConservativeRegridding, and Adapt are loaded
+with either `import` or `using`.
 
 
 For more information about the CMIP component models, please see the
@@ -28,6 +28,7 @@ import ClimaCoupler:
 import Oceananigans as OC
 import ClimaOcean as CO
 import ClimaSeaIce as CSI
+import ClimaAtmos as CA # for basis conversions (projected_vector_data)
 import ClimaCore as CC
 import ClimaParams as CP
 using KernelAbstractions: @kernel, @index, @inbounds

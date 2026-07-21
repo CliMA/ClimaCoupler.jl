@@ -327,19 +327,13 @@ KernelAbstractions kernel on the GPU, selected by the destination's backend.
 =#
 
 import KernelAbstractions
-using KernelAbstractions: @Const
 
 const _KA_WORKGROUP = 256
 
 @inline _is_cpu(x) = KernelAbstractions.get_backend(x) isa KernelAbstractions.CPU
 
 # dst[r] = Σ_p w[p] src[col[p]] over CSR row r
-#
-# `src` is deliberately not `@Const`: gathers pass `Base.ReshapedArray`s
-# (`se_field_to_vec` / `vec(interior(...))`), and KernelAbstractions'
-# `constify` re-runs `reshape` inside the device function, hitting
-# error-string code that is invalid in GPU IR.
-@kernel function _csr_matvec_kernel!(dst, @Const(ptr), @Const(col), @Const(w), src)
+@kernel function _csr_matvec_kernel!(dst, ptr, col, w, src)
     r = @index(Global)
     acc = zero(eltype(dst))
     @inbounds begin
@@ -375,9 +369,7 @@ Rows sum to 1, so constants are preserved exactly.
 gather_nodes_to_polys!(poly_values, eg::ExchangeGrid, nodal_values) =
     _csr_matvec!(poly_values, eg.gpoly_ptr, eg.gnode, eg.gweight, nodal_values)
 
-# `src` not `@Const` for the same `Base.ReshapedArray` reason as
-# `_csr_matvec_kernel!` (callers pass `vec(interior(...))`).
-@kernel function _gather_cells_kernel!(dst, @Const(oc_of_poly), src)
+@kernel function _gather_cells_kernel!(dst, oc_of_poly, src)
     k = @index(Global)
     @inbounds dst[k] = src[oc_of_poly[k]]
 end
@@ -417,15 +409,7 @@ receiving field. For a per-unit-wet-area result use
 scatter_polys_to_nodes!(nodal_values, eg::ExchangeGrid, poly_values) =
     _csr_matvec!(nodal_values, eg.snode_ptr, eg.spoly, eg.sweight, poly_values)
 
-@kernel function _csr_matvec_normalized_kernel!(
-    dst,
-    @Const(ptr),
-    @Const(col),
-    @Const(w),
-    @Const(src),
-    @Const(cov),
-    cutoff,
-)
+@kernel function _csr_matvec_normalized_kernel!(dst, ptr, col, w, src, cov, cutoff)
     r = @index(Global)
     @inbounds begin
         c = cov[r]
@@ -484,14 +468,7 @@ function scatter_polys_to_nodes_normalized!(
     return nodal_values
 end
 
-@kernel function _scatter_cells_kernel!(
-    dst,
-    @Const(ptr),
-    @Const(polys),
-    @Const(area),
-    @Const(wet_area),
-    @Const(src),
-)
+@kernel function _scatter_cells_kernel!(dst, ptr, polys, area, wet_area, src)
     c = @index(Global)
     @inbounds begin
         aw = wet_area[c]

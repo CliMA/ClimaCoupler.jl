@@ -328,7 +328,12 @@ the destination's backend, so the same code path runs on CPU and GPU.
 
 import KernelAbstractions
 
-const _KA_WORKGROUP = 256
+# Launch `kernel!` over `worksize` linear work-items on `backend`, following the
+# Oceananigans convention: bake a static workgroup/worksize into the kernel
+# instance (workgroup capped at 256, as in `Oceananigans.Utils.heuristic_workgroup`)
+# instead of passing a dynamic `ndrange`.
+launch_kernel!(kernel!, backend, worksize, args...) =
+    kernel!(backend, min(worksize, 256), worksize)(args...)
 
 # dst[r] = Σ_p w[p] src[col[p]] over CSR row r
 @kernel function _csr_matvec_kernel!(dst, ptr, col, w, src)
@@ -344,7 +349,7 @@ end
 
 function _csr_matvec!(dst, ptr, col, w, src)
     backend = KernelAbstractions.get_backend(dst)
-    _csr_matvec_kernel!(backend, _KA_WORKGROUP)(dst, ptr, col, w, src; ndrange = length(dst))
+    launch_kernel!(_csr_matvec_kernel!, backend, length(dst), dst, ptr, col, w, src)
     return dst
 end
 
@@ -370,11 +375,13 @@ polygon lies inside exactly one cell).
 """
 function gather_cells_to_polys!(poly_values, eg::ExchangeGrid, cell_values)
     backend = KernelAbstractions.get_backend(poly_values)
-    _gather_cells_kernel!(backend, _KA_WORKGROUP)(
+    launch_kernel!(
+        _gather_cells_kernel!,
+        backend,
+        eg.n_poly,
         poly_values,
         eg.oc_of_poly,
-        cell_values;
-        ndrange = eg.n_poly,
+        cell_values,
     )
     return poly_values
 end
@@ -422,15 +429,17 @@ function scatter_polys_to_nodes_normalized!(
     cov_cutoff,
 )
     backend = KernelAbstractions.get_backend(nodal_values)
-    _csr_matvec_normalized_kernel!(backend, _KA_WORKGROUP)(
+    launch_kernel!(
+        _csr_matvec_normalized_kernel!,
+        backend,
+        eg.n_nodes,
         nodal_values,
         eg.snode_ptr,
         eg.spoly,
         eg.sweight,
         poly_values,
         eg.node_cov,
-        cov_cutoff;
-        ndrange = eg.n_nodes,
+        cov_cutoff,
     )
     return nodal_values
 end
@@ -462,14 +471,16 @@ exactly. Cells with zero wet area (dry, fold shadows) are set to 0; run
 """
 function scatter_polys_to_cells!(cell_values, eg::ExchangeGrid, poly_values)
     backend = KernelAbstractions.get_backend(cell_values)
-    _scatter_cells_kernel!(backend, _KA_WORKGROUP)(
+    launch_kernel!(
+        _scatter_cells_kernel!,
+        backend,
+        eg.n_oc,
         cell_values,
         eg.soc_ptr,
         eg.soc_poly,
         eg.area,
         eg.oc_wet_area,
-        poly_values;
-        ndrange = eg.n_oc,
+        poly_values,
     )
     return cell_values
 end

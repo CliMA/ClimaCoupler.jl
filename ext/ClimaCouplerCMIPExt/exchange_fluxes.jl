@@ -283,12 +283,14 @@ NVTX.@annotate function compute_ocean_polygon_fluxes!(
     config,
 )
     backend = KernelAbstractions.get_backend(fs.F_sh)
-    _ocean_polygon_fluxes_kernel!(backend, _KA_WORKGROUP)(
+    launch_kernel!(
+        _ocean_polygon_fluxes_kernel!,
+        backend,
+        length(fs.F_sh),
         _kernel_state(fs),
         surface_fluxes_params,
         thermo_params,
-        config;
-        ndrange = length(fs.F_sh),
+        config,
     )
     return nothing
 end
@@ -456,7 +458,10 @@ NVTX.@annotate function compute_ice_polygon_fluxes!(
     T_melt,
 )
     backend = KernelAbstractions.get_backend(is.fluxes.F_sh)
-    _ice_polygon_fluxes_kernel!(backend, _KA_WORKGROUP)(
+    launch_kernel!(
+        _ice_polygon_fluxes_kernel!,
+        backend,
+        length(is.fluxes.F_sh),
         _kernel_state(is),
         surface_fluxes_params,
         thermo_params,
@@ -464,8 +469,7 @@ NVTX.@annotate function compute_ice_polygon_fluxes!(
         σ,
         ϵ,
         α_albedo,
-        T_melt;
-        ndrange = length(is.fluxes.F_sh),
+        T_melt,
     )
     return nothing
 end

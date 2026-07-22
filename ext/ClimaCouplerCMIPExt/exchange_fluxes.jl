@@ -58,13 +58,19 @@ end
 
 Adapt.@adapt_structure ExchangeFluxState
 
-function ExchangeFluxState{FT}(arch, n_poly::Int) where {FT}
-    state = ExchangeFluxState{FT, Vector{FT}}(
-        ntuple(_ -> zeros(FT, n_poly), 23)...,
+# CPU-resident, zero-initialized flux state. Every field is a per-polygon
+# vector except the trailing `n_acc` counter, so allocate one vector per field
+# and cap it with the counter.
+function _cpu_exchange_flux_state(FT, n_poly::Int)
+    n_vec = fieldcount(ExchangeFluxState) - 1
+    return ExchangeFluxState{FT, Vector{FT}}(
+        ntuple(_ -> zeros(FT, n_poly), n_vec)...,
         Ref(0),
     )
-    return on_device(arch, state)
 end
+
+ExchangeFluxState{FT}(arch, n_poly::Int) where {FT} =
+    on_device(arch, _cpu_exchange_flux_state(FT, n_poly))
 
 """
     IceExchangeState{FT, VF}
@@ -87,11 +93,11 @@ end
 Adapt.@adapt_structure IceExchangeState
 
 function IceExchangeState{FT}(arch, n_poly::Int) where {FT}
-    fluxes = ExchangeFluxState{FT, Vector{FT}}(
-        ntuple(_ -> zeros(FT, n_poly), 23)...,
-        Ref(0),
+    n_vec = fieldcount(IceExchangeState) - 1 # ice-specific vectors (all but `fluxes`)
+    state = IceExchangeState(
+        _cpu_exchange_flux_state(FT, n_poly),
+        ntuple(_ -> zeros(FT, n_poly), n_vec)...,
     )
-    state = IceExchangeState(fluxes, ntuple(_ -> zeros(FT, n_poly), 5)...)
     return on_device(arch, state)
 end
 

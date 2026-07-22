@@ -440,8 +440,9 @@ function construct_remapper(
         exchange_grid = on_device(arch, exchange_grid_cpu)
 
         # Per-polygon flux scratch, boundary-space flux scratch fields (in the
-        # layout `update_flux_fields!` expects), a shared DSS buffer, and the
-        # DSS'd nodal wet coverage used to normalize the SE-side flux scatter.
+        # layout `update_flux_fields!` expects), the boundary-space nodal
+        # coverage of the current flux weight (`scatter_poly_fluxes_to_boundary!`
+        # fills it each step), and a shared DSS buffer.
         ocean_flux_state = ExchangeFluxState{FT}(arch, exchange_grid_cpu.n_poly)
         ice_flux_state = IceExchangeState{FT}(arch, exchange_grid_cpu.n_poly)
         weight_cov_scratch = CC.Fields.zeros(boundary_space)
@@ -453,14 +454,6 @@ function construct_remapper(
             F_turb_moisture = CC.Fields.zeros(boundary_space),
         )
         flux_dss_buffer = Utilities.init_dss_buffer(flux_scratch.F_sh)
-        node_cov_dss = CC.Fields.zeros(boundary_space)
-        CRExt = get_ConservativeRegriddingCCExt()
-        device_array_type = ClimaComms.array_type(ClimaComms.device(boundary_space))
-        CRExt.vec_to_se_field!(
-            node_cov_dss,
-            Adapt.adapt(device_array_type, exchange_grid_cpu.node_cov),
-        )
-        Utilities.apply_dss!(node_cov_dss, flux_dss_buffer)
     else
         exchange_grid = nothing
         wet_ocean_fraction = nothing
@@ -469,7 +462,6 @@ function construct_remapper(
         weight_cov_scratch = nothing
         flux_scratch = nothing
         flux_dss_buffer = nothing
-        node_cov_dss = nothing
     end
 
     # `TripolarGrid` covers the full sphere by construction, so no polar
@@ -490,7 +482,6 @@ function construct_remapper(
         weight_cov_scratch,
         flux_scratch,
         flux_dss_buffer,
-        node_cov_dss,
         use_exchange_grid,
     )
 end

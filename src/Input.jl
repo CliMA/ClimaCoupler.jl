@@ -546,9 +546,9 @@ function get_coupler_args(config_dict::Dict)
     # Walltime reporting information
     walltime_dt = get(config_dict, "walltime_dt", nothing)
     if isnothing(walltime_dt)
-        # default to a tenth of the simulation length (capped at one day, but never
+        # default to a tenth of the simulation length (capped at 30 days, but never
         # shorter than one coupling step)
-        walltime_dt_secs = max(min(float(t_end - t_start) / 10, 86400.0), float(Δt_cpl))
+        walltime_dt_secs = max(min(float(t_end - t_start) / 10, 2592000.0), float(Δt_cpl))
         walltime_dt = "$(walltime_dt_secs)secs"
     end
 

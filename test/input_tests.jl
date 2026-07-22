@@ -160,9 +160,9 @@ end
     # ... for a longer simulation, the tenth-of-length rule applies (8000secs / 10)
     config_dict["t_end"] = "8000secs"
     @test Input.get_coupler_args(config_dict).walltime_dt == "800.0secs"
-    # ... capped at one day
+    # ... capped at 30 days
     config_dict["t_end"] = "3650days"
-    @test Input.get_coupler_args(config_dict).walltime_dt == "86400.0secs"
+    @test Input.get_coupler_args(config_dict).walltime_dt == "2592000.0secs"
     config_dict["t_end"] = "800secs" # undo
     # If specified, walltime_dt is passed through unchanged
     config_dict["walltime_dt"] = "never"

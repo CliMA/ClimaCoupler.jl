@@ -162,7 +162,7 @@ end
     @test Input.get_coupler_args(config_dict).walltime_dt == "800.0secs"
     # ... capped at 30 days
     config_dict["t_end"] = "3650days"
-    @test Input.get_coupler_args(config_dict).walltime_dt == "2592000.0secs"
+    @test Input.get_coupler_args(config_dict).walltime_dt == "2.592e6secs"
     config_dict["t_end"] = "800secs" # undo
     # If specified, walltime_dt is passed through unchanged
     config_dict["walltime_dt"] = "never"

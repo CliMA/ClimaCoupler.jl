@@ -12,7 +12,7 @@ dt_seaice: "240secs"
 dt_rad: "120secs"
 dz_bottom: 100.0
 energy_check: false
-h_elem: 6
+h_elem: 4
 checkpoint_dt: "480secs"
 ice_model: "clima_seaice"
 land_model: "integrated"
@@ -25,7 +25,7 @@ rayleigh_sponge: true
 simple_ocean: true
 save_cache: true
 start_date: "20100101"
-use_itime: false
+use_itime: true
 surface_setup: "PrescribedSurface"
 t_end: "480secs"
 topo_smoothing: true

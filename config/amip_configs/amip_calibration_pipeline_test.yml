@@ -1,7 +1,9 @@
+# Low-resolution copy of amip_calibration.yml for the Buildkite pipeline
+# smoke test (TEST_CALIBRATION). Production calibration keeps h_elem: 12.
 FLOAT_TYPE: "Float32"
 
 ### Grid ###
-h_elem: 12
+h_elem: 4
 z_max: 60000.0
 z_elem: 63
 dz_bottom: 30.0

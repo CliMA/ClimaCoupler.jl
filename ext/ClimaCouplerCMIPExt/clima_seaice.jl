@@ -1,7 +1,6 @@
 using ClimaSeaIce.SeaIceThermodynamics.HeatBoundaryConditions:
     IceWaterThermalEquilibrium, PrescribedTemperature, get_tracer
 import ClimaComms
-import ClimaOcean.EN4: download_dataset
 import NVTX
 import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters as SFP
@@ -85,7 +84,15 @@ function ClimaSeaIceSimulation(
     arch = OC.Architectures.architecture(grid)
 
     advection = ocean.ocean.model.advection.T
-    ice = sea_ice_simulation(grid, ocean.ocean; Δt = float(dt), advection)
+
+    ice = sea_ice_simulation(
+        grid,
+        ocean.ocean;
+        clock = deepcopy(ocean.ocean.model.clock),
+        stop_time = ocean.ocean.stop_time,
+        Δt = float(dt),
+        advection,
+    )
 
     ocean_ice_flux_formulation = ThreeEquationHeatFlux(ice)
     interface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
@@ -107,18 +114,21 @@ function ClimaSeaIceSimulation(
             dir_kw = (;)
         end
 
-        sic_metadata = CO.DataWrangling.Metadatum(
+        sic_metadata = CO.Metadatum(
             :sea_ice_concentration,
-            dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
+            dataset = CO.ECCO4Monthly(),
             date = start_date;
             dir_kw...,
         )
-        h_metadata = CO.DataWrangling.Metadatum(
+        h_metadata = CO.Metadatum(
             :sea_ice_thickness,
-            dataset = CO.DataWrangling.ECCO.ECCO4Monthly(),
+            dataset = CO.ECCO4Monthly(),
             date = start_date;
             dir_kw...,
         )
+
+        @info "ECCOv4 sea-ice concentration data path: $(CO.DataWrangling.metadata_path(sic_metadata))"
+        @info "ECCOv4 sea-ice thickness data path: $(CO.DataWrangling.metadata_path(h_metadata))"
 
         OC.set!(ice.model.ice_concentration, sic_metadata)
         OC.set!(ice.model.ice_thickness, h_metadata)

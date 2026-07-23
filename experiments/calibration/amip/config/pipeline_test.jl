@@ -9,9 +9,13 @@
 # completing one iteration will catch most errors with the full calibration
 # pipeline
 
-# Define which coupler config to use
-config_file =
-    joinpath(pkgdir(ClimaCoupler), "config", "amip_configs", "amip_calibration.yml")
+# Define which coupler config to use (coarse h_elem for CI smoke test only)
+config_file = joinpath(
+    pkgdir(ClimaCoupler),
+    "config",
+    "amip_configs",
+    "amip_calibration_pipeline_test.yml",
+)
 
 # Calibrate only on Jan 1 2010
 sample_date_ranges =

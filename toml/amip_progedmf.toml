@@ -20,13 +20,13 @@ value = 0
 value = 0.1
 
 [min_area_limiter_scale]
-value = 0.0001
+value = 1e-6
 
 [min_area_limiter_power]
 value = 1
 
 [turb_entr_param_vec]
-value = [1e-4, 10]
+value = [1e-6, 10]
 
 [entr_detr_limit_inv_tau]
 value = 0
@@ -52,11 +52,8 @@ value = 0.001
 [max_area_limiter_power]
 value = 1
 
-[pressure_normalmode_drag_coeff]
-value = 40.0
-
-[mixing_length_eddy_viscosity_coefficient]
-value = 0.56
-
 [precipitation_timescale]
 value = 1200
+
+[cloud_fraction_steepness_scale]
+value = 0.5

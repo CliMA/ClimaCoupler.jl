@@ -3,7 +3,8 @@ import ClimaSeaIce.SeaIceThermodynamics: ConductiveFlux, IceWaterThermalEquilibr
 import ClimaSeaIce.SeaIceDynamics: maybe_extended_grid
 import Oceananigans.BoundaryConditions: Zipper
 
-ocean_reference_density(ocean::OceananigansModelSimulations, FT) = convert(FT, ocean.model.buoyancy.formulation.equation_of_state.reference_density)
+ocean_reference_density(ocean::OceananigansModelSimulations, FT) =
+    convert(FT, ocean.model.buoyancy.formulation.equation_of_state.reference_density)
 ocean_reference_density(::Nothing, FT) = convert(FT, 1026.0)
 
 @inline u_immersed_side_drag(i, j, k, grid, clock, Φ, μ) = @inbounds -μ * Φ.u[i, j, k] * spᶠᶜᶜ(i, j, k, grid, Φ)
@@ -14,7 +15,11 @@ function default_snow_thermodynamics(grid)
     snow_conductivity = FT(0.31)
     snow_surface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     top_heat_boundary_condition = CSI.PrescribedTemperature(snow_surface_temperature.data)
-    return CSI.snow_slab_thermodynamics(grid; conductivity = snow_conductivity, top_heat_boundary_condition)
+    return CSI.snow_slab_thermodynamics(
+        grid;
+        conductivity = snow_conductivity,
+        top_heat_boundary_condition,
+    )
 end
 
 correct_tripolar_bcs(grid, bcs) = bcs
@@ -123,7 +128,8 @@ function sea_ice_simulation(grid, ocean = nothing;
 
     if isnothing(top_heat_boundary_condition)
         top_surface_temperature = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-        top_heat_boundary_condition = CSI.PrescribedTemperature(top_surface_temperature.data)
+        top_heat_boundary_condition =
+            CSI.PrescribedTemperature(top_surface_temperature.data)
     end
 
     if isnothing(bottom_heat_boundary_condition)
@@ -131,14 +137,16 @@ function sea_ice_simulation(grid, ocean = nothing;
         bottom_heat_boundary_condition = IceWaterThermalEquilibrium(surface_ocean_salinity)
     end
 
-    ice_thermodynamics = CSI.sea_ice_slab_thermodynamics(grid;
-                                                         internal_heat_flux,
-                                                         top_heat_boundary_condition,
-                                                         bottom_heat_boundary_condition)
+    ice_thermodynamics = CSI.sea_ice_slab_thermodynamics(
+        grid;
+        internal_heat_flux,
+        top_heat_boundary_condition,
+        bottom_heat_boundary_condition,
+    )
 
     bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    top_heat_flux    = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    snowfall         = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    top_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    snowfall = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
     side_drag_coefficient = convert(eltype(grid), side_drag_coefficient)
     u_bc = OC.FluxBoundaryCondition(u_immersed_side_drag, discrete_form = true, parameters = side_drag_coefficient)
@@ -176,7 +184,8 @@ function sea_ice_simulation(grid, ocean = nothing;
 end
 
 default_coriolis(ocean::OC.Simulation) = ocean.model.coriolis
-default_coriolis(ocean::Nothing) = OC.HydrostaticSphericalCoriolis(; rotation_rate = default_planet_rotation_rate())
+default_coriolis(ocean::Nothing) =
+    OC.HydrostaticSphericalCoriolis(; rotation_rate = default_planet_rotation_rate())
 
 function sea_ice_dynamics(grid, ocean = nothing;
                           sea_ice_ocean_drag_coefficient = 3.24e-3,

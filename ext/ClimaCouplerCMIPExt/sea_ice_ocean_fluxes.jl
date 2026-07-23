@@ -40,7 +40,8 @@ For a constant friction velocity (`u★::Number`), returns the value directly.
 For `MomentumBasedFrictionVelocity`, computes ``u_* = \\sqrt{|\\tau| / \\rho_o}`` from momentum stresses.
 """
 @inline get_friction_velocity(u★::Number, i, j, grid, τˣ, τʸ, ρᵒᶜ) = u★
-@inline get_friction_velocity(::MomentumBasedFrictionVelocity, i, j, grid, τˣ, τʸ, ρᵒᶜ) = sqrt(τᶜᶜᶜ(i, j, 1, grid, τˣ, τʸ) / ρᵒᶜ)
+@inline get_friction_velocity(::MomentumBasedFrictionVelocity, i, j, grid, τˣ, τʸ, ρᵒᶜ) =
+    sqrt(τᶜᶜᶜ(i, j, 1, grid, τˣ, τʸ) / ρᵒᶜ)
 
 #####
 ##### Three-equation heat flux
@@ -78,19 +79,20 @@ References
   ice-ocean interface heat flux parameterizations. *Geosci. Model Dev.*, 14, 4891-4908.
 """
 struct ThreeEquationHeatFlux{F, T, FT, U}
-    conductive_flux :: F
-    internal_temperature :: T
-    heat_transfer_coefficient :: FT
-    salt_transfer_coefficient :: FT
-    friction_velocity :: U
+    conductive_flux::F
+    internal_temperature::T
+    heat_transfer_coefficient::FT
+    salt_transfer_coefficient::FT
+    friction_velocity::U
 end
 
-Adapt.adapt_structure(to, f::ThreeEquationHeatFlux) =
-    ThreeEquationHeatFlux(Adapt.adapt(to, f.conductive_flux),
-                          Adapt.adapt(to, f.internal_temperature),
-                          f.heat_transfer_coefficient,
-                          f.salt_transfer_coefficient,
-                          Adapt.adapt(to, f.friction_velocity))
+Adapt.adapt_structure(to, f::ThreeEquationHeatFlux) = ThreeEquationHeatFlux(
+    Adapt.adapt(to, f.conductive_flux),
+    Adapt.adapt(to, f.internal_temperature),
+    f.heat_transfer_coefficient,
+    f.salt_transfer_coefficient,
+    Adapt.adapt(to, f.friction_velocity),
+)
 
 """
     ThreeEquationHeatFlux(sea_ice::Simulation{<:SeaIceModel}, FT::DataType = Oceananigans.defaults.FloatType;
@@ -110,22 +112,28 @@ Keyword Arguments
 - `salt_transfer_coefficient`: turbulent salt exchange coefficient ``\\alpha_s``. Default: ``\\alpha_h / 35 \\approx 0.000271``.
 - `friction_velocity`: friction velocity value or formulation. Default: 0.002.
 """
-function ThreeEquationHeatFlux(sea_ice::OC.Simulation{<:CSI.SeaIceModel}, FT::DataType = OC.defaults.FloatType;
-                               heat_transfer_coefficient = 0.0095,
-                               salt_transfer_coefficient = heat_transfer_coefficient / 35,
-                               friction_velocity = convert(FT, 0.002))
+function ThreeEquationHeatFlux(
+    sea_ice::OC.Simulation{<:CSI.SeaIceModel},
+    FT::DataType = OC.defaults.FloatType;
+    heat_transfer_coefficient = 0.0095,
+    salt_transfer_coefficient = heat_transfer_coefficient / 35,
+    friction_velocity = convert(FT, 0.002),
+)
 
     conductive_flux = sea_ice.model.ice_thermodynamics.internal_heat_flux
     ice_temperature = sea_ice.model.ice_thermodynamics.top_surface_temperature
 
-    return ThreeEquationHeatFlux(conductive_flux,
-                                 ice_temperature,
-                                 convert(FT, heat_transfer_coefficient),
-                                 convert(FT, salt_transfer_coefficient),
-                                 friction_velocity)
+    return ThreeEquationHeatFlux(
+        conductive_flux,
+        ice_temperature,
+        convert(FT, heat_transfer_coefficient),
+        convert(FT, salt_transfer_coefficient),
+        friction_velocity,
+    )
 end
 
-@inline extract_internal_temperature(flux::ThreeEquationHeatFlux, i, j) = @inbounds flux.internal_temperature[i, j, 1]
+@inline extract_internal_temperature(flux::ThreeEquationHeatFlux, i, j) =
+    @inbounds flux.internal_temperature[i, j, 1]
 
 @inline function store_interface_state!(::ThreeEquationHeatFlux, T★, S★, i, j, Tᵦ, Sᵦ)
     @inbounds T★[i, j, 1] = Tᵦ
@@ -141,12 +149,18 @@ Returns `(Q, Tᵦ, Sᵦ)` where:
 - `Q > 0` means heat flux from ocean to ice (ocean cooling)
 - `Tᵦ, Sᵦ` are the interface temperature and salinity
 """
-@inline function compute_interface_heat_flux(flux::ThreeEquationHeatFlux,
-                                             ocean_state, ice_state,
-                                             liquidus, ocean_properties, ℰ, u★)
+@inline function compute_interface_heat_flux(
+    flux::ThreeEquationHeatFlux,
+    ocean_state,
+    ice_state,
+    liquidus,
+    ocean_properties,
+    ℰ,
+    u★,
+)
     Tᵒᶜ = ocean_state.T
     Sᵒᶜ = ocean_state.S
-    ℵ  = ice_state.ℵ
+    ℵ = ice_state.ℵ
 
     ρᵒᶜ = ocean_properties.reference_density
     cᵒᶜ = ocean_properties.heat_capacity
@@ -154,7 +168,19 @@ Returns `(Q, Tᵦ, Sᵦ)` where:
     αₕ = flux.heat_transfer_coefficient
     αₛ = flux.salt_transfer_coefficient
 
-    T★, S★, q = solve_interface_conditions(flux, Tᵒᶜ, Sᵒᶜ, ice_state, αₕ, αₛ, u★, ℰ, ρᵒᶜ, cᵒᶜ, liquidus)
+    T★, S★, q = solve_interface_conditions(
+        flux,
+        Tᵒᶜ,
+        Sᵒᶜ,
+        ice_state,
+        αₕ,
+        αₛ,
+        u★,
+        ℰ,
+        ρᵒᶜ,
+        cᵒᶜ,
+        liquidus,
+    )
 
     # Scale by ice concentration
     Qᵢₒ = ℰ * q * ℵ
@@ -163,10 +189,10 @@ Returns `(Q, Tᵦ, Sᵦ)` where:
 end
 
 @inline function conductive_flux_parameters(flux::ThreeEquationHeatFlux, ice_state, ℰ)
-    h  = ice_state.h
+    h = ice_state.h
     hc = ice_state.hc
     Tˢⁱ = ice_state.T
-    k  = flux.conductive_flux.conductivity
+    k = flux.conductive_flux.conductivity
     # Set κ to zero when h < hc (ice not consolidated)
     consolidated = h ≥ hc
     κ = ifelse(consolidated, k / (h * ℰ), zero(h))
@@ -191,8 +217,19 @@ Arguments
 
 Returns `(T★, S★, q)` where q is the melt rate (positive for melting).
 """
-@inline function solve_interface_conditions(flux::ThreeEquationHeatFlux, Tᵒᶜ, Sᵒᶜ, ice_state,
-                                            αₕ, αₛ, u★, ℰ, ρᵒᶜ, cᵒᶜ, liquidus::LinearLiquidus)
+@inline function solve_interface_conditions(
+    flux::ThreeEquationHeatFlux,
+    Tᵒᶜ,
+    Sᵒᶜ,
+    ice_state,
+    αₕ,
+    αₛ,
+    u★,
+    ℰ,
+    ρᵒᶜ,
+    cᵒᶜ,
+    liquidus::LinearLiquidus,
+)
     Sˢⁱ = ice_state.S
 
     κ, Tˢⁱ = conductive_flux_parameters(flux, ice_state, ℰ)
@@ -223,7 +260,9 @@ Returns `(T★, S★, q)` where q is the melt rate (positive for melting).
     return T★, S★, q
 end
 
-Base.summary(::ThreeEquationHeatFlux{<:Any, <:Any, FT}) where FT = "ThreeEquationHeatFlux{$FT}"
+Base.summary(
+    ::ThreeEquationHeatFlux{<:Any, <:Any, FT},
+) where {FT} = "ThreeEquationHeatFlux{$FT}"
 
 function Base.show(io::IO, flux::ThreeEquationHeatFlux)
     print(io, summary(flux), '\n')
@@ -246,8 +285,8 @@ function interface_kernel_parameters(grid)
     else
         # Compute fluxes into halo regions (0:N+1) for non-Flat dimensions.
         # Flat dimensions have no halo cells, so only iterate over the interior.
-        x_range = TX === Flat ? (1:Sx) : (0:Sx+1)
-        y_range = TY === Flat ? (1:Sy) : (0:Sy+1)
+        x_range = TX === Flat ? (1:Sx) : (0:(Sx + 1))
+        y_range = TY === Flat ? (1:Sy) : (0:(Sy + 1))
         kernel_parameters = KernelParameters(x_range, y_range)
     end
 
@@ -299,8 +338,20 @@ function compute_sea_ice_ocean_fluxes!(interface, ocean, sea_ice, ocean_properti
     if !isnothing(dynamics)
         kernel_parameters = interface_kernel_parameters(grid)
         τₛ = dynamics.external_momentum_stresses.bottom
-        launch!(arch, grid, kernel_parameters, _compute_sea_ice_ocean_stress!,
-                fluxes, grid, clock, hˢⁱ, ℵ, uˢⁱ, vˢⁱ, τₛ)
+        launch!(
+            arch,
+            grid,
+            kernel_parameters,
+            _compute_sea_ice_ocean_stress!,
+            fluxes,
+            grid,
+            clock,
+            hˢⁱ,
+            ℵ,
+            uˢⁱ,
+            vˢⁱ,
+            τₛ,
+        )
     else
         τₛ = nothing
     end
@@ -313,14 +364,16 @@ function compute_sea_ice_ocean_fluxes!(interface, ocean, sea_ice, ocean_properti
     return nothing
 end
 
-@kernel function _compute_sea_ice_ocean_stress!(fluxes,
-                                                grid,
-                                                clock,
-                                                ice_thickness,
-                                                ice_concentration,
-                                                sea_ice_u_velocity,
-                                                sea_ice_v_velocity,
-                                                sea_ice_ocean_stress)
+@kernel function _compute_sea_ice_ocean_stress!(
+    fluxes,
+    grid,
+    clock,
+    ice_thickness,
+    ice_concentration,
+    sea_ice_u_velocity,
+    sea_ice_v_velocity,
+    sea_ice_ocean_stress,
+)
     i, j = @index(Global, NTuple)
 
     τˣ = fluxes.x_momentum
@@ -335,8 +388,10 @@ end
 
     # Momentum stresses
     @inbounds begin
-        τˣ[i, j, 1] = x_momentum_stress(i, j, Nz, grid, sea_ice_ocean_stress, clock, sea_ice_fields)
-        τʸ[i, j, 1] = y_momentum_stress(i, j, Nz, grid, sea_ice_ocean_stress, clock, sea_ice_fields)
+        τˣ[i, j, 1] =
+            x_momentum_stress(i, j, Nz, grid, sea_ice_ocean_stress, clock, sea_ice_fields)
+        τʸ[i, j, 1] =
+            y_momentum_stress(i, j, Nz, grid, sea_ice_ocean_stress, clock, sea_ice_fields)
     end
 end
 
@@ -376,7 +431,7 @@ end
     Tᵒᶜ = ocean_temperature
     Sᵒᶜ = ocean_salinity
     hc = ice_consolidation_thickness
-    ℰ  = latent_heat
+    ℰ = latent_heat
 
     ρᵒᶜ = ocean_properties.reference_density
     cᵒᶜ = ocean_properties.heat_capacity
@@ -389,7 +444,7 @@ end
 
     δ𝒬ᶠʳᶻ = zero(grid)
 
-    for k = Nz:-1:1
+    for k in Nz:-1:1
         @inbounds begin
             Δz = Δzᶜᶜᶜ(i, j, k, grid)
             Tᵏ = Tᵒᶜ[i, j, k]
@@ -418,12 +473,12 @@ end
     @inbounds 𝒬ᶠʳᶻ[i, j, 1] = δ𝒬ᶠʳᶻ
 
     @inbounds begin
-        Tᴺ  = Tᵒᶜ[i, j, Nz]
-        Sᴺ  = Sᵒᶜ[i, j, Nz]
+        Tᴺ = Tᵒᶜ[i, j, Nz]
+        Sᴺ = Sᵒᶜ[i, j, Nz]
         Sˢⁱ = ice_salinity[i, j, 1]
         hˢⁱ = ice_thickness[i, j, 1]
-        ℵᵢ  = ice_concentration[i, j, 1]
-        hc  = ice_consolidation_thickness[i, j, 1]
+        ℵᵢ = ice_concentration[i, j, 1]
+        hc = ice_consolidation_thickness[i, j, 1]
     end
 
     Tˢⁱ = extract_internal_temperature(flux_formulation, i, j)

@@ -23,7 +23,8 @@ where τ is the magnitude of the momentum stress vector and ρᵒᶜ is the ocea
 struct MomentumBasedFrictionVelocity end
 
 # ϕ² is shared with ocean_simulation.jl
-@inline τᶜᶜᶜ(i, j, k, grid, τˣ, τʸ) = @inbounds sqrt(ℑxᶜᵃᵃ(i, j, k, grid, ϕ², τˣ) + ℑyᵃᶜᵃ(i, j, k, grid, ϕ², τʸ))
+@inline τᶜᶜᶜ(i, j, k, grid, τˣ, τʸ) =
+    @inbounds sqrt(ℑxᶜᵃᵃ(i, j, k, grid, ϕ², τˣ) + ℑyᵃᶜᵃ(i, j, k, grid, ϕ², τʸ))
 
 Base.summary(::MomentumBasedFrictionVelocity) = "MomentumBasedFrictionVelocity"
 
@@ -356,10 +357,33 @@ function compute_sea_ice_ocean_fluxes!(interface, ocean, sea_ice, ocean_properti
         τₛ = nothing
     end
 
-    launch!(arch, grid, :xy, _compute_sea_ice_ocean_fluxes!,
-            flux_formulation, fluxes, Tˢⁱ, Sˢⁱ, grid, clock,
-            hˢⁱ, hc, ℵ, Sⁱ, Tᵒᶜ, Sᵒᶜ, uˢⁱ, vˢⁱ, τₛ,
-            liquidus, ocean_properties, L, Δt, mass_fluxes.ice, mass_fluxes.snow)
+    launch!(
+        arch,
+        grid,
+        :xy,
+        _compute_sea_ice_ocean_fluxes!,
+        flux_formulation,
+        fluxes,
+        Tˢⁱ,
+        Sˢⁱ,
+        grid,
+        clock,
+        hˢⁱ,
+        hc,
+        ℵ,
+        Sⁱ,
+        Tᵒᶜ,
+        Sᵒᶜ,
+        uˢⁱ,
+        vˢⁱ,
+        τₛ,
+        liquidus,
+        ocean_properties,
+        L,
+        Δt,
+        mass_fluxes.ice,
+        mass_fluxes.snow,
+    )
 
     return nothing
 end
@@ -395,27 +419,29 @@ end
     end
 end
 
-@kernel function _compute_sea_ice_ocean_fluxes!(flux_formulation,
-                                                fluxes,
-                                                interface_temperature,
-                                                interface_salinity,
-                                                grid,
-                                                clock,
-                                                ice_thickness,
-                                                ice_consolidation_thickness,
-                                                ice_concentration,
-                                                ice_salinity,
-                                                ocean_temperature,
-                                                ocean_salinity,
-                                                sea_ice_u_velocity,
-                                                sea_ice_v_velocity,
-                                                sea_ice_ocean_stresses,
-                                                liquidus,
-                                                ocean_properties,
-                                                latent_heat,
-                                                Δt,
-                                                ice_ocean_mass_flux,
-                                                snow_ocean_mass_flux)
+@kernel function _compute_sea_ice_ocean_fluxes!(
+    flux_formulation,
+    fluxes,
+    interface_temperature,
+    interface_salinity,
+    grid,
+    clock,
+    ice_thickness,
+    ice_consolidation_thickness,
+    ice_concentration,
+    ice_salinity,
+    ocean_temperature,
+    ocean_salinity,
+    sea_ice_u_velocity,
+    sea_ice_v_velocity,
+    sea_ice_ocean_stresses,
+    liquidus,
+    ocean_properties,
+    latent_heat,
+    Δt,
+    ice_ocean_mass_flux,
+    snow_ocean_mass_flux,
+)
 
     i, j = @index(Global, NTuple)
 
@@ -494,9 +520,15 @@ end
     # Part 3: Interface heat flux
     # =============================================
     # Returns interfacial heat flux and interface T, S
-    𝒬ⁱᵒ, Tᵦ, Sᵦ = compute_interface_heat_flux(flux_formulation,
-                                              ocean_surface_state, ice_state,
-                                              liquidus, ocean_properties, ℰ, u★)
+    𝒬ⁱᵒ, Tᵦ, Sᵦ = compute_interface_heat_flux(
+        flux_formulation,
+        ocean_surface_state,
+        ice_state,
+        liquidus,
+        ocean_properties,
+        ℰ,
+        u★,
+    )
 
     # Store interface values and heat flux
     @inbounds 𝒬ⁱⁿ[i, j, 1] = 𝒬ⁱᵒ

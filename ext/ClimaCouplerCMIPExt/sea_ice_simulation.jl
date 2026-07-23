@@ -7,8 +7,10 @@ ocean_reference_density(ocean::OceananigansModelSimulations, FT) =
     convert(FT, ocean.model.buoyancy.formulation.equation_of_state.reference_density)
 ocean_reference_density(::Nothing, FT) = convert(FT, 1026.0)
 
-@inline u_immersed_side_drag(i, j, k, grid, clock, Φ, μ) = @inbounds -μ * Φ.u[i, j, k] * spᶠᶜᶜ(i, j, k, grid, Φ)
-@inline v_immersed_side_drag(i, j, k, grid, clock, Φ, μ) = @inbounds -μ * Φ.v[i, j, k] * spᶜᶠᶜ(i, j, k, grid, Φ)
+@inline u_immersed_side_drag(i, j, k, grid, clock, Φ, μ) =
+    @inbounds -μ * Φ.u[i, j, k] * spᶠᶜᶜ(i, j, k, grid, Φ)
+@inline v_immersed_side_drag(i, j, k, grid, clock, Φ, μ) =
+    @inbounds -μ * Φ.v[i, j, k] * spᶜᶠᶜ(i, j, k, grid, Φ)
 
 function default_snow_thermodynamics(grid)
     FT = eltype(grid)
@@ -27,7 +29,15 @@ correct_tripolar_bcs(grid, bcs) = bcs
 function correct_tripolar_bcs(grid::TripolarGridOfSomeKind, bcs)
     if bcs.north isa OC.BoundaryCondition && bcs.north.classification isa Zipper
         north = OC.BoundaryCondition(bcs.north.classification, -bcs.north.condition)
-        bcs = OC.FieldBoundaryConditions(bcs.west, bcs.east, bcs.south, north, bcs.bottom, bcs.top, bcs.immersed)
+        bcs = OC.FieldBoundaryConditions(
+            bcs.west,
+            bcs.east,
+            bcs.south,
+            north,
+            bcs.bottom,
+            bcs.top,
+            bcs.immersed,
+        )
     end
     return bcs
 end
@@ -99,28 +109,33 @@ Keyword Arguments
 - `snow_thermodynamics`: thermodynamics for the snow layer (default is a slab thermodynamics with
                          specified conductivity and prescribed temperature)
 """
-function sea_ice_simulation(grid, ocean = nothing;
-                            clock = Clock(grid),
-                            stop_time = default_stop_time(grid, clock),
-                            Δt = 5minutes,
-                            ice_salinity = 4, # psu
-                            advection = nothing,
-                            tracers = (),
-                            ice_heat_capacity = 2100, # J kg⁻¹ K⁻¹
-                            ice_consolidation_thickness = 0.05, # m
-                            sea_ice_density = 900, # kg m⁻³
-                            snow_density = 330, # kg m⁻³
-                            side_drag_coefficient = 3e-3,
-                            dynamics = sea_ice_dynamics(grid, ocean),
-                            bottom_heat_boundary_condition = nothing,
-                            top_heat_boundary_condition = nothing,
-                            timestepper = :SplitRungeKutta3,
-                            phase_transitions = CSI.PhaseTransitions(eltype(grid);
-                                                                     heat_capacity = ice_heat_capacity,
-                                                                     density = sea_ice_density),
-                            conductivity = 2, # W m⁻¹ K⁻¹
-                            internal_heat_flux = ConductiveFlux(; conductivity),
-                            snow_thermodynamics = default_snow_thermodynamics(grid))
+function sea_ice_simulation(
+    grid,
+    ocean = nothing;
+    clock = Clock(grid),
+    stop_time = default_stop_time(grid, clock),
+    Δt = 5minutes,
+    ice_salinity = 4, # psu
+    advection = nothing,
+    tracers = (),
+    ice_heat_capacity = 2100, # J kg⁻¹ K⁻¹
+    ice_consolidation_thickness = 0.05, # m
+    sea_ice_density = 900, # kg m⁻³
+    snow_density = 330, # kg m⁻³
+    side_drag_coefficient = 3e-3,
+    dynamics = sea_ice_dynamics(grid, ocean),
+    bottom_heat_boundary_condition = nothing,
+    top_heat_boundary_condition = nothing,
+    timestepper = :SplitRungeKutta3,
+    phase_transitions = CSI.PhaseTransitions(
+        eltype(grid);
+        heat_capacity = ice_heat_capacity,
+        density = sea_ice_density,
+    ),
+    conductivity = 2, # W m⁻¹ K⁻¹
+    internal_heat_flux = ConductiveFlux(; conductivity),
+    snow_thermodynamics = default_snow_thermodynamics(grid),
+)
 
     # Build consistent boundary conditions for the ice model:
     # - bottom -> flux boundary condition
@@ -149,33 +164,59 @@ function sea_ice_simulation(grid, ocean = nothing;
     snowfall = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
     side_drag_coefficient = convert(eltype(grid), side_drag_coefficient)
-    u_bc = OC.FluxBoundaryCondition(u_immersed_side_drag, discrete_form = true, parameters = side_drag_coefficient)
-    v_bc = OC.FluxBoundaryCondition(v_immersed_side_drag, discrete_form = true, parameters = side_drag_coefficient)
+    u_bc = OC.FluxBoundaryCondition(
+        u_immersed_side_drag,
+        discrete_form = true,
+        parameters = side_drag_coefficient,
+    )
+    v_bc = OC.FluxBoundaryCondition(
+        v_immersed_side_drag,
+        discrete_form = true,
+        parameters = side_drag_coefficient,
+    )
 
-    immersed_u_bc = OC.ImmersedBoundaries.ImmersedBoundaryCondition(south = u_bc, north = u_bc)
-    immersed_v_bc = OC.ImmersedBoundaries.ImmersedBoundaryCondition(west = v_bc, east = v_bc)
+    immersed_u_bc =
+        OC.ImmersedBoundaries.ImmersedBoundaryCondition(south = u_bc, north = u_bc)
+    immersed_v_bc =
+        OC.ImmersedBoundaries.ImmersedBoundaryCondition(west = v_bc, east = v_bc)
 
-    u_bcs = correct_tripolar_bcs(grid, OC.FieldBoundaryConditions(grid, (OC.Face(), OC.Center(), nothing); immersed = immersed_u_bc))
-    v_bcs = correct_tripolar_bcs(grid, OC.FieldBoundaryConditions(grid, (OC.Center(), OC.Face(), nothing); immersed = immersed_v_bc))
+    u_bcs = correct_tripolar_bcs(
+        grid,
+        OC.FieldBoundaryConditions(
+            grid,
+            (OC.Face(), OC.Center(), nothing);
+            immersed = immersed_u_bc,
+        ),
+    )
+    v_bcs = correct_tripolar_bcs(
+        grid,
+        OC.FieldBoundaryConditions(
+            grid,
+            (OC.Center(), OC.Face(), nothing);
+            immersed = immersed_v_bc,
+        ),
+    )
 
     # Build the sea ice model
-    sea_ice_model = CSI.SeaIceModel(grid;
-                                    clock,
-                                    ice_salinity,
-                                    advection,
-                                    tracers,
-                                    ice_consolidation_thickness,
-                                    sea_ice_density,
-                                    snow_density,
-                                    phase_transitions,
-                                    ice_thermodynamics,
-                                    snow_thermodynamics,
-                                    snowfall,
-                                    dynamics,
-                                    timestepper,
-                                    bottom_heat_flux,
-                                    boundary_conditions = (u = u_bcs, v = v_bcs),
-                                    top_heat_flux)
+    sea_ice_model = CSI.SeaIceModel(
+        grid;
+        clock,
+        ice_salinity,
+        advection,
+        tracers,
+        ice_consolidation_thickness,
+        sea_ice_density,
+        snow_density,
+        phase_transitions,
+        ice_thermodynamics,
+        snow_thermodynamics,
+        snowfall,
+        dynamics,
+        timestepper,
+        bottom_heat_flux,
+        boundary_conditions = (u = u_bcs, v = v_bcs),
+        top_heat_flux,
+    )
 
     verbose = false
     sea_ice = OC.Simulation(sea_ice_model; Δt, stop_time, verbose)
@@ -187,12 +228,15 @@ default_coriolis(ocean::OC.Simulation) = ocean.model.coriolis
 default_coriolis(ocean::Nothing) =
     OC.HydrostaticSphericalCoriolis(; rotation_rate = default_planet_rotation_rate())
 
-function sea_ice_dynamics(grid, ocean = nothing;
-                          sea_ice_ocean_drag_coefficient = 3.24e-3,
-                          rheology = CSI.ElastoViscoPlasticRheology(),
-                          coriolis = default_coriolis(ocean),
-                          free_drift = nothing,
-                          solver = CSI.SplitExplicitSolver(grid; substeps = 100))
+function sea_ice_dynamics(
+    grid,
+    ocean = nothing;
+    sea_ice_ocean_drag_coefficient = 3.24e-3,
+    rheology = CSI.ElastoViscoPlasticRheology(),
+    coriolis = default_coriolis(ocean),
+    free_drift = nothing,
+    solver = CSI.SplitExplicitSolver(grid; substeps = 100),
+)
 
     SSU, SSV = ocean_surface_velocities(ocean)
 
@@ -200,22 +244,35 @@ function sea_ice_dynamics(grid, ocean = nothing;
     sea_ice_ocean_drag_coefficient = convert(FT, sea_ice_ocean_drag_coefficient)
     ρₑ = ocean_reference_density(ocean, FT)
 
-    τo  = CSI.SemiImplicitStress(uₑ = SSU, vₑ = SSV, Cᴰ = sea_ice_ocean_drag_coefficient, ρₑ = ρₑ)
+    τo = CSI.SemiImplicitStress(
+        uₑ = SSU,
+        vₑ = SSV,
+        Cᴰ = sea_ice_ocean_drag_coefficient,
+        ρₑ = ρₑ,
+    )
 
     velocity_grid = maybe_extended_grid(solver, grid)
 
-    τua = OC.Field{OC.Face, OC.Center, Nothing}(velocity_grid; boundary_conditions = default_sea_ice_boundary_conditions(velocity_grid, :u))
-    τva = OC.Field{OC.Center, OC.Face, Nothing}(velocity_grid; boundary_conditions = default_sea_ice_boundary_conditions(velocity_grid, :v))
+    τua = OC.Field{OC.Face, OC.Center, Nothing}(
+        velocity_grid;
+        boundary_conditions = default_sea_ice_boundary_conditions(velocity_grid, :u),
+    )
+    τva = OC.Field{OC.Center, OC.Face, Nothing}(
+        velocity_grid;
+        boundary_conditions = default_sea_ice_boundary_conditions(velocity_grid, :v),
+    )
 
     if isnothing(free_drift)
         free_drift = CSI.StressBalanceFreeDrift((u = τua, v = τva), τo)
     end
 
-    return CSI.SeaIceMomentumEquation(velocity_grid;
-                                      coriolis,
-                                      top_momentum_stress = (u = τua, v = τva),
-                                      bottom_momentum_stress = τo,
-                                      rheology,
-                                      free_drift,
-                                      solver)
+    return CSI.SeaIceMomentumEquation(
+        velocity_grid;
+        coriolis,
+        top_momentum_stress = (u = τua, v = τva),
+        bottom_momentum_stress = τo,
+        rheology,
+        free_drift,
+        solver,
+    )
 end

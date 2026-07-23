@@ -82,7 +82,7 @@ function tripolar_ocean_simulation(
 
     free_surface = OC.SplitExplicitFreeSurface(grid; substeps)
 
-    return CO.ocean_simulation(
+    return ocean_simulation(
         grid;
         clock,
         stop_time,
@@ -199,9 +199,9 @@ function OceananigansSimulation(
     # Create ocean simulation
     closure = if simple_ocean
         @info "Using simpler ocean setup; to be used for software testing only."
-        CO.OceanConfigurations.simplified_ocean_closure()
+        simplified_ocean_closure()
     else
-        CO.OceanConfigurations.default_one_degree_closure()
+        default_one_degree_closure()
     end
 
     if tspan[1] isa ITime
@@ -250,7 +250,7 @@ function OceananigansSimulation(
 
     # Get some ocean properties and parameters (including COARE3 roughness params)
     ocean_properties = (;
-        reference_density = 1020,
+        reference_density = 1026,
         heat_capacity = 3991,
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         C_to_K = coupled_param_dict["temperature_water_freeze"],

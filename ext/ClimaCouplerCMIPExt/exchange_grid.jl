@@ -13,63 +13,6 @@ gather/scatter.
 =#
 
 """
-    PolygonIntersectionOperator{M <: CR.Manifold}
-
-`ConservativeRegridding` intersection operator that assembles a sparse matrix
-of intersection *polygons* rather than scalar areas.
-"""
-struct PolygonIntersectionOperator{M <: CR.Manifold}
-    manifold::M
-end
-
-function _intersection_polygon_type()
-    CRExt = get_ConservativeRegriddingCCExt()
-    @assert !isnothing(CRExt)
-    GI = CRExt.GI
-    GO = CRExt.GO
-    return GI.Polygon{
-        true,
-        false,
-        Vector{
-            GI.LinearRing{
-                true,
-                false,
-                Vector{GO.UnitSpherical.UnitSphericalPoint{Float64}},
-                Nothing,
-                Nothing,
-            },
-        },
-        Nothing,
-        Nothing,
-    }
-end
-
-CR.IntersectionReturnStyle(::PolygonIntersectionOperator) = CR.OutOfPlaceSingleResult()
-CR.output_eltype(::PolygonIntersectionOperator) = _intersection_polygon_type()
-CR.output_eltype(op::PolygonIntersectionOperator, src_tree, dst_tree) =
-    CR.output_eltype(op)
-
-function CR.should_store_result(::PolygonIntersectionOperator, result)
-    result === nothing && return false
-    CRExt = get_ConservativeRegriddingCCExt()
-    return result isa CRExt.GI.Polygon
-end
-
-function (op::PolygonIntersectionOperator)(src_cell, dst_cell)
-    CRExt = get_ConservativeRegriddingCCExt()
-    GO = CRExt.GO
-    GI = CRExt.GI
-    intersection_poly = GO.intersection(
-        GO.ConvexConvexSutherlandHodgman(op.manifold),
-        src_cell,
-        dst_cell;
-        target = GI.PolygonTrait(),
-    )
-    iszero(GO.area(op.manifold, intersection_poly)) && return nothing
-    return intersection_poly
-end
-
-"""
     ExchangeGrid{FT, VI, VF}
 
 Sparse coupling between the SE boundary space, the FV (Oceananigans) surface
@@ -194,7 +137,7 @@ function build_exchange_grid(boundary_space, grid_oc; sliver_rtol = 0.0)
         CR.False(),
         dst_tree,
         src_tree;
-        intersection_operator = PolygonIntersectionOperator(manifold),
+        intersection_operator = CR.IntersectionGridOperator(manifold),
     )
     elem_of_poly, oc_of_poly, polys = SparseArrays.findnz(intersections)
     n_elem, n_oc = size(intersections)

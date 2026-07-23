@@ -407,6 +407,10 @@ function exchange!(cs::Interfacer.CoupledSimulation)
     import_atmos_fields!(cs.fields, cs.model_sims)
     import_combined_surface_fields!(cs.fields, cs.model_sims)
 
+    # NOTE: Component-model flux accumulators are expected to have been zeroed by
+    # `FluxCalculator.reset_fluxes!(cs)` in the top-level coupler step. We do not
+    # re-zero here so the ordering remains explicit in `SimCoordinator.step!`.
+
     # Update the component model simulations with the coupler fields
     update_model_sims!(cs.model_sims, cs.fields)
     return nothing

@@ -471,6 +471,21 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     return nothing
 end
 
+function FluxCalculator.reset_fluxes!(sim::ClimaSeaIceSimulation)
+    si_flux_heat = sim.ice.model.external_heat_fluxes.top
+    if si_flux_heat isa OC.Field
+        OC.interior(si_flux_heat, :, :, 1) .= 0
+    end
+
+    if !isnothing(sim.ice.model.dynamics)
+        si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
+        si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
+        si_flux_u isa OC.Field && (OC.interior(si_flux_u, :, :, 1) .= 0)
+        si_flux_v isa OC.Field && (OC.interior(si_flux_v, :, :, 1) .= 0)
+    end
+    return nothing
+end
+
 function Interfacer.update_field!(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}, field)
     sim.area_fraction .= field
     return nothing

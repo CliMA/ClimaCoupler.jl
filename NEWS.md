@@ -4,6 +4,15 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Reintroduce the Eisenman-Zhang sea ice model
+The Eisenman-Zhang thermodynamic 0-layer sea ice model (removed in
+[#1284](https://github.com/CliMA/ClimaCoupler.jl/pull/1284)) is reintroduced
+as `Models.EisenmanIceSimulation`, ported to the current Interfacer API and
+selectable with `ice_model: "eisenman"`. The turbulent flux derivative
+`∂F_turb/∂T_sfc` (whose coupler-side finite-difference machinery was removed
+with the model) is dropped from the surface Newton solve, which now treats
+the turbulent flux explicitly and retains only the radiative derivative.
+
 #### Adapt to the redesigned RRTMGP 0.22 / ClimaAtmos 0.42 radiation API.
 The atmosphere radiation cache now holds an `RRTMGP.RRTMGPSolver`; coupler flux and albedo
 accesses go through `RRTMGP` getters (e.g. `RRTMGP.sw_flux_dn`, `RRTMGP.surface_emissivity`),

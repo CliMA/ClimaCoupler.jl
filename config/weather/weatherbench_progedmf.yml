@@ -1,0 +1,83 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+# atmos_config_file: "config/atmos_configs/climaatmos_wx_weatherbench.yml"
+atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf.yml"
+# coupler_toml: ["toml/amip_progedmf.toml"]
+strict_params: false
+mode_name: "subseasonal"
+
+# clima machine data paths
+# era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_0p25deg_dev"
+# era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev_with_w"
+# era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_ml_correct_v1"
+
+# derecho machine data paths
+# era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_0p25deg_dev"
+
+# coupler_output_dir: "/net/sampo/data1/cchristo/weatherbench2/coupuler_runs"
+initial_condition: "WeatherModel"
+checkpoint_dt: "1000days"
+dt: "50secs"
+dt_cpl: "50secs"
+dt_seaice: "50secs"
+energy_check: false
+h_elem: 30
+z_elem: 100
+
+### Microphysics
+### 0M Microphysics ##
+# microphysics_model: "0M"
+# toml: [toml/longrun_aquaplanet_progedmf.toml]
+# coupler_toml: ["toml/amip_progedmf.toml"]
+### 1M Microphysics ###
+microphysics_model: "1M"
+toml: ["toml/prognostic_edmfx_1M.toml"]
+
+
+land_fraction_source: "era5"
+binary_area_fraction: false
+### integrated land ###
+land_model: "integrated"
+lai_source: "modis_monthly_climatology"
+
+### bucket land ###
+# land_model: "bucket"
+# bucket_albedo_type: "map_temporal"
+land_spun_up_ic: false
+land_temperature_anomaly: "nothing"
+use_land_diagnostics: false
+radiation_reset_rng_seed: true
+start_date: "20201001"
+surface_setup: "PrescribedSurface"
+topo_smoothing: true
+topography: "Earth"
+t_end: "7days"
+netcdf_output_at_levels: true
+output_default_diagnostics: false
+use_coupler_diagnostics: true
+extra_atmos_diagnostics:
+  ### hourly inst (surface + model-level)
+  - short_name: [tas, uas, vas, ts, tas, mslp, pr, prra, clt, prw, lwp, iwp, clwvi] #rwp]
+    reduction_time: inst
+    period: 1hours
+  - short_name: [ta, ua, va, wa, husv, hus, cl, clw, cli, zg, orog, pfull, rhoa]
+    reduction_time: inst
+    period: 1hours
+  ### daily average (surface + model-level)
+  - short_name: [zg, orog, tas, mslp, pr, ta, hus, ua, va, zg, clw, cli, cl, pfull]
+    period: 1days
+    reduction_time: average
+
+  # ### daily mean (pressure + selected model-level) ###
+  # - short_name: [ta, ua, va, wa, husv, hus, clw, cl, cli, zg, pfull, edt, evu, tke, arup, waup]
+  #   reduction_time: average
+  #   period: 1days
+  #   pressure_coordinates: true
+  # - short_name: [zg, orog, thetaa, edt, evu]
+  #   period: 1days
+  #   reduction_time: average
+  # - short_name: [ta, ua, va, wa, husv, hus, clw, cli, zg, pfull]
+  #   reduction_time: average
+  #   period: 1hours
+  #   pressure_coordinates: true

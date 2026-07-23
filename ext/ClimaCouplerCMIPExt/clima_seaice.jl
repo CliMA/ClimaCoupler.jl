@@ -137,6 +137,7 @@ function ClimaSeaIceSimulation(
     io_bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     io_frazil_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     io_salt_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    io_freshwater_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     x_momentum = OC.Field{OC.Face, OC.Center, Nothing}(grid)
     y_momentum = OC.Field{OC.Center, OC.Face, Nothing}(grid)
 
@@ -144,6 +145,7 @@ function ClimaSeaIceSimulation(
         interface_heat = io_bottom_heat_flux,
         frazil_heat = io_frazil_heat_flux,
         salt = io_salt_flux,
+        freshwater = io_freshwater_flux,
         x_momentum = x_momentum,
         y_momentum = y_momentum,
     )
@@ -597,9 +599,12 @@ function FluxCalculator.ocean_seaice_fluxes!(
     OC.interior(oc_flux_T, :, :, 1) .+= heat_flux
 
     oc_flux_S = surface_flux(ocean_sim.ocean.model.tracers.S)
-    salt_contrib = OC.interior(ocean_sim.remapping.scratch_field_oc2, :, :, 1)
-    salt_contrib .= OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
-    OC.interior(oc_flux_S, :, :, 1) .+= salt_contrib
+    surface_salinity = OC.interior(ocean_sim.ocean.model.tracers.S, :, :, grid.Nz)
+    Jˢ = OC.interior(ice_sim.ocean_ice_interface.fluxes.salt, :, :, 1)
+    Jʷ = OC.interior(ice_sim.ocean_ice_interface.fluxes.freshwater, :, :, 1)
+    salt_flux = OC.interior(ocean_sim.remapping.scratch_field_oc2, :, :, 1)
+    salt_flux .= Jˢ .+ surface_salinity .* Jʷ
+    OC.interior(oc_flux_S, :, :, 1) .+= salt_flux
 
     return nothing
 end

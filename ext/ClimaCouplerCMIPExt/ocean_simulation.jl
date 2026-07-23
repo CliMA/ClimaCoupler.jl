@@ -1,11 +1,10 @@
-# Ported from NumericalEarth v0.5.8, src/Oceans/{ocean_simulation,Oceans,barotropic_potential_forcing}.jl
-
 import Oceananigans.BoundaryConditions: DefaultBoundaryCondition
 import Oceananigans.DistributedComputations: all_reduce
 import Oceananigans.Architectures: ReactantState, AbstractArchitecture
 import Oceananigans.Operators: ℑxyᶠᶜᵃ, ℑxyᶜᶠᵃ, ∂xᶠᶜᶜ, ∂yᶜᶠᶜ
 import Oceananigans.TimeSteppers: AdaptiveVerticallyImplicitDiscretization
 import Oceananigans.Units: hours, minutes
+import Oceananigans.OrthogonalSphericalShellGrids: TripolarGridOfSomeKind, north_fold_boundary_condition
 import Statistics: mean
 
 const TEOS10EquationOfState = OC.BuoyancyFormulations.SeawaterPolynomials.TEOS10.TEOS10EquationOfState
@@ -91,7 +90,12 @@ end
 @inline u_immersed_bottom_drag(i, j, k, grid, clock, Φ, μ) = @inbounds -μ * Φ.u[i, j, k] * spᶠᶜᶜ(i, j, k, grid, Φ)
 @inline v_immersed_bottom_drag(i, j, k, grid, clock, Φ, μ) = @inbounds -μ * Φ.v[i, j, k] * spᶜᶠᶜ(i, j, k, grid, Φ)
 
-@inline build_top_bc(flux_field, ::Nothing) = OC.FluxBoundaryCondition(flux_field)
+vector_component_boundary_conditions(grid, loc) = OC.FieldBoundaryConditions(grid, loc)
+
+function vector_component_boundary_conditions(grid::TripolarGridOfSomeKind, loc)
+    north_bc = north_fold_boundary_condition(grid)(-1)
+    return OC.FieldBoundaryConditions(grid, loc; north = north_bc)
+end
 
 default_free_surface(grid) = OC.SplitExplicitFreeSurface(grid; cfl = 0.7)
 
@@ -132,16 +136,29 @@ default_stop_time(::ReactantState, clock) = nothing
 hasclosure(closure, ClosureType) = closure isa ClosureType
 hasclosure(closure_tuple::Tuple, ClosureType) = any(hasclosure(c, ClosureType) for c in closure_tuple)
 
-const OceananigansModelSimulations =
-    Union{OC.Simulation{<:OC.HydrostaticFreeSurfaceModel}, OC.Simulation{<:OC.NonhydrostaticModel}}
+ocean_surface_salinity(::Nothing) = 0
+
+function ocean_surface_salinity(ocean::OC.Simulation{<:OC.HydrostaticFreeSurfaceModel},)
+    kᴺ = size(ocean.model.grid, 3)
+    return view(parent(ocean.model.tracers.S), :, :, kᴺ:kᴺ)
+end
+
+ocean_surface_velocities(::Nothing) = (OC.Fields.ZeroField(), OC.Fields.ZeroField())
+
+function ocean_surface_velocities(ocean::OC.Simulation{<:OC.HydrostaticFreeSurfaceModel},)
+    kᴺ = size(ocean.model.grid, 3)
+    return view(ocean.model.velocities.u, :, :, kᴺ), view(ocean.model.velocities.v, :, :, kᴺ)
+end
 
 """
     ocean_simulation(grid;
+                     clock = Clock(grid),
+                     stop_time = default_stop_time(grid, clock),
                      Δt = estimate_maximum_Δt(grid),
                      closure = default_ocean_closure(),
                      tracers = (:T, :S),
                      free_surface = default_free_surface(grid),
-                     reference_density = 1020,
+                     reference_density = 1026,
                      rotation_rate = default_planet_rotation_rate(),
                      gravitational_acceleration = default_gravitational_acceleration(),
                      bottom_drag_coefficient = Default(0.003),
@@ -155,7 +172,7 @@ const OceananigansModelSimulations =
                      equation_of_state = TEOS10EquationOfState(; reference_density),
                      boundary_conditions::NamedTuple = NamedTuple(),
                      radiative_forcing = nothing,
-                     clock = nothing,
+                     materialize_buoyancy_gradients = true,
                      warn = true,
                      verbose = false)
 
@@ -197,11 +214,12 @@ defaults on a per-field basis.
 
 ## Keyword Arguments
 
+- `clock`: Clock for the underlying model. Defaults to `Clock(grid)`, a numeric clock starting at `time = 0`.
+  Pass a `DateTime`-based clock to step the simulation in calendar time (e.g. when coupling).
+- `stop_time`: Stop time for the simulation. Defaults to `Inf` for numeric clocks, or
+  `DateTime(9999, 12, 31, 23, 59, 59)` for `DateTime` clocks. On Reactant architectures it defaults to `nothing`,
+  since Reactant does not support `stop_time`.
 - `Δt`: Timestep used by the `Simulation`. Defaults to the maximum stable timestep estimated from the `grid`.
-- `clock`: Clock for the underlying model. Defaults to `nothing`, in which case the
-  model builds its own default clock. Pass a `Clock` (e.g. `Clock{Float64}(time=0)` or
-  a `DateTime`-based clock) to control the time type, for instance when coupling.
-- `stop_time`: the end time of the ocean simulation. Defaults to `Inf`.
 - `closure`: A turbulence or mixing closure. Defaults to `default_ocean_closure()`.
 - `tracers`: Tuple of tracer names. Defaults to `(:T, :S)`.
 - `free_surface`: Free–surface solver. Defaults to `default_free_surface(grid)`.
@@ -219,17 +237,18 @@ defaults on a per-field basis.
 - `equation_of_state`: Equation of state object. Defaults to TEOS-10 (`TEOS10EquationOfState`).
 - `boundary_conditions`: User-supplied boundary conditions; merged with defaults.
 - `radiative_forcing`: Additional temperature forcing; merged into `forcing`. Defaults to `nothing`.
+- `materialize_buoyancy_gradients`: If `true`, buoyancy gradients are precomputed and stored in fields.
 - `warn`: If `true`, warnings are emitted for potentially unintended setups.
 - `verbose`: If `true`, prints additional setup information.
 """
 function ocean_simulation(grid;
-                          Δt = estimate_maximum_Δt(grid),
                           clock = Clock(grid),
                           stop_time = default_stop_time(grid, clock),
+                          Δt = estimate_maximum_Δt(grid),
                           closure = default_ocean_closure(),
                           tracers = (:T, :S),
                           free_surface = default_free_surface(grid),
-                          reference_density = 1020,
+                          reference_density = 1026,
                           rotation_rate = default_planet_rotation_rate(),
                           gravitational_acceleration = default_gravitational_acceleration(),
                           bottom_drag_coefficient = Default(0.003),
@@ -243,6 +262,7 @@ function ocean_simulation(grid;
                           equation_of_state = TEOS10EquationOfState(; reference_density),
                           boundary_conditions::NamedTuple = NamedTuple(),
                           radiative_forcing = nothing,
+                          materialize_buoyancy_gradients = true,
                           warn = true,
                           verbose = false)
 
@@ -310,8 +330,11 @@ function ocean_simulation(grid;
     bottom_drag_coefficient = convert(FT, bottom_drag_coefficient)
 
     # Set up boundary conditions using Field
-    top_zonal_momentum_flux = τˣ = OC.Field{OC.Face, OC.Center, Nothing}(grid)
-    top_meridional_momentum_flux = τʸ = OC.Field{OC.Center, OC.Face, Nothing}(grid)
+    x_velocity_bcs = vector_component_boundary_conditions(grid, (OC.Face(), OC.Center(), nothing))
+    y_velocity_bcs = vector_component_boundary_conditions(grid, (OC.Center(), OC.Face(), nothing))
+
+    top_zonal_momentum_flux = τˣ = OC.Field{OC.Face, OC.Center, Nothing}(grid; boundary_conditions = x_velocity_bcs)
+    top_meridional_momentum_flux = τʸ = OC.Field{OC.Center, OC.Face, Nothing}(grid; boundary_conditions = y_velocity_bcs)
     top_ocean_heat_flux = Jᵀ = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     top_salt_flux = Jˢ = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
@@ -320,10 +343,10 @@ function ocean_simulation(grid;
     additional = merge(default_additional_fluxes, additional_surface_fluxes)
 
     # Construct ocean boundary conditions including surface forcing and bottom drag
-    u_top_bc = build_top_bc(τˣ, additional.u)
-    v_top_bc = build_top_bc(τʸ, additional.v)
-    T_top_bc = build_top_bc(Jᵀ, additional.T)
-    S_top_bc = build_top_bc(Jˢ, additional.S)
+    u_top_bc = OC.FluxBoundaryCondition(τˣ)
+    v_top_bc = OC.FluxBoundaryCondition(τʸ)
+    T_top_bc = OC.FluxBoundaryCondition(Jᵀ)
+    S_top_bc = OC.FluxBoundaryCondition(Jˢ)
 
     u_bot_bc = OC.FluxBoundaryCondition(u_quadratic_bottom_drag, discrete_form = true, parameters = bottom_drag_coefficient)
     v_bot_bc = OC.FluxBoundaryCondition(v_quadratic_bottom_drag, discrete_form = true, parameters = bottom_drag_coefficient)
@@ -341,6 +364,7 @@ function ocean_simulation(grid;
 
     boundary_conditions = merge(default_boundary_conditions, merged_boundary_conditions)
     buoyancy = OC.SeawaterBuoyancy(; gravitational_acceleration, equation_of_state)
+    buoyancy = OC.BuoyancyFormulations.BuoyancyForce(grid, buoyancy; materialize_gradients = materialize_buoyancy_gradients)
 
     tracer_advection = NamedTuple(name => tracer_advection for name in tracers)
 
@@ -350,10 +374,8 @@ function ocean_simulation(grid;
         tracer_advection = merge(tracer_advection, tke_advection)
     end
 
-    # Only forward `clock` when supplied so the model keeps its own default otherwise.
-    clock_kw = isnothing(clock) ? NamedTuple() : (; clock)
-
     ocean_model = OC.HydrostaticFreeSurfaceModel(grid;
+                                                 clock,
                                                  buoyancy,
                                                  closure,
                                                  biogeochemistry,
@@ -364,10 +386,9 @@ function ocean_simulation(grid;
                                                  free_surface,
                                                  coriolis,
                                                  forcing,
-                                                 boundary_conditions,
-                                                 clock_kw...)
+                                                 boundary_conditions)
 
-    ocean = OC.Simulation(ocean_model; Δt, verbose)
+    ocean = OC.Simulation(ocean_model; Δt, stop_time, verbose)
 
     return ocean
 end

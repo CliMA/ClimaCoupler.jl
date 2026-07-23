@@ -242,7 +242,7 @@ function OceananigansSimulation(
 
     # Get some ocean properties and parameters (including COARE3 roughness params)
     ocean_properties = (;
-        reference_density = 1020,
+        reference_density = 1026,
         heat_capacity = 3991,
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         C_to_K = coupled_param_dict["temperature_water_freeze"],

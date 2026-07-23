@@ -1,6 +1,3 @@
-# Ported from ClimaOcean v0.10.0, src/OceanConfigurations/{OceanConfigurations,one_degree_tripolar}.jl,
-# and NumericalEarth v0.5.8, src/Oceans/ocean_simulation.jl
-
 import Oceananigans.Units: days
 import Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities: CATKEVerticalDiffusivity, CATKEMixingLength, CATKEEquation
 
@@ -24,7 +21,7 @@ end
 """
     simplified_ocean_closure(FT=Oceananigans.defaults.FloatType)
 
-A minimal closure suitable for testing on memory-limited GPUs (e.g. P100). Uses `ConvectiveAdjustmentVerticalDiffusivity`with a background
+A minimal closure suitable for testing on memory-limited GPUs (e.g. P100). Uses `ConvectiveAdjustmentVerticalDiffusivity` with a background
 vertical diffusivity and viscosity, avoiding the large parameter space of CATKE + Gent-McWilliams + biharmonic closures.
 """
 function simplified_ocean_closure(FT = OC.defaults.FloatType)

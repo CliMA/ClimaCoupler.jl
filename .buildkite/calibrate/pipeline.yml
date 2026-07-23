@@ -9,6 +9,7 @@ steps:
     command:
       - echo "--- Instantiate AMIP env"
       - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true); Pkg.status()'
+      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="ClimaCalibrate", rev="ne/async"))'
 
     env:
       JULIA_NUM_PRECOMPILE_TASKS: 8
@@ -20,11 +21,7 @@ steps:
     - label: "Generate observations"
       key: "gen_obs"
       command:
-      - julia --project=experiments/AMIP/ experiments/calibration/amip/generate_observations.jl
-
-    - label: "Run calibration"
-      depends_on: "gen_obs"
-      command:
+        - julia --project=experiments/AMIP/ experiments/calibration/amip/generate_observations.jl
         - julia --project=experiments/AMIP/ experiments/calibration/amip/run_calibration.jl
       agents:
         pbs_l_walltime: "12:00:00"

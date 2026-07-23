@@ -35,12 +35,12 @@ If a surface model is not present, the area fraction is set to 0.
 function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     # An ocean model may provide its own authoritative surface fractions
     # (e.g. derived from its bathymetric wet mask); if it does, skip the
-    # legacy land-fraction-based update.
+    # land-fraction-based derivation below.
     if haskey(cs.model_sims, :ocean_sim) &&
        align_surface_fractions!(cs.model_sims.ocean_sim, cs)
         return nothing
     end
-    _update_surface_fractions_legacy!(cs)
+    _update_surface_fractions_from_land_fraction!(cs)
     return nothing
 end
 
@@ -51,7 +51,7 @@ Give the ocean model the opportunity to set all surface area fractions from its
 own representation of the land/sea distribution (e.g. a fraction derived from
 the ocean bathymetry via an exchange grid).
 
-Return `true` if the fractions were updated (in which case the legacy update in
+Return `true` if the fractions were updated (in which case the land-fraction-based update in
 [`update_surface_fractions!`](@ref) is skipped), `false` otherwise. The default
 implementation returns `false`; ocean models can extend this method.
 
@@ -62,7 +62,7 @@ function align_surface_fractions!(ocean_sim, cs::Interfacer.CoupledSimulation)
     return false
 end
 
-function _update_surface_fractions_legacy!(cs::Interfacer.CoupledSimulation)
+function _update_surface_fractions_from_land_fraction!(cs::Interfacer.CoupledSimulation)
     FT = CC.Spaces.undertype(Interfacer.boundary_space(cs))
 
     # land fraction is static

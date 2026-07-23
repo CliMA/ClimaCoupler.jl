@@ -440,10 +440,10 @@ function construct_remapper(
         exchange_grid = on_device(arch, exchange_grid_cpu)
 
         # Per-polygon flux scratch, boundary-space flux scratch fields (in the
-        # layout `update_flux_fields!` expects), a shared DSS buffer, and the
-        # DSS'd nodal wet coverage used to normalize the SE-side flux scatter.
+        # layout `update_flux_fields!` expects), the boundary-space nodal
+        # coverage of the current flux weight (`scatter_poly_fluxes_to_boundary!`
+        # fills it each step), and a shared DSS buffer.
         ocean_flux_state = ExchangeFluxState{FT}(arch, exchange_grid_cpu.n_poly)
-        momentum_basis = momentum_basis_fields(boundary_space)
         ice_flux_state = IceExchangeState{FT}(arch, exchange_grid_cpu.n_poly)
         weight_cov_scratch = CC.Fields.zeros(boundary_space)
         flux_scratch = (;
@@ -454,24 +454,14 @@ function construct_remapper(
             F_turb_moisture = CC.Fields.zeros(boundary_space),
         )
         flux_dss_buffer = Utilities.init_dss_buffer(flux_scratch.F_sh)
-        node_cov_dss = CC.Fields.zeros(boundary_space)
-        CRExt = get_ConservativeRegriddingCCExt()
-        device_array_type = ClimaComms.array_type(ClimaComms.device(boundary_space))
-        CRExt.vec_to_se_field!(
-            node_cov_dss,
-            Adapt.adapt(device_array_type, exchange_grid_cpu.node_cov),
-        )
-        Utilities.apply_dss!(node_cov_dss, flux_dss_buffer)
     else
         exchange_grid = nothing
         wet_ocean_fraction = nothing
         ocean_flux_state = nothing
-        momentum_basis = nothing
         ice_flux_state = nothing
         weight_cov_scratch = nothing
         flux_scratch = nothing
         flux_dss_buffer = nothing
-        node_cov_dss = nothing
     end
 
     # `TripolarGrid` covers the full sphere by construction, so no polar
@@ -488,12 +478,10 @@ function construct_remapper(
         exchange_grid,
         wet_ocean_fraction,
         ocean_flux_state,
-        momentum_basis,
         ice_flux_state,
         weight_cov_scratch,
         flux_scratch,
         flux_dss_buffer,
-        node_cov_dss,
         use_exchange_grid,
     )
 end
@@ -783,7 +771,7 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
 
     # Gather the atmospheric and ocean-surface state onto the polygons.
-    gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec, remapping.momentum_basis)
+    gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec)
     Nz = size(sim.ocean.model.grid, 3)
     gather_cells_to_polys!(
         fs.T_sfc,
@@ -800,7 +788,6 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
         SF.ConstantGustinessSpec(FT(1)),
     )
     compute_ocean_polygon_fluxes!(fs, surface_fluxes_params, thermo_params, config)
-    check_poly_flux_nans(fs, eg, "ocean")
     fs.n_acc[] += 1
 
     # The ocean fluxes apply to the open-water part of each polygon.

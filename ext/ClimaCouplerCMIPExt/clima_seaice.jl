@@ -532,7 +532,7 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
 
     # Atmospheric state, including the downwelling radiation entering the
     # skin-temperature balance.
-    gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec, remapping.momentum_basis)
+    gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec)
     gather_nodes_to_polys!(is.SW_d, eg, CRExt.se_field_to_vec(csf.SW_d))
     gather_nodes_to_polys!(is.LW_d, eg, CRExt.se_field_to_vec(csf.LW_d))
 
@@ -598,7 +598,6 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
         α_albedo,
         T_melt,
     )
-    check_poly_flux_nans(is, eg, "sea-ice")
     fs.n_acc[] += 1
 
     # The ice fluxes apply to the ice-covered part of each polygon.

@@ -3,7 +3,7 @@ import ClimaSeaIce.SeaIceThermodynamics: ConductiveFlux, IceWaterThermalEquilibr
 import ClimaSeaIce.SeaIceDynamics: maybe_extended_grid
 import Oceananigans.BoundaryConditions: Zipper
 
-ocean_reference_density(ocean::Simulation, FT) =
+ocean_reference_density(ocean::OC.Simulation, FT) =
     convert(FT, ocean.model.buoyancy.formulation.equation_of_state.reference_density)
 ocean_reference_density(::Nothing, FT) = convert(FT, 1026.0)
 

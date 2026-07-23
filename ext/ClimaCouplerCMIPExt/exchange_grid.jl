@@ -529,54 +529,24 @@ end
 On a `RightCenterFolded` `TripolarGrid` the fold-row cell `(i, Ny)` is the
 same physical cell as `(Nx + 1 - i, Ny)`; the exchange grid keeps one copy as
 a real cell and leaves the other a degenerate shadow with no polygons, so
-shadow slots hold 0 after a scatter. Mirror each primary (fold locals
-`1..Nx÷4` and `Nx÷2 + 1 .. Nx÷2 + Nx÷4`; partner of local `r` is
-`Nx + 1 - r`) into its partner slot. Replicates the internal
-`mirror_fold_partners!` in `ConservativeRegriddingOceananigansExt`.
+shadow slots hold 0 after a scatter.
 =#
-
-@kernel function _mirror_fold_kernel!(dst, Nx, Nh, Nquarter, fold_offset)
-    i = @index(Global)
-    r = ifelse(i <= Nquarter, i, i + Nh - Nquarter)
-    @inbounds dst[Nx + 1 - r + fold_offset] = dst[r + fold_offset]
-end
 
 """
     mirror_fold_partners!(cell_values, grid)
 
 Copy each fold-row primary cell's value into its shadow partner slot on a
 `RightCenterFolded` tripolar grid; no-op for other grids. `cell_values` is a
-flat vector over the `Nx × Ny` surface cells.
+flat vector over the `Nx × Ny` surface cells. Delegates to the internal
+`mirror_fold_partners!` in `ConservativeRegriddingOceananigansExt`.
 """
-mirror_fold_partners!(cell_values, grid) = cell_values
-
 mirror_fold_partners!(cell_values, grid::OC.ImmersedBoundaryGrid) =
     mirror_fold_partners!(cell_values, grid.underlying_grid)
 
-function mirror_fold_partners!(
-    cell_values,
-    grid::OC.Grids.ZRegOrthogonalSphericalShellGrid{<:Number, <:Any, OC.RightCenterFolded},
-)
-    Nx, Ny, _ = size(grid)
-    Nh = Nx ÷ 2
-    Nquarter = Nx ÷ 4
-    fold_offset = (Ny - 1) * Nx
-    if _is_cpu(cell_values)
-        @inbounds for i in 1:(2 * Nquarter)
-            r = ifelse(i <= Nquarter, i, i + Nh - Nquarter)
-            cell_values[Nx + 1 - r + fold_offset] = cell_values[r + fold_offset]
-        end
-    else
-        backend = KernelAbstractions.get_backend(cell_values)
-        _mirror_fold_kernel!(backend, _KA_WORKGROUP)(
-            cell_values,
-            Nx,
-            Nh,
-            Nquarter,
-            fold_offset;
-            ndrange = 2 * Nquarter,
-        )
-    end
+function mirror_fold_partners!(cell_values, grid)
+    CROCExt = get_ConservativeRegriddingOCExt()
+    @assert !isnothing(CROCExt)
+    CROCExt.mirror_fold_partners!(cell_values, grid)
     return cell_values
 end
 

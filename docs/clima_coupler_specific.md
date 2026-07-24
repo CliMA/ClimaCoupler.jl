@@ -39,8 +39,8 @@ Mapped to the architectural layers in
 | Component Extensions | `ext/ClimaCouplerClimaAtmosExt.jl` | ClimaAtmos component-model integration |
 | Component Extensions | `ext/ClimaCouplerClimaLandExt/` | ClimaLand component-model integration |
 | Component Extensions | `ext/ClimaCouplerCMIPExt/` | CMIP-mode (Oceananigans + ClimaSeaIce) integration |
-| Component Extensions | `ext/ClimaCouplerCMIPMakieExt.jl` | Oceananigans-specific Makie visualization (heatmaps, extrema printing) |
-| Component Extensions | `ext/ClimaCouplerMakieExt/` | General visualization extensions (debug plots, diagnostics plots, leaderboard) |
+| Component Extensions | `ext/ClimaCouplerCMIPMakieExt/` | Ocean/sea-ice (Oceananigans JLD2) diagnostics plots |
+| Component Extensions | `ext/ClimaCouplerMakieExt/` | Visualization extensions (snapshot plots, diagnostics plots, conservation plots, leaderboard) |
 | Driver Scripts | `experiments/AMIP/` | AMIP run scripts and configuration |
 | Driver Scripts | `experiments/CMIP/` | CMIP run scripts and configuration |
 | Driver Scripts | `experiments/calibration/` | EKI calibration experiment drivers |

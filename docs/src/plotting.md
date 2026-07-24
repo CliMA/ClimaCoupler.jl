@@ -1,19 +1,78 @@
 # Plotting
 
 The `Plotting` module provides functionality for visualizing ClimaCoupler simulation output,
-including diagnostic plots, visualizations for debugging, leaderboards comparing to observations,
-and calibration parameter plots.
+including instantaneous snapshot plots, diagnostic plots, leaderboards comparing to
+observations, and calibration parameter plots.
 
 By default, the `Plotting` module provides stub implementations that do nothing.
 The actual plotting implementations are provided by the `ClimaCouplerMakieExt` extension
-when Makie.jl and related packages are available, and by `ClimaCouplerCMIPMakieExt`
-when the plotting packages and Oceananigans.jl are available.
+when Makie.jl and related packages are available.
+
+### Output layout
+
+Plots are written to the simulation's `artifacts` directory, grouped into
+per-component subdirectories so that the top-level directory stays manageable
+once periodic snapshots are added:
+
+```
+artifacts/
+├── atmos_sim/
+│   ├── snapshot_2010_01_01.png      # instantaneous snapshots (one per plot_interval)
+│   ├── snapshot_2010_02_01.png
+│   ├── summary_2D_2010_01_01.pdf    # end-of-run diagnostics (one per time step)
+│   └── summary_2D_2010_02_01.pdf
+├── ocean_sim/
+├── land_sim/
+├── ice_sim/
+├── coupler/                         # component snapshots + coupler-field snapshots
+└── ...                             # conservation and leaderboard plots
+```
+
+### Plot styling
+
+All global (lat/lon) plots share a common style so that snapshots and diagnostics
+look consistent:
+
+- **Colormaps** are chosen per variable by [`Plotting.colormap_for`](@ref): e.g.
+  precipitation uses `:rain`, temperature `:thermal`, salinity `:haline`. Fields
+  that are inherently signed (velocities, fluxes, anomalies) or whose data spans
+  zero use the divergent `:balance` colormap, centered on zero. Anything else
+  falls back to `:viridis`.
+- Maps use the **Robinson projection** ([`Plotting.PROJECTION`](@ref)) and are
+  drawn with **coastlines**, with the lat/lon graticule and its labels hidden.
+- Each panel is titled with the variable name and units; the colorbar is narrow
+  ([`Plotting.COLORBAR_WIDTH`](@ref)) and unlabeled. The overall figure is titled
+  like `Ocean snapshots at 2010-01-01`.
+- Ocean and sea ice plots fill the continents in gray (land carries no data
+  there).
+
+### Snapshot plots
+
+Instantaneous "snapshot" plots are produced *during* a run by a callback, at the
+interval set by the `plot_interval` configuration flag (default `"1months"`; set
+to `"never"` to disable). They read the live state directly via
+`Interfacer.get_field`, so they are produced even for runs that crash before
+completion — useful for debugging test runs. (Snapshots replace the older
+end-of-run "debug" plots.)
+
+Each component gets one figure per snapshot, saved as
+`artifacts/<component>/snapshot_<date>.png`, plus one figure for the coupler
+exchange fields (fluxes, area fractions, etc.) at
+`artifacts/coupler/snapshot_<date>.png`. The component fields plotted are given
+by [`Plotting.snapshot_plot_fields`](@ref) (e.g. surface speed, SST, and SSS for
+the ocean), which can be specialized per component model.
 
 ### Postprocessing
 
-The `postprocess` function coordinates all postprocessing operations after a simulation completes,
-including generating diagnostic plots, leaderboards, conservation plots, and debug visualizations.
-It also performs RMSE checks against observations and closes diagnostics file writers.
+The `postprocess` function coordinates all end-of-run postprocessing operations,
+including generating diagnostic plots, leaderboards, and conservation plots. It
+also performs RMSE checks against observations and closes diagnostics file
+writers. Unlike the snapshot callback, `postprocess` covers the diagnostics that
+require the full time series and so runs once the simulation completes.
+
+By default (`plot_diagnostics = :all`) `postprocess` plots every saved time step
+of each diagnostic; pass `plot_diagnostics = :last` to plot only the final
+averaging window.
 
 **Note:** While `postprocess` can be called without the Makie extension loaded, it will not generate
 any plots. To produce visualizations, ensure the `ClimaCouplerMakieExt` extension is loaded by
@@ -42,16 +101,33 @@ Once loaded, all plotting functions in the `Plotting` module will use the full i
 
 ### Features
 
+#### Snapshot plots
+
+Instantaneous snapshot plots of each component model's key surface fields, and of
+the coupler exchange fields, are generated periodically during a run (see
+[Snapshot plots](@ref) above). Each field is remapped onto the coupler boundary
+space and plotted on a global map with the shared plot styling. These replace the
+older debug plots.
+
 #### Diagnostics plots
 
 ClimaCouplerMakieExt.jl uses ClimaAnalysis.jl to generate plots of diagnostic variables
-saved using the ClimaDiagnostics.jl infrastructure.
+saved using the ClimaDiagnostics.jl infrastructure (atmosphere, land, and coupler).
+
+By default every saved time step is plotted (one summary file per time step per
+component); pass `plot_diagnostics = :last` to `postprocess` to plot only the
+final averaging window.
 
 For information about diagnostics in ClimaCoupler, including how to customize which
 variables to save, how often, and with which reductions, see the [SimOutput](@ref) documentation.
 
 For example, here is a plot of the atmosphere water vapor path diagnostic, generated using ClimaAnalysis.jl:
 ![Water vapor path diagnostic](assets/amip-25Jan2026-diagnostic-water_vapor.png)
+
+The Oceananigans-based ocean and sea ice components write their surface
+diagnostics as Oceananigans JLD2 output on their native (possibly curvilinear)
+grids. These are plotted by the [ClimaCouplerCMIPMakieExt Extension](@ref) using
+the same global styling.
 
 #### Leaderboards
 
@@ -93,55 +169,46 @@ For information about conservation checks in ClimaCoupler, see the [Conservation
 Here is an example plot of energy conservation over the course of a 10-day slabplanet simulation:
 ![Slabplanet energy conservation](assets/longrun-25Jan2026-conservation-energy.png)
 
-#### Debug plots
-
-To facilitate debugging, ClimaCoupler.jl plots most coupler fields and model
-fields of physical interest by default. These plots are availabe at the end of a simulation
-in the provided artifacts directory.
-
-Since these plots are intended for debugging, they are less polished than the other plotting options.
-
-For example, here are the debug plots generation for the atmosphere component:
-![Atmosphere debug plots](assets/longrun-25Jan2026-debug-atmos.png)
-
 ## ClimaCouplerCMIPMakieExt Extension
 
-The `ClimaCouplerCMIPMakieExt` extension extends the base plotting functionality
-to support Oceananigans.jl fields when Oceananigans is used as the ocean component model.
-
-### Loading the Extension
-
-The extension is automatically loaded when Oceananigans.jl and the required Makie packages are available:
+The `ClimaCouplerCMIPMakieExt` extension plots the diagnostics of the
+Oceananigans-based ocean and sea ice components. It is loaded automatically when
+Oceananigans and the Makie packages are available:
 
 ```julia
-using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, Poppler_jll, Printf
+using Makie, GeoMakie, CairoMakie, Poppler_jll, Printf
 using Oceananigans
 ```
 
-The `ClimaCouplerCMIPExt` extension adds support for:
+The ocean and sea ice write their surface diagnostics as Oceananigans JLD2
+`FieldTimeSeries` output (`ocean_surface`, `seaice_surface`) on their native
+(possibly curvilinear, e.g. tripolar) grids. `Plotting.make_ocean_diagnostics_plots`
+and `Plotting.make_seaice_diagnostics_plots` read those series and plot each
+field on a global map — using the field's own longitude/latitude nodes as
+coordinates, so curvilinear grids are handled correctly — with the same shared
+styling (Robinson projection, coastlines, per-variable colormaps) as the other
+diagnostics. Like the other diagnostics, they honor `plot_diagnostics`
+(`:all`/`:last`).
 
-- **Oceananigans field plotting**: Extends `Plotting.debug_plot!` to handle `Oceananigans.Field`
-  and `Oceananigans.AbstractOperations.AbstractOperation` types, allowing debug plots to visualize
-  ocean model fields directly.
-
-- **Oceananigans field extrema**: Extends `Plotting.print_extrema` to format the minimum and maximum
-  values of Oceananigans fields for display in plot titles and labels.
-
-These extensions enable the debug plotting system to automatically handle Oceananigans fields
-when they are encountered in coupled simulations, without requiring any special handling in user code.
-
-For example, here are the debug plots generation for the Oceananigans component:
-![Øceananigans debug plots](assets/shortrun-28Feb2026-debug-ocean.png)
+Ocean fields: surface current speed, sea surface temperature, salinity, and
+height. Sea ice fields: drift speed, concentration, thickness, and top-surface
+temperature.
 
 ## Plotting API
 
 ```@docs
 Plotting.postprocess
+Plotting.plot_snapshots
+Plotting.snapshot_plot
+Plotting.snapshot_plot_fields
+Plotting.colormap_for
+Plotting.geo_plot_kwargs
+Plotting.component_artifacts_dir
+Plotting.PROJECTION
+Plotting.COLORBAR_WIDTH
 Plotting.make_diagnostics_plots
 Plotting.make_ocean_diagnostics_plots
-Plotting.debug
-Plotting.debug_plot_fields
-Plotting.debug_plot!
+Plotting.make_seaice_diagnostics_plots
 Plotting.plot_global_conservation
 Plotting.compute_leaderboard
 Plotting.compute_pfull_leaderboard

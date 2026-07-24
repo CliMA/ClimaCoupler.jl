@@ -652,19 +652,22 @@ Arguments:
         ρτyio[i, j, 1] * ρₒ⁻¹ * OC.Operators.ℑyᵃᶠᵃ(i, j, 1, grid, ice_concentration)
 end
 
-# Additional ClimaSeaIceSimulation getter methods for plotting debug fields
+# Additional ClimaSeaIceSimulation getter methods for snapshot plot fields
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:u}) = sim.ice.model.velocities.u
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:v}) = sim.ice.model.velocities.v
 
 """
-    Plotting.debug_plot_fields(sim::ClimaSeaIceSimulation)
+    Plotting.snapshot_plot_fields(sim::ClimaSeaIceSimulation)
 
-Return the fields to include in debug plots for a ClimaSeaIce simulation.
-This includes the area fraction, surface temperature, ice concentration, ice thickness, and
-zonal and meridional velocity fields. Note that if the sea ice model does not have dynamics,
-the velocity fields will be zero.
-
-These plots are not polished, and are intended for debugging.
+Return the fields to include in instantaneous snapshot plots for a ClimaSeaIce
+simulation: area fraction, surface temperature, ice concentration, ice
+thickness, and surface (drift) speed. Note that if the sea ice model does not
+have dynamics, the surface speed will be zero.
 """
-Plotting.debug_plot_fields(sim::ClimaSeaIceSimulation) =
-    (:area_fraction, :surface_temperature, :ice_concentration, :ice_thickness, :u, :v)
+Plotting.snapshot_plot_fields(sim::ClimaSeaIceSimulation) = (
+    :area_fraction,
+    :surface_temperature,
+    :ice_concentration,
+    :ice_thickness,
+    :surface_speed,
+)

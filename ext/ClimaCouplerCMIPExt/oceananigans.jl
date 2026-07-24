@@ -656,11 +656,16 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:free_surface_displaceme
     sim.ocean.model.free_surface.displacement
 
 """
-    Plotting.debug_plot_fields(sim::OceananigansSimulation)
+    Plotting.snapshot_plot_fields(sim::OceananigansSimulation)
 
-Return the fields to include in debug plots for an Oceananigans simulation.
-This includes the area fraction, surface temperature, salinity, velocity, and
-free surface displacement. These plots are not polished, and are intended for debugging.
+Return the fields to include in instantaneous snapshot plots for an Oceananigans
+simulation: area fraction, sea surface temperature and salinity, surface current
+speed, and free surface displacement.
 """
-Plotting.debug_plot_fields(sim::OceananigansSimulation) =
-    (:area_fraction, :surface_temperature, :salinity, :u, :v, :free_surface_displacement)
+Plotting.snapshot_plot_fields(sim::OceananigansSimulation) = (
+    :area_fraction,
+    :surface_temperature,
+    :salinity,
+    :surface_speed,
+    :free_surface_displacement,
+)

@@ -112,7 +112,10 @@ coupler_output_dir_amip/
 ├── checkpoints
 │       └── checkpoints for the various models
 ├── artifacts
-│       └── plots produced by the postporcessing step
+│       ├── atmos_sim/  ← snapshot + diagnostics plots, per component
+│       ├── ocean_sim/
+│       ├── ...
+│       └── plots produced by the postprocessing step (conservation, leaderboard)
 ├── regrid_tmp_<random_tempdir>/
 │       └── temporary files used for regridding
 ├── output_0000/
@@ -130,7 +133,7 @@ coupler_output_dir_amip/
 # Arguments
 - `output_dir::String`: The directory where the output files will be stored.
         Default is the current directory.
-- `artifacts_dir::String`: The directory where plots (from postprocessing and conservation checks) will be stored.
+- `artifacts_dir::String`: The directory where plots (periodic snapshots, end-of-run diagnostics, and conservation checks) will be stored, grouped into per-component subdirectories.
         Default is `output_dir/artifacts/`.
 - `checkpoint_dir::String`: The directory where the checkpoint files will be stored.
         Default is `output_dir/checkpoints/`.

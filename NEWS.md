@@ -4,6 +4,40 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Revamp plotting: periodic snapshots, per-component folders, and per-variable styling
+Plotting has been overhauled:
+- **Instantaneous snapshot plots** are now produced *during* a run by a callback (rather than
+  only at the end via `postprocess`), so plots are available even for runs that crash. The
+  interval is controlled by the new `plot_interval` config flag (default `"1months"`,
+  `"never"` to disable). Snapshots read each component's live state via `Interfacer.get_field`
+  and plot a small curated set of fields per component (e.g. surface speed, SST, and SSS for
+  the ocean), given by the new `Plotting.snapshot_plot_fields`.
+- **Per-component output folders**: plots are now written to per-component subdirectories of
+  `artifacts` (e.g. `artifacts/atmos_sim`), with snapshots named `snapshot_<date>.png`.
+- **Per-variable styling**: global (lat/lon) plots now use sensible per-variable colormaps
+  (`Plotting.colormap_for`; e.g. `:rain` for precipitation, `:thermal` for temperature,
+  `:haline` for salinity, and the divergent `:balance` for signed fields), the Robinson
+  projection, and coastlines. The lat/lon graticule and its labels are hidden, each panel is
+  titled with the variable name and units, colorbars are narrow and unlabeled, and ocean/sea
+  ice plots draw land in gray. This styling is applied to both the snapshot plots and the
+  end-of-run diagnostics.
+- **Snapshots replace debug plots**: the old end-of-run "debug" plots have been removed
+  (`Plotting.debug`, `debug_plot_fields`, `debug_plot!`, and `print_extrema` are gone).
+  Snapshots now also cover the coupler exchange fields
+  (`artifacts/coupler/snapshot_<date>.png`) and an expanded per-component field set, and warn
+  (rather than error) on NaN/Inf.
+- **`postprocess` plots the full time series**: `postprocess` now accepts
+  `plot_diagnostics` (`:all` by default) to plot every saved time step of each diagnostic
+  (one summary file per time step, named with the date); pass `:last` to plot only the final
+  averaging window (the previous behavior).
+- **Ocean/sea-ice diagnostics plots**: the Oceananigans ocean and sea ice surface diagnostics
+  (JLD2 `FieldTimeSeries` output) are now plotted by a reinstated `ClimaCouplerCMIPMakieExt`
+  extension (`Plotting.make_ocean_diagnostics_plots` / `make_seaice_diagnostics_plots`). They
+  render each field on a global map using the field's own lon/lat nodes (so curvilinear/tripolar
+  grids work) with the shared Robinson/coastline/per-variable-colormap styling, and honor
+  `plot_diagnostics`. This replaces the previous ocean diagnostics function, which read a
+  NetCDF file that was never written.
+
 #### Adapt to the redesigned RRTMGP 0.22 / ClimaAtmos 0.42 radiation API.
 The atmosphere radiation cache now holds an `RRTMGP.RRTMGPSolver`; coupler flux and albedo
 accesses go through `RRTMGP` getters (e.g. `RRTMGP.sw_flux_dn`, `RRTMGP.surface_emissivity`),

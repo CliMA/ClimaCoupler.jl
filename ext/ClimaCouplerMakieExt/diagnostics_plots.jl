@@ -1,6 +1,7 @@
 import CairoMakie
 import CairoMakie.Makie
 import ClimaAnalysis as CAN
+import Dates
 using Poppler_jll: pdfunite
 
 const LARGE_NUM = typemax(Int)
@@ -20,16 +21,68 @@ long_name(var) = var.attributes["long_name"]
 short_name(var) = var.attributes["short_name"]
 
 """
+    _styled_plot!(grid_loc, var; kwargs...)
+
+Plot a single diagnostic `var` at `grid_loc` using the shared plot styling.
+
+Any keyword arguments (e.g. `time = ...`) are treated as slices and applied to
+`var` first (by nearest value), so that after slicing the variable is reduced to
+the dimensions being plotted. This mirrors how `ClimaAnalysis`'s `plot!` consumes
+its slicing keywords, but lets us inspect the *sliced* data to choose styling.
+
+For 2-D lat/lon variables this applies the per-variable colormap, Robinson
+projection, and coastlines (see [`Plotting.geo_plot_kwargs`](@ref)), so that the
+diagnostics plots match the instantaneous snapshot plots. Other variables (e.g.
+vertical profiles or zonally-averaged fields) fall back to the default
+`ClimaAnalysis` plotting.
+"""
+function _styled_plot!(grid_loc, var; kwargs...)
+    # Apply the slicing keywords (e.g. `time`) up front so we style and plot the
+    # already-sliced variable. Only slice by dimensions the variable actually has
+    # (`slice` slices by nearest value by default, so `time = LAST_SNAP` selects
+    # the last time step).
+    for (dim_name, val) in kwargs
+        haskey(var.dims, string(dim_name)) || continue
+        var = CAN.slice(var; NamedTuple{(dim_name,)}((val,))...)
+    end
+
+    is_latlon_2d =
+        length(var.dims) == 2 &&
+        (CAN.has_longitude(var) && CAN.has_latitude(var))
+    if is_latlon_2d
+        # Reuse the shared global-map renderer (Robinson projection + coastlines +
+        # per-variable colormap) so diagnostics match the snapshot plots.
+        Plotting.snapshot_plot(grid_loc, var)
+    else
+        CAN.Visualize.plot!(grid_loc, var)
+    end
+    return nothing
+end
+
+"""
     make_diagnostics_plots(
         output_path::AbstractString,
         plot_path::AbstractString;
         output_prefix = "",
+        plot_diagnostics = :all,
     )
-Create plots for diagnostics. The plots are saved to `plot_path`.
+Create plots for diagnostics. The plots are saved to `plot_path` (typically a
+per-component subdirectory of `artifacts`, e.g. `artifacts/atmos_sim`).
 This function will plot all variables that have been saved in `output_path`.
+
+`plot_diagnostics` controls which time steps are plotted:
+- `:all` (default): plot every saved time step, producing one summary file per
+  time step (named with the date, e.g. `summary_2D_2010_01_01.pdf`).
+- `:last`: plot only the last saved time step (i.e. the final averaging window),
+  producing a single summary file (e.g. `summary_2D.pdf`).
 
 When plotting diagnostics, diagnostics that are daily averages in z coordinates
 (if available) are prioritized first.
+
+Two-dimensional lat/lon variables are plotted on a global map using the shared
+plot styling (per-variable colormap, Robinson projection, and coastlines; see
+[`Plotting.geo_plot_kwargs`](@ref)), so that these diagnostics match the
+instantaneous snapshot plots.
 
 For column / box-grid output (no lat/lon dimensions), degenerate horizontal
 dimensions are sliced out and 3-D variables are plotted as vertical profiles
@@ -39,6 +92,7 @@ function Plotting.make_diagnostics_plots(
     output_path::AbstractString,
     plot_path::AbstractString;
     output_prefix = "",
+    plot_diagnostics = :all,
 )
     simdir = CAN.SimDir(output_path)
     short_names = CAN.available_vars(simdir)
@@ -67,42 +121,132 @@ function Plotting.make_diagnostics_plots(
         vars_3D = map(var_3D -> CAN.average_lon(var_3D), filter(is_3d, vars))
         vars_2D = filter(var -> !is_3d(var), vars)
 
-        !isempty(vars_3D) && make_plots_generic(
+        _plot_var_group(
             output_path,
             plot_path,
             vars_3D,
-            time = LAST_SNAP,
-            output_name = output_prefix * "summary_3D",
+            output_prefix * "summary_3D",
+            plot_diagnostics;
             more_kwargs = YLINEARSCALE,
         )
-        !isempty(vars_2D) && make_plots_generic(
+        _plot_var_group(
             output_path,
             plot_path,
             vars_2D,
-            time = LAST_SNAP,
-            output_name = output_prefix * "summary_2D",
+            output_prefix * "summary_2D",
+            plot_diagnostics;
+            plot_fn = _styled_plot!,
         )
     else
         # Column / box-grid mode: slice out degenerate horizontal dims
         vars_profile = _slice_to_column.(filter(is_3d, vars))
         vars_surface = _slice_to_column.(filter(var -> !is_3d(var), vars))
 
-        !isempty(vars_profile) && make_plots_generic(
+        _plot_var_group(
             output_path,
             plot_path,
             vars_profile,
-            time = LAST_SNAP,
-            output_name = output_prefix * "summary_profiles",
+            output_prefix * "summary_profiles",
+            plot_diagnostics;
             more_kwargs = YLINEARSCALE,
         )
-        !isempty(vars_surface) && make_plots_generic(
+        _plot_var_group(
             output_path,
             plot_path,
             vars_surface,
-            time = LAST_SNAP,
-            output_name = output_prefix * "summary_surface",
+            output_prefix * "summary_surface",
+            plot_diagnostics,
         )
     end
+end
+
+"""
+    _plot_var_group(output_path, plot_path, vars, base_name, plot_diagnostics; kwargs...)
+
+Plot a group of diagnostic `vars` (e.g. all 2-D lat/lon fields) to `plot_path`,
+dispatching on `plot_diagnostics`:
+- `:last`: one summary file `<base_name>.pdf` at the last time step.
+- `:all`: one summary file per saved time step, `<base_name>_<date>.pdf`.
+
+For `:all`, the set of time steps is taken from the union of the `vars`' time
+dimensions; variables without a time dimension are plotted once (at their single
+value) in every time step's file. Extra `kwargs` (e.g. `plot_fn`, `more_kwargs`)
+are forwarded to [`make_plots_generic`](@ref).
+"""
+function _plot_var_group(
+    output_path,
+    plot_path,
+    vars,
+    base_name,
+    plot_diagnostics;
+    kwargs...,
+)
+    isempty(vars) && return nothing
+
+    if plot_diagnostics == :last
+        make_plots_generic(
+            output_path,
+            plot_path,
+            vars,
+            time = LAST_SNAP,
+            output_name = base_name;
+            kwargs...,
+        )
+        return nothing
+    end
+
+    plot_diagnostics == :all || error(
+        "`plot_diagnostics` must be `:all` or `:last`, got `$(plot_diagnostics)`",
+    )
+
+    # Collect the union of all time steps across the variables that have a time
+    # dimension, then produce one summary file per time step.
+    times = Float64[]
+    for var in vars
+        CAN.has_time(var) && union!(times, CAN.times(var))
+    end
+    sort!(times)
+
+    # If no variable has a time dimension, there is a single (timeless) plot.
+    if isempty(times)
+        make_plots_generic(
+            output_path,
+            plot_path,
+            vars,
+            output_name = base_name;
+            kwargs...,
+        )
+        return nothing
+    end
+
+    for t in times
+        make_plots_generic(
+            output_path,
+            plot_path,
+            vars,
+            time = t,
+            output_name = "$(base_name)_$(_time_suffix(vars, t))";
+            kwargs...,
+        )
+    end
+    return nothing
+end
+
+"""
+    _time_suffix(vars, t)
+
+Return a filename-friendly suffix for the time step `t` (seconds): the date
+`yyyy_mm_dd` if any of `vars` carries a `start_date` (so a calendar date can be
+computed), otherwise the integer number of seconds.
+"""
+function _time_suffix(vars, t)
+    for var in vars
+        if CAN.has_time(var) && haskey(var.attributes, "start_date")
+            date = Dates.DateTime(var.attributes["start_date"]) + Dates.Second(round(Int, t))
+            return Dates.format(date, "yyyy_mm_dd")
+        end
+    end
+    return string(round(Int, t)) * "s"
 end
 
 
@@ -123,56 +267,6 @@ function _slice_to_column(var)
     "y" in dim_names && (var = CAN.slice(var, by = CAN.Index(), y = 1))
     return var
 end
-
-"""
-    make_ocean_diagnostics_plots(output_path::AbstractString, plot_path::AbstractString; output_prefix = "")
-
-Create plots for diagnostics. The plots are saved to `ocean_summary_2D.pdf` in `plot_path`.
-This function will plot the following variables, if they have been saved in `output_path`:
-    - Temperature (`T`)
-    - Salinity (`S`)
-    - Zonal velocity (`u`)
-    - Meridional velocity (`v`)
-
-For each variable, take the surface level (top level) of the variable
-and create a 2D plot. The plots will be saved in a single PDF file.
-"""
-function Plotting.make_ocean_diagnostics_plots(
-    output_path::AbstractString,
-    plot_path::AbstractString;
-    output_prefix = "",
-)
-    expected_output_path = joinpath(output_path, "ocean_diagnostics.nc")
-    isfile(expected_output_path) || return nothing
-
-    # Create an OutputVar for each diagnostic, so we can use ClimaAnalysis to plot
-    var_names = ["T", "S", "u", "v"]
-    vars = Array{Union{CAN.OutputVar, Nothing}}(undef, length(var_names))
-    for (i, var_name) in enumerate(var_names)
-        # Create an OutputVar if the variable is available in the output file
-        output_var = CAN.OutputVar(expected_output_path, var_name)
-        output_var.attributes["short_name"] = var_name
-
-        # Take the top level (surface) of the variable
-        output_var = CAN.slice(output_var, z_aac = output_var.dims["z_aac"][1])
-
-        vars[i] = output_var
-    end
-
-    # Filter out any variables that are not available
-    vars = filter(!isnothing, vars)
-
-    # Make plots for each variable, saved in one PDF file
-    !isempty(vars) && make_plots_generic(
-        expected_output_path, # file_path
-        plot_path,
-        vars,
-        time = LAST_SNAP,
-        output_name = output_prefix * "summary_2D",
-    )
-    return nothing
-end
-
 
 """
     make_plots_generic(
@@ -222,9 +316,14 @@ function make_plots_generic(
         output_name *= "_comparison"
     end
 
-    # Default plotting function needs access to kwargs
-    if isnothing(plot_fn)
+    # Both the default and any provided `plot_fn` need access to the slicing
+    # `args`/`kwargs` (e.g. `time = ...`), so close over them here. A provided
+    # `plot_fn` (e.g. `_styled_plot!`) receives them as keyword arguments.
+    user_plot_fn = plot_fn
+    if isnothing(user_plot_fn)
         plot_fn = (grid_loc, var) -> CAN.Visualize.plot!(grid_loc, var, args...; kwargs...)
+    else
+        plot_fn = (grid_loc, var) -> user_plot_fn(grid_loc, var; kwargs...)
     end
 
     MAX_PLOTS_PER_PAGE = MAX_NUM_ROWS * MAX_NUM_COLS

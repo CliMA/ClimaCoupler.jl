@@ -561,10 +561,13 @@ function Checkpointer.restore_cache!(sim::BucketSimulation, new_cache)
     )
 end
 
-# Additional BucketSimulation getter methods for plotting debug fields
+# Additional BucketSimulation getter methods for snapshot plot fields
 Interfacer.get_field(sim::BucketSimulation, ::Val{:σS}) = sim.integrator.u.bucket.σS
 Interfacer.get_field(sim::BucketSimulation, ::Val{:Ws}) = sim.integrator.u.bucket.Ws
 Interfacer.get_field(sim::BucketSimulation, ::Val{:W}) = sim.integrator.u.bucket.W
 
-Plotting.debug_plot_fields(sim::BucketSimulation) =
+# Fields for instantaneous snapshot plots of the bucket land: area fraction,
+# surface temperature, snow water equivalent, and surface/subsurface water
+# storage.
+Plotting.snapshot_plot_fields(sim::BucketSimulation) =
     (:area_fraction, :surface_temperature, :σS, :Ws, :W)

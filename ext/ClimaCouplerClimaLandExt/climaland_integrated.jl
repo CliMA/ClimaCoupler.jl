@@ -625,7 +625,7 @@ function Interfacer.progress(land_sim::ClimaLandSimulation, cs)
     return nothing
 end
 
-# Additional ClimaLand getter methods for plotting debug fields
+# Additional ClimaLand getter methods for snapshot plot fields
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_water}) =
     sim.integrator.u.soil.ϑ_l
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:soil_ice}) = sim.integrator.u.soil.θ_i
@@ -642,7 +642,9 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_water_equiv}) =
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:snow_liquid_water}) =
     sim.integrator.u.snow.S_l
 
-Plotting.debug_plot_fields(sim::ClimaLandSimulation) = (
+# Fields for instantaneous snapshot plots of the integrated land: surface state,
+# albedos, and the soil/canopy/snow prognostic variables.
+Plotting.snapshot_plot_fields(sim::ClimaLandSimulation) = (
     :area_fraction,
     :surface_direct_albedo,
     :surface_diffuse_albedo,

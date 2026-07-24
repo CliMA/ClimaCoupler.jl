@@ -21,10 +21,12 @@ import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
 import ClimaCore as CC
 import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
+import Dates
 import Random
 
 import ClimaCoupler
 import ..Interfacer
+import ..Plotting
 import ..ConservationChecker
 import ..FieldExchanger
 import ..FluxCalculator
@@ -213,6 +215,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         use_coupler_diagnostics,
         coupler_diagnostics_period,
         coupler_diagnostics_reduction,
+        plot_interval,
         output_dir_root,
         parameter_files,
         era5_filepaths,
@@ -457,6 +460,21 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         walltime_cb =
             TimeManager.Callback(schedule_walltime, TimeManager.WalltimeReporter())
         callbacks = (checkpoint_cb, walltime_cb)
+    end
+
+    # instantaneous snapshot plots (cheap, per-component; produced during the run
+    # so that plots are available even for runs that crash before completion)
+    if plot_interval != "never"
+        schedule_plot =
+            EveryCalendarDtSchedule(TimeManager.time_to_period(plot_interval); start_date)
+        plot_cb = TimeManager.Callback(
+            schedule_plot,
+            cs -> Plotting.plot_snapshots(
+                cs,
+                cs.start_date + Dates.Second(round(Int, float(cs.t[]))),
+            ),
+        )
+        callbacks = (callbacks..., plot_cb)
     end
 
     # component model progress reporting

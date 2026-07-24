@@ -847,33 +847,18 @@ function climaatmos_restart_path(output_dir_root, t)
     error("Restart file for time $t not found")
 end
 
-# Additional ClimaAtmos getter methods for plotting debug fields
-function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:w})
-    w_c = ones(CC.Spaces.horizontal_space(sim.domain.face_space))
-    parent(w_c) .= parent(
-        CC.Fields.level(
-            CC.Geometry.WVector.(sim.integrator.u.f.u₃),
-            5 .+ CC.Utilities.half,
-        ),
-    )
-    return w_c
-end
-specific_humidity(::CA.DryModel, integrator) = [eltype(integrator.u)(0)]
-specific_humidity(
-    ::Union{
-        CA.EquilibriumMicrophysics0M,
-        CA.NonEquilibriumMicrophysics1M,
-        CA.NonEquilibriumMicrophysics2M,
-        CA.NonEquilibriumMicrophysics2MP3,
-    },
-    integrator,
-) = integrator.u.c.ρq_tot
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρq_tot}) =
-    specific_humidity(sim.integrator.p.atmos.microphysics_model, sim.integrator)
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrator.u.c.ρe_tot
-
-Plotting.debug_plot_fields(sim::ClimaAtmosSimulation) =
-    (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
+# Fields for instantaneous snapshot plots of the atmosphere: near-surface wind
+# speed and air temperature, downwelling shortwave and longwave radiation, and
+# liquid and snow precipitation. These are all surface (2-D) fields that can be
+# remapped onto the coupler boundary space and plotted on a global map.
+Plotting.snapshot_plot_fields(sim::ClimaAtmosSimulation) = (
+    :surface_speed,
+    :air_temperature,
+    :SW_d,
+    :LW_d,
+    :liquid_precipitation,
+    :snow_precipitation,
+)
 
 """
     Interfacer.set_albedos!(sim::Models.PrescribedOceanSimulation, t)

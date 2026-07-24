@@ -22,8 +22,11 @@ using Makie
 # Diagnostics plots
 include(joinpath("ClimaCouplerMakieExt", "diagnostics_plots.jl"))
 
-# Debug plots
-include(joinpath("ClimaCouplerMakieExt", "debug_plots.jl"))
+# Instantaneous snapshot plots
+include(joinpath("ClimaCouplerMakieExt", "snapshot_plots.jl"))
+
+# Conservation plots
+include(joinpath("ClimaCouplerMakieExt", "conservation_plots.jl"))
 
 # Leaderboard
 include(joinpath("ClimaCouplerMakieExt", "leaderboard", "data_sources.jl"))

@@ -180,6 +180,10 @@ function argparse_settings()
         help = "Reduction mode for coupler diagnostic outputs. [`average` (default), `instantaneous`, `max`, `min`]"
         arg_type = String
         default = "average"
+        "--plot_interval"
+        help = "Time interval between instantaneous snapshot plots of each component model, saved to per-component subdirectories of `artifacts`. Set to \"never\" to disable. [\"1months\" (default), \"never\", or any \"Nsecs\"/\"Nmins\"/\"Nhours\"/\"Ndays\"/\"Nmonths\"]"
+        arg_type = String
+        default = "1months"
         # Physical simulation information
         "--evolving_ocean"
         help = "Boolean flag indicating whether to use a dynamic slab ocean model, as opposed to constant surface temperatures [`true` (default), `false`]"
@@ -573,6 +577,9 @@ function get_coupler_args(config_dict::Dict)
         coupler_diagnostics_period = TimeManager.time_to_period(coupler_diagnostics_period)
     end
 
+    # Interval between instantaneous snapshot plots ("never" disables them)
+    plot_interval = config_dict["plot_interval"]
+
     # Physical simulation information
     evolving_ocean = config_dict["evolving_ocean"]
 
@@ -684,6 +691,7 @@ function get_coupler_args(config_dict::Dict)
         use_coupler_diagnostics,
         coupler_diagnostics_period,
         coupler_diagnostics_reduction,
+        plot_interval,
         evolving_ocean,
         energy_check,
         conservation_softfail,

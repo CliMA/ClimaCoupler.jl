@@ -97,8 +97,9 @@ The available extensions are:
 - `ClimaCouplerMakieExt`: Implements all [Plotting](@ref) functions using Makie.jl,
   CairoMakie.jl, ClimaCoreMakie.jl, and GeoMakie.jl. Loaded automatically when these packages
   are available.
-- `ClimaCouplerCMIPMakieExt`: Extends the Makie plotting support to handle
-  Oceananigans.jl fields when Oceananigans is used as the ocean component model.
+- `ClimaCouplerCMIPMakieExt`: Plots the diagnostics of the Oceananigans-based ocean and
+  sea ice components. Loaded automatically when Oceananigans.jl and the Makie packages are
+  available.
 
 Details about the component model extensions can be found in the section [Models in Extensions](@ref),
 and details about the plotting extensions can be found in [Plotting](@ref).

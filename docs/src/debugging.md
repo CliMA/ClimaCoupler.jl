@@ -88,14 +88,19 @@ values in any field, or values that are zero where they shouldn't be.
 
 ### Plotting ClimaCore fields
 
-The built-in `Plotting.debug` function produces a grid of heatmaps of all coupler and
-component model fields, and is the easiest first step:
+The built-in [`Plotting.plot_snapshots`](@ref) function produces global maps of each
+component model's key fields and of the coupler exchange fields, and is the easiest
+first step:
 
 ```julia
-# Plot all coupler fields and component model fields to a directory
-Plotting.debug(cs, "debug_output")
-# Produces: debug_output/debug_coupler.png, debug_output/debug_<ModelName>.png, etc.
+using CairoMakie, GeoMakie, ClimaCoreMakie
+import Dates
+# Plot component and coupler snapshots to `<artifacts>/<component>/snapshot_<date>.png`
+Plotting.plot_snapshots(cs, Dates.DateTime(cs.start_date) + Dates.Second(round(Int, cs.t[])))
 ```
+
+These are the same snapshots produced automatically during a run at the `plot_interval`
+frequency (see [Snapshot plots](@ref)).
 
 You can also plot individual ClimaCore fields with ClimaCoreMakie directly:
 
@@ -174,8 +179,10 @@ OC.compute!(field_3d)
 CairoMakie.heatmap!(ax, view(field_3d, :, :, derived.grid.Nz))
 ```
 
-The `Plotting.debug` function handles both field types automatically when the
-`ClimaCouplerCMIPMakieExt` extension is loaded.
+For a non-interactive alternative, the [snapshot plots](@ref "Snapshot plots")
+produced during a run (and via [`Plotting.plot_snapshots`](@ref)) render each
+component's key fields — including Oceananigans-based ocean and sea ice fields —
+remapped onto the coupler boundary space.
 
 ## Software errors
 

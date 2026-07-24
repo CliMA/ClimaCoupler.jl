@@ -38,3 +38,4 @@ t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
 use_itime: true
+plot_interval: "360secs"

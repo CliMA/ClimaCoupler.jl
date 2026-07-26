@@ -112,14 +112,18 @@ if abspath(PROGRAM_FILE) == @__FILE__
     ceres_data_loader = CalibrationTools.CERESDataLoader()
     modis_data_loader = CalibrationTools.ModisDataLoader()
     mac_data_loader = CalibrationTools.MACDataLoader()
+    # CALIPSO/CloudSat provides level-resolved cloud fraction `cl`.
+    calipso_data_loader = CalibrationTools.CalipsoDataLoader()
     # Both MODIS and MAC provide `lwp`, so disambiguate to get `lwp` from MAC.
     # MODIS is kept for its ice water path (`clivi`).
     data_loader = CalibrationTools.CompositeDataLoader(
         era5_pl_data_loader,
         ceres_data_loader,
         modis_data_loader,
-        mac_data_loader;
-        varname_to_loader = Dict("lwp" => mac_data_loader),
+        mac_data_loader,
+        calipso_data_loader;
+        varname_to_loader =
+            Dict("lwp" => mac_data_loader, "cl" => calipso_data_loader),
     )
 
     (; short_names) = CALIBRATE_CONFIG
@@ -135,11 +139,18 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # In the future, if we want to do specific preprocessing, this needs to
     # change
     vars = select_pressure_levels.(vars, Ref(PRESSURE_LEVELS))
+    vars = select_altitude_levels.(vars, Ref(ALTITUDE_LEVELS))
     lonlat_regridder = get_lonlat_regridder(config_file)
     vars = lonlat_regridder.(vars)
     lat_left = -90
     lat_right = 90
     vars = apply_lat_window.(vars, lat_left, lat_right)
+
+    # Collapse the longitude dimension to a zonal mean. This cuts the number of
+    # (spatially correlated) constraints ~2 orders of magnitude down to the true
+    # large-scale degrees of freedom, preventing the over-informed SVDplusD
+    # inverse from collapsing the TransformUnscented ensemble (see zonal_average).
+    vars = zonal_average.(vars)
 
     # Harmonize each variable's NaN pattern across the covariance dates so all
     # SVDplusD samples have equal length. Satellite lwp coverage varies by year;
@@ -158,18 +169,27 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Create observation vector: calibration targets from sample_date_ranges, with
     # a data-informed covariance estimated from the independent COVARIANCE_DATE_RANGES.
     (; sample_date_ranges) = CALIBRATE_CONFIG
+    # model_error_scale adds `(model_error_scale * mean(field))^2` to the diagonal
+    # as a structural-model-error floor. The previous 0.01 (1% of field) was far
+    # below both the internal variability and the real structural biases (lwp
+    # ~37%, cl ~72% low), so the diagonal directions were tightly constrained to
+    # ~1% precision — the second driver (with the O(10^4) constraint count) of the
+    # ensemble collapse, because EKP then chases irreducible structural error. At
+    # 0.2 the floor (~20% of field) is comparable to the internal variability and
+    # a realistic fraction of the structural error, so a perfect parameter set is
+    # allowed to leave that mismatch and the posterior keeps a finite spread.
     observation_vec = make_data_informed_observation_vector(
         vars,
         sample_date_ranges,
         COVARIANCE_DATE_RANGES;
-        model_error_scale = 0.1,
+        model_error_scale = 0.2,
         use_latitude_weights = true,
         min_cosd_lat = 0.1,
     )
 
-    # Save observation vector
-    output_path = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "amip")
-    JLD2.save_object(joinpath(output_path, "observation_vec.jld2"), observation_vec)
+    # Save observation vector into the config's output_dir so that different
+    # calibration setups (e.g. lwp+cl vs LWP-only) keep independent observations.
+    JLD2.save_object(joinpath(output_dir, "observation_vec.jld2"), observation_vec)
 
     # Reconstruct the variables from the observation and show them for debugging
     for (i, obs) in enumerate(observation_vec)

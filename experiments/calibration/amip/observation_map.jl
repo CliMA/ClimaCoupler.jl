@@ -37,11 +37,26 @@ function preprocess_sim_vars(vars)
     vars = set_unitless_units!.(vars)
 
     vars = select_pressure_levels.(vars, Ref(PRESSURE_LEVELS))
+    vars = select_altitude_levels.(vars, Ref(ALTITUDE_LEVELS))
+    # Model cloud fraction `cl` is in %, but the CALIPSO observation is a fraction
+    # in [0, 1]. Convert sim `cl` to a fraction (and mark it unitless) to match.
+    vars = map(vars) do var
+        if ClimaAnalysis.short_name(var) == "cl"
+            var = ClimaAnalysis.remake(var; data = var.data ./ 100)
+            var = ClimaAnalysis.set_units(var, "unitless")
+        end
+        return var
+    end
     # We do not resample since the simulation variables are already on the
     # simulation grid
     lat_left = -90
     lat_right = 90
     vars = apply_lat_window.(vars, lat_left, lat_right)
+
+    # Zonal (longitude) mean — must match the obs-side preprocessing in
+    # generate_observations.jl so the flattened G aligns with the observation
+    # vector (see zonal_average).
+    vars = zonal_average.(vars)
 
     if isfile(NORMALIZATION_STATS_FP)
         # Note: This should not be used with SVDplusDCovariance matrix

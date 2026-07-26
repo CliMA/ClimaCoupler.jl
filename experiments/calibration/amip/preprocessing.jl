@@ -23,6 +23,39 @@ function select_pressure_levels(var, pressure_levels::Union{Vector, AbstractFloa
 end
 
 """
+    select_altitude_levels(var, altitudes)
+
+Select `altitudes` (meters) from `var` if it has an altitude dimension, using
+nearest-level selection, then pin the altitude coordinate to the nominal
+`altitudes`.
+
+Cloud fraction `cl` is compared on altitude levels, but the observation
+(CALIPSO, 240 m grid) and the simulation (model z-levels) are on different
+vertical grids, so an exact `MatchValue` selection (as used for pressure levels)
+would not line up. We instead take the nearest level on each grid and relabel the
+coordinate to the shared nominal targets so obs and sim align positionally in the
+flattened observation vector. The nearest levels differ by at most ~120 m between
+the two grids, which is negligible relative to cloud vertical structure.
+
+This is a no-op for variables without an altitude dimension (e.g. `lwp`).
+"""
+function select_altitude_levels(var, altitudes)
+    ClimaAnalysis.has_altitude(var) || return var
+    @info "Selecting altitude levels: $(altitudes) for $(ClimaAnalysis.short_name(var))"
+    var = ClimaAnalysis.select(
+        var;
+        by = ClimaAnalysis.NearestValue(),
+        altitude = altitudes,
+    )
+    # Relabel the altitude coordinate to the nominal targets so obs and sim share
+    # an identical vertical axis.
+    zname = ClimaAnalysis.altitude_name(var)
+    new_dims = copy(var.dims)
+    new_dims[zname] = collect(float.(altitudes))
+    return ClimaAnalysis.remake(var; dims = new_dims)
+end
+
+"""
     apply_lat_window(var, lat_left, lat_right)
 
 Apply latitude window by constraining the longitudes to be in the range
@@ -41,6 +74,32 @@ function apply_lat_window(var, lat_left, lat_right)
     )
     @info "Windowing latitudes, latitudes of $(ClimaAnalysis.short_name(var)) is $(ClimaAnalysis.latitudes(var))"
     return var
+end
+
+"""
+    zonal_average(var)
+
+Reduce `var` to a NaN-aware zonal (longitude) mean, collapsing the longitude
+dimension so each latitude (and vertical level) contributes a single constraint.
+
+Rationale: a global field's grid points are highly spatially correlated, but the
+`SVDplusDCovariance` only captures a handful of interannual modes
+(rank ≤ n_covariance_dates − 1) and treats every remaining grid point as an
+independent, tightly-constrained observation. With O(10⁴) points that massively
+over-informs a 3-parameter inverse — the effective information is ~10⁷ and the
+`TransformUnscented` ensemble collapses to a point after a single update (spread
+→ 1e-13), after which no further learning happens. Averaging zonally cuts the
+constraint count ~2 orders of magnitude down to the true large-scale degrees of
+freedom, and simultaneously averages out per-gridpoint weather noise (better
+signal-to-noise). Must be applied identically to obs and sim so the flattened
+observation vectors stay positionally aligned.
+
+No-op for variables without a longitude dimension.
+"""
+function zonal_average(var)
+    ClimaAnalysis.has_longitude(var) || return var
+    @info "Zonal (longitude) averaging $(ClimaAnalysis.short_name(var))"
+    return ClimaAnalysis.average_lon(var; ignore_nan = true)
 end
 
 """

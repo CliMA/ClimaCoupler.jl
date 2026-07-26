@@ -35,6 +35,13 @@ SurfaceFluxes = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
 Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
+# Use the async-worker branch of ClimaCalibrate (persistent GPU workers reused
+# across iterations, driven via add_workers/@worker_setup/WorkerBackend in
+# run_calibration.jl). Pkg.instantiate/resolve honors this, so buildkite picks
+# it up too.
+[sources]
+ClimaCalibrate = {url = "https://github.com/CliMA/ClimaCalibrate.jl", rev = "ne/async"}
+
 [compat]
 CUDA = "5"
 ClimaCalibrate = "0.3.1"

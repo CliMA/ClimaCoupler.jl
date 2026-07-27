@@ -30,6 +30,9 @@ end
 @safetestset "Utilities tests" begin
     include("utilities_tests.jl")
 end
+@safetestset "TimeManager tests" begin
+    include("timemanager_tests.jl")
+end
 @safetestset "FieldExchanger tests" begin
     include("field_exchanger_tests.jl")
 end

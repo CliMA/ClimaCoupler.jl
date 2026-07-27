@@ -20,13 +20,13 @@ value = 0
 value = 0.1
 
 [min_area_limiter_scale]
-value = 1e-6
+value = 0.0001
 
 [min_area_limiter_power]
 value = 1
 
 [turb_entr_param_vec]
-value = [1e-6, 10]
+value = [0.0001, 10000]
 
 [entr_detr_limit_inv_tau]
 value = 0

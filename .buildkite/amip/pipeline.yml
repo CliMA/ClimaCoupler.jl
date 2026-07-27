@@ -36,7 +36,7 @@ steps:
 
     steps:
 
-      - label: "Current AMIP: progedmf + 0M + integrated land"
+      - label: "Current AMIP: progedmf + 1M + integrated land"
         key: "amip"
         command:
           - echo "--- Run simulation"

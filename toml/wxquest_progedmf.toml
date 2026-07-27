@@ -31,7 +31,7 @@ value = 0.1
 type = "float"
 
 [min_area_limiter_scale]
-value = 1e-6
+value = 0.0001
 type = "float"
 
 [min_area_limiter_power]
@@ -39,7 +39,7 @@ value = 1
 type = "float"
 
 [turb_entr_param_vec]
-value = [1e-6, 10]
+value = [0.0001, 10000]
 type = "float"
 
 [entr_detr_limit_inv_tau]

@@ -106,18 +106,17 @@ function _build_csr(rows::Vector{Int}, n_rows::Int)
 end
 
 """
-    build_exchange_grid(boundary_space, grid_oc; sliver_rtol = 0.0)
+    build_exchange_grid(boundary_space, grid_oc)
 
 Construct an [`ExchangeGrid`](@ref) between a ClimaCore cubed-sphere
 `boundary_space` and an Oceananigans `grid_oc`, on the CPU in `Float64`:
 intersect SE elements with FV cells (fold-aware on a `TripolarGrid`, so fold
-shadow cells never produce polygons), drop polygons over dry (immersed) cells
-and slivers with `area < sliver_rtol * mean(area)` (guards `Float32` weight
-underflow; disabled by default), then integrate the SEM basis over each
-polygon (`accumulate_principled_b`) to obtain the gather/scatter weights and
-nodal coverages. Move the result to the device with [`on_device`](@ref).
+shadow cells never produce polygons), drop polygons over dry (immersed)
+cells, then integrate the SEM basis over each polygon
+(`accumulate_principled_b`) to obtain the gather/scatter weights and nodal
+coverages. Move the result to the device with [`on_device`](@ref).
 """
-function build_exchange_grid(boundary_space, grid_oc; sliver_rtol = 0.0)
+function build_exchange_grid(boundary_space, grid_oc)
     CRExt = get_ConservativeRegriddingCCExt()
     @assert !isnothing(CRExt) "ConservativeRegriddingClimaCoreExt must be loaded"
     GO = CRExt.GO
@@ -143,8 +142,8 @@ function build_exchange_grid(boundary_space, grid_oc; sliver_rtol = 0.0)
     n_elem, n_oc = size(intersections)
     area = [GO.area(manifold, poly) for poly in polys]
 
-    # 2. Mark polygons over dry (immersed) surface cells and slivers. They are
-    #    dropped from the exchange grid but still contribute to the geometric
+    # 2. Mark polygons over dry (immersed) surface cells. They are dropped
+    #    from the exchange grid but still contribute to the geometric
     #    coverage `node_cov_total`.
     keep = trues(length(area))
     if grid_oc isa OC.ImmersedBoundaryGrid
@@ -156,10 +155,6 @@ function build_exchange_grid(boundary_space, grid_oc; sliver_rtol = 0.0)
             keep[k] =
                 !OC.ImmersedBoundaries.immersed_cell(i, j, Nz_oc, grid_with_mask_cpu)
         end
-    end
-    if sliver_rtol > 0
-        cutoff = sliver_rtol * sum(area) / length(area)
-        keep .&= area .> cutoff
     end
 
     # 3. SEM basis integrals B_kn over each polygon. All polygons contribute

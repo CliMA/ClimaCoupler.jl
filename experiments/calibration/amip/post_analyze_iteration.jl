@@ -115,6 +115,167 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
 end
 
 """
+    plot_g_vs_obs(ekp, iteration; g_ensemble = nothing, output_dir)
+
+Plot the forward-model output against the observation POINT BY POINT in the
+flattened observation index space, and save `g_vs_obs.png`.
+
+Two rows:
+ 1. the G ensemble members, the ensemble mean forward map, and the observation,
+    using the `ClimaCalibrate.Visualization` recipes;
+ 2. the residual `(mean(G) - y) / σ`, normalized by each point's observational
+    noise standard deviation (the diagonal of the observation covariance), with
+    ±1σ/±2σ guides and dashed lines at the per-variable block boundaries.
+
+Why this exists: `plot_bias_weekly` draws bias on the globe, which requires a
+longitude dimension — but the calibration observations are ZONAL MEANS, so that
+plot fails for every variable (it has been erroring as "bias plot error: lwp" in
+every iteration and saving blank panels). This diagnostic always works regardless
+of the observation's dimensionality, since it operates on the flattened vector EKP
+actually sees.
+
+Row 1 uses the `ClimaCalibrate.Visualization.plot_g!` / `plot_g_mean!` /
+`plot_obs!` recipes. Those live in `ClimaCalibrateMakieExt`, which the AMIP
+Manifest had failed to register as an extension of the pinned `ne/async`
+ClimaCalibrate even though the package declares it (and Makie 0.24 / CairoMakie
+0.15 already satisfy its compat) — the Manifest entry was stale, so the recipe
+methods silently never loaded. Registering the extension there makes them
+available.
+
+Note the recipes read the G ensemble as `EKP.get_g(ekp, iter)`, so `iter` must be
+an iteration the ekp has actually completed. `analyze_iteration` runs *after*
+`update_ensemble!`, so live `iter = iteration` is correct. A saved
+`iteration_N/eki_file.jld2`, by contrast, is the state BEFORE iteration N runs and
+holds only N-1 G ensembles, so re-plotting from one must clamp — see `g_iter`.
+
+The normalized residual is the useful quantity, not the raw one: the observation
+vector concatenates variables in different physical units (lwp ~0.09 kg m^-2 next
+to pr ~-2.3 mm/day), so a raw residual is dominated by whichever variable has the
+larger magnitude. Dividing by σ puts every point on a common "how many noise
+standard deviations off am I" scale, which is exactly the quantity the EKP
+objective is built from — points beyond ±2σ are real, learnable misfit, while
+scatter within ±1σ is noise the calibration should not chase.
+"""
+function plot_g_vs_obs(ekp, iteration; g_ensemble = nothing, output_dir)
+    # Which iteration's G are we plotting? Normally `analyze_iteration` hands us
+    # this iteration's G directly. When called without one (e.g. re-plotting from
+    # a saved eki_file), fall back to the newest G the ekp actually holds: a saved
+    # `iteration_N/eki_file.jld2` is the state BEFORE iteration N runs, so it
+    # contains only N-1 completed G ensembles and asking for N would throw.
+    # G and the observation must come from the SAME iteration, otherwise a
+    # multi-year minibatch would compare a model year against another year's obs.
+    g_iter = iteration
+    g_ens = g_ensemble
+    if isnothing(g_ens)
+        n_completed = EKP.get_N_iterations(ekp)
+        n_completed >= 1 ||
+            error("ekp holds no completed G ensemble; nothing to plot")
+        g_iter = min(iteration, n_completed)
+        g_ens = EKP.get_g(ekp, g_iter)
+    end
+
+    obs_series = EKP.get_observation_series(ekp)
+    minibatch_obs =
+        ClimaCalibrate.get_observations_for_nth_iteration(obs_series, g_iter)
+    y = mapreduce(EKP.get_obs, vcat, minibatch_obs)
+
+    # Per-point noise sigma = sqrt of the observation covariance diagonal, read
+    # entry by entry so we never materialize a large dense covariance.
+    sigma = mapreduce(vcat, minibatch_obs) do obs
+        cov = EKP.get_obs_noise_cov(obs)
+        [sqrt(abs(cov[i, i])) for i in 1:size(cov, 1)]
+    end
+
+    # Variable names and block lengths, so the residual panel can be read per
+    # variable. Lengths use the same NaN-dropping flatten as the observation.
+    obs_vars =
+        mapreduce(ClimaCalibrate.ObservationRecipe.reconstruct_vars, vcat, minibatch_obs)
+    var_names = ClimaAnalysis.short_name.(obs_vars)
+    var_lengths = [length(ClimaAnalysis.flatten(v).data) for v in obs_vars]
+
+    # NaN-aware ensemble mean, so one failed member does not blank the curve.
+    g_mean = map(eachrow(g_ens)) do row
+        finite = filter(isfinite, row)
+        isempty(finite) ? NaN : Statistics.mean(finite)
+    end
+
+    fig = CairoMakie.Figure(size = (1400, 900))
+    ax1 = CairoMakie.Axis(
+        fig[1, 1],
+        title = "G ensemble, mean forward map, and observations (iteration $g_iter)",
+        xlabel = "Index",
+        ylabel = "Value",
+    )
+    g_plot = ClimaCalibrate.Visualization.plot_g!(
+        ax1,
+        ekp;
+        iter = g_iter,
+        color = :black,
+        alpha = 0.2,
+    )
+    g_mean_plot = ClimaCalibrate.Visualization.plot_g_mean!(
+        ax1,
+        ekp;
+        iter = g_iter,
+        color = :black,
+    )
+    obs_plot =
+        ClimaCalibrate.Visualization.plot_obs!(ax1, ekp; iter = g_iter, color = :blue)
+    CairoMakie.Legend(
+        fig[1, 2],
+        [g_plot, g_mean_plot, obs_plot],
+        ["G", "G mean", "Observation"],
+    )
+    # Mark where one variable's block ends and the next begins. Row 1 shares a
+    # single y-axis across variables in different units (lwp ~0.09 kg m^-2 vs
+    # pr ~-2.3 mm/day), so the smaller-magnitude variable is squashed there —
+    # read row 2 for anything cross-variable.
+    let off = 0
+        for len in var_lengths[1:(end - 1)]
+            off += len
+            CairoMakie.vlines!(ax1, [off + 0.5]; color = :black, linestyle = :dash)
+        end
+    end
+
+    n = min(length(g_mean), length(y), length(sigma))
+    resid = [
+        (isfinite(g_mean[i]) && sigma[i] > 0) ? (g_mean[i] - y[i]) / sigma[i] : NaN
+        for i in 1:n
+    ]
+
+    ax2 = CairoMakie.Axis(
+        fig[2, 1],
+        title = "Point-by-point residual (mean(G) - obs) / σ",
+        xlabel = "Index",
+        ylabel = "Residual [σ]",
+    )
+    CairoMakie.hlines!(ax2, [0.0]; color = :blue)
+    CairoMakie.hlines!(ax2, [-1.0, 1.0]; color = :gray, linestyle = :dash)
+    CairoMakie.hlines!(ax2, [-2.0, 2.0]; color = :red, linestyle = :dot)
+    CairoMakie.scatter!(ax2, 1:n, resid; color = :black, markersize = 5)
+
+    # Mark and label per-variable blocks, and report each block's RMS residual
+    # in sigma units -- ~1 means "already fit to within noise" (nothing to
+    # learn), >>1 means real remaining signal.
+    offset = 0
+    labels = String[]
+    for (name, len) in zip(var_names, var_lengths)
+        lo, hi = offset + 1, min(offset + len, n)
+        offset += len
+        offset < n && CairoMakie.vlines!(ax2, [offset + 0.5]; color = :black, linestyle = :dash)
+        block = filter(isfinite, view(resid, lo:hi))
+        rms = isempty(block) ? NaN : sqrt(Statistics.mean(abs2, block))
+        push!(labels, "$name: RMS = $(round(rms; digits = 2))σ (n=$(hi - lo + 1))")
+    end
+    ax2.subtitle = join(labels, "   |   ")
+
+    figpath = joinpath(output_dir, "g_vs_obs.png")
+    CairoMakie.save(figpath, fig)
+    @info "Saved point-by-point residual plot" figpath residual_rms_per_var = labels
+    return nothing
+end
+
+"""
     ClimaCalibrate.analyze_iteration(
         interface::CouplerModelInterface,
         ekp,
@@ -139,6 +300,16 @@ function ClimaCalibrate.analyze_iteration(
 )
     plot_output_path = ClimaCalibrate.path_to_iteration(output_dir, iteration)
     plot_constrained_params_and_errors(output_dir, ekp, prior)
+
+    # Point-by-point residual in the flattened observation space. Kept separate
+    # from (and ahead of) the on-globe bias plot below because that one requires a
+    # longitude dimension and therefore fails on our zonal-mean observations —
+    # this is the residual diagnostic we always get.
+    try
+        plot_g_vs_obs(ekp, iteration; g_ensemble, output_dir = plot_output_path)
+    catch e
+        @error "G-vs-obs residual plotting failed" exception = (e, catch_backtrace())
+    end
 
     (; config) = interface
     job_id = get_job_id(config)

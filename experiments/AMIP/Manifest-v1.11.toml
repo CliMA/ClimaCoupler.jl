@@ -419,10 +419,11 @@ repo-rev = "ne/async"
 repo-url = "https://github.com/CliMA/ClimaCalibrate.jl"
 uuid = "4347a170-ebd6-470c-89d3-5c705c0cacc2"
 version = "0.3.1"
-weakdeps = ["ClimaAnalysis", "NaNStatistics"]
+weakdeps = ["ClimaAnalysis", "Makie", "NaNStatistics"]
 
     [deps.ClimaCalibrate.extensions]
     ClimaCalibrateClimaAnalysisExt = ["ClimaAnalysis", "NaNStatistics"]
+    ClimaCalibrateMakieExt = ["Makie"]
 
 [[deps.ClimaComms]]
 deps = ["Adapt", "Logging", "LoggingExtras"]

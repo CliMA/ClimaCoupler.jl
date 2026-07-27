@@ -6,7 +6,12 @@ bias_plot_extrema = Dict(
     "rsus" => (-50, 50),
     "rlus" => (-50, 50),
     "mslp" => (-1000, 1000),
-    "pr" => (-1e-4, 1e-4),
+    # `pr` is compared in mm/day (the GPCP unit; sim is converted from
+    # kg m^-2 s^-1 in preprocess_sim_vars), so these bounds are mm/day. The old
+    # (-1e-4, 1e-4) was for the raw kg m^-2 s^-1 field and is off by ~86400.
+    "pr" => (-3, 3),
+    "lwp" => (-0.05, 0.05),
+    "cl" => (-0.3, 0.3),
     "ta_850hPa" => (-2, 2),
     "ta_500hPa" => (-2, 2),
     "ta_200hPa" => (-2, 2),
@@ -14,6 +19,124 @@ bias_plot_extrema = Dict(
     "hur_500hPa" => (-2, 2),
     "hur_200hPa" => (-2, 2),
 )
+
+"""
+    level_dim_of(var)
+
+Return `(name, values)` for the vertical coordinate of `var` — `("pressure", ...)`,
+`("altitude", ...)`, or `(nothing, [nothing])` when the variable has no vertical
+dimension. Lets the bias plotting loop over levels without caring which kind of
+vertical coordinate a variable uses (`ta`/`hur` are on pressure levels, `cl` is on
+altitude levels, `lwp`/`pr` are 2-D).
+"""
+function level_dim_of(var)
+    ClimaAnalysis.has_pressure(var) && return ("pressure", ClimaAnalysis.pressures(var))
+    ClimaAnalysis.has_altitude(var) && return ("altitude", ClimaAnalysis.altitudes(var))
+    return (nothing, [nothing])
+end
+
+"""
+    select_level(var, level_name, value)
+
+Select a single vertical level from `var`, or return `var` unchanged when
+`level_name` is `nothing`.
+"""
+function select_level(var, level_name, value)
+    isnothing(level_name) && return var
+    return ClimaAnalysis.select(
+        var;
+        by = ClimaAnalysis.MatchValue(),
+        NamedTuple{(Symbol(level_name),)}((value,))...,
+    )
+end
+
+"""
+    latitude_profile(var)
+
+Reduce `var` to `(latitudes, values)` with `values` a plain vector aligned to
+`latitudes`, squeezing any remaining singleton dimensions (e.g. a selected time or
+level). Used for the zonal-mean bias panels, where the variable has no longitude.
+"""
+function latitude_profile(var)
+    lats = ClimaAnalysis.latitudes(var)
+    lat_idx = var.dim2index[ClimaAnalysis.latitude_name(var)]
+    data = Array(var.data)
+    # Move latitude first, then flatten the rest (all singleton after selection).
+    perm = [lat_idx; setdiff(1:ndims(data), lat_idx)]
+    permuted = reshape(permutedims(data, perm), size(data, lat_idx), :)
+    return lats, permuted[:, 1]
+end
+
+"""
+    plot_zonal_bias!(gridpos, sim_var, obs_var; title)
+
+Plot a zonal-mean bias panel at `gridpos`: the simulation and observation as
+latitude profiles (top), and their difference `sim - obs` (bottom) with a zero
+line.
+
+This is the no-longitude counterpart to `plot_bias_on_globe!`. The calibration
+observations are zonal means (see `zonal_average` in preprocessing.jl), so they
+have no longitude dimension and cannot be drawn on a globe at all — which is why
+the on-globe path had been failing for every variable in every iteration. Latitude
+is the only remaining spatial coordinate, so the bias *is* a latitude profile.
+
+The reported mean bias and RMSE are area-weighted by `cos(latitude)`, since equal
+latitude bands do not represent equal area; an unweighted mean would let the poles
+dominate.
+"""
+function plot_zonal_bias!(gridpos, sim_var, obs_var; title)
+    sim_lats, sim_vals = latitude_profile(sim_var)
+    obs_lats, obs_vals = latitude_profile(obs_var)
+    sim_lats == obs_lats || length(sim_lats) == length(obs_lats) || error(
+        "simulation and observation latitude grids differ ($(length(sim_lats)) vs " *
+        "$(length(obs_lats))); they must be on a common grid to take a bias",
+    )
+
+    bias = sim_vals .- obs_vals
+    weights = cosd.(sim_lats)
+    keep = findall(i -> isfinite(bias[i]), eachindex(bias))
+    if isempty(keep)
+        @warn "no overlapping finite points for zonal bias" title
+        return nothing
+    end
+    wsum = sum(weights[keep])
+    mean_bias = sum(bias[keep] .* weights[keep]) / wsum
+    rmse = sqrt(sum(abs2.(bias[keep]) .* weights[keep]) / wsum)
+
+    units = ClimaAnalysis.units(sim_var)
+    gl = CairoMakie.GridLayout(gridpos)
+    ax1 = CairoMakie.Axis(
+        gl[1, 1],
+        title = "$title\narea-weighted bias = $(round(mean_bias; sigdigits = 3)), " *
+                "RMSE = $(round(rmse; sigdigits = 3)) [$units]",
+        ylabel = "value [$units]",
+    )
+    sim_line = CairoMakie.lines!(ax1, sim_lats, sim_vals; color = :black)
+    obs_line = CairoMakie.lines!(ax1, obs_lats, obs_vals; color = :blue)
+    CairoMakie.axislegend(
+        ax1,
+        [sim_line, obs_line],
+        ["simulation", "observation"];
+        position = :lt,
+    )
+    CairoMakie.hidexdecorations!(ax1; grid = false)
+
+    ax2 = CairoMakie.Axis(
+        gl[2, 1],
+        xlabel = "latitude [deg]",
+        ylabel = "bias [$units]",
+    )
+    CairoMakie.hlines!(ax2, [0.0]; color = :black)
+    CairoMakie.lines!(ax2, sim_lats, bias; color = :red)
+    # Deliberately NOT clamped to `bias_plot_extrema`: those bounds are chosen to
+    # keep an on-globe colour scale readable, and imposing them here clipped the
+    # largest biases (for lwp the ±0.05 bound cut off both the tropical spike and
+    # the high-latitude deficit) — exactly the points worth seeing. Let the axis
+    # autoscale to the data instead.
+    CairoMakie.rowsize!(gl, 1, CairoMakie.Relative(0.6))
+    CairoMakie.linkxaxes!(ax1, ax2)
+    return nothing
+end
 
 """
     plot_bias_weekly(ekp, simdir, iteration; output_dir)
@@ -53,7 +176,10 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
         return nothing
     end
 
-    fig = GeoMakie.Figure(size = (2000, 500 * length(var_pairs)))
+    # One row per variable, one column per vertical level (a single column for 2-D
+    # variables like lwp/pr).
+    n_cols = maximum(length(last(level_dim_of(sim_var))) for (sim_var, _) in var_pairs)
+    fig = GeoMakie.Figure(size = (1000 * n_cols, 550 * length(var_pairs)))
     for (i, (sim_var, era5_var)) in enumerate(var_pairs)
         sn = ClimaAnalysis.short_name(sim_var)
         sim_var_t = ClimaAnalysis.select(
@@ -66,51 +192,48 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
             by = ClimaAnalysis.MatchValue(),
             time = calib_start,
         )
-        cmap_extrema = get(bias_plot_extrema, sn, extrema(sim_var_t.data))
-        # `lwp` (MAC) is an ocean-only retrieval with NaNs over land. The bias
-        # plot's internal resampling is not NaN-aware, which previously errored
-        # ("bias plot error: lwp"). Masking the ocean aligns the NaN pattern of
-        # both fields so the bias can be computed and plotted.
+        cmap_extrema = get(bias_plot_extrema, sn, nothing)
+        # `lwp` (MAC) is an ocean-only retrieval with NaNs over land. The on-globe
+        # plot's internal resampling is not NaN-aware, so mask to ocean to align
+        # the NaN patterns. Only meaningful for the on-globe path.
         plot_mask = sn == "lwp" ? ClimaAnalysis.Visualize.oceanmask() : nothing
-        try
-            if ClimaAnalysis.has_pressure(sim_var_t)
-                for (j, pressure) in enumerate(ClimaAnalysis.pressures(sim_var_t))
-                    sim_var_t_p = ClimaAnalysis.select(
-                        sim_var_t;
-                        by = ClimaAnalysis.MatchValue(),
-                        pressure,
-                    )
-                    era5_var_t_p = ClimaAnalysis.select(
-                        era5_var_t;
-                        by = ClimaAnalysis.MatchValue(),
-                        pressure,
-                    )
-                    # Sometimes the float type of the dims don't match so we resample...
-                    # sim_var_t_p = ClimaAnalysis.resampled_as(sim_var_t_p, era5_var_t_p)
+
+        # Loop the vertical coordinate generically: `pressure` for ta/hur,
+        # `altitude` for cl, and a single no-op level for 2-D fields. Previously
+        # only `pressure` was handled, so an altitude-resolved variable such as cl
+        # fell through to the 2-D branch and failed.
+        level_name, level_values = level_dim_of(sim_var_t)
+        for (j, level) in enumerate(level_values)
+            label = isnothing(level_name) ? sn :
+                    "$sn @ $(round(level; sigdigits = 4)) $level_name"
+            try
+                sim_l = select_level(sim_var_t, level_name, level)
+                obs_l = select_level(era5_var_t, level_name, level)
+                # Dispatch on whether a longitude dimension survived preprocessing.
+                # The calibration observations are zonal means, so in practice this
+                # takes the latitude-profile path; the on-globe path is kept for
+                # configurations that skip zonal averaging.
+                if ClimaAnalysis.has_longitude(sim_l) &&
+                   ClimaAnalysis.has_longitude(obs_l)
                     ClimaAnalysis.Visualize.plot_bias_on_globe!(
                         fig[i, j],
-                        sim_var_t_p,
-                        era5_var_t_p,
-                        # era5_var_t_p;
-                        # cmap_extrema,
+                        sim_l,
+                        obs_l;
+                        cmap_extrema = something(cmap_extrema, extrema(sim_l.data)),
+                        mask = plot_mask,
                     )
+                else
+                    plot_zonal_bias!(fig[i, j], sim_l, obs_l; title = label)
                 end
-            else
-                ClimaAnalysis.Visualize.plot_bias_on_globe!(
-                    fig[i, 1],
-                    sim_var_t,
-                    era5_var_t;
-                    cmap_extrema,
-                    mask = plot_mask,
-                )
+            catch e
+                @error "bias plot error: $label" exception = (e, catch_backtrace())
             end
-        catch e
-            @error "bias plot error: $(ClimaAnalysis.short_name(sim_var_t))" exception =
-                (e, catch_backtrace())
         end
     end
 
-    GeoMakie.save(joinpath(output_dir, "bias_sample_dates.png"), fig)
+    figpath = joinpath(output_dir, "bias_sample_dates.png")
+    GeoMakie.save(figpath, fig)
+    @info "Saved bias plot" figpath
     return nothing
 end
 

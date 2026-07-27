@@ -13,63 +13,6 @@ gather/scatter.
 =#
 
 """
-    PolygonIntersectionOperator{M <: CR.Manifold}
-
-`ConservativeRegridding` intersection operator that assembles a sparse matrix
-of intersection *polygons* rather than scalar areas.
-"""
-struct PolygonIntersectionOperator{M <: CR.Manifold}
-    manifold::M
-end
-
-function _intersection_polygon_type()
-    CRExt = get_ConservativeRegriddingCCExt()
-    @assert !isnothing(CRExt)
-    GI = CRExt.GI
-    GO = CRExt.GO
-    return GI.Polygon{
-        true,
-        false,
-        Vector{
-            GI.LinearRing{
-                true,
-                false,
-                Vector{GO.UnitSpherical.UnitSphericalPoint{Float64}},
-                Nothing,
-                Nothing,
-            },
-        },
-        Nothing,
-        Nothing,
-    }
-end
-
-CR.IntersectionReturnStyle(::PolygonIntersectionOperator) = CR.OutOfPlaceSingleResult()
-CR.output_eltype(::PolygonIntersectionOperator) = _intersection_polygon_type()
-CR.output_eltype(op::PolygonIntersectionOperator, src_tree, dst_tree) =
-    CR.output_eltype(op)
-
-function CR.should_store_result(::PolygonIntersectionOperator, result)
-    result === nothing && return false
-    CRExt = get_ConservativeRegriddingCCExt()
-    return result isa CRExt.GI.Polygon
-end
-
-function (op::PolygonIntersectionOperator)(src_cell, dst_cell)
-    CRExt = get_ConservativeRegriddingCCExt()
-    GO = CRExt.GO
-    GI = CRExt.GI
-    intersection_poly = GO.intersection(
-        GO.ConvexConvexSutherlandHodgman(op.manifold),
-        src_cell,
-        dst_cell;
-        target = GI.PolygonTrait(),
-    )
-    iszero(GO.area(op.manifold, intersection_poly)) && return nothing
-    return intersection_poly
-end
-
-"""
     ExchangeGrid{FT, VI, VF}
 
 Sparse coupling between the SE boundary space, the FV (Oceananigans) surface
@@ -194,7 +137,7 @@ function build_exchange_grid(boundary_space, grid_oc; sliver_rtol = 0.0)
         CR.False(),
         dst_tree,
         src_tree;
-        intersection_operator = PolygonIntersectionOperator(manifold),
+        intersection_operator = CR.IntersectionGridOperator(manifold),
     )
     elem_of_poly, oc_of_poly, polys = SparseArrays.findnz(intersections)
     n_elem, n_oc = size(intersections)
@@ -490,11 +433,7 @@ end
 
 On a `RightCenterFolded` `TripolarGrid` the fold-row cell `(i, Ny)` is the
 same physical cell as `(Nx + 1 - i, Ny)`; the exchange grid keeps one copy as
-a real cell and leaves the other a degenerate shadow with no polygons, so
-shadow slots hold 0 after a scatter. The actual mirroring is done by
-`ConservativeRegriddingOceananigansExt.mirror_fold_partners!`; we only unwrap
-an `ImmersedBoundaryGrid` to its underlying grid first (upstream dispatches on
-the concrete folded grid type, which the immersed wrapper hides).
+a real cell and leaves the other a degenerate shadow with no polygons.
 =#
 
 """
@@ -502,14 +441,16 @@ the concrete folded grid type, which the immersed wrapper hides).
 
 Copy each fold-row primary cell's value into its shadow partner slot on a
 `RightCenterFolded` tripolar grid; no-op for other grids. `cell_values` is a
-flat vector over the `Nx × Ny` surface cells. Delegates to
-`ConservativeRegriddingOceananigansExt.mirror_fold_partners!`.
+flat vector over the `Nx × Ny` surface cells. Delegates to the internal
+`mirror_fold_partners!` in `ConservativeRegriddingOceananigansExt`.
 """
 mirror_fold_partners!(cell_values, grid::OC.ImmersedBoundaryGrid) =
     mirror_fold_partners!(cell_values, grid.underlying_grid)
 
 function mirror_fold_partners!(cell_values, grid)
-    get_ConservativeRegriddingOCExt().mirror_fold_partners!(cell_values, grid)
+    CROCExt = get_ConservativeRegriddingOCExt()
+    @assert !isnothing(CROCExt)
+    CROCExt.mirror_fold_partners!(cell_values, grid)
     return cell_values
 end
 

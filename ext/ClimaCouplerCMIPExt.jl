@@ -40,7 +40,6 @@ import SparseArrays # for converting Regridder element types
 
 get_ConservativeRegriddingCCExt() =
     Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
-
 get_ConservativeRegriddingOCExt() =
     Base.get_extension(CR, :ConservativeRegriddingOceananigansExt)
 

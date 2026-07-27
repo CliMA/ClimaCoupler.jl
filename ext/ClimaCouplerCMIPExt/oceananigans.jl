@@ -650,8 +650,14 @@ end
 # Additional OceananigansSimulation getter methods for plotting debug fields
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:salinity}) =
     sim.ocean.model.tracers.S
-Interfacer.get_field(sim::OceananigansSimulation, ::Val{:u}) = sim.ocean.model.velocities.u
-Interfacer.get_field(sim::OceananigansSimulation, ::Val{:v}) = sim.ocean.model.velocities.v
+# The velocity components live on staggered faces (`u` on Face-Center, `v` on
+# Center-Face), but the Oceananigans → ClimaCore remapper is built for the
+# cell-centered (Center, Center) grid. Interpolate to cell centers so that
+# remapping onto the exchange grid works (see `_at_centers`).
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:u}) =
+    _at_centers(sim.ocean.model.velocities.u)
+Interfacer.get_field(sim::OceananigansSimulation, ::Val{:v}) =
+    _at_centers(sim.ocean.model.velocities.v)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:free_surface_displacement}) =
     sim.ocean.model.free_surface.displacement
 
@@ -660,12 +666,15 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:free_surface_displaceme
 
 Return the fields to include in instantaneous snapshot plots for an Oceananigans
 simulation: area fraction, sea surface temperature and salinity, surface current
-speed, and free surface displacement.
+speed and its zonal (`:u`) and meridional (`:v`) components, and free surface
+displacement.
 """
 Plotting.snapshot_plot_fields(sim::OceananigansSimulation) = (
     :area_fraction,
     :surface_temperature,
     :salinity,
     :surface_speed,
+    :u,
+    :v,
     :free_surface_displacement,
 )

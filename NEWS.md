@@ -13,14 +13,19 @@ Plotting has been overhauled:
   and plot a small curated set of fields per component (e.g. surface speed, SST, and SSS for
   the ocean), given by the new `Plotting.snapshot_plot_fields`.
 - **Per-component output folders**: plots are now written to per-component subdirectories of
-  `artifacts` (e.g. `artifacts/atmos_sim`), with snapshots named `snapshot_<date>.png`.
+  `artifacts` (e.g. `artifacts/atmos_sim`), with snapshots named with a full ISO-8601
+  timestamp, `snapshot_<yyyy-mm-ddTHH:MM:SS>.png` (so sub-daily snapshots do not collide).
 - **Per-variable styling**: global (lat/lon) plots now use sensible per-variable colormaps
   (`Plotting.colormap_for`; e.g. `:rain` for precipitation, `:thermal` for temperature,
   `:haline` for salinity, and the divergent `:balance` for signed fields), the Robinson
-  projection, and coastlines. The lat/lon graticule and its labels are hidden, each panel is
-  titled with the variable name and units, colorbars are narrow and unlabeled, and ocean/sea
-  ice plots draw land in gray. This styling is applied to both the snapshot plots and the
-  end-of-run diagnostics.
+  projection, and coastlines. Whether a field is signed (and so drawn with a zero-centered
+  divergent scale) is decided by name only (`Plotting.is_divergent`), so inherently-positive
+  fields like temperature and salinity are never flipped to a symmetric scale by spurious
+  negative values from coastal remapping. The lat/lon graticule and its labels are hidden,
+  each panel is titled with the variable name and units, colorbars are narrow
+  (`Plotting.COLORBAR_WIDTH`) and short (`Plotting.COLORBAR_HEIGHT_FRACTION`) and unlabeled,
+  and ocean/sea ice plots mask and gray-fill the continents. This styling is applied to both
+  the snapshot plots and the end-of-run diagnostics.
 - **Snapshots replace debug plots**: the old end-of-run "debug" plots have been removed
   (`Plotting.debug`, `debug_plot_fields`, `debug_plot!`, and `print_extrema` are gone).
   Snapshots now also cover the coupler exchange fields

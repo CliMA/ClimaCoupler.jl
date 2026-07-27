@@ -60,13 +60,22 @@ function _field_to_outputvar(field, short_name; hresolution = 180)
     return CAN.OutputVar(attribs, dims, dim_attribs, permutedims(Array(data)))
 end
 
+# Human-readable titles for short names that would otherwise prettify to a
+# cryptic single letter (the signed surface velocity components).
+const _PRETTY_NAME_OVERRIDES =
+    Dict("u" => "Zonal velocity", "v" => "Meridional velocity", "w" => "Vertical velocity")
+
 """
     _prettify_name(short_name)
 
 Turn a variable's short name (e.g. `:surface_temperature`) into a human-readable
-title (e.g. `"Surface temperature"`) for use as a plot title.
+title (e.g. `"Surface temperature"`) for use as a plot title. A few short names
+(the velocity components `u`/`v`/`w`) are mapped to spelled-out titles via
+`_PRETTY_NAME_OVERRIDES`.
 """
 function _prettify_name(short_name)
+    key = lowercase(string(short_name))
+    haskey(_PRETTY_NAME_OVERRIDES, key) && return _PRETTY_NAME_OVERRIDES[key]
     words = split(replace(string(short_name), "_" => " "))
     isempty(words) && return string(short_name)
     return uppercasefirst(join(words, " "))
@@ -81,11 +90,19 @@ the Robinson projection ([`Plotting.PROJECTION`](@ref)), and coastlines. This is
 the common rendering path shared by the snapshot callback and the diagnostics
 postprocessing, so both produce consistent-looking plots.
 """
-function Plotting.snapshot_plot(place, var::CAN.OutputVar; p_loc = (1, 1))
+function Plotting.snapshot_plot(place, var::CAN.OutputVar; p_loc = (1, 1), mask_land = false)
     var = _ensure_square_latlon(var)
     title = _var_title(var)
     more_kwargs = Plotting.geo_plot_kwargs(CAN.short_name(var), var.data; title)
-    CAN.Visualize.heatmap2D_on_globe!(place, var; p_loc, more_kwargs)
+    # `geo_plot_kwargs` lives in the (Makie-free) base package, so the colorbar
+    # height (a `Makie.Relative`) has to be filled in here.
+    more_kwargs[:cb][:height] = CairoMakie.Relative(Plotting.COLORBAR_HEIGHT_FRACTION)
+    # For ocean/sea-ice fields, blank out and gray-fill the continents (they carry
+    # no data there). `landmask()` both masks the land data and draws the polygons,
+    # whose color we set via the `:mask` kwargs.
+    mask = mask_land ? CAN.Visualize.landmask() : nothing
+    mask_land && (more_kwargs[:mask] = Dict(:color => :gray70))
+    CAN.Visualize.heatmap2D_on_globe!(place, var; p_loc, mask, more_kwargs)
     return nothing
 end
 
@@ -194,6 +211,16 @@ function Plotting.plot_snapshots(
 end
 
 """
+    _snapshot_file_date(date)
+
+Format `date` as a filename-friendly ISO-8601 timestamp, e.g.
+`"2010-01-01T12:23:01"`, for use in `snapshot_<date>.png`. Unlike the date-only
+figure title, this keeps the time of day so that sub-daily snapshots do not
+collide.
+"""
+_snapshot_file_date(date) = Dates.format(date, "yyyy-mm-ddTHH:MM:SS")
+
+"""
     _snapshot_figure_title(sim_name, date)
 
 Build the overall figure title for a snapshot, e.g. `"Ocean snapshots at
@@ -258,20 +285,26 @@ function _save_snapshot_figure(vars, title, artifacts_dir, sim_name, date)
 
     # Lay out panels in a roughly square grid. Each panel uses two columns so
     # that `heatmap2D_on_globe!` can place its colorbar in the adjacent column.
-    n = length(plottable)
-    ncols = ceil(Int, sqrt(n))
-    nrows = ceil(Int, n / ncols)
-    fig = CairoMakie.Figure(size = (600 * ncols, 400 * nrows))
-    for (i, var) in enumerate(plottable)
-        row = div(i - 1, ncols) + 1
-        col = mod(i - 1, ncols) + 1
-        Plotting.snapshot_plot(fig, var; p_loc = (row, 2 * col - 1))
-    end
-    CairoMakie.Label(fig[0, :], title, fontsize = 20, font = :bold)
+    # Ocean and sea-ice fields carry no data over land, so gray out the continents.
+    mask_land = string(sim_name) in ("ocean_sim", "ice_sim")
 
-    dir = Plotting.component_artifacts_dir(artifacts_dir, sim_name)
-    output_file = joinpath(dir, "snapshot_$(Dates.format(date, "yyyy_mm_dd")).png")
-    CairoMakie.save(output_file, fig)
+    elapsed = @elapsed begin
+        n = length(plottable)
+        ncols = ceil(Int, sqrt(n))
+        nrows = ceil(Int, n / ncols)
+        fig = CairoMakie.Figure(size = (600 * ncols, 400 * nrows))
+        for (i, var) in enumerate(plottable)
+            row = div(i - 1, ncols) + 1
+            col = mod(i - 1, ncols) + 1
+            Plotting.snapshot_plot(fig, var; p_loc = (row, 2 * col - 1), mask_land)
+        end
+        CairoMakie.Label(fig[0, :], title, fontsize = 20, font = :bold)
+
+        dir = Plotting.component_artifacts_dir(artifacts_dir, sim_name)
+        output_file = joinpath(dir, "snapshot_$(_snapshot_file_date(date)).png")
+        CairoMakie.save(output_file, fig)
+    end
+    @info "Saved $(output_file) in $(round(elapsed, digits = 2)) s"
     return output_file
 end
 
@@ -324,7 +357,9 @@ Like `Interfacer.get_field(boundary_space, sim, Val(field_name))`, but return
 function _try_get_field(boundary_space, sim, field_name)
     try
         return Interfacer.get_field(boundary_space, sim, Val(field_name))
-    catch
+    catch e
+        @warn "Snapshot: could not get field $(field_name) for $(nameof(typeof(sim)))" exception =
+            (e, catch_backtrace())
         return nothing
     end
 end

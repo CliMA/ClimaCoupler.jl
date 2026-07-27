@@ -17,8 +17,8 @@ once periodic snapshots are added:
 ```
 artifacts/
 ├── atmos_sim/
-│   ├── snapshot_2010_01_01.png      # instantaneous snapshots (one per plot_interval)
-│   ├── snapshot_2010_02_01.png
+│   ├── snapshot_2010-01-01T00:00:00.png   # instantaneous snapshots (one per plot_interval)
+│   ├── snapshot_2010-02-01T00:00:00.png
 │   ├── summary_2D_2010_01_01.pdf    # end-of-run diagnostics (one per time step)
 │   └── summary_2D_2010_02_01.pdf
 ├── ocean_sim/
@@ -35,14 +35,19 @@ look consistent:
 
 - **Colormaps** are chosen per variable by [`Plotting.colormap_for`](@ref): e.g.
   precipitation uses `:rain`, temperature `:thermal`, salinity `:haline`. Fields
-  that are inherently signed (velocities, fluxes, anomalies) or whose data spans
-  zero use the divergent `:balance` colormap, centered on zero. Anything else
-  falls back to `:viridis`.
+  that are inherently signed *by name* (velocities, fluxes, anomalies,
+  displacements; see [`Plotting.is_divergent`](@ref)) use the divergent
+  `:balance` colormap, centered on zero. Anything else falls back to `:viridis`.
+  Divergence is decided by name only — not by whether the data happens to span
+  zero — so that inherently-positive fields (temperature, salinity, area
+  fraction) are never flipped to a symmetric scale by a few spurious negative
+  values from remapping near coasts.
 - Maps use the **Robinson projection** ([`Plotting.PROJECTION`](@ref)) and are
   drawn with **coastlines**, with the lat/lon graticule and its labels hidden.
 - Each panel is titled with the variable name and units; the colorbar is narrow
-  ([`Plotting.COLORBAR_WIDTH`](@ref)) and unlabeled. The overall figure is titled
-  like `Ocean snapshots at 2010-01-01`.
+  ([`Plotting.COLORBAR_WIDTH`](@ref)) and short (a fraction
+  [`Plotting.COLORBAR_HEIGHT_FRACTION`](@ref) of the panel height) and unlabeled.
+  The overall figure is titled like `Ocean snapshots at 2010-01-01`.
 - Ocean and sea ice plots fill the continents in gray (land carries no data
   there).
 
@@ -202,10 +207,12 @@ Plotting.plot_snapshots
 Plotting.snapshot_plot
 Plotting.snapshot_plot_fields
 Plotting.colormap_for
+Plotting.is_divergent
 Plotting.geo_plot_kwargs
 Plotting.component_artifacts_dir
 Plotting.PROJECTION
 Plotting.COLORBAR_WIDTH
+Plotting.COLORBAR_HEIGHT_FRACTION
 Plotting.make_diagnostics_plots
 Plotting.make_ocean_diagnostics_plots
 Plotting.make_seaice_diagnostics_plots

@@ -67,8 +67,16 @@ function _geo_field_plot!(fig, field, short_name, title; p_loc = (1, 1))
     # no data), then draw the coastlines on top.
     Makie.poly!(ax, GeoMakie.land(); color = :gray70)
     Makie.lines!(ax, GeoMakie.coastlines(); color = :black)
-    # Narrow, label-free colorbar (the variable name and units are in the title).
-    Makie.Colorbar(fig[row, 2col], hm; label = "", width = Plotting.COLORBAR_WIDTH)
+    # Narrow, short, label-free colorbar (the variable name and units are in the
+    # title). `Relative` height keeps it shorter than the map instead of stretching
+    # to fill the panel.
+    Makie.Colorbar(
+        fig[row, 2col],
+        hm;
+        label = "",
+        width = Plotting.COLORBAR_WIDTH,
+        height = Makie.Relative(Plotting.COLORBAR_HEIGHT_FRACTION),
+    )
     return nothing
 end
 

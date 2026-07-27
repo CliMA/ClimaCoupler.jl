@@ -210,6 +210,28 @@ function Interfacer.get_field(
 end
 
 """
+    _at_centers(field)
+
+Interpolate an Oceananigans `field` to the cell-centered `(Center, Center, ⋯)`
+location, returning a materialized `Field`.
+
+Velocity components live on staggered faces, but the Oceananigans → ClimaCore
+remapper (`remapper_oc_to_cc`) is built for the cell-centered grid and expects a
+`(Center, Center)` source. Feeding it a face-located field silently fails inside
+the regridder, so callers that want to remap a velocity component (e.g. the
+snapshot plots) must center it first with this helper.
+"""
+function _at_centers(field)
+    LX, LY, _ = OC.location(field)
+    (LX === OC.Center && LY === OC.Center) && return field
+    # `@at` needs the target location as a literal tuple, so we always target the
+    # fully cell-centered location; the surface plots only use the top level.
+    centered = OC.Field(OC.@at((OC.Center, OC.Center, OC.Center), field))
+    OC.compute!(centered)
+    return centered
+end
+
+"""
     get_oc_sim(sim)
 
 Return the underlying `Oceananigans.Simulation` object for component models

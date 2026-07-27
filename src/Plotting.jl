@@ -56,13 +56,16 @@ implementation is provided by the `ClimaCouplerMakieExt` extension.
 function plot_snapshots end
 
 """
-    snapshot_plot(place, var; p_loc = (1, 1))
+    snapshot_plot(place, var; p_loc = (1, 1), mask_land = false)
 
 Plot a single 2-D lat/lon `var` on a global map at grid position `p_loc` using
 the shared plot styling (per-variable colormap, Robinson projection, and
 coastlines). This is the common rendering path shared by the snapshot callback
-and the diagnostics postprocessing. The implementation is provided by the
-`ClimaCouplerMakieExt` extension.
+and the diagnostics postprocessing.
+
+Pass `mask_land = true` for ocean/sea-ice fields to blank out and gray-fill the
+continents (where those fields carry no data). The implementation is provided by
+the `ClimaCouplerMakieExt` extension.
 """
 function snapshot_plot end
 
@@ -138,26 +141,35 @@ const _DIVERGENT_EXACT = ["u", "v", "w"]
 # Substrings (lowercased) whose presence in a short name marks the variable as
 # inherently signed (can be positive or negative). Unlike `_DIVERGENT_EXACT`,
 # these are long enough to match unambiguously as substrings.
-const _DIVERGENT_SUBSTRINGS =
-    ["velocity", "flux", "anomaly", "tendency", "stress", "curl", "vort"]
+const _DIVERGENT_SUBSTRINGS = [
+    "velocity",
+    "flux",
+    "anomaly",
+    "tendency",
+    "stress",
+    "curl",
+    "vort",
+    "displacement",
+]
 
 """
     is_divergent(short_name, data)
 
 Return `true` if a variable should be plotted with a divergent colormap.
 
-A variable is treated as divergent if its (lowercased) `short_name` is one of the
-signed velocity components (`u`, `v`, `w`), contains one of the signed-quantity
-substrings (fluxes, anomalies, ...), or if its `data` spans zero (has both
-positive and negative finite values).
+A variable is treated as divergent purely by its name: if its (lowercased)
+`short_name` is one of the signed velocity components (`u`, `v`, `w`), or
+contains one of the signed-quantity substrings (velocities, fluxes, anomalies,
+displacements, ...). `data` is accepted for interface symmetry but is
+deliberately *not* inspected: a data-driven "spans zero" heuristic wrongly flips
+inherently-positive fields (temperature, salinity, area fraction) to a symmetric
+divergent scale when remapping/extrapolation introduces a few spurious negative
+values near coasts.
 """
-function is_divergent(short_name, data)
+function is_divergent(short_name, _data = nothing)
     name = lowercase(string(short_name))
     name in _DIVERGENT_EXACT && return true
-    any(sub -> occursin(sub, name), _DIVERGENT_SUBSTRINGS) && return true
-    finite = filter(isfinite, data)
-    isempty(finite) && return false
-    return minimum(finite) < 0 < maximum(finite)
+    return any(sub -> occursin(sub, name), _DIVERGENT_SUBSTRINGS)
 end
 
 """
@@ -211,6 +223,16 @@ does not dominate each panel; the variable name and units live in the panel
 title instead of on the colorbar.
 """
 const COLORBAR_WIDTH = 12
+
+"""
+    COLORBAR_HEIGHT_FRACTION
+
+Height of the colorbars on global plots, as a fraction of the panel height. Kept
+below 1 so the colorbar is shorter than the map rather than stretching to fill
+the whole panel. Applied as a `Makie.Relative` by the plotting extension (the
+base package has no Makie dependency).
+"""
+const COLORBAR_HEIGHT_FRACTION = 0.6
 
 """
     geo_plot_kwargs(short_name, data; title = nothing)

@@ -652,17 +652,23 @@ Arguments:
         ρτyio[i, j, 1] * ρₒ⁻¹ * OC.Operators.ℑyᵃᶠᵃ(i, j, 1, grid, ice_concentration)
 end
 
-# Additional ClimaSeaIceSimulation getter methods for snapshot plot fields
-Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:u}) = sim.ice.model.velocities.u
-Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:v}) = sim.ice.model.velocities.v
+# Additional ClimaSeaIceSimulation getter methods for snapshot plot fields.
+# Interpolate the staggered velocity components to cell centers so they can be
+# remapped by the (Center, Center) Oceananigans → ClimaCore remapper (see
+# `_at_centers`).
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:u}) =
+    _at_centers(sim.ice.model.velocities.u)
+Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:v}) =
+    _at_centers(sim.ice.model.velocities.v)
 
 """
     Plotting.snapshot_plot_fields(sim::ClimaSeaIceSimulation)
 
 Return the fields to include in instantaneous snapshot plots for a ClimaSeaIce
 simulation: area fraction, surface temperature, ice concentration, ice
-thickness, and surface (drift) speed. Note that if the sea ice model does not
-have dynamics, the surface speed will be zero.
+thickness, and surface (drift) speed with its zonal (`:u`) and meridional (`:v`)
+components. Note that if the sea ice model does not have dynamics, the surface
+speed and velocity components will be zero.
 """
 Plotting.snapshot_plot_fields(sim::ClimaSeaIceSimulation) = (
     :area_fraction,
@@ -670,4 +676,6 @@ Plotting.snapshot_plot_fields(sim::ClimaSeaIceSimulation) = (
     :ice_concentration,
     :ice_thickness,
     :surface_speed,
+    :u,
+    :v,
 )

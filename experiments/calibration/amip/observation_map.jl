@@ -40,10 +40,18 @@ function preprocess_sim_vars(vars)
     vars = select_altitude_levels.(vars, Ref(ALTITUDE_LEVELS))
     # Model cloud fraction `cl` is in %, but the CALIPSO observation is a fraction
     # in [0, 1]. Convert sim `cl` to a fraction (and mark it unitless) to match.
+    # Model precipitation `pr` is in kg m^-2 s^-1, but the GPCP observation is in
+    # mm/day (see GPCPDataLoader). 1 kg m^-2 s^-1 of water = 86400 mm/day, so
+    # multiply the sim by 86400 to match. Both obs and sim carry CliMA's
+    # downward-negative sign convention (GPCP is flip_sign'd on load), so no sign
+    # change is needed here.
     vars = map(vars) do var
         if ClimaAnalysis.short_name(var) == "cl"
             var = ClimaAnalysis.remake(var; data = var.data ./ 100)
             var = ClimaAnalysis.set_units(var, "unitless")
+        elseif ClimaAnalysis.short_name(var) == "pr"
+            var = ClimaAnalysis.remake(var; data = var.data .* 86400)
+            var = ClimaAnalysis.set_units(var, "mm/day")
         end
         return var
     end

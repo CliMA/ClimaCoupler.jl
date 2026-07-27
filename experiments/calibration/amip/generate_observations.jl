@@ -114,6 +114,9 @@ if abspath(PROGRAM_FILE) == @__FILE__
     mac_data_loader = CalibrationTools.MACDataLoader()
     # CALIPSO/CloudSat provides level-resolved cloud fraction `cl`.
     calipso_data_loader = CalibrationTools.CalipsoDataLoader()
+    # GPCP provides monthly precipitation `pr` (mm/day; converted to match the
+    # model's kg m^-2 s^-1 on the sim side in observation_map.jl).
+    gpcp_data_loader = CalibrationTools.GPCPDataLoader()
     # Both MODIS and MAC provide `lwp`, so disambiguate to get `lwp` from MAC.
     # MODIS is kept for its ice water path (`clivi`).
     data_loader = CalibrationTools.CompositeDataLoader(
@@ -121,9 +124,13 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ceres_data_loader,
         modis_data_loader,
         mac_data_loader,
-        calipso_data_loader;
-        varname_to_loader =
-            Dict("lwp" => mac_data_loader, "cl" => calipso_data_loader),
+        calipso_data_loader,
+        gpcp_data_loader;
+        varname_to_loader = Dict(
+            "lwp" => mac_data_loader,
+            "cl" => calipso_data_loader,
+            "pr" => gpcp_data_loader,
+        ),
     )
 
     (; short_names) = CALIBRATE_CONFIG

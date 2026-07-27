@@ -37,7 +37,16 @@ import CairoMakie
 # Brings in CouplerModelInterface, forward_model, observation_map, and (via the
 # config include below) the priors + calibration config.
 include(joinpath(@__DIR__, "model_interface.jl"))
-include(joinpath(@__DIR__, "config", "pressure_levels.jl"))
+# Config-selectable like run_calibration.jl. Defaults to the lwp+pr config so the
+# sweep probes the warm-rain parameters against {lwp, pr}. Override with
+# ENV["CALIBRATION_CONFIG"].
+_sweep_config_path = get(
+    ENV,
+    "CALIBRATION_CONFIG",
+    joinpath(@__DIR__, "config", "lwp_pr.jl"),
+)
+@info "Sweep using calibration configuration in: $_sweep_config_path"
+include(_sweep_config_path)
 
 # ---------------------------------------------------------------------------
 # Analysis: per-variable RMSE vs parameter, with the replicate noise floor.
@@ -166,31 +175,42 @@ end
 # which knob -- if any -- each observed variable actually responds to.
 # ---------------------------------------------------------------------------
 
-# REACHABILITY sweep #2: the 1M warm-rain autoconversion THRESHOLD (q_liq above
-# which cloud liquid converts to rain). This is the more physical lever than the
-# timescale — a higher threshold lets clouds hold more liquid before raining.
-# rain_autoconversion_timescale is NOT written, so it stays at its model default
-# (1000 s); only the threshold is varied. σ just parameterizes the transform;
-# the explicit values round-trip exactly as long as they lie in (lower, upper).
+# IDENTIFIABILITY sweep: the two warm-rain autoconversion parameters, swept
+# jointly on a 2-D grid, to answer whether precipitation (pr) breaks the
+# q_liq/rain_tau degeneracy that LWP alone leaves. Both raise LWP by suppressing
+# autoconversion (the reservoir); the hypothesis is that pr (the sink) responds
+# to rain_tau in a way LWP does not, so the two observables together separate the
+# parameters. analyze_sweep reports, per observed variable, the RMSE-to-obs
+# response to EACH parameter (one column per param) plus reachability — read the
+# lwp vs pr rows side by side to judge independence. σ just parameterizes the
+# transform; explicit values round-trip exactly as long as they lie in (lower,
+# upper).
 const SWEEP_PRIORS = EKP.combine_distributions([
     PD.constrained_gaussian(
         "cloud_liquid_water_specific_humidity_autoconversion_threshold",
-        5e-3, 4e-3, 1e-5, 1e-1,
+        5e-4, 4e-4, 1e-5, 3e-3,
     ),
+    PD.constrained_gaussian("rain_autoconversion_timescale", 1500, 1000, 200, 4000),
 ])
 
-# Threshold (unitless specific humidity, kg/kg). Model default is 5e-4; sweep from
-# 2x to 60x the default to map how far raising the threshold pushes LWP toward the
-# observed 0.086 — the threshold analogue of "slowing autoconversion".
-const SWEEP_GRIDS = [[1e-3, 3e-3, 1e-2, 3e-2]]
-const SWEEP_DEFAULTS = [5e-4]
+# Grids (full-factorial → 3×3 = 9 sweep members). q_liq brackets the ~7e-4 the
+# LWP-only runs converged to; rain_tau spans its physical prior range. Cost is
+# k^P, so keep both at 3 points.
+const SWEEP_GRIDS = [[2e-4, 7e-4, 1.2e-3], [500.0, 1500.0, 3000.0]]
+const SWEEP_DEFAULTS = [5e-4, 1000.0]
 
 # Full-factorial product of the per-parameter grids -> N_param x N_sweep matrix.
 sweep_matrix =
     reduce(hcat, [collect(pt) for pt in vec(collect(Iterators.product(SWEEP_GRIDS...)))])
 
-# One reference run at the default threshold (5e-4) to anchor the baseline LWP.
-jitter = [0.0]
+# Near-default replicate cluster (small ±1% jitter on both params) that anchors
+# the baseline and gives a local-gradient noise band. NOTE: the model is
+# deterministic over a single window, so this band is a proxy for "how flat is
+# the response near default", not true internal variability — the real
+# interannual noise floor is already encoded in the observation's SVDplusD
+# covariance. The primary read is the RMSE-vs-parameter response curves and
+# reachability, not this band.
+jitter = [-0.01, 0.0, 0.01]
 replicate_matrix = reduce(hcat, [SWEEP_DEFAULTS .* (1.0 .+ j) for j in jitter])
 
 # Columns = members: sweep members first, then replicate members.
@@ -203,7 +223,7 @@ const ITERATION = 1  # single-iteration "sweep"; mirrors calibration iteration 1
 # output + JLD2/HDF5 checkpoints per member, which blows the 100 GiB home quota
 # and makes checkpoint writes fail with EOFError. Scratch is large and is where
 # the calibrations run.
-const SWEEP_OUTPUT_DIR = "/glade/derecho/scratch/nefrathe/amip_parameter_sweep_qliq"
+const SWEEP_OUTPUT_DIR = "/glade/derecho/scratch/nefrathe/amip_parameter_sweep_lwp_pr"
 
 # Rebuild the calibration config pointed at the sweep output directory so this
 # never clobbers a real calibration.
@@ -233,9 +253,12 @@ sweep_config = CalibrationTools.CalibrateConfig(;
 if abspath(PROGRAM_FILE) == @__FILE__
     isdir(SWEEP_OUTPUT_DIR) || mkpath(SWEEP_OUTPUT_DIR)
 
-    observation_vector_filepath = joinpath(@__DIR__, "observation_vec.jld2")
+    # generate_observations.jl writes the observation vector into the config's
+    # output_dir (each setup keeps its own), so read it from there.
+    observation_vector_filepath = joinpath(output_dir, "observation_vec.jld2")
     isfile(observation_vector_filepath) || error(
-        "Observation vector not found. Generate it with generate_observations.jl first.",
+        "Observation vector not found at $observation_vector_filepath. " *
+        "Generate it with generate_observations.jl (matching CALIBRATION_CONFIG) first.",
     )
     observation_vector = JLD2.load_object(observation_vector_filepath)
 

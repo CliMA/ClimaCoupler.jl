@@ -1,6 +1,6 @@
 # Pre-flight validator plan (v1)
 
-Status: PLANNED. Target: one manageable PR.
+Status: IMPLEMENTED. Validated on Derecho (job 6936450): all checks pass on config/phase2.jl, and the wiring check fails on the known not-wired parameter mixing_length_diss_coeff.
 
 ## Goal
 

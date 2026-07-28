@@ -1016,4 +1016,71 @@ function emulate_diagnostics!(sim, t_end)
     return nothing
 end
 
+"""
+    find_partial_members(output_dir)
+
+Return member directories whose checkpoint says started but not completed. A
+member resumed from a mid-run model checkpoint writes wrong-dated monthly
+diagnostics and crashes the observation map, so a resume must clean these
+first.
+"""
+function find_partial_members(output_dir)
+    partial = String[]
+    isdir(output_dir) || return partial
+    for it in filter(d -> startswith(d, "iteration_"), readdir(output_dir))
+        itdir = joinpath(output_dir, it)
+        isdir(itdir) || continue
+        for mem in filter(d -> startswith(d, "member_"), readdir(itdir))
+            ckpt = joinpath(itdir, mem, "checkpoint.txt")
+            isfile(ckpt) || continue
+            strip(read(ckpt, String)) == "completed" && continue
+            push!(partial, joinpath(itdir, mem))
+        end
+    end
+    return partial
+end
+
+"""
+    numeric_leaf_diff(a, b; path = "", out = String[])
+
+Recursively compare two objects of the same type and collect the field paths
+where a numeric leaf (a number or a numeric array) differs. Non-numeric leaves
+(strings, symbols, booleans, `nothing`) are ignored. The pre-flight wiring
+check uses this on two ClimaAtmos parameter structs: an empty result means the
+perturbed parameter never lands in the model.
+"""
+function numeric_leaf_diff(a, b; path = "", out = String[])
+    label(suffix) = isempty(path) ? suffix : path * " " * suffix
+    typeof(a) == typeof(b) || (push!(out, label("(type)")); return out)
+    if isnothing(a) || a isa Bool || a isa Symbol || a isa AbstractString
+        # Not numeric (Bool subtypes Number, so it must be excluded first).
+    elseif a isa Number
+        (a == b || (isnan(a) && isnan(b))) || push!(out, path)
+    elseif a isa AbstractArray
+        if eltype(a) <: Number
+            isequal(a, b) || push!(out, path)
+        else
+            length(a) == length(b) || (push!(out, label("(length)")); return out)
+            for (i, (x, y)) in enumerate(zip(a, b))
+                numeric_leaf_diff(x, y; path = "$path[$i]", out)
+            end
+        end
+    elseif a isa AbstractDict
+        keys(a) == keys(b) || (push!(out, label("(keys)")); return out)
+        for k in keys(a)
+            numeric_leaf_diff(a[k], b[k]; path = "$path[$k]", out)
+        end
+    elseif nfields(a) > 0
+        for f in fieldnames(typeof(a))
+            numeric_leaf_diff(
+                getfield(a, f),
+                getfield(b, f);
+                path = isempty(path) ? string(f) : path * "." * string(f),
+                out,
+            )
+        end
+    end
+    return out
+end
+
 end

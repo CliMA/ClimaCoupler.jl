@@ -360,13 +360,13 @@ function plot_g_vs_obs(ekp, iteration; g_ensemble = nothing, output_dir)
 end
 
 """
-    animate_iteration_plots(output_dir; names, delay_cs = 100, strip = false)
+    animate_iteration_plots(output_dir; names, delay_cs = 100, strip = true)
 
 Collect one plot type from every `iteration_NNN` directory and write an
 animated GIF `<stem>_evolution.gif` in `output_dir`. With `strip = true`, also
-write a horizontally stitched `<stem>_strip.png`. Uses ImageMagick, which is on
-the default PATH on Derecho. Call after the last iteration, or standalone on
-any completed run directory:
+write `<stem>_first_last.png`, the first and last frames side by side. Uses
+ImageMagick, which is on the default PATH on Derecho. Call after the last
+iteration, or standalone on any completed run directory:
 
     animate_iteration_plots("/path/to/output_dir")
 
@@ -376,7 +376,7 @@ function animate_iteration_plots(
     output_dir;
     names = ["bias_sample_dates.png", "g_vs_obs.png"],
     delay_cs = 100,
-    strip = false,
+    strip = true,
 )
     magick = Sys.which("magick")
     if isnothing(magick)
@@ -403,9 +403,9 @@ function animate_iteration_plots(
             run(`$magick -delay $delay_cs $frames -loop 0 $gif`)
             @info "Wrote iteration animation" gif n_frames = length(frames)
             if strip
-                strippath = joinpath(output_dir, "$(stem)_strip.png")
-                run(`$magick $frames +append $strippath`)
-                @info "Wrote iteration strip" strippath
+                strippath = joinpath(output_dir, "$(stem)_first_last.png")
+                run(`$magick $(first(frames)) $(last(frames)) -resize x800 +append $strippath`)
+                @info "Wrote first/last comparison" strippath
             end
         catch e
             @error "Failed to animate $name" exception = (e, catch_backtrace())

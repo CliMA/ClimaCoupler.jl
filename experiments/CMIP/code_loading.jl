@@ -22,7 +22,7 @@ using CairoMakie, ClimaCoreMakie, GeoMakie, Makie, Poppler_jll, Printf
 
 # Trigger ClimaCouplerCMIPExt
 import Oceananigans,
-    ClimaOcean, ClimaSeaIce, KernelAbstractions, ConservativeRegridding, Adapt
+    ClimaSeaIce, KernelAbstractions, ConservativeRegridding, Adapt
 
 # Trigger ClimaCouplerClimaLandExt
 import ClimaLand

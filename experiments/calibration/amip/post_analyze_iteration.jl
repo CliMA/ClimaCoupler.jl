@@ -481,18 +481,70 @@ function ClimaCalibrate.analyze_iteration(
 end
 
 """
+    member_loss_stats(ekp)
+
+Return `(iters, means, stds)` of the per-member normalized loss for each
+completed iteration. The loss of member `j` at iteration `k` is the mean of
+`((G_ij - y_i) / sigma_i)^2` over the observation points of that iteration's
+minibatch, with `sigma` the square root of the observation covariance
+diagonal. The ensemble standard deviation shows how much of the reported error
+is spread between members rather than shared misfit.
+"""
+function member_loss_stats(ekp)
+    n_iters = EKP.get_N_iterations(ekp)
+    means = Float64[]
+    stds = Float64[]
+    for k in 1:n_iters
+        g = EKP.get_g(ekp, k)
+        y, sigma, _ = _obs_blocks(ekp, k)
+        n = min(size(g, 1), length(y), length(sigma))
+        losses = Float64[]
+        for j in 1:size(g, 2)
+            terms = [
+                ((g[i, j] - y[i]) / sigma[i])^2 for
+                i in 1:n if isfinite(g[i, j]) && sigma[i] > 0
+            ]
+            isempty(terms) || push!(losses, Statistics.mean(terms))
+        end
+        push!(means, isempty(losses) ? NaN : Statistics.mean(losses))
+        push!(stds, length(losses) > 1 ? Statistics.std(losses) : NaN)
+    end
+    return 1:n_iters, means, stds
+end
+
+"""
     plot_constrained_params_and_errors(output_dir, ekp, prior)
 
 Plot the constrained parameters and errors from `ekp` and `prior` and save
-them to `output_dir`.
+them to `output_dir`. The error panel shows the ensemble mean of the
+per-member normalized loss with a band of one ensemble standard deviation,
+next to the EKP loss-over-time panel.
 """
 function plot_constrained_params_and_errors(output_dir, ekp, prior)
     dim_size = sum(length.(EKP.batch(prior)))
-    fig = CairoMakie.Figure(size = ((dim_size + 1) * 500, 500))
+    fig = CairoMakie.Figure(size = ((dim_size + 2) * 500, 500))
     for i in 1:dim_size
         EKP.Visualize.plot_ϕ_over_iters(fig[1, i], ekp, prior, i)
     end
-    EKP.Visualize.plot_error_over_iters(fig[1, dim_size + 1], ekp, error_metric = "loss")
+    ax = CairoMakie.Axis(
+        fig[1, dim_size + 1],
+        title = "normalized loss (ensemble mean ± std)",
+        xlabel = "iteration",
+        ylabel = "mean ((G - y)/σ)²",
+    )
+    iters, means, stds = member_loss_stats(ekp)
+    keep = findall(i -> isfinite(means[i]) && isfinite(stds[i]), eachindex(means))
+    if !isempty(keep)
+        CairoMakie.band!(
+            ax,
+            collect(iters)[keep],
+            (means .- stds)[keep],
+            (means .+ stds)[keep];
+            color = (:steelblue, 0.3),
+        )
+        CairoMakie.lines!(ax, collect(iters)[keep], means[keep]; color = :steelblue)
+        CairoMakie.hlines!(ax, [1.0]; color = :gray, linestyle = :dash)
+    end
     EKP.Visualize.plot_error_over_time(fig[1, dim_size + 2], ekp, error_metric = "loss")
     CairoMakie.save(joinpath(output_dir, "constrained_params_and_error.png"), fig)
     return nothing

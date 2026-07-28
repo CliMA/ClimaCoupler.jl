@@ -153,17 +153,35 @@ if abspath(PROGRAM_FILE) == @__FILE__
     lat_right = 90
     vars = apply_lat_window.(vars, lat_left, lat_right)
 
+    # Harmonize each variable's NaN pattern across the covariance dates so all
+    # SVDplusD samples have equal length. Satellite lwp coverage varies by year;
+    # without this the interannual samples drop different numbers of points and
+    # SVDplusDCovariance errors ("Length of all the samples are not the same").
+    #
+    # NOTE: this runs BEFORE the zonal mean (it used to run after). Harmonizing the
+    # 2-D field means every date's zonal mean is taken over an identical set of
+    # grid points, so year-to-year changes in satellite coverage can no longer leak
+    # into the interannual spread the covariance is estimated from. It also still
+    # guarantees equal sample lengths, since a latitude is now dropped only when all
+    # of its longitudes are missing — consistently for every date.
+    foreach(v -> harmonize_nan_mask_over_dates!(v, COVARIANCE_DATE_RANGES), vars)
+
+    # Save where each observation actually has data, so the simulation can be
+    # restricted to the SAME points before its own zonal mean. Without this the
+    # observed zonal mean is ocean-only (MAC lwp is NaN over land, ~54% of points)
+    # while the simulated one covers all longitudes — two different spatial
+    # samples, which for lwp flips the sign of the area-weighted bias. Must be
+    # written before zonal_average, while longitude still exists.
+    coverage_masks = Dict{String, Any}(
+        ClimaAnalysis.short_name(v) => coverage_mask(v, COVARIANCE_DATE_RANGES) for
+        v in vars
+    )
+
     # Collapse the longitude dimension to a zonal mean. This cuts the number of
     # (spatially correlated) constraints ~2 orders of magnitude down to the true
     # large-scale degrees of freedom, preventing the over-informed SVDplusD
     # inverse from collapsing the TransformUnscented ensemble (see zonal_average).
     vars = zonal_average.(vars)
-
-    # Harmonize each variable's NaN pattern across the covariance dates so all
-    # SVDplusD samples have equal length. Satellite lwp coverage varies by year;
-    # without this the interannual samples drop different numbers of points and
-    # SVDplusDCovariance errors ("Length of all the samples are not the same").
-    foreach(v -> harmonize_nan_mask_over_dates!(v, COVARIANCE_DATE_RANGES), vars)
 
     # NOTE: Normalization is intentionally NOT applied. The SVDplusD covariance
     # below carries each variable's physical scale, and normalization is
@@ -197,6 +215,14 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Save observation vector into the config's output_dir so that different
     # calibration setups (e.g. lwp+cl vs LWP-only) keep independent observations.
     JLD2.save_object(joinpath(output_dir, "observation_vec.jld2"), observation_vec)
+
+    # Coverage masks live next to the observation vector; preprocess_sim_vars reads
+    # them so the simulation is sampled at the same points as the observation.
+    JLD2.save_object(coverage_mask_path(output_dir), coverage_masks)
+    for (name, (dims, mask)) in coverage_masks
+        @info "Coverage mask for $name" dims missing_fraction =
+            round(count(mask) / length(mask); digits = 3)
+    end
 
     # Reconstruct the variables from the observation and show them for debugging
     for (i, obs) in enumerate(observation_vec)

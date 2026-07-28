@@ -103,6 +103,126 @@ function zonal_average(var)
 end
 
 """
+    coverage_mask_path(output_dir)
+
+Path of the saved observational coverage mask (see `coverage_mask` /
+`apply_coverage_mask`).
+"""
+coverage_mask_path(output_dir) = joinpath(output_dir, "coverage_masks.jld2")
+
+"""
+    ordered_dim_names(var)
+
+Dimension names of `var` in the order of its data axes.
+"""
+function ordered_dim_names(var)
+    idx_name = sort([(idx, name) for (name, idx) in var.dim2index])
+    return [name for (_, name) in idx_name]
+end
+
+"""
+    date_range_nan_mask(var, date_ranges)
+
+Union of `var`'s missing (NaN) points over the time slices covered by
+`date_ranges`: `true` where the value is missing at ANY of those dates.
+
+Restricted to `date_ranges` on purpose. Unioning over *every* slice in the record
+would be wrong: satellite products span decades, so a point missing in any single
+month would be dropped and the mask saturates to "everything missing".
+"""
+function date_range_nan_mask(var, date_ranges)
+    tname = ClimaAnalysis.time_name(var)
+    tidx = var.dim2index[tname]
+    all_dates = ClimaAnalysis.dates(var)
+
+    sel = Int[]
+    for (s, e) in date_ranges
+        idxs = findall(d -> s <= d <= e, all_dates)
+        isempty(idxs) && error(
+            "Date range ($s, $e) not found in $(ClimaAnalysis.short_name(var)); " *
+            "check the date ranges against the observational data.",
+        )
+        append!(sel, idxs)
+    end
+
+    nanmask = falses(size(selectdim(var.data, tidx, first(sel)))...)
+    for i in sel
+        nanmask .|= isnan.(selectdim(var.data, tidx, i))
+    end
+    return nanmask
+end
+
+"""
+    coverage_mask(var, date_ranges)
+
+Return `(dim_names, mask)` describing where `var` has NO observational data over
+`date_ranges`: `mask` is a `Bool` array over `var`'s non-time dimensions
+(true = missing), and `dim_names` are those dimensions in the mask's axis order.
+
+Used to make the simulation sample exactly the same points as the observation
+before taking a zonal mean — see `apply_coverage_mask`. Shares
+`date_range_nan_mask` with `harmonize_nan_mask_over_dates!`, so the mask saved for
+the simulation is by construction the same one applied to the observation.
+"""
+function coverage_mask(var, date_ranges)
+    tname = ClimaAnalysis.time_name(var)
+    names = ordered_dim_names(var)
+    if isnothing(tname) || !(tname in names)
+        return (names, isnan.(Array(var.data)))
+    end
+    return (filter(!=(tname), names), date_range_nan_mask(var, date_ranges))
+end
+
+"""
+    apply_coverage_mask(var, dim_names, mask)
+
+Set `var` to NaN wherever `mask` (over dimensions `dim_names`, as produced by
+`coverage_mask`) says the observation has no data, broadcasting over time.
+
+Why this is required: satellite retrievals do not cover the whole globe — MAC
+`lwp` is ocean-only and is NaN over land, missing ~54% of grid points. Because
+`zonal_average` ignores NaNs, the OBSERVED zonal mean is an average over covered
+(ocean) points only, while the simulation has no NaNs and would be averaged over
+ALL longitudes. That compares two different spatial samples, and for `lwp` it is
+not a small effect: it flips the sign of the area-weighted bias (model 11.5% LOW
+against the all-longitude sample vs 9.1% HIGH against the ocean-only sample,
+because model LWP over land is much lower than over ocean — e.g. at 36.8°N the
+all-longitude mean is 0.068 while the ocean-only mean is 0.116 against an observed
+0.107). Masking the simulation to the observation's coverage first makes the two
+zonal means like-for-like.
+
+A no-op for variables whose observation covers every point (e.g. GPCP `pr`).
+"""
+function apply_coverage_mask(var, dim_names, mask)
+    tname = ClimaAnalysis.time_name(var)
+    var_names = filter(!=(tname), ordered_dim_names(var))
+    if Set(var_names) != Set(dim_names)
+        @warn "coverage mask dimensions do not match variable; skipping mask" short_name =
+            ClimaAnalysis.short_name(var) var_names dim_names
+        return var
+    end
+    # Reorder the mask axes to match this variable's axis order.
+    perm = [findfirst(==(n), dim_names) for n in var_names]
+    m = permutedims(mask, perm)
+
+    data = copy(Array(var.data))
+    if isnothing(tname) || !(tname in ordered_dim_names(var))
+        size(m) == size(data) || (@warn "mask size mismatch; skipping"; return var)
+        data[m] .= NaN
+    else
+        tidx = var.dim2index[tname]
+        size(m) == size(selectdim(data, tidx, 1)) ||
+            (@warn "mask size mismatch; skipping"; return var)
+        for i in axes(data, tidx)
+            selectdim(data, tidx, i)[m] .= NaN
+        end
+    end
+    @info "Applied observational coverage mask to $(ClimaAnalysis.short_name(var))" masked_fraction =
+        round(count(m) / length(m); digits = 3)
+    return ClimaAnalysis.remake(var; data)
+end
+
+"""
     get_lonlat_regridder(config_file)
 
 Create a regridder for `OutputVar`s for regridding to the simulation grid.
@@ -143,25 +263,11 @@ function harmonize_nan_mask_over_dates!(var, date_ranges)
     tname = ClimaAnalysis.time_name(var)
     isnothing(tname) && return var
     tidx = var.dim2index[tname]
-    all_dates = ClimaAnalysis.dates(var)
 
-    # Time indices covered by the requested date ranges (inclusive), mirroring
-    # how ObservationRecipe windows each sample.
-    sel = Int[]
-    for (s, e) in date_ranges
-        idxs = findall(d -> s <= d <= e, all_dates)
-        isempty(idxs) && error(
-            "Date range ($s, $e) not found in $(ClimaAnalysis.short_name(var)); " *
-            "check COVARIANCE_DATE_RANGES against the observational data.",
-        )
-        append!(sel, idxs)
-    end
-
-    # Union of NaN locations across the selected time slices (spatial dims only).
-    nanmask = falses(size(selectdim(var.data, tidx, first(sel)))...)
-    for i in sel
-        nanmask .|= isnan.(selectdim(var.data, tidx, i))
-    end
+    # Union of NaN locations across the selected time slices (spatial dims only),
+    # shared with `coverage_mask` so the observation and the simulation are
+    # guaranteed to be restricted to the same points.
+    nanmask = date_range_nan_mask(var, date_ranges)
 
     # Apply that union mask to every time slice.
     for i in axes(var.data, tidx)

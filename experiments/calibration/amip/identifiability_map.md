@@ -180,6 +180,40 @@ swcre/lwp **half right** (lwp/pr yes, swcre no); max-area → cl/swcre **wrong**
 
 ---
 
+## cl definition check (2026-07-28) — the "too few" bias is REAL
+
+Question: is the ~18% cl deficit physics or a definition mismatch between the
+observation and the model diagnostic?
+
+**Observation** (`calipso_cloudsat` artifact = CloudSat+CALIPSO radar-lidar
+combined product, monthly 2.5°, 240 m height bins): cloud fraction = fraction of
+radar-lidar samples where cloud is *detected* (radar reflectivity or lidar
+scattering-ratio thresholds), nadir-only ~1:30 LT sun-synchronous sampling. The
+loader uses the "all cases" operations slice (full radar ops through 2006–2010).
+
+**Model** (`cl` diagnostic): quadrature SGS cloud fraction —
+`cache.precomputed.ᶜcloud_fraction`, the fraction of the subgrid distribution
+holding *any* condensate. No detection threshold, full diurnal sampling.
+
+**Directional verdict**: the definitional gap goes the WRONG way to explain the
+bias. Detection-thresholded obs *miss* thin cloud, while the model definition
+*counts* any condensate — so model cl is definitionally an overcount relative to
+"detectable" cloud. The model sits ~18% BELOW the obs despite that overcounting
+definition → **the "too few clouds" bias is real and, if anything, understated.**
+(Secondary terms are small at our levels: radar ground clutter affects <1 km,
+below our 2 km level; diurnal sampling bias for marine Sc is a few percent.)
+
+**Bug found during the check**: the Calipso loader **imputes missing/NaN obs
+values with the global mean** (fabricating data in unobserved bins — polar caps
+beyond the ~82° orbit limit and gappy cells) which also blinds the coverage-mask
+machinery (cl showed 0% missing in scouts because imputation removed the NaNs
+first). Fixed: NaNs are now retained so `harmonize_nan_mask_over_dates!` +
+`coverage_mask` handle them like MAC lwp's gaps.
+
+**Consequence**: cl stays a legitimate future target (with an honest floor), but
+no swept parameter moves it — the deficit points at the cloud-fraction closure
+itself → row 4 (quadrature/SGS-variance parameters) is the mechanism to test.
+
 ## Rows 3+ — planned (ROADMAP.md priority order)
 
 3. **Cloud optics / droplet number / effective radius** — targets swcre's "too

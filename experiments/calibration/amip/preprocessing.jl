@@ -121,6 +121,23 @@ function ordered_dim_names(var)
 end
 
 """
+    canonical_dim_name(name)
+
+Map the various spellings of the spatial dimensions onto canonical names, so an
+observation's coverage mask can be matched against a simulation variable even when
+the two datasets name the same axis differently (e.g. the CALIPSO product calls the
+altitude axis `height` while the model diagnostics call it `z` — without this the
+mask was silently skipped with a "dimensions do not match" warning).
+"""
+function canonical_dim_name(name)
+    n = lowercase(String(name))
+    n in ("z", "height", "altitude", "z_reference") && return "altitude"
+    n in ("lon", "long", "longitude") && return "longitude"
+    n in ("lat", "latitude") && return "latitude"
+    return n
+end
+
+"""
     date_range_nan_mask(var, date_ranges)
 
 Union of `var`'s missing (NaN) points over the time slices covered by
@@ -196,13 +213,17 @@ A no-op for variables whose observation covers every point (e.g. GPCP `pr`).
 function apply_coverage_mask(var, dim_names, mask)
     tname = ClimaAnalysis.time_name(var)
     var_names = filter(!=(tname), ordered_dim_names(var))
-    if Set(var_names) != Set(dim_names)
+    # Compare on canonical names: obs and sim may spell the same axis differently
+    # (CALIPSO `height` vs model `z`).
+    var_canon = canonical_dim_name.(var_names)
+    mask_canon = canonical_dim_name.(dim_names)
+    if Set(var_canon) != Set(mask_canon)
         @warn "coverage mask dimensions do not match variable; skipping mask" short_name =
             ClimaAnalysis.short_name(var) var_names dim_names
         return var
     end
     # Reorder the mask axes to match this variable's axis order.
-    perm = [findfirst(==(n), dim_names) for n in var_names]
+    perm = [findfirst(==(n), mask_canon) for n in var_canon]
     m = permutedims(mask, perm)
 
     data = copy(Array(var.data))

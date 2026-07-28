@@ -694,14 +694,15 @@ function Base.get(loader::ModisDataLoader, short_name::String)
     return preprocess(loader, var, Val(Symbol(short_name)))
 end
 
-function preprocess(::ModisDataLoader, var, ::Union{Val{:clivi}, Val{:lwp}})
-    var = _preprocess_var(var)
-    not_nans = filter(!isnan, var.data)
-    global_mean = sum(not_nans) / length(not_nans)
-    @info "$(ClimaAnalysis.short_name(var)): Imputing global mean $global_mean for NaNs"
-    replace!(x -> isnan(x) ? global_mean : x, var)
-    return var
-end
+# NaNs (unobserved bins) are RETAINED, not imputed. Imputing the global mean
+# fabricates observations where the satellite never looked and blinds the
+# coverage-mask machinery (`coverage_mask` sees full coverage, so the simulation
+# is never restricted to the observed sampling — the same inconsistency that
+# flipped the sign of the MAC lwp bias). The preprocessing pipeline handles NaNs
+# explicitly: `harmonize_nan_mask_over_dates!` equalizes them across covariance
+# dates and `apply_coverage_mask` mirrors them onto the simulation.
+preprocess(::ModisDataLoader, var, ::Union{Val{:clivi}, Val{:lwp}}) =
+    _preprocess_var(var)
 
 """
     CalipsoDataLoader
@@ -770,14 +771,17 @@ function preprocess(::CalipsoDataLoader, var, ::Val{:cl})
     var = _preprocess_var(var)
     # Convert from percentage (0–100) to fraction (0–1)
     var = ClimaAnalysis.convert_units(var, "unitless"; conversion_function = x -> x / 100)
-    # Impute missing and NaN values with the global mean in one pass
+    # Missing/unobserved bins (polar caps beyond the ~82° orbit limit, gappy
+    # cells) become NaN and are RETAINED — imputing the global mean fabricated
+    # observations where the satellite never looked and blinded the coverage-mask
+    # machinery (cl reported 0% missing coverage). Downstream handles NaNs
+    # explicitly: `harmonize_nan_mask_over_dates!` + `apply_coverage_mask` restrict
+    # obs and sim to the same observed sampling. Only the eltype is narrowed
+    # (Missing -> NaN) so later array ops stay concrete.
     T = nonmissingtype(eltype(var.data))
-    valid = filter(x -> !ismissing(x) && !isnan(x), vec(var.data))
-    global_mean = T(sum(valid) / length(valid))
-    @info "$(ClimaAnalysis.short_name(var)): Imputing global mean $global_mean for missing/NaN values"
     return ClimaAnalysis.remake(
         var;
-        data = map(x -> (ismissing(x) || isnan(x)) ? global_mean : T(x), var.data),
+        data = map(x -> ismissing(x) ? T(NaN) : T(x), var.data),
     )
 end
 

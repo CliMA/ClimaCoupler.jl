@@ -175,43 +175,74 @@ end
 # which knob -- if any -- each observed variable actually responds to.
 # ---------------------------------------------------------------------------
 
-# IDENTIFIABILITY sweep: the two warm-rain autoconversion parameters, swept
-# jointly on a 2-D grid, to answer whether precipitation (pr) breaks the
-# q_liq/rain_tau degeneracy that LWP alone leaves. Both raise LWP by suppressing
-# autoconversion (the reservoir); the hypothesis is that pr (the sink) responds
-# to rain_tau in a way LWP does not, so the two observables together separate the
-# parameters. analyze_sweep reports, per observed variable, the RMSE-to-obs
-# response to EACH parameter (one column per param) plus reachability — read the
-# lwp vs pr rows side by side to judge independence. σ just parameterizes the
-# transform; explicit values round-trip exactly as long as they lie in (lower,
-# upper).
+# IDENTIFIABILITY-MAP ROW 2: EDMF family (ROADMAP.md Phase 1,
+# identifiability_map.md). The warm-rain row left lwp/pr fit to their noise floors
+# while cl is ~18% too LOW and swcre 13-28 W/m^2 too REFLECTIVE ("too few, too
+# bright") — structure warm rain cannot reach. This sweep probes the EDMF closure's
+# ACTIVE knobs for the ones that move cloud fraction / brightness:
+#   entr_coeff (0.1)                    — entrainment velocity scale
+#   detr_buoy_coeff (1.0)               — buoyancy detrainment
+#   detr_massflux_vertdiv_coeff (0.3)   — mass-flux vertical-divergence detrainment
+#   EDMF_max_area (0.7)                 — updraft area cap
+#   mixing_length_eddy_viscosity_coefficient (0.14, ClimaParams default)
+#   mixing_length_diss_coeff (0.22, ClimaParams default)
+# NOT swept: turb_entr_param_vec — at config values [1e-4, 1e4] the turbulent
+# entrainment a*exp(-b*area) is ~0 for any realized updraft area (effectively
+# inactive), and it is a vector parameter the scalar-prior plumbing here does not
+# handle. The disabled (=0) closure terms (entr_inv_tau, detr_coeff,
+# detr_vertdiv_coeff) are also not swept — turning them on changes the closure
+# form, which is a different experiment.
+#
+# Design: PLUS design (one-at-a-time around the base point) — 12 sweep members +
+# 1 center = 13 forward runs. Warm rain PINNED at the current lwp+pr calibration
+# center (iteration_005 member_001): the base TOML's q_liq = 1e-4 is far from
+# calibrated and responses must be measured in the calibrated microphysics regime.
+# σ in the priors just parameterizes the transform; explicit values round-trip
+# exactly while inside (lower, upper).
 const SWEEP_PRIORS = EKP.combine_distributions([
     PD.constrained_gaussian(
         "cloud_liquid_water_specific_humidity_autoconversion_threshold",
-        5e-4, 4e-4, 1e-5, 3e-3,
+        2.9e-4, 1e-4, 0.0, 1.5e-3,
     ),
-    PD.constrained_gaussian("rain_autoconversion_timescale", 1500, 1000, 200, 4000),
+    PD.constrained_gaussian("rain_autoconversion_timescale", 1463, 500, 300, 3600),
+    PD.constrained_gaussian("entr_coeff", 0.1, 0.08, 0.0, 1.0),
+    PD.constrained_gaussian("detr_buoy_coeff", 1.0, 0.8, 0.0, 10.0),
+    PD.constrained_gaussian("detr_massflux_vertdiv_coeff", 0.3, 0.25, 0.0, 3.0),
+    PD.constrained_gaussian("EDMF_max_area", 0.7, 0.15, 0.05, 0.95),
+    PD.constrained_gaussian(
+        "mixing_length_eddy_viscosity_coefficient", 0.14, 0.1, 0.0, 1.0,
+    ),
+    PD.constrained_gaussian("mixing_length_diss_coeff", 0.22, 0.15, 0.0, 1.0),
 ])
 
-# Grids (full-factorial → 3×3 = 9 sweep members). q_liq brackets the ~7e-4 the
-# LWP-only runs converged to; rain_tau spans its physical prior range. Cost is
-# k^P, so keep both at 3 points.
-const SWEEP_GRIDS = [[2e-4, 7e-4, 1.2e-3], [500.0, 1500.0, 3000.0]]
-const SWEEP_DEFAULTS = [5e-4, 1000.0]
+# Pinned warm rain (current calibrated center) and the base point for each knob.
+const QLIQ_PIN = 2.885040714042334e-4
+const RTAU_PIN = 1463.1170909634866
+const BASE = [QLIQ_PIN, RTAU_PIN, 0.1, 1.0, 0.3, 0.7, 0.14, 0.22]
 
-# Full-factorial product of the per-parameter grids -> N_param x N_sweep matrix.
-sweep_matrix =
-    reduce(hcat, [collect(pt) for pt in vec(collect(Iterators.product(SWEEP_GRIDS...)))])
+# One-at-a-time perturbations: (param row, low, high). ×3/÷3 where physical;
+# EDMF_max_area is an area fraction, so an additive bracket is used instead.
+const PERTURB = [
+    (3, 0.03, 0.3),     # entr_coeff
+    (4, 0.3, 3.0),      # detr_buoy_coeff
+    (5, 0.1, 0.9),      # detr_massflux_vertdiv_coeff
+    (6, 0.4, 0.9),      # EDMF_max_area
+    (7, 0.05, 0.42),    # mixing_length_eddy_viscosity_coefficient
+    (8, 0.073, 0.66),   # mixing_length_diss_coeff
+]
 
-# Near-default replicate cluster (small ±1% jitter on both params) that anchors
-# the baseline and gives a local-gradient noise band. NOTE: the model is
-# deterministic over a single window, so this band is a proxy for "how flat is
-# the response near default", not true internal variability — the real
-# interannual noise floor is already encoded in the observation's SVDplusD
-# covariance. The primary read is the RMSE-vs-parameter response curves and
-# reachability, not this band.
-jitter = [-0.01, 0.0, 0.01]
-replicate_matrix = reduce(hcat, [SWEEP_DEFAULTS .* (1.0 .+ j) for j in jitter])
+sweep_matrix = reduce(hcat, [
+    begin
+        col = copy(BASE)
+        col[row] = val
+        col
+    end for (row, lo, hi) in PERTURB for val in (lo, hi)
+])
+
+# Single center member: the baseline anchor every perturbation is read against.
+# The noise floor comes from the observations' interannual spread (scout
+# analysis), not from replicate scatter.
+replicate_matrix = reshape(copy(BASE), :, 1)
 
 # Columns = members: sweep members first, then replicate members.
 constrained_samples = hcat(sweep_matrix, replicate_matrix)
@@ -223,7 +254,7 @@ const ITERATION = 1  # single-iteration "sweep"; mirrors calibration iteration 1
 # output + JLD2/HDF5 checkpoints per member, which blows the 100 GiB home quota
 # and makes checkpoint writes fail with EOFError. Scratch is large and is where
 # the calibrations run.
-const SWEEP_OUTPUT_DIR = "/glade/derecho/scratch/nefrathe/amip_parameter_sweep_lwp_pr"
+const SWEEP_OUTPUT_DIR = "/glade/derecho/scratch/nefrathe/amip_sweep_entr_detr"
 
 # Rebuild the calibration config pointed at the sweep output directory so this
 # never clobbers a real calibration.

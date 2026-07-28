@@ -12,6 +12,7 @@ include("ConservationChecker.jl")
 include("FluxCalculator.jl")
 include("FieldExchanger.jl")
 include("Checkpointer.jl")
+include("Era5InitialConditions.jl")
 include("Input.jl")
 include("SimOutput/SimOutput.jl")
 include("Plotting.jl")
@@ -28,6 +29,7 @@ import ..Plotting: postprocess
 export CalibrationTools,
     ConservationChecker,
     Checkpointer,
+    Era5InitialConditions,
     FieldExchanger,
     FluxCalculator,
     Input,

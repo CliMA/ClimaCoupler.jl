@@ -42,6 +42,9 @@ end
 @safetestset "Input tests" begin
     include("input_tests.jl")
 end
+@safetestset "ERA5 initial conditions tests" begin
+    include("era5_initial_conditions_tests.jl")
+end
 @safetestset "SimOutput tests" begin
     include("sim_output_tests.jl")
 end

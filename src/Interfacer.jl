@@ -530,7 +530,11 @@ abstract type AMIPMode <: AbstractSimulationMode end
 An abstract type representing the subseasonal simulation mode. This mode is similar to AMIP
 but uses different data sources and initialization pathways tailored for subseasonal runs.
 
-Inputs are ERA5-derived netcdfs with initial conditions produced by `https://github.com/CliMA/WeatherQuest`. Given `start_date` (YYYYMMDD)
+Inputs are ERA5-derived netcdfs with initial conditions. When
+`era5_initial_condition_dir` is not set, the files are fetched from the
+Copernicus Climate Data Store on demand and cached (see
+`Era5InitialConditions`), with the `wxquest_initial_conditions` artifact as a
+fallback. Given `start_date` (YYYYMMDD)
 and directory `era5_initial_condition_dir`, filenames containing the initial conditions are inferred as:
 - `sst_processed_YYYYMMDD_0000.nc` (variable `SST`)
 - `sic_processed_YYYYMMDD_0000.nc` (variable `SEAICE`)

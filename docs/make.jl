@@ -40,6 +40,7 @@ example_pages = [
 interface_pages = [
     "interfacer.md",
     "input.md",
+    "era5initialconditions.md",
     "simcoordinator.md",
     "timemanager.md",
     "fieldexchanger.md",

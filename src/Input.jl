@@ -14,6 +14,7 @@ import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaCore as CC
 import ClimaCoupler
 import ..Checkpointer
+import ..Era5InitialConditions
 import ..Interfacer
 import ..TimeManager
 import ..Utilities
@@ -267,7 +268,7 @@ function argparse_settings()
         arg_type = String
         default = ""
         "--era5_initial_condition_dir"
-        help = "Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from start_date [none (default)]. Generated with `https://github.com/CliMA/WeatherQuest`"
+        help = "Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from start_date. When not set, files are fetched from the Copernicus Climate Data Store on demand and cached (requires ~/.cdsapirc credentials), with the wxquest_initial_conditions artifact as fallback [none (default)]"
         arg_type = String
         default = nothing
         # Ocean model specific
@@ -1061,22 +1062,65 @@ function _apply_scm_surface_type(scm_surface_type, ocean_model, ice_model, land_
 end
 
 """
-    resolve_era5_dir(era5_initial_condition_dir)
+    resolve_era5_dir(era5_initial_condition_dir, start_date; comms_ctx = nothing)
 
-Return `era5_initial_condition_dir` if it is not `nothing`, otherwise attempt to
-use the `wxquest_initial_conditions` ClimaArtifact as a fallback.  Errors if
-neither source is available.
+Return a directory with the ERA5 initial condition files for `start_date`.
+
+The sources are tried in this order:
+1. `era5_initial_condition_dir`, when it is not `nothing`;
+2. an on-demand fetch from the Copernicus Climate Data Store (cached, so
+   only the first run for a date downloads; see
+   [`Era5InitialConditions.fetch_era5_initial_conditions`](@ref));
+3. the `wxquest_initial_conditions` ClimaArtifact.
+
+Errors when no source is available.
 """
-function resolve_era5_dir(era5_initial_condition_dir)
+function resolve_era5_dir(era5_initial_condition_dir, start_date; comms_ctx = nothing)
     isnothing(era5_initial_condition_dir) || return era5_initial_condition_dir
+    fetch_error = nothing
+    try
+        return Era5InitialConditions.fetch_era5_initial_conditions(
+            start_date;
+            comms_ctx,
+        )
+    catch err
+        fetch_error = err
+        @warn "Could not fetch ERA5 initial conditions from CDS, falling " *
+              "back to the wxquest_initial_conditions artifact" exception = err
+    end
     try
         return @clima_artifact("wxquest_initial_conditions")
     catch
         error(
-            "subseasonal mode requires --era5_initial_condition_dir or the " *
-            "wxquest_initial_conditions ClimaArtifact",
+            "subseasonal mode requires ERA5 initial conditions from one of: " *
+            "--era5_initial_condition_dir, a CDS fetch (set up credentials " *
+            "in ~/.cdsapirc, see https://cds.climate.copernicus.eu/how-to-api; " *
+            "the fetch failed with: $(sprint(showerror, fetch_error))), or " *
+            "the wxquest_initial_conditions ClimaArtifact",
         )
     end
+end
+
+"""
+    resolve_era5_dir!(config_dict; comms_ctx = nothing)
+
+For subseasonal mode, resolve the ERA5 initial condition directory (see
+[`resolve_era5_dir`](@ref)) and write it back into
+`config_dict["era5_initial_condition_dir"]`, so that ClimaAtmos's
+WeatherModel initial condition reads from the same directory. Other modes
+leave `config_dict` unchanged.
+"""
+function resolve_era5_dir!(config_dict; comms_ctx = nothing)
+    sim_mode = MODE_NAME_DICT[config_dict["mode_name"]]
+    sim_mode <: Interfacer.SubseasonalMode || return config_dict
+    start_date =
+        Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
+    config_dict["era5_initial_condition_dir"] = resolve_era5_dir(
+        config_dict["era5_initial_condition_dir"],
+        start_date;
+        comms_ctx,
+    )
+    return config_dict
 end
 
 """
@@ -1108,7 +1152,8 @@ function get_era5_filepaths(
     start_date,
     bucket_initial_condition,
 )
-    era5_initial_condition_dir = resolve_era5_dir(era5_initial_condition_dir)
+    era5_initial_condition_dir =
+        resolve_era5_dir(era5_initial_condition_dir, start_date)
     datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
 
     # Verify that the required files exist for this date

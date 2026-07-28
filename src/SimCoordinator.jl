@@ -177,6 +177,11 @@ end
 function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     comms_ctx = Utilities.get_comms_context(config_dict)
 
+    # Resolve the ERA5 initial condition directory (fetching from CDS when
+    # needed) before the component configs are read, so ClimaAtmos sees the
+    # same directory through `era5_initial_condition_dir`.
+    Input.resolve_era5_dir!(config_dict; comms_ctx)
+
     (;
         job_id,
         sim_mode,

@@ -1,3 +1,5 @@
+include(joinpath(@__DIR__, "steering_indicators.jl"))
+import EnsembleKalmanProcesses as EKP
 bias_plot_extrema = Dict(
     "tas" => (-6, 6),
     "tas - ta" => (-6, 6),
@@ -204,8 +206,8 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
         # fell through to the 2-D branch and failed.
         level_name, level_values = level_dim_of(sim_var_t)
         for (j, level) in enumerate(level_values)
-            label = isnothing(level_name) ? sn :
-                    "$sn @ $(round(level; sigdigits = 4)) $level_name"
+            label = isnothing(level_name) ? "$sn (iteration $iteration)" :
+                    "$sn @ $(round(level; sigdigits = 4)) $level_name (iteration $iteration)"
             try
                 sim_l = select_level(sim_var_t, level_name, level)
                 obs_l = select_level(era5_var_t, level_name, level)
@@ -240,53 +242,30 @@ end
 """
     plot_g_vs_obs(ekp, iteration; g_ensemble = nothing, output_dir)
 
-Plot the forward-model output against the observation POINT BY POINT in the
-flattened observation index space, and save `g_vs_obs.png`.
+Plot the forward-model output against the observation point by point and save
+`g_vs_obs.png`.
 
-Two rows:
- 1. the G ensemble members, the ensemble mean forward map, and the observation,
-    using the `ClimaCalibrate.Visualization` recipes;
- 2. the residual `(mean(G) - y) / σ`, normalized by each point's observational
-    noise standard deviation (the diagonal of the observation covariance), with
-    ±1σ/±2σ guides and dashed lines at the per-variable block boundaries.
+Each observed variable gets its own column, so variables with different scales
+stay readable. Each column has two boxes:
+ 1. The G ensemble members, the ensemble mean, and the observation, on the
+    variable's own value axis.
+ 2. The residual `(mean(G) - y) / σ` with guides at ±1σ and ±2σ, where σ is the
+    square root of the observation covariance diagonal. The box title reports
+    the block RMS in σ units. An RMS near 1 means the variable is fit to its
+    noise level. An RMS well above 2 means learnable signal remains.
 
-Why this exists: `plot_bias_weekly` draws bias on the globe, which requires a
-longitude dimension — but the calibration observations are ZONAL MEANS, so that
-plot fails for every variable (it has been erroring as "bias plot error: lwp" in
-every iteration and saving blank panels). This diagnostic always works regardless
-of the observation's dimensionality, since it operates on the flattened vector EKP
-actually sees.
+This plot works for observations of any dimensionality because it operates on
+the flattened vector that EKP sees. `plot_bias_weekly` needs spatial
+coordinates and is complementary.
 
-Row 1 uses the `ClimaCalibrate.Visualization.plot_g!` / `plot_g_mean!` /
-`plot_obs!` recipes. Those live in `ClimaCalibrateMakieExt`, which the AMIP
-Manifest had failed to register as an extension of the pinned `ne/async`
-ClimaCalibrate even though the package declares it (and Makie 0.24 / CairoMakie
-0.15 already satisfy its compat) — the Manifest entry was stale, so the recipe
-methods silently never loaded. Registering the extension there makes them
-available.
-
-Note the recipes read the G ensemble as `EKP.get_g(ekp, iter)`, so `iter` must be
-an iteration the ekp has actually completed. `analyze_iteration` runs *after*
-`update_ensemble!`, so live `iter = iteration` is correct. A saved
-`iteration_N/eki_file.jld2`, by contrast, is the state BEFORE iteration N runs and
-holds only N-1 G ensembles, so re-plotting from one must clamp — see `g_iter`.
-
-The normalized residual is the useful quantity, not the raw one: the observation
-vector concatenates variables in different physical units (lwp ~0.09 kg m^-2 next
-to pr ~-2.3 mm/day), so a raw residual is dominated by whichever variable has the
-larger magnitude. Dividing by σ puts every point on a common "how many noise
-standard deviations off am I" scale, which is exactly the quantity the EKP
-objective is built from — points beyond ±2σ are real, learnable misfit, while
-scatter within ±1σ is noise the calibration should not chase.
+`analyze_iteration` passes this iteration's G ensemble directly. When
+`g_ensemble` is not given, the newest completed G in the ekp is used. A saved
+`iteration_N/eki_file.jld2` holds the state from before iteration N runs, so it
+contains only N-1 completed G ensembles. G and the observation always come from
+the same iteration, so a minibatch never compares one sample's model output
+against another sample's observation.
 """
 function plot_g_vs_obs(ekp, iteration; g_ensemble = nothing, output_dir)
-    # Which iteration's G are we plotting? Normally `analyze_iteration` hands us
-    # this iteration's G directly. When called without one (e.g. re-plotting from
-    # a saved eki_file), fall back to the newest G the ekp actually holds: a saved
-    # `iteration_N/eki_file.jld2` is the state BEFORE iteration N runs, so it
-    # contains only N-1 completed G ensembles and asking for N would throw.
-    # G and the observation must come from the SAME iteration, otherwise a
-    # multi-year minibatch would compare a model year against another year's obs.
     g_iter = iteration
     g_ens = g_ensemble
     if isnothing(g_ens)
@@ -302,99 +281,136 @@ function plot_g_vs_obs(ekp, iteration; g_ensemble = nothing, output_dir)
         ClimaCalibrate.get_observations_for_nth_iteration(obs_series, g_iter)
     y = mapreduce(EKP.get_obs, vcat, minibatch_obs)
 
-    # Per-point noise sigma = sqrt of the observation covariance diagonal, read
-    # entry by entry so we never materialize a large dense covariance.
+    # Read the covariance diagonal entry by entry to avoid materializing a
+    # large dense matrix.
     sigma = mapreduce(vcat, minibatch_obs) do obs
         cov = EKP.get_obs_noise_cov(obs)
         [sqrt(abs(cov[i, i])) for i in 1:size(cov, 1)]
     end
 
-    # Variable names and block lengths, so the residual panel can be read per
-    # variable. Lengths use the same NaN-dropping flatten as the observation.
     obs_vars =
         mapreduce(ClimaCalibrate.ObservationRecipe.reconstruct_vars, vcat, minibatch_obs)
     var_names = ClimaAnalysis.short_name.(obs_vars)
     var_lengths = [length(ClimaAnalysis.flatten(v).data) for v in obs_vars]
 
-    # NaN-aware ensemble mean, so one failed member does not blank the curve.
+    # Ensemble mean per point. NaN entries from failed members are skipped.
     g_mean = map(eachrow(g_ens)) do row
         finite = filter(isfinite, row)
         isempty(finite) ? NaN : Statistics.mean(finite)
     end
 
-    fig = CairoMakie.Figure(size = (1400, 900))
-    ax1 = CairoMakie.Axis(
-        fig[1, 1],
-        title = "G ensemble, mean forward map, and observations (iteration $g_iter)",
-        xlabel = "Index",
-        ylabel = "Value",
-    )
-    g_plot = ClimaCalibrate.Visualization.plot_g!(
-        ax1,
-        ekp;
-        iter = g_iter,
-        color = :black,
-        alpha = 0.2,
-    )
-    g_mean_plot = ClimaCalibrate.Visualization.plot_g_mean!(
-        ax1,
-        ekp;
-        iter = g_iter,
-        color = :black,
-    )
-    obs_plot =
-        ClimaCalibrate.Visualization.plot_obs!(ax1, ekp; iter = g_iter, color = :blue)
-    CairoMakie.Legend(
-        fig[1, 2],
-        [g_plot, g_mean_plot, obs_plot],
-        ["G", "G mean", "Observation"],
-    )
-    # Mark where one variable's block ends and the next begins. Row 1 shares a
-    # single y-axis across variables in different units (lwp ~0.09 kg m^-2 vs
-    # pr ~-2.3 mm/day), so the smaller-magnitude variable is squashed there —
-    # read row 2 for anything cross-variable.
-    let off = 0
-        for len in var_lengths[1:(end - 1)]
-            off += len
-            CairoMakie.vlines!(ax1, [off + 0.5]; color = :black, linestyle = :dash)
-        end
-    end
-
     n = min(length(g_mean), length(y), length(sigma))
-    resid = [
-        (isfinite(g_mean[i]) && sigma[i] > 0) ? (g_mean[i] - y[i]) / sigma[i] : NaN
-        for i in 1:n
-    ]
+    n_vars = length(var_names)
+    fig = CairoMakie.Figure(size = (700 * n_vars, 900))
 
-    ax2 = CairoMakie.Axis(
-        fig[2, 1],
-        title = "Point-by-point residual (mean(G) - obs) / σ",
-        xlabel = "Index",
-        ylabel = "Residual [σ]",
-    )
-    CairoMakie.hlines!(ax2, [0.0]; color = :blue)
-    CairoMakie.hlines!(ax2, [-1.0, 1.0]; color = :gray, linestyle = :dash)
-    CairoMakie.hlines!(ax2, [-2.0, 2.0]; color = :red, linestyle = :dot)
-    CairoMakie.scatter!(ax2, 1:n, resid; color = :black, markersize = 5)
-
-    # Mark and label per-variable blocks, and report each block's RMS residual
-    # in sigma units -- ~1 means "already fit to within noise" (nothing to
-    # learn), >>1 means real remaining signal.
-    offset = 0
     labels = String[]
-    for (name, len) in zip(var_names, var_lengths)
+    legend_handles = nothing
+    offset = 0
+    for (col, (name, len)) in enumerate(zip(var_names, var_lengths))
         lo, hi = offset + 1, min(offset + len, n)
         offset += len
-        offset < n && CairoMakie.vlines!(ax2, [offset + 0.5]; color = :black, linestyle = :dash)
-        block = filter(isfinite, view(resid, lo:hi))
-        rms = isempty(block) ? NaN : sqrt(Statistics.mean(abs2, block))
-        push!(labels, "$name: RMS = $(round(rms; digits = 2))σ (n=$(hi - lo + 1))")
+        lo <= hi || continue
+        idx = lo:hi
+        xs = 1:length(idx)
+
+        # Box 1: values on this variable's own axis.
+        ax1 = CairoMakie.Axis(
+            fig[1, col],
+            title = "$name (iteration $g_iter)",
+            xlabel = "index in block",
+            ylabel = "value",
+        )
+        h_g = nothing
+        for member in eachcol(view(g_ens, idx, :))
+            h_g = CairoMakie.lines!(ax1, xs, collect(member); color = (:black, 0.2))
+        end
+        h_mean = CairoMakie.lines!(ax1, xs, g_mean[idx]; color = :black)
+        h_obs = CairoMakie.lines!(ax1, xs, y[idx]; color = :blue)
+        isnothing(legend_handles) && (legend_handles = [h_g, h_mean, h_obs])
+
+        # Box 2: residual in units of the observation noise.
+        resid = [
+            (isfinite(g_mean[i]) && sigma[i] > 0) ? (g_mean[i] - y[i]) / sigma[i] :
+            NaN for i in idx
+        ]
+        finite_resid = filter(isfinite, resid)
+        rms = isempty(finite_resid) ? NaN :
+              sqrt(Statistics.mean(abs2, finite_resid))
+        push!(labels, "$name: RMS = $(round(rms; digits = 2))σ (n=$(length(idx)))")
+        ax2 = CairoMakie.Axis(
+            fig[2, col],
+            title = "residual (mean(G) - obs) / σ   RMS = $(round(rms; digits = 2))σ",
+            xlabel = "index in block",
+            ylabel = "residual [σ]",
+        )
+        CairoMakie.hlines!(ax2, [0.0]; color = :blue)
+        CairoMakie.hlines!(ax2, [-1.0, 1.0]; color = :gray, linestyle = :dash)
+        CairoMakie.hlines!(ax2, [-2.0, 2.0]; color = :red, linestyle = :dot)
+        CairoMakie.scatter!(ax2, xs, resid; color = :black, markersize = 5)
     end
-    ax2.subtitle = join(labels, "   |   ")
+
+    isnothing(legend_handles) ||
+        CairoMakie.Legend(fig[1, n_vars + 1], legend_handles,
+                          ["G", "G mean", "Observation"])
 
     figpath = joinpath(output_dir, "g_vs_obs.png")
     CairoMakie.save(figpath, fig)
     @info "Saved point-by-point residual plot" figpath residual_rms_per_var = labels
+    return nothing
+end
+
+"""
+    animate_iteration_plots(output_dir; names, delay_cs = 100, strip = false)
+
+Collect one plot type from every `iteration_NNN` directory and write an
+animated GIF `<stem>_evolution.gif` in `output_dir`. With `strip = true`, also
+write a horizontally stitched `<stem>_strip.png`. Uses ImageMagick, which is on
+the default PATH on Derecho. Call after the last iteration, or standalone on
+any completed run directory:
+
+    animate_iteration_plots("/path/to/output_dir")
+
+`delay_cs` is the frame delay in centiseconds.
+"""
+function animate_iteration_plots(
+    output_dir;
+    names = ["bias_sample_dates.png", "g_vs_obs.png"],
+    delay_cs = 100,
+    strip = false,
+)
+    magick = Sys.which("magick")
+    if isnothing(magick)
+        @warn "ImageMagick not found on PATH; skipping iteration-plot animation"
+        return nothing
+    end
+    for name in names
+        frames = sort(
+            filter(
+                isfile,
+                [
+                    joinpath(d, name) for d in readdir(output_dir; join = true) if
+                    startswith(basename(d), "iteration_")
+                ],
+            ),
+        )
+        if length(frames) < 2
+            @info "Fewer than two frames for $name; skipping animation"
+            continue
+        end
+        stem = splitext(name)[1]
+        gif = joinpath(output_dir, "$(stem)_evolution.gif")
+        try
+            run(`$magick -delay $delay_cs $frames -loop 0 $gif`)
+            @info "Wrote iteration animation" gif n_frames = length(frames)
+            if strip
+                strippath = joinpath(output_dir, "$(stem)_strip.png")
+                run(`$magick $frames +append $strippath`)
+                @info "Wrote iteration strip" strippath
+            end
+        catch e
+            @error "Failed to animate $name" exception = (e, catch_backtrace())
+        end
+    end
     return nothing
 end
 
@@ -434,6 +450,13 @@ function ClimaCalibrate.analyze_iteration(
         @error "G-vs-obs residual plotting failed" exception = (e, catch_backtrace())
     end
 
+    # Log the plain-language steering block. Advisory and never fatal.
+    try
+        @info "\n" * steering_summary(ekp, g_ensemble, prior, iteration)
+    catch e
+        @error "Steering indicators failed" exception = (e, catch_backtrace())
+    end
+
     (; config) = interface
     job_id = get_job_id(config)
     member_path = ClimaCalibrate.path_to_ensemble_member(output_dir, iteration, 1)
@@ -443,6 +466,14 @@ function ClimaCalibrate.analyze_iteration(
         plot_bias_weekly(ekp, simdir, iteration; output_dir = plot_output_path)
     catch e
         @error "Bias plotting failed" exception = (e, catch_backtrace())
+    end
+
+    # Refresh the cross-iteration animations. The GIFs stay current even when a
+    # run stops before its final iteration.
+    try
+        animate_iteration_plots(output_dir)
+    catch e
+        @error "Iteration-plot animation failed" exception = (e, catch_backtrace())
     end
 
     @info "Ensemble spread: $(scalar_spread(ekp))"

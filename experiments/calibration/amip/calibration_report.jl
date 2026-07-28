@@ -33,7 +33,7 @@ import Printf: @sprintf
                        outfile=joinpath(output_dir,"calibration_report.md"))
 
 Build a plain-language Markdown report for the calibration in `output_dir`,
-print it, and (unless `outfile === nothing`) write it there. Returns the report
+print it, and (unless `isnothing(outfile)`) write it there. Returns the report
 string.
 """
 function calibration_report(
@@ -53,7 +53,7 @@ function calibration_report(
     prior_path = joinpath(output_dir, iters[1], "prior.jld2")
     isfile(prior_path) || (prior_path = joinpath(output_dir, "prior.jld2"))
     prior = isfile(prior_path) ? JLD2.load_object(prior_path) : nothing
-    pnames = prior === nothing ? nothing : PD.get_name(prior)
+    pnames = isnothing(prior) ? nothing : PD.get_name(prior)
 
     # --- trajectories ---
     err = EKP.get_error(ekp)                     # one per completed update
@@ -66,7 +66,7 @@ function calibration_report(
 
     # constrained parameter ensemble mean per iteration (physical units)
     ϕmean = nothing
-    if prior !== nothing
+    if !isnothing(prior)
         ϕ = EKP.get_ϕ(prior, ekp)
         ϕmean = [vec(Statistics.mean(p, dims = 2)) for p in ϕ]
     end
@@ -83,7 +83,7 @@ function calibration_report(
     end
 
     cfg = nothing
-    if config_path !== nothing && isfile(config_path)
+    if !isnothing(config_path) && isfile(config_path)
         cfg = _load_config_context(config_path)
     end
 
@@ -103,11 +103,11 @@ function calibration_report(
     p()
     p("- Output dir: `", output_dir, "`")
     p("- Iterations with parameters: ", n_param_iters,
-      cfg !== nothing ? " (of $(cfg.n_iterations) targeted)" : "")
+      !isnothing(cfg) ? " (of $(cfg.n_iterations) targeted)" : "")
     p("- Ensemble members (N_ens): ", N_ens)
     p("- Observation dimension: ", obs_dim,
-      obs_names !== nothing ? "  (variables: $(join(obs_names, ", ")))" : "")
-    if cfg !== nothing
+      !isnothing(obs_names) ? "  (variables: $(join(obs_names, ", ")))" : "")
+    if !isnothing(cfg)
         p("- Target variables: ", join(cfg.short_names, ", "))
         p("- Calibration target date(s): ", _fmt_ranges(cfg.sample_ranges_unique))
         p("- Covariance estimated from: ", _fmt_ranges(cfg.covariance_ranges))
@@ -116,7 +116,7 @@ function calibration_report(
     p()
 
     # --- data reduction + covariance (if the observation vector is available) ---
-    if oa !== nothing
+    if !isnothing(oa)
         _reduction_section(io, oa, cfg)
         _covariance_section(io, oa)
     end
@@ -124,7 +124,7 @@ function calibration_report(
     # --- parameters ---
     p("## Parameters")
     p()
-    if prior === nothing
+    if isnothing(prior)
         p("_prior.jld2 not found; parameter names unavailable._")
     else
         p("| parameter | initial | final | change |")
@@ -143,7 +143,7 @@ function calibration_report(
     p()
     hdr = "| iter | cov-weighted error | spread (rel. to iter 1) |"
     sep = "|---|---|---|"
-    if prior !== nothing
+    if !isnothing(prior)
         hdr *= " " * join(["`$(n)` |" for n in pnames], " ")
         sep *= " " * join(["---|" for _ in pnames], " ")
     end
@@ -151,7 +151,7 @@ function calibration_report(
     for i in 1:n_param_iters
         e = i <= length(err) ? @sprintf("%.4f", err[i]) : "—"
         row = "| $i | $e | $(@sprintf("%.3f", spread_ratio[i])) |"
-        if prior !== nothing
+        if !isnothing(prior)
             row *= " " * join([_sig(ϕmean[i][j]) * " |" for j in 1:length(pnames)], " ")
         end
         p(row)
@@ -184,7 +184,7 @@ function calibration_report(
 
     report = String(take!(io))
     print(report)
-    if outfile !== nothing
+    if !isnothing(outfile)
         open(outfile, "w") do f
             write(f, report)
         end
@@ -252,7 +252,7 @@ function _reduction_section(io, oa, cfg)
     p()
     p("| variable | reduced grid | calibration points |")
     p("|---|---|---|")
-    for pv in (oa.pervar === nothing ? [] : oa.pervar)
+    for pv in (isnothing(oa.pervar) ? [] : oa.pervar)
         v = pv.v
         dimdesc = String[]
         if ClimaAnalysis.has_altitude(v)
@@ -267,7 +267,7 @@ function _reduction_section(io, oa, cfg)
     end
     p("| **total** | | **", length(oa.y), "** |")
     p()
-    if zonal && cfg !== nothing && cfg.nlon !== nothing
+    if zonal && !isnothing(cfg) && !isnothing(cfg.nlon)
         nlat = length(ClimaAnalysis.latitudes(oa.vars[1]))
         full = cfg.nlon * nlat * sum(v -> ClimaAnalysis.has_altitude(v) ?
                                      length(ClimaAnalysis.altitudes(v)) : 1, oa.vars)
@@ -298,7 +298,7 @@ function _covariance_section(io, oa)
     p()
     p("| variable | data \\|y\\| | noise σ | σ as % of field | floor σ (model error) |")
     p("|---|---|---|---|---|")
-    for pv in (oa.pervar === nothing ? [] : oa.pervar)
+    for pv in (isnothing(oa.pervar) ? [] : oa.pervar)
         r = pv.rng
         yv = Statistics.median(abs.(oa.y[r]))
         st = Statistics.median(oa.σtot[r])
@@ -362,12 +362,12 @@ end
 function _narrative(label, cfg, niter, nens, obsdim, obsnames, pnames, ϕmean,
                     err, spread_ratio, collapsed, one_step_crash)
     io = IOBuffer()
-    vars = obsnames !== nothing ? join(obsnames, "+") :
-           (cfg !== nothing ? join(cfg.short_names, "+") : "the target field(s)")
-    target = cfg !== nothing ? _fmt_ranges(cfg.sample_ranges_unique) : "a fixed target"
+    vars = !isnothing(obsnames) ? join(obsnames, "+") :
+           (!isnothing(cfg) ? join(cfg.short_names, "+") : "the target field(s)")
+    target = !isnothing(cfg) ? _fmt_ranges(cfg.sample_ranges_unique) : "a fixed target"
     print(io, "This calibration fit $(nens) ensemble members to $(obsdim) data points ",
           "of $(vars) (target: $(target)) over $(niter) iterations")
-    cfg !== nothing && niter < cfg.n_iterations &&
+    !isnothing(cfg) && niter < cfg.n_iterations &&
         print(io, " (short of the $(cfg.n_iterations) targeted, typically because the workers hit their walltime)")
     print(io, ". ")
 
@@ -387,7 +387,7 @@ function _narrative(label, cfg, niter, nens, obsdim, obsnames, pnames, ϕmean,
               "(best $(round(ebest,sigdigits=3)), $(redpct)% below the start). ")
     end
 
-    if pnames !== nothing && !collapsed
+    if !isnothing(pnames) && !collapsed
         moves = String[]
         for j in 1:length(pnames)
             i0, i1 = ϕmean[1][j], ϕmean[end][j]

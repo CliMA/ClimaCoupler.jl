@@ -100,17 +100,18 @@ function ocean_simulation(
     clock,
     stop_time,
     depth = 5500,
-    Nz = 32,
-    momentum_advection = OC.WENOVectorInvariant(order = 5),
-    tracer_advection = OC.WENO(order = 5),
+    Nz = 60,
+    momentum_advection = OC.WENOVectorInvariant(
+        order = 5,
+        time_discretization = AdaptiveVerticallyImplicitDiscretization(cfl = 0.4),
+    ),
+    tracer_advection = OC.WENO(
+        order = 7,
+        time_discretization = AdaptiveVerticallyImplicitDiscretization(cfl = 0.4),
+    ),
     kwargs...,
 )
     substeps = simple_ocean ? 70 : 150
-
-    if ocean_grid == :orca && simple_ocean
-        @warn "`simple_ocean=true` not supported for ORCA1 grid, using one_deg_tripolar grid instead"
-        ocean_grid = :one_deg_tripolar
-    end
 
     active_cells_map = !simple_ocean
     zstar = !simple_ocean

@@ -457,3 +457,42 @@ end
         scm_surface_type = "invalid_surface",
     )
 end
+
+@testset "ERA5 initial condition resolution" begin
+    date = Dates.DateTime(2024, 3, 15)
+
+    # An explicit directory is used as-is, with no artifact lookup and no
+    # download, so this needs neither the network nor CDS credentials
+    mktempdir() do dir
+        @test Input.resolve_era5_dir(dir, date) == dir
+    end
+
+    # get_era5_filepaths is a pure path builder. It must not resolve or
+    # download, so an unresolved directory is an error that names the fix.
+    @test_throws "not resolved yet" Input.get_era5_filepaths(
+        Interfacer.SubseasonalMode,
+        nothing,
+        date,
+        "",
+    )
+
+    # Non-subseasonal modes pass through untouched
+    paths = Input.get_era5_filepaths(Interfacer.AMIPMode, nothing, date, "bucket.nc")
+    @test isnothing(paths.sst_path)
+    @test paths.bucket_initial_condition == "bucket.nc"
+
+    # resolve_era5_dir! only touches subseasonal configs
+    amip_config = Dict("mode_name" => "amip", "era5_initial_condition_dir" => nothing)
+    @test isnothing(Input.resolve_era5_dir!(amip_config)["era5_initial_condition_dir"])
+
+    # For subseasonal, it writes the resolved directory back so that ClimaAtmos
+    # reads from the same place
+    mktempdir() do dir
+        config = Dict(
+            "mode_name" => "subseasonal",
+            "start_date" => "20240315",
+            "era5_initial_condition_dir" => dir,
+        )
+        @test Input.resolve_era5_dir!(config)["era5_initial_condition_dir"] == dir
+    end
+end

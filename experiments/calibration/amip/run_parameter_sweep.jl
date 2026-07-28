@@ -199,6 +199,15 @@ end
 # calibrated and responses must be measured in the calibrated microphysics regime.
 # σ in the priors just parameterizes the transform; explicit values round-trip
 # exactly while inside (lower, upper).
+# MINI-ROW (row 2b): the WIRED TKE-dissipation controls + one combined-detrainment
+# point. Row 2 found mixing_length_diss_coeff is not wired in Atmos 0.42 — c_d is
+# derived as c_m*c_b/Ri_c — so the dissipation physics is actually controlled by
+# `mixing_length_static_stab_coeff` (c_b, default 0.4) and `mixing_length_Ri_crit`
+# (Ri_c, default 0.25), swept here. The combined member tests whether a MODERATE
+# dmfvd increase (0.6, between base 0.3 and the 0.9 that improved swcre by 0.62σ
+# but degraded lwp by 1.56σ) buys radiation improvement at acceptable lwp cost —
+# informing the Phase-2 prior for dmfvd. Center member repeated to double-check
+# cross-sweep reproducibility against Row 2's center (bit-identical expected).
 const SWEEP_PRIORS = EKP.combine_distributions([
     PD.constrained_gaussian(
         "cloud_liquid_water_specific_humidity_autoconversion_threshold",
@@ -212,23 +221,19 @@ const SWEEP_PRIORS = EKP.combine_distributions([
     PD.constrained_gaussian(
         "mixing_length_eddy_viscosity_coefficient", 0.14, 0.1, 0.0, 1.0,
     ),
-    PD.constrained_gaussian("mixing_length_diss_coeff", 0.22, 0.15, 0.0, 1.0),
+    PD.constrained_gaussian("mixing_length_static_stab_coeff", 0.4, 0.3, 0.0, 3.0),
+    PD.constrained_gaussian("mixing_length_Ri_crit", 0.25, 0.15, 0.05, 1.0),
 ])
 
 # Pinned warm rain (current calibrated center) and the base point for each knob.
 const QLIQ_PIN = 2.885040714042334e-4
 const RTAU_PIN = 1463.1170909634866
-const BASE = [QLIQ_PIN, RTAU_PIN, 0.1, 1.0, 0.3, 0.7, 0.14, 0.22]
+const BASE = [QLIQ_PIN, RTAU_PIN, 0.1, 1.0, 0.3, 0.7, 0.14, 0.4, 0.25]
 
-# One-at-a-time perturbations: (param row, low, high). ×3/÷3 where physical;
-# EDMF_max_area is an area fraction, so an additive bracket is used instead.
+# One-at-a-time perturbations: (param row, low, high).
 const PERTURB = [
-    (3, 0.03, 0.3),     # entr_coeff
-    (4, 0.3, 3.0),      # detr_buoy_coeff
-    (5, 0.1, 0.9),      # detr_massflux_vertdiv_coeff
-    (6, 0.4, 0.9),      # EDMF_max_area
-    (7, 0.05, 0.42),    # mixing_length_eddy_viscosity_coefficient
-    (8, 0.073, 0.66),   # mixing_length_diss_coeff
+    (8, 0.13, 1.2),     # mixing_length_static_stab_coeff (c_b), ×3/÷3
+    (9, 0.1, 0.5),      # mixing_length_Ri_crit, physical bracket
 ]
 
 sweep_matrix = reduce(hcat, [
@@ -239,9 +244,13 @@ sweep_matrix = reduce(hcat, [
     end for (row, lo, hi) in PERTURB for val in (lo, hi)
 ])
 
-# Single center member: the baseline anchor every perturbation is read against.
-# The noise floor comes from the observations' interannual spread (scout
-# analysis), not from replicate scatter.
+# Combined-detrainment member: dmfvd = 0.6, everything else at base.
+let col = copy(BASE)
+    col[5] = 0.6
+    global sweep_matrix = hcat(sweep_matrix, col)
+end
+
+# Center member: baseline anchor + cross-sweep reproducibility check vs Row 2.
 replicate_matrix = reshape(copy(BASE), :, 1)
 
 # Columns = members: sweep members first, then replicate members.
@@ -254,7 +263,7 @@ const ITERATION = 1  # single-iteration "sweep"; mirrors calibration iteration 1
 # output + JLD2/HDF5 checkpoints per member, which blows the 100 GiB home quota
 # and makes checkpoint writes fail with EOFError. Scratch is large and is where
 # the calibrations run.
-const SWEEP_OUTPUT_DIR = "/glade/derecho/scratch/nefrathe/amip_sweep_entr_detr"
+const SWEEP_OUTPUT_DIR = "/glade/derecho/scratch/nefrathe/amip_sweep_mixlen_mini"
 
 # Rebuild the calibration config pointed at the sweep output directory so this
 # never clobbers a real calibration.

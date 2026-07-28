@@ -180,6 +180,33 @@ swcre/lwp **half right** (lwp/pr yes, swcre no); max-area → cl/swcre **wrong**
 
 ---
 
+## Row 2b — TKE-dissipation controls + combined detrainment — ✅ COMPLETE
+
+6 members (2026-07-28): one-at-a-time `mixing_length_static_stab_coeff`
+(0.13/1.2) and `mixing_length_Ri_crit` (0.1/0.5), one combined member
+`detr_massflux_vertdiv_coeff` = 0.6, one center.
+
+| perturbation | lwp | pr | cl | swcre | lwcre |
+|---|---|---|---|---|---|
+| static_stab 0.13 | −0.07 | −0.21 | −0.04 | +0.16 | +0.20 |
+| static_stab 1.2 | −0.15 | +0.06 | +0.01 | −0.01 | +0.01 |
+| Ri_crit 0.1 | +0.12 | +0.08 | +0.02 | +0.01 | +0.08 |
+| Ri_crit 0.5 | −0.17 | −0.06 | +0.03 | +0.12 | +0.22 |
+| **dmfvd 0.6** | **+0.16** | +0.01 | −0.02 | **−0.34** | −0.13 |
+
+Verdicts:
+- **static_stab_coeff, Ri_crit — REJECT** (max swings 0.21σ / 0.22σ). These do
+  change the simulation, so the dissipation channel is wired, but it is a weak
+  lever at these ranges.
+- **dmfvd response is strongly nonlinear**: 0.6 gives −0.34σ swcre at +0.16σ lwp
+  cost, while 0.9 gave −0.62σ swcre at +1.56σ lwp cost. Roughly half the
+  radiation gain at a tenth of the lwp damage. **Phase-2 prior for dmfvd:
+  center near 0.3–0.4 with an upper bound near 0.7.**
+- **Cross-sweep determinism confirmed**: the center member reproduces the Row-2
+  center to 4 significant figures on lwp/pr/swcre/lwcre. The cl difference
+  (0.1523 vs 0.1385) measures the imputation fix: with fabricated points
+  removed, the observed cl mean is 0.1788 and the model deficit is ~22%.
+
 ## cl definition check (2026-07-28) — the "too few" bias is REAL
 
 Question: is the ~18% cl deficit physics or a definition mismatch between the

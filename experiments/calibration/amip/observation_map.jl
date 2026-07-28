@@ -83,10 +83,10 @@ function preprocess_sim_vars(vars)
                observations to create them." coverage_fp
     end
 
-    # Zonal (longitude) mean — must match the obs-side preprocessing in
+    # Spatial reduction. Must match the observation-side preprocessing in
     # generate_observations.jl so the flattened G aligns with the observation
-    # vector (see zonal_average).
-    vars = zonal_average.(vars)
+    # vector (see reduce_spatial).
+    vars = reduce_spatial.(vars)
 
     if isfile(NORMALIZATION_STATS_FP)
         # Note: This should not be used with SVDplusDCovariance matrix

@@ -177,11 +177,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
         v in vars
     )
 
-    # Collapse the longitude dimension to a zonal mean. This cuts the number of
-    # (spatially correlated) constraints ~2 orders of magnitude down to the true
-    # large-scale degrees of freedom, preventing the over-informed SVDplusD
-    # inverse from collapsing the TransformUnscented ensemble (see zonal_average).
-    vars = zonal_average.(vars)
+    # Reduce the spatial dimensions to approximately independent constraints.
+    # Native grid points are strongly correlated, and treating them as
+    # independent over-informs the inverse and collapses the ensemble. The
+    # default is a zonal mean. A config that defines COARSEN_FACTOR keeps two
+    # spatial dimensions on a block-averaged grid instead (see coarsen_lonlat).
+    vars = reduce_spatial.(vars)
 
     # NOTE: Normalization is intentionally NOT applied. The SVDplusD covariance
     # below carries each variable's physical scale, and normalization is
@@ -195,22 +196,40 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # a data-informed covariance estimated from the independent COVARIANCE_DATE_RANGES.
     (; sample_date_ranges) = CALIBRATE_CONFIG
     # model_error_scale adds `(model_error_scale * mean(field))^2` to the diagonal
-    # as a structural-model-error floor. The previous 0.01 (1% of field) was far
-    # below both the internal variability and the real structural biases (lwp
-    # ~37%, cl ~72% low), so the diagonal directions were tightly constrained to
-    # ~1% precision — the second driver (with the O(10^4) constraint count) of the
-    # ensemble collapse, because EKP then chases irreducible structural error. At
-    # 0.2 the floor (~20% of field) is comparable to the internal variability and
-    # a realistic fraction of the structural error, so a perfect parameter set is
-    # allowed to leave that mismatch and the posterior keeps a finite spread.
-    observation_vec = make_data_informed_observation_vector(
-        vars,
-        sample_date_ranges,
-        COVARIANCE_DATE_RANGES;
-        model_error_scale = 0.2,
-        use_latitude_weights = true,
-        min_cosd_lat = 0.1,
-    )
+    # as a structural-model-error floor. The floor states how much mismatch a
+    # perfect parameter set is expected to leave. 0.2 (20% of the field mean) is
+    # comparable to the internal variability of lwp and pr. An observable with a
+    # larger irreducible bias needs a larger floor, otherwise the calibration
+    # distorts reachable parameters to chase it.
+    #
+    # A config may define OBS_NOISE_GROUPS to give variable groups their own
+    # floors. Each group becomes its own covariance block and the per-sample
+    # observations are combined with EKP.combine_observations, so the flattened
+    # layout is group order then variable order within the group.
+    noise_groups = @isdefined(OBS_NOISE_GROUPS) ? OBS_NOISE_GROUPS :
+                   [(short_names = short_names, model_error_scale = 0.2)]
+
+    grouped_obs_vecs = map(noise_groups) do group
+        group_vars = filter(
+            v -> ClimaAnalysis.short_name(v) in group.short_names, collect(vars),
+        )
+        isempty(group_vars) && error(
+            "OBS_NOISE_GROUPS entry $(group.short_names) matches no loaded variables",
+        )
+        make_data_informed_observation_vector(
+            group_vars,
+            sample_date_ranges,
+            COVARIANCE_DATE_RANGES;
+            model_error_scale = group.model_error_scale,
+            use_latitude_weights = true,
+            min_cosd_lat = 0.1,
+        )
+    end
+    observation_vec = [
+        length(grouped_obs_vecs) == 1 ? grouped_obs_vecs[1][k] :
+        EKP.combine_observations([gv[k] for gv in grouped_obs_vecs]) for
+        k in eachindex(sample_date_ranges)
+    ]
 
     # Save observation vector into the config's output_dir so that different
     # calibration setups (e.g. lwp+cl vs LWP-only) keep independent observations.

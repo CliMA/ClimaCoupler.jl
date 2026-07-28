@@ -244,6 +244,88 @@ function apply_coverage_mask(var, dim_names, mask)
 end
 
 """
+    coarsen_lonlat(var, factor)
+
+Reduce `var` to a coarse longitude-latitude grid by block averaging. Each
+output cell is the mean of a `factor` x `factor` block of input cells, weighted
+by `cosd(latitude)` within the block and skipping NaN cells. Block coordinates
+are the unweighted centers of the input coordinates. Other dimensions (time,
+altitude) pass through unchanged.
+
+This is the aggregation counterpart of `zonal_average` for calibrations that
+keep two spatial dimensions. `ClimaAnalysis.resampled_as` is not suitable here:
+it interpolates point values at the coarse nodes, which discards most of the
+data, aliases small scales, and spreads NaN from masked cells.
+
+The longitude and latitude sizes must divide by `factor`. A NaN block (for
+example a fully land-masked ocean retrieval block) stays NaN and is handled by
+the flatten step like any other missing point.
+"""
+function coarsen_lonlat(var, factor)
+    ClimaAnalysis.has_longitude(var) || return var
+    lonname = ClimaAnalysis.longitude_name(var)
+    latname = ClimaAnalysis.latitude_name(var)
+    li = var.dim2index[lonname]
+    lj = var.dim2index[latname]
+    nlon = length(var.dims[lonname])
+    nlat = length(var.dims[latname])
+    (nlon % factor == 0 && nlat % factor == 0) || error(
+        "coarsen_lonlat: grid $(nlon)x$(nlat) does not divide by factor $factor",
+    )
+    @info "Coarsening $(ClimaAnalysis.short_name(var)) by $factor: " *
+          "$(nlon)x$(nlat) -> $(div(nlon, factor))x$(div(nlat, factor))"
+
+    lats = collect(var.dims[latname])
+    w_lat = cosd.(lats)
+
+    outsize = collect(size(var.data))
+    outsize[li] = div(nlon, factor)
+    outsize[lj] = div(nlat, factor)
+    out = fill(NaN, outsize...)
+
+    for idx in CartesianIndices(Tuple(outsize))
+        lonrange = ((idx[li] - 1) * factor + 1):(idx[li] * factor)
+        latrange = ((idx[lj] - 1) * factor + 1):(idx[lj] * factor)
+        num = 0.0
+        den = 0.0
+        for a in lonrange, b in latrange
+            src = ntuple(
+                d -> d == li ? a : d == lj ? b : idx[d], ndims(var.data),
+            )
+            x = var.data[src...]
+            isfinite(x) || continue
+            num += w_lat[b] * x
+            den += w_lat[b]
+        end
+        den > 0 && (out[idx] = num / den)
+    end
+
+    blockmean(v) = [
+        Statistics.mean(v[((k - 1) * factor + 1):(k * factor)]) for
+        k in 1:div(length(v), factor)
+    ]
+    new_dims = copy(var.dims)
+    new_dims[lonname] = blockmean(collect(var.dims[lonname]))
+    new_dims[latname] = blockmean(lats)
+    return ClimaAnalysis.remake(var; data = out, dims = new_dims)
+end
+
+"""
+    reduce_spatial(var)
+
+Apply the configured spatial reduction: `coarsen_lonlat` when the config
+defines `COARSEN_FACTOR`, `zonal_average` otherwise. Must be applied
+identically to the observations and the simulation so the flattened vectors
+stay aligned.
+"""
+function reduce_spatial(var)
+    if isdefined(Main, :COARSEN_FACTOR)
+        return coarsen_lonlat(var, Main.COARSEN_FACTOR)
+    end
+    return zonal_average(var)
+end
+
+"""
     get_lonlat_regridder(config_file)
 
 Create a regridder for `OutputVar`s for regridding to the simulation grid.

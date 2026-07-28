@@ -251,6 +251,17 @@ itself → row 4 (quadrature/SGS-variance parameters) is the mechanism to test.
 
 ---
 
+## Spatial decorrelation of the covariance samples (measured 2026-07-28)
+
+Pair correlations of the interannual Oct 2006-2010 anomalies across the 5 years,
+pooled per 250 km distance bin on the 2.5 degree grid (script:
+tmp/decorrelation.jl): **e-folding ~625 km for lwp, ~875 km for pr** (r at
+1000-1250 km is 0.09 and 0.05). Consequence for 2-D coarse observations:
+10 degree blocks (~1100 km) are effectively independent pixels, 15 degree
+blocks fully independent, and 5 degree blocks would be 30-50% correlated with
+their neighbors. This is the empirical footing for COARSEN_FACTOR = 4 (10 deg)
+as the preferred 2-D grid, pending the validation runs.
+
 ## Current status (2026-07-28, 04:10 MDT)
 
 - **Row-2 sweep**: ✅ COMPLETE (jobs 6930400–6930412, 13/13 members). Results and

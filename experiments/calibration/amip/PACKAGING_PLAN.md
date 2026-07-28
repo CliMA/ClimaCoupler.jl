@@ -1,5 +1,9 @@
 # Packaged Calibration Framework (freeze-from-snapshot)
 
+> STATUS (2026-07-28): ON HOLD by user decision. Phase-1 snapshot/provenance/
+> fingerprint/verify functions exist in `experiments/calibration/amip/packaging.jl`
+> (uncommitted, untested). The launcher and driver template are not built.
+
 ## Context
 
 A calibration's definition is currently scattered across five layers: the config `.jl`

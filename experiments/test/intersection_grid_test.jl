@@ -417,30 +417,12 @@ end
     node_lat = CRExt.flat_nodal_data(CC.Fields.field_values(coords.lat))
     node_lon = CRExt.flat_nodal_data(CC.Fields.field_values(coords.long))
 
-    # `topography_damping_factor = 1` means zero smoothing iterations
-    # (maxiter = round(log(1)/0.05) = 0): the raw, DSS'd, clamped fraction.
-    f_raw = CMIPExt.wet_ocean_fraction_field(
-        boundary_space,
-        eg_c;
-        topography_damping_factor = 1,
-    )
-    f_smooth = CMIPExt.wet_ocean_fraction_field(
-        boundary_space,
-        eg_c;
-        topography_damping_factor = 5,
-    )
-    raw = CRExt.se_field_to_vec(f_raw)
-    smooth = CRExt.se_field_to_vec(f_smooth)
+    f = CMIPExt.wet_ocean_fraction_field(boundary_space, eg_c)
+    vals = CRExt.se_field_to_vec(f)
 
     # Bounds and non-triviality.
-    @test all(v -> 0 <= v <= 1, raw)
-    @test all(v -> 0 <= v <= 1, smooth)
-    @test maximum(abs.(smooth .- raw)) > 0
-
-    # The diffusion is (weak-form) conservative; with the clamp the global
-    # integral moves only slightly. `sum` of a ClimaCore field is the
-    # area-weighted integral.
-    @test sum(f_smooth) ≈ sum(f_raw) rtol = 2e-2
+    @test all(v -> 0 <= v <= 1, vals)
+    @test any(!=(0), vals) && any(!=(1), vals)
 
     # Interior values: fully ocean far from the idealized coastlines at
     # wrapped longitudes 0 and 180, fully land in the middle of the land
@@ -449,14 +431,13 @@ end
         lonw = mod(node_lon[n], 360)
         abs(node_lat[n]) > 45 && continue
         if 60 < lonw < 120 # deep inside land
-            @test smooth[n] < 0.1
+            @test vals[n] < 0.1
         elseif 240 < lonw < 300 # deep inside ocean
-            @test smooth[n] > 0.9
+            @test vals[n] > 0.9
         end
     end
 
-    # Fully wet grid: fraction ≈ 1 everywhere the ocean grid reaches, and
-    # the smoothing must not degrade it.
+    # Fully wet grid: fraction ≈ 1 everywhere the ocean grid reaches.
     f_wet = CMIPExt.wet_ocean_fraction_field(boundary_space, eg_wet)
     wet_vals = CRExt.se_field_to_vec(f_wet)
     for n in 1:(eg_wet.n_nodes)

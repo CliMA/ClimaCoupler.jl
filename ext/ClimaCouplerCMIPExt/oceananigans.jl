@@ -182,7 +182,6 @@ function OceananigansSimulation(
     simple_ocean = false,
     ocean_grid = :one_deg_tripolar,
     use_intersection_grid = true,
-    topography_damping_factor = 5,
     depth = 5500,
     dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
@@ -248,7 +247,6 @@ function OceananigansSimulation(
         grid,
         boundary_space;
         use_intersection_grid,
-        topography_damping_factor,
     )
 
     # COARE3 roughness params (allocated once, reused each timestep)
@@ -349,8 +347,7 @@ underlying_grid(grid) = grid
 
 """
     construct_remapper(grid_oc, boundary_space;
-                       use_intersection_grid = true,
-                       topography_damping_factor = 5)
+                       use_intersection_grid = true)
 
 Construct the two sparse regridders needed to remap between an Oceananigans
 grid and a ClimaCore boundary space, plus remapping scratch space:
@@ -367,16 +364,14 @@ The `Interfacer.remap!` methods in `climaocean_helpers.jl` accept
 When `use_intersection_grid = true` and the setup supports it (a
 `SpectralElementSpace2D` boundary space on a single process), the returned
 NamedTuple additionally carries the device-resident [`ExchangeGrid`](@ref),
-the static `wet_ocean_fraction` field (filtered consistently with the
-atmosphere's orography smoothing), the per-polygon flux states and
-boundary-space flux scratch, and `use_exchange_grid::Bool` indicating the
-exchange-grid path is active.
+the static `wet_ocean_fraction` field (DSS'd nodal ratio of wet to geometric
+coverage), the per-polygon flux states and boundary-space flux scratch, and
+`use_exchange_grid::Bool` indicating the exchange-grid path is active.
 """
 function construct_remapper(
     grid_oc,
     boundary_space;
     use_intersection_grid = true,
-    topography_damping_factor = 5,
 )
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), underlying_grid(grid_oc))
     boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
@@ -432,11 +427,8 @@ function construct_remapper(
         ClimaComms.context(boundary_space) isa ClimaComms.SingletonCommsContext
     if use_exchange_grid
         exchange_grid_cpu = build_exchange_grid(boundary_space, grid_oc)
-        wet_ocean_fraction = wet_ocean_fraction_field(
-            boundary_space,
-            exchange_grid_cpu;
-            topography_damping_factor,
-        )
+        wet_ocean_fraction =
+            wet_ocean_fraction_field(boundary_space, exchange_grid_cpu)
         exchange_grid = on_device(arch, exchange_grid_cpu)
 
         # Per-polygon flux scratch, boundary-space flux scratch fields (in the
@@ -516,10 +508,9 @@ end
 Ocean-bathymetry-authoritative surface fractions on the exchange grid.
 
 The static wet-ocean fraction (`remapping.wet_ocean_fraction`, derived from
-the intersection areas with the ocean's immersed wet mask and filtered
-consistently with the atmosphere's orography smoothing) partitions each
-boundary node into wet and land parts. Sea ice and open ocean subdivide the
-wet part; land fills the remainder:
+the intersection areas with the ocean's immersed wet mask and DSS'd onto the
+boundary space) partitions each boundary node into wet and land parts. Sea
+ice and open ocean subdivide the wet part; land fills the remainder:
 
     ice   = clamp(ice_concentration, 0, wet)
     ocean = wet - ice

@@ -47,7 +47,6 @@ t_end: "30days"
 topo_smoothing: true
 topography: "Earth"
 use_intersection_grid: true
-topography_damping_factor: 5.0
 use_itime: true
 viscous_sponge: true
 z_elem: 39

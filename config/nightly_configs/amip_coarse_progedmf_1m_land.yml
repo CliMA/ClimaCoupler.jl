@@ -24,6 +24,9 @@ surface_setup: "PrescribedSurface"
 topo_smoothing: true
 topography: "Earth"
 
+# Testing acnv(w)
+rain_autoconversion: "VelocityDependent"
+
 # weather model setup
 initial_condition: "WeatherModel"
 mode_name: "subseasonal"

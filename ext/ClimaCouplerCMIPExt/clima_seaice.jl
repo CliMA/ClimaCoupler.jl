@@ -477,19 +477,20 @@ function _update_ice_turbulent_fluxes_boundary!(sim::ClimaSeaIceSimulation, fiel
         )
     end
 
-    # Remap the latent and sensible heat fluxes using scratch fields
-    Interfacer.remap!(sim.remapping.scratch_field_oc1, F_lh, sim.remapping) # latent heat flux
-    Interfacer.remap!(sim.remapping.scratch_field_oc2, F_sh, sim.remapping) # sensible heat flux
-
-    # Rename for clarity; recall F_turb_energy = F_lh + F_sh (interiors match main's scratch-array sum)
-    remapped_F_lh = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
-    remapped_F_sh = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
-
     # Update the sea ice heat flux only where the concentration is greater than zero.
-    # With PrescribedTemperature the top heat flux is a FluxFunction, not a Field;
-    # the flux is determined from the diagnosed T_sfc so we skip writing here.
+    # With PrescribedTemperature the top heat flux is a FluxFunction, not a Field: the flux
+    # is the internal conductive flux in equilibrium with the diagnosed T_sfc (the
+    # skin-temperature solve already balances the turbulent fluxes against conduction), so
+    # we skip writing here to avoid double-counting the surface energy budget.
     si_flux_heat = sim.ice.model.external_heat_fluxes.top
     if si_flux_heat isa OC.Field
+        # Remap the latent and sensible heat fluxes using scratch fields.
+        # Recall F_turb_energy = F_lh + F_sh (interiors match main's scratch-array sum).
+        Interfacer.remap!(sim.remapping.scratch_field_oc1, F_lh, sim.remapping) # latent heat flux
+        Interfacer.remap!(sim.remapping.scratch_field_oc2, F_sh, sim.remapping) # sensible heat flux
+        remapped_F_lh = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
+        remapped_F_sh = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
+
         OC.interior(si_flux_heat, :, :, 1) .+=
             (OC.interior(ice_concentration, :, :, 1) .> 0) .*
             (remapped_F_lh .+ remapped_F_sh)
@@ -723,19 +724,19 @@ ClimaSeaIce expects `snowfall` as a positive accumulation rate, so the sign is f
 function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
     ice_concentration = sim.ice.model.ice_concentration
 
-    # Remap radiative fluxes onto scratch fields (separate buffers so SW is not overwritten by LW)
-    Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.SW_d, sim.remapping) # shortwave radiation
-    remapped_SW_d = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
-
-    Interfacer.remap!(sim.remapping.scratch_field_oc2, csf.LW_d, sim.remapping) # longwave radiation
-    remapped_LW_d = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
-
-    # Update only the part due to radiative fluxes. For the full update, the component due
-    # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
-    # With PrescribedTemperature the top heat flux is a FluxFunction, not a Field;
-    # the flux is determined from the diagnosed T_sfc so we skip writing here.
+    # With PrescribedTemperature the top heat flux is a FluxFunction, not a Field: the flux
+    # is the internal conductive flux in equilibrium with the diagnosed T_sfc (which the
+    # skin-temperature solve already balances against the full radiative budget), so we
+    # skip writing here to avoid double-counting the surface energy budget.
     si_flux_heat = sim.ice.model.external_heat_fluxes.top
     if si_flux_heat isa OC.Field
+        # Remap radiative fluxes onto scratch fields (separate buffers so SW is not overwritten by LW)
+        Interfacer.remap!(sim.remapping.scratch_field_oc1, csf.SW_d, sim.remapping) # shortwave radiation
+        remapped_SW_d = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
+
+        Interfacer.remap!(sim.remapping.scratch_field_oc2, csf.LW_d, sim.remapping) # longwave radiation
+        remapped_LW_d = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
+
         α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
         ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
 

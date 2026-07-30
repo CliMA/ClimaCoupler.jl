@@ -1,5 +1,6 @@
 import ClimaSeaIce: default_sea_ice_boundary_conditions
-import ClimaSeaIce.SeaIceThermodynamics: ConductiveFlux, IceWaterThermalEquilibrium
+import ClimaSeaIce.SeaIceThermodynamics:
+    ConductiveFlux, IceWaterThermalEquilibrium, IceSnowConductiveFlux
 import ClimaSeaIce.SeaIceDynamics: maybe_extended_grid
 import Oceananigans.BoundaryConditions: Zipper
 
@@ -160,8 +161,27 @@ function sea_ice_simulation(
     )
 
     bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
-    top_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     snowfall = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+
+    # Top heat flux under the `PrescribedTemperature` top boundary condition.
+    #
+    # The coupler diagnoses the skin temperature itself (see `update_T_sfc`),
+    # solving the full surface energy balance Jᵃ(Tₛ) + (Tₛ - Tᵢ)/R = 0, and
+    # writes the result into `top_surface_temperature`. 
+    column_conductive_flux =
+        if isnothing(snow_thermodynamics)
+            internal_heat_flux
+        else
+            IceSnowConductiveFlux(
+                snow_thermodynamics.internal_heat_flux.conductivity,
+                internal_heat_flux.conductivity,
+            )
+        end
+    top_heat_flux = CSI.SeaIceThermodynamics.internal_flux_function(
+        column_conductive_flux,
+        phase_transitions.liquidus,
+        bottom_heat_boundary_condition,
+    )
 
     side_drag_coefficient = convert(eltype(grid), side_drag_coefficient)
     u_bc = OC.FluxBoundaryCondition(

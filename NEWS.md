@@ -4,6 +4,23 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Fix spurious sea-ice top melt under the prognostic ClimaSeaIce coupling.
+The prognostic sea-ice top boundary is a `PrescribedTemperature`: the coupler
+diagnoses the skin temperature `T_sfc` from the full surface energy balance
+`Jᵃ(T_sfc) + (T_sfc − T_i)/R = 0` and writes it into the ice model, so the ice
+top should sit in conductive equilibrium (top interface velocity `wu ≡ 0`).
+However, `sea_ice_simulation` allocated the ice model's `top_heat_flux` as a
+plain `Field`, which the coupler then filled with the atmospheric net flux
+`−(1−α)SW↓ − ϵLW↓ + F_sh + F_lh`. Because that flux omits the surface emission
+`σϵT_sfc⁴` already used to set `T_sfc`, the melt/freeze tendency
+`wu = (Q_top − Q_conductive)/ℰ` carried a persistent, sign-definite residual of
+order the surface emission (~300 W m⁻²), melting tens of metres of ice per year
+in both the remap and exchange-grid paths. The top heat flux is now built as the
+equilibrium internal conductive `FluxFunction` (combined snow+ice
+resistors-in-series when a snow layer is present, ice-only otherwise), so the
+coupler's radiative/turbulent write paths correctly skip it and thermodynamic
+thickness change is driven at the bottom by the ocean interface flux.
+
 #### Exchange (intersection) grid for CMIP surface fractions and fluxes.
 When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange
 grid — the polygons where the cubed-sphere spectral elements intersect the

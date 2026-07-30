@@ -16,7 +16,7 @@ env:
   # UPSTREAM_PACKAGES environment variable. For example, if you pass
   # `UPSTREAM_PACKAGES="ClimaAtmos SurfaceFluxes@1.1.0", then the main branch
   # of ClimaAtmos and SurfaceFluxes v1.1.0 will be used.
-  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES: ClimaAtmos#aj/testing_rain_acnv_w ClimaCore ClimaCoreMakie ClimaTimeSteppers Thermodynamics ClimaLand@1.10.3 SurfaceFluxes@1.1 RRTMGP CloudMicrophysics#aj/regime_rain_formation}"
+  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos#aj/testing_rain_acnv_w ClimaCore ClimaCoreMakie ClimaTimeSteppers Thermodynamics ClimaLand@1.10.3 SurfaceFluxes@1.1 RRTMGP CloudMicrophysics#aj/regime_rain_formation}"
 
 timeout_in_minutes: 840
 

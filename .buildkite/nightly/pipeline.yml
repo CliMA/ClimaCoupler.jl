@@ -16,7 +16,7 @@ env:
   # UPSTREAM_PACKAGES environment variable. For example, if you pass
   # `UPSTREAM_PACKAGES="ClimaAtmos SurfaceFluxes@1.1.0", then the main branch
   # of ClimaAtmos and SurfaceFluxes v1.1.0 will be used.
-  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore ClimaCoreMakie ClimaTimeSteppers Thermodynamics ClimaLand@1.10.3 SurfaceFluxes@1.1 RRTMGP}"
+  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos#aj/testing_rain_acnv_w ClimaCore ClimaCoreMakie ClimaTimeSteppers Thermodynamics ClimaLand@1.10.3 SurfaceFluxes@1.1 RRTMGP CloudMicrophysics#aj/regime_rain_formation}"
 
 timeout_in_minutes: 840
 
@@ -29,8 +29,8 @@ steps:
 
       - echo "--- Instantiate AMIP env"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"CloudMicrophysics\", rev=\"aj/regime_rain_formation\"))'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaAtmos\", rev=\"aj/testing_rain_acnv_w\"))'"
+      # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"CloudMicrophysics\", rev=\"aj/regime_rain_formation\"))'"
+      # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaAtmos\", rev=\"aj/testing_rain_acnv_w\"))'"
 
       # For this pipeline, use the main branches of certain upstream packages
       # see UPSTREAM_PACKAGES environment variable

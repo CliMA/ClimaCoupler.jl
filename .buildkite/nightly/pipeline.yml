@@ -30,6 +30,7 @@ steps:
       - echo "--- Instantiate AMIP env"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"CloudMicrophysics\", rev=\"aj/regime_rain_formation\"))'"
+      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaAtmos\", rev=\"aj/testing_rain_acnv_w\"))'"
 
       # For this pipeline, use the main branches of certain upstream packages
       # see UPSTREAM_PACKAGES environment variable

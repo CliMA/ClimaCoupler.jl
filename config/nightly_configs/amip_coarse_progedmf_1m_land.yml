@@ -6,20 +6,46 @@ coupler_toml: ["toml/amip_progedmf_1m.toml"]
 dt: "180secs"
 dt_cpl: "180secs"
 energy_check: false
-extra_atmos_diagnostics:
-  - short_name: [hur, hus, ta]
-    period: 1months
-    reduction_time: average
-    pressure_coordinates: true
-    compute_every: 6hours
+# extra_atmos_diagnostics:
+#   - short_name: [hur, hus, ta]
+#     period: 1months
+#     reduction_time: average
+#     pressure_coordinates: true
+#     compute_every: 6hours
 h_elem: 12
 land_model: "integrated"
-mode_name: "amip"
+# mode_name: "amip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
-start_date: "20100101"
+# start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "366days"
+# t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
+
+# weather model setup
+initial_condition: "WeatherModel"
+mode_name: "subseasonal"
+era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+land_temperature_anomaly: "nothing"
+land_fraction_source: "era5"
+binary_area_fraction: false
+lai_source: "modis_monthly_climatology"
+start_date: "20100924"
+t_end: "39days"
+
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta, clw, cli, cl]
+    period: monthly
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 1hours
+  - short_name: [ua, va, wa, ta, hus, hur, arup, waup, taup, husup, hurup, tke, lmix, edt, evu, clw, cli, husra, hussn, clwup, cliup, husraup, hussnup, cl]
+    period: monthly
+    reduction_time: average
+    compute_every: 1hours
+  - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, iwp, rwp, swp, clwvi, clivi, clt]
+    period: monthly
+    reduction_time: average
+    compute_every: 1hours

@@ -7,19 +7,17 @@ ClimaCoupler.jl Release Notes
 #### Fix spurious sea-ice top melt under the prognostic ClimaSeaIce coupling.
 The prognostic sea-ice top boundary is a `PrescribedTemperature`: the coupler
 diagnoses the skin temperature `T_sfc` from the full surface energy balance
-`Jᵃ(T_sfc) + (T_sfc − T_i)/R = 0` and writes it into the ice model, so the ice
-top should sit in conductive equilibrium (top interface velocity `wu ≡ 0`).
-However, `sea_ice_simulation` allocated the ice model's `top_heat_flux` as a
-plain `Field`, which the coupler then filled with the atmospheric net flux
-`−(1−α)SW↓ − ϵLW↓ + F_sh + F_lh`. Because that flux omits the surface emission
-`σϵT_sfc⁴` already used to set `T_sfc`, the melt/freeze tendency
-`wu = (Q_top − Q_conductive)/ℰ` carried a persistent, sign-definite residual of
-order the surface emission (~300 W m⁻²), melting tens of metres of ice per year
-in both the remap and exchange-grid paths. The top heat flux is now built as the
-equilibrium internal conductive `FluxFunction` (combined snow+ice
-resistors-in-series when a snow layer is present, ice-only otherwise), so the
-coupler's radiative/turbulent write paths correctly skip it and thermodynamic
-thickness change is driven at the bottom by the ocean interface flux.
+`Jᵃ(T_sfc) + (T_sfc − T_i)/R = 0` and writes it into the ice model. The ice
+Stefan residual is `δQ = Q_top − Q_conductive`, so `Q_top` must equal the same
+net upward flux `Jᵃ` used in the skin solve. Previously the coupler filled
+`top_heat_flux` with `−(1−α)SW↓ − ϵLW↓ + F_sh + F_lh`, omitting surface emission
+`σϵT_sfc⁴` already used to set `T_sfc`. That left a persistent residual of order
+the emission (~300 W m⁻²), melting tens of metres of ice per year in both the
+remap and exchange-grid paths. The coupler now writes the full
+`Jᵃ = σϵT_sfc⁴ − (1−α)SW↓ − ϵLW↓ + F_sh + F_lh` into the top heat flux `Field`
+(radiative absorption in `update_sim!`; emission from the diagnosed `T_sfc` plus
+turbulent fluxes when fluxes are pushed). At skin equilibrium `δQ = 0`; when
+`T_sfc` is capped at melting, the residual is retained to drive top melt.
 
 #### Exchange (intersection) grid for CMIP surface fractions and fluxes.
 When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange

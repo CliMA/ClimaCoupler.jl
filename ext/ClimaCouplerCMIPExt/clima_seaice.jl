@@ -392,10 +392,10 @@ function _compute_ice_boundary_fluxes!(
         update_T_sfc_cb,
     )
 
-    FluxCalculator.update_flux_fields!(csf, sim, fluxes, accumulator)
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
+    # before `update_flux_fields!` so an immediate turbulent push builds Jᵃ with this T.
     csf.scalar_temp2 .= ifelse.(
         area_fraction .≈ 0,
         zero(FT),
@@ -411,6 +411,8 @@ function _compute_ice_boundary_fluxes!(
         remapped_T_sfc,
         OC.interior(top_sfc_T, :, :, 1),
     )
+
+    FluxCalculator.update_flux_fields!(csf, sim, fluxes, accumulator)
 
     return nothing
 end
@@ -445,10 +447,39 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     return nothing
 end
 
+"""
+    compute_ice_top_heat_flux!(sim, remapped_F_lh, remapped_F_sh)
+
+Complete the ice top heat flux Field as the skin-balance net upward flux
+
+    Jᵃ = σϵTₛ⁴ − (1−α)SW↓ − ϵLW↓ + F_sh + F_lh
+
+The absorbed radiative part `−(1−α)SW↓ − ϵLW↓` is written in `update_sim!`.
+This adds surface emission (from the diagnosed `top_surface_temperature`) and
+the turbulent fluxes. At skin equilibrium `Jᵃ = Q_conductive`, so the Stefan
+residual vanishes; when `Tₛ` is capped at `T_melt`, the residual drives melt.
+"""
+function compute_ice_top_heat_flux!(sim::ClimaSeaIceSimulation, remapped_F_lh, remapped_F_sh)
+    si_flux_heat = sim.ice.model.external_heat_fluxes.top
+    si_flux_heat isa OC.Field || return nothing
+
+    ice_concentration = sim.ice.model.ice_concentration
+    T_sfc_C = top_thermodynamics(sim).top_surface_temperature
+    FT = eltype(T_sfc_C)
+    σ = FT(sim.ice_properties.σ)
+    C_to_K = FT(sim.ice_properties.C_to_K)
+    ϵ = FT(Interfacer.get_field(sim, Val(:emissivity)))
+
+    ice_mask = OC.interior(ice_concentration, :, :, 1) .> 0
+    T_K = OC.interior(T_sfc_C, :, :, 1) .+ C_to_K
+    OC.interior(si_flux_heat, :, :, 1) .+=
+        ice_mask .* (σ .* ϵ .* T_K .^ 4 .+ remapped_F_lh .+ remapped_F_sh)
+    return nothing
+end
+
 function _update_ice_turbulent_fluxes_boundary!(sim::ClimaSeaIceSimulation, fields)
     (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
     grid = sim.ice.model.grid
-    ice_concentration = sim.ice.model.ice_concentration
 
     # We only need to provide momentum fluxes if the sea ice model has dynamics
     if !isnothing(sim.ice.model.dynamics)
@@ -477,24 +508,13 @@ function _update_ice_turbulent_fluxes_boundary!(sim::ClimaSeaIceSimulation, fiel
         )
     end
 
-    # Update the sea ice heat flux only where the concentration is greater than zero.
-    # With PrescribedTemperature the top heat flux is a FluxFunction, not a Field: the flux
-    # is the internal conductive flux in equilibrium with the diagnosed T_sfc (the
-    # skin-temperature solve already balances the turbulent fluxes against conduction), so
-    # we skip writing here to avoid double-counting the surface energy budget.
-    si_flux_heat = sim.ice.model.external_heat_fluxes.top
-    if si_flux_heat isa OC.Field
-        # Remap the latent and sensible heat fluxes using scratch fields.
-        # Recall F_turb_energy = F_lh + F_sh (interiors match main's scratch-array sum).
-        Interfacer.remap!(sim.remapping.scratch_field_oc1, F_lh, sim.remapping) # latent heat flux
-        Interfacer.remap!(sim.remapping.scratch_field_oc2, F_sh, sim.remapping) # sensible heat flux
-        remapped_F_lh = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
-        remapped_F_sh = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
-
-        OC.interior(si_flux_heat, :, :, 1) .+=
-            (OC.interior(ice_concentration, :, :, 1) .> 0) .*
-            (remapped_F_lh .+ remapped_F_sh)
-    end
+    # Remap turbulent heat fluxes and complete
+    # Jᵃ = σϵT⁴ − (1−α)SW − ϵLW + F_sh + F_lh (radiative part from update_sim!).
+    Interfacer.remap!(sim.remapping.scratch_field_oc1, F_lh, sim.remapping) # latent heat flux
+    Interfacer.remap!(sim.remapping.scratch_field_oc2, F_sh, sim.remapping) # sensible heat flux
+    remapped_F_lh = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
+    remapped_F_sh = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
+    compute_ice_top_heat_flux!(sim, remapped_F_lh, remapped_F_sh)
 
     return nothing
 end
@@ -605,11 +625,9 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
 
     # The ice fluxes apply to the ice-covered part of each polygon.
     scatter_poly_fluxes_to_boundary!(remapping, eg, fs, fs.sic)
-    FluxCalculator.update_flux_fields!(csf, sim, remapping.flux_scratch, accumulator)
 
-    # Write the diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only
-    # where ice exists; `sic` is a cell quantity, so all polygons of a cell
-    # with ice carry a valid diagnosis).
+    # Write the diagnosed T_sfc back before `update_flux_fields!` so an
+    # immediate turbulent push builds Jᵃ with this T.
     T_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
     scatter_polys_to_cells!(T_cells, eg, is.T_sfc_new)
     mirror_fold_partners!(T_cells, grid)
@@ -620,6 +638,8 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
         OC.interior(remapping.scratch_field_oc1, :, :, 1) .- C_to_K,
         OC.interior(top_sfc_T, :, :, 1),
     )
+
+    FluxCalculator.update_flux_fields!(csf, sim, remapping.flux_scratch, accumulator)
     return nothing
 end
 
@@ -628,8 +648,7 @@ end
 
 Push the per-polygon ice turbulent fluxes currently held in
 `sim.remapping.ice_flux_state` into the ClimaSeaIce boundary conditions
-(momentum stresses when dynamics are active; the turbulent part of the top
-heat flux otherwise handled by the flux function of `PrescribedTemperature`).
+(momentum stresses when dynamics are active; complete top heat flux Jᵃ).
 Fluxes are per unit ice area, matching `_update_ice_turbulent_fluxes_boundary!`.
 """
 NVTX.@annotate function push_exchange_fluxes_to_ice!(sim::ClimaSeaIceSimulation)
@@ -637,7 +656,6 @@ NVTX.@annotate function push_exchange_fluxes_to_ice!(sim::ClimaSeaIceSimulation)
     eg = remapping.exchange_grid
     fs = remapping.ice_flux_state.fluxes
     grid = sim.ice.model.grid
-    ice_concentration = sim.ice.model.ice_concentration
 
     if !isnothing(sim.ice.model.dynamics)
         τu_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
@@ -656,19 +674,19 @@ NVTX.@annotate function push_exchange_fluxes_to_ice!(sim::ClimaSeaIceSimulation)
         )
     end
 
-    # With PrescribedTemperature the top heat flux is a FluxFunction, not a
-    # Field; the flux is determined from the diagnosed T_sfc so we skip
-    # writing here.
-    si_flux_heat = sim.ice.model.external_heat_fluxes.top
-    if si_flux_heat isa OC.Field
-        @. fs.scratch1 = fs.F_lh + fs.F_sh
-        heat_cells = vec(OC.interior(remapping.scratch_field_oc3, :, :, 1))
-        scatter_polys_to_cells!(heat_cells, eg, fs.scratch1)
-        mirror_fold_partners!(heat_cells, grid)
-        OC.interior(si_flux_heat, :, :, 1) .+=
-            (OC.interior(ice_concentration, :, :, 1) .> 0) .*
-            OC.interior(remapping.scratch_field_oc3, :, :, 1)
-    end
+    # Scatter F_lh / F_sh to cells and complete Jᵃ (emission + radiative from
+    # update_sim! + turbulent), consistent with the skin-temperature balance.
+    F_lh_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
+    F_sh_cells = vec(OC.interior(remapping.scratch_field_oc2, :, :, 1))
+    scatter_polys_to_cells!(F_lh_cells, eg, fs.F_lh)
+    scatter_polys_to_cells!(F_sh_cells, eg, fs.F_sh)
+    mirror_fold_partners!(F_lh_cells, grid)
+    mirror_fold_partners!(F_sh_cells, grid)
+    compute_ice_top_heat_flux!(
+        sim,
+        OC.interior(remapping.scratch_field_oc1, :, :, 1),
+        OC.interior(remapping.scratch_field_oc2, :, :, 1),
+    )
     return nothing
 end
 
@@ -724,10 +742,10 @@ ClimaSeaIce expects `snowfall` as a positive accumulation rate, so the sign is f
 function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
     ice_concentration = sim.ice.model.ice_concentration
 
-    # With PrescribedTemperature the top heat flux is a FluxFunction, not a Field: the flux
-    # is the internal conductive flux in equilibrium with the diagnosed T_sfc (which the
-    # skin-temperature solve already balances against the full radiative budget), so we
-    # skip writing here to avoid double-counting the surface energy budget.
+    # Absorbed radiative part of Jᵃ (upward positive): −(1−α)SW↓ − ϵLW↓.
+    # Emission σϵTₛ⁴ and turbulent fluxes are added in
+    # `compute_ice_top_heat_flux!` after Tₛ is diagnosed, so the Field holds
+    # the full skin-balance net flux when the ice steps.
     si_flux_heat = sim.ice.model.external_heat_fluxes.top
     if si_flux_heat isa OC.Field
         # Remap radiative fluxes onto scratch fields (separate buffers so SW is not overwritten by LW)

@@ -9,6 +9,14 @@ env:
   SLURM_KILL_BAD_EXIT: 1
   CONFIG_PATH: "config/nightly_configs"
   BENCHMARK_CONFIG_PATH: "config/benchmark_configs"
+  # By default, packages use the main branch.
+  # Use `Package@version` to pin a version.
+  # Use `Package#rev` to pin a branch or commit.
+  # If you are starting a new build using the web API, you can set the
+  # UPSTREAM_PACKAGES environment variable. For example, if you pass
+  # `UPSTREAM_PACKAGES="ClimaAtmos SurfaceFluxes@1.1.0", then the main branch
+  # of ClimaAtmos and SurfaceFluxes v1.1.0 will be used.
+  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore ClimaCoreMakie ClimaTimeSteppers Thermodynamics ClimaLand#kd/snow_surf_temp_performance SurfaceFluxes@1.2.1 RRTMGP}"
 
 timeout_in_minutes: 840
 
@@ -21,16 +29,22 @@ steps:
 
       - echo "--- Instantiate AMIP env"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-
       # For this pipeline, use the main branches of certain upstream packages
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaAtmos\", rev=\"main\"))'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaCore\", rev=\"main\"))'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaCoreMakie\", rev=\"main\"))'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaTimeSteppers\", rev=\"main\"))'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"Thermodynamics\", rev=\"main\"))'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaLand\", rev=\"main\"))'"
-      # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"SurfaceFluxes\", rev=\"main\"))'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"RRTMGP\", rev=\"main\"))'"
+      # see UPSTREAM_PACKAGES environment variable
+      - |
+        julia --project=experiments/AMIP/ -e '
+          using Pkg
+          Pkg.add(map(split(ENV["UPSTREAM_PACKAGES"])) do entry
+              if occursin("@", entry)
+                  name, version = String.(split(entry, "@"))
+                  Pkg.PackageSpec(; name, version)
+              elseif occursin("#", entry)
+                  name, rev = String.(split(entry, "#"))
+                  Pkg.PackageSpec(; name, rev)
+              else
+                  Pkg.PackageSpec(; name = entry, rev = "main")
+              end
+          end)'
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.resolve()'"
 
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
@@ -63,7 +77,7 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 30GB
-      
+
       - label: "Coarse current AMIP: progedmf + 1M + integrated land"
         key: "amip_progedmf_1m_land"
         command:

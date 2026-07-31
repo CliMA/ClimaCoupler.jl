@@ -2,6 +2,7 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 atmos_progress_interval: "10days"
+checkpoint_dt: "30days"
 coupler_diagnostics_period: "1hours"
 coupler_diagnostics_reduction: "instantaneous"
 coupler_toml: ["toml/amip_edonly.toml"]
@@ -34,7 +35,7 @@ seaice_progress_interval: "12hours"
 simple_ocean: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "3hours"
+t_end: "120days"
 topo_smoothing: true
 topography: "Earth"
 use_itime: true

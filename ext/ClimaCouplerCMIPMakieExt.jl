@@ -16,6 +16,7 @@ import ClimaCoupler: Plotting
 
 using CairoMakie
 using ClimaCoreMakie
+using Dates
 using GeoMakie
 using JLD2
 using Makie

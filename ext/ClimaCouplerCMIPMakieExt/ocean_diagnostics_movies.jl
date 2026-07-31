@@ -1,4 +1,4 @@
-import Oceananigans.OutputReaders: FieldTimeSeries
+import Oceananigans.OutputReaders: FieldTimeSeries, OnDisk
 
 const DEFAULT_OCEAN_MOVIE_PROJECTION = "+proj=eqearth"
 const OCEAN_LAND_NAN_COLOR = :black
@@ -251,6 +251,11 @@ metadata for some velocity fields (notably meridional velocity on tripolar grids
 can fail JLD2 deserialization and break halo filling when indexing snapshots.
 Interior values are sufficient for plotting.
 
+Uses `OnDisk()` rather than the default `InMemory()` backend. Split JLD2 writers
+often emit single-snapshot part files; Oceananigans' in-memory loader computes
+`mean(diff(times))` per part and throws `InexactError: Int64(NaN)` when a part
+has only one time. Lazy on-disk indexing skips that path and is enough for movies.
+
 When split part files exist (``<collection>_part1.jld2``, etc.), all parts are merged.
 Oceananigans only auto-discovers parts if the base ``<collection>.jld2`` is missing;
 writers often leave a stale base file alongside parts, which would otherwise truncate
@@ -263,6 +268,7 @@ function _ocean_diagnostic_field_time_series(collection_path, variable_name)
             FieldTimeSeries(
                 file,
                 variable_name;
+                backend = OnDisk(),
                 boundary_conditions = nothing,
                 Nparts = length(part_paths),
                 part_paths = part_paths,
@@ -270,7 +276,12 @@ function _ocean_diagnostic_field_time_series(collection_path, variable_name)
             )
         end
     end
-    return FieldTimeSeries(collection_path, variable_name; boundary_conditions = nothing)
+    return FieldTimeSeries(
+        collection_path,
+        variable_name;
+        backend = OnDisk(),
+        boundary_conditions = nothing,
+    )
 end
 
 """
@@ -453,12 +464,14 @@ end
 """
     _format_simulation_time(t)
 
-Format simulation time (in seconds) for plot titles.
+Format simulation time for plot titles.
+
+Numeric times are treated as seconds since the simulation start.
+`DateTime` / `Date` values from calendar-aware Oceananigans output are shown directly.
 """
-function _format_simulation_time(t)
-    days = t / 86400
-    return Printf.@sprintf("%.1f days", days)
-end
+_format_simulation_time(t::Real) = Printf.@sprintf("%.1f days", t / 86400)
+_format_simulation_time(t::Dates.TimeType) = string(t)
+_format_simulation_time(t) = string(t)
 
 """
     _global_colorrange(fts; range_style = :sequential)

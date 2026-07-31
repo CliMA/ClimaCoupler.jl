@@ -52,22 +52,22 @@ steps:
           slurm_ntasks: 1
           slurm_mem: 30GB
 
-  - wait
+  # - wait
 
-  - group: "Job analysis and reporting"
+  # - group: "Job analysis and reporting"
 
-    steps:
+  #   steps:
 
-      - label: "Send simulation output to Azure VM for visualization"
-        command:
-          # Exclude restart checkpoints (*.hdf5): ClimaViz/ClimaAnalysis only read the
-          # NetCDF diagnostics, and the checkpoints (~2.4 GB/run) otherwise fill the VM's
-          # 16 GB ephemeral disk. They remain written/kept on the cluster for restarts.
-          - rsync -avz --exclude='*.hdf5' output/amip/output_active/* azure-arenchon:/home/arenchon/GitHub/ClimaViz.jl/data/climacoupler-amip/
+  #     - label: "Send simulation output to Azure VM for visualization"
+  #       command:
+  #         # Exclude restart checkpoints (*.hdf5): ClimaViz/ClimaAnalysis only read the
+  #         # NetCDF diagnostics, and the checkpoints (~2.4 GB/run) otherwise fill the VM's
+  #         # 16 GB ephemeral disk. They remain written/kept on the cluster for restarts.
+  #         - rsync -avz --exclude='*.hdf5' output/amip/output_active/* azure-arenchon:/home/arenchon/GitHub/ClimaViz.jl/data/climacoupler-amip/
 
-      - label: ":envelope: Slack report: current AMIP"
-        command:
-          - |
-            find output/amip/artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
-              slack-upload -c C04S6MBSDC4 -f "$$file" -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
-            done
+  #     - label: ":envelope: Slack report: current AMIP"
+  #       command:
+  #         - |
+  #           find output/amip/artifacts/ -type f -name 'bias*.png' -print0 | while IFS= read -r -d '' file; do
+  #             slack-upload -c C04S6MBSDC4 -f "$$file" -n "$$(basename "$$file" .png)" -x "$$(basename "$$file" .png)"
+  #           done

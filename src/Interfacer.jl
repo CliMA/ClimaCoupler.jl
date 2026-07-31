@@ -341,6 +341,7 @@ update_field!(
     sim::AbstractAtmosSimulation,
     val::Union{
         Val{:emissivity},
+        Val{:ocean_fraction},
         Val{:surface_direct_albedo},
         Val{:surface_diffuse_albedo},
         Val{:surface_temperature},

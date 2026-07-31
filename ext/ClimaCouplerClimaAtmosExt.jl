@@ -407,6 +407,13 @@ end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:water}) =
     ρq_tot(sim.integrator.p.atmos.microphysics_model, sim.integrator)
 
+
+function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:ocean_fraction}, field)
+    # warn and skip when no ocean_fraction cache field
+    hasproperty(sim.integrator.p, :ocean_fraction) ||
+        return Interfacer.update_field_warning(sim, Val(:ocean_fraction))
+    Interfacer.remap!(sim.integrator.p.ocean_fraction, field)
+end
 function Interfacer.update_field!(
     sim::ClimaAtmosSimulation,
     ::Val{:surface_temperature},

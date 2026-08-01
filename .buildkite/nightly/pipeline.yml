@@ -18,6 +18,7 @@ env:
   # of ClimaAtmos and SurfaceFluxes v1.1.0 will be used.
   UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos#aj/testing_rain_acnv_w ClimaCore ClimaCoreMakie ClimaTimeSteppers Thermodynamics ClimaLand@1.10.3 SurfaceFluxes@1.1 RRTMGP CloudMicrophysics#aj/regime_rain_formation}"
 
+
 timeout_in_minutes: 840
 
 
@@ -29,28 +30,11 @@ steps:
 
       - echo "--- Instantiate AMIP env"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"CloudMicrophysics\", rev=\"aj/regime_rain_formation\"))'"
-      # - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"ClimaAtmos\", rev=\"aj/testing_rain_acnv_w\"))'"
-
       # For this pipeline, use the main branches of certain upstream packages
       # see UPSTREAM_PACKAGES environment variable
       - |
         julia --project=experiments/AMIP/ -e '
           using Pkg
-
-          @info((map(split(ENV["UPSTREAM_PACKAGES"])) do entry
-              if occursin("@", entry)
-                  name, version = String.(split(entry, "@"))
-                  Pkg.PackageSpec(; name, version)
-              elseif occursin("#", entry)
-                  name, rev = String.(split(entry, "#"))
-                  Pkg.PackageSpec(; name, rev)
-              else
-                  Pkg.PackageSpec(; name = entry, rev = "main")
-              end
-          end
-          ))
-
           Pkg.add(map(split(ENV["UPSTREAM_PACKAGES"])) do entry
               if occursin("@", entry)
                   name, version = String.(split(entry, "@"))
@@ -80,21 +64,6 @@ steps:
 
     steps:
 
-     # - label: "Coarse current AMIP: progedmf + 0M + integrated land"
-     #   key: "amip_progedmf_land"
-     #   command:
-     #     - echo "--- Run simulation"
-     #     - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_progedmf_land.yml --job_id amip_coarse_progedmf_land"
-     #   artifact_paths: "output/amip_coarse_progedmf_land/artifacts/*"
-     #   timeout_in_minutes: 840
-     #   env:
-     #     CLIMACOMMS_DEVICE: "CUDA"
-     #   agents:
-     #     slurm_gpus_per_task: 1
-     #     slurm_cpus_per_task: 4
-     #     slurm_ntasks: 1
-     #     slurm_mem: 30GB
-
       - label: "Coarse current AMIP: progedmf + 1M + integrated land"
         key: "amip_progedmf_1m_land"
         command:
@@ -109,15 +78,3 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 30GB
-
-     # - label: "Flagship AMIP GPU with prognostic EDMF + 1M + integrated land (16 helems)"
-     #   key: "gpu_amip_progedmf_1M_land_he16"
-     #   command: "srun julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $BENCHMARK_CONFIG_PATH/amip_progedmf_1m_land_he16.yml --job_id gpu_amip_progedmf_1M_land_he16"
-     #   artifact_paths: "output/gpu_amip_progedmf_1M_land_he16/artifacts/*"
-     #   env:
-     #     CLIMACOMMS_DEVICE: "CUDA"
-     #   agents:
-     #     slurm_gpus_per_task: 1
-     #     slurm_cpus_per_task: 4
-     #     slurm_ntasks: 1
-     #     slurm_mem: 16GB

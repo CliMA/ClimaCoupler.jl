@@ -52,3 +52,7 @@ extra_atmos_diagnostics:
     period: monthly
     reduction_time: average
     compute_every: 1hours
+  - short_name: [mp1mup_tau_acnv, mp1men_tau_acnv]
+    period: monthly
+    reduction_time: average
+    compute_every: 1hours

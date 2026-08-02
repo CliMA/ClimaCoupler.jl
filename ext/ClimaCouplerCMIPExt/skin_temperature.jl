@@ -15,16 +15,80 @@ import SurfaceFluxes as SF
 import Thermodynamics as TD
 
 """
+    surface_turbulent_energy_flux(ζ, param_set, thermo_params, inputs, scheme,
+                                  u_star, z0m, z0s, T_sfc)
+
+Total upward turbulent energy flux `F_sh + F_lh` at a trial surface temperature
+`T_sfc`, with surface density and saturation specific humidity evaluated
+consistently at `T_sfc`.
+"""
+function surface_turbulent_energy_flux(
+    ζ,
+    param_set,
+    thermo_params,
+    inputs,
+    scheme,
+    u_star,
+    z0m,
+    z0s,
+    T_sfc,
+)
+    ρ_sfc = SF.surface_density(
+        param_set,
+        inputs.T_int,
+        inputs.ρ_int,
+        T_sfc,
+        inputs.Δz,
+        inputs.q_tot_int,
+        inputs.q_liq_int,
+        inputs.q_ice_int,
+    )
+    q_vap_sfc = TD.q_vap_saturation(
+        thermo_params,
+        T_sfc,
+        ρ_sfc,
+        inputs.q_liq_int,
+        inputs.q_ice_int,
+    )
+
+    F_sh = SF.sensible_heat_flux(
+        param_set,
+        ζ,
+        u_star,
+        inputs,
+        z0m,
+        z0s,
+        T_sfc,
+        q_vap_sfc,
+        inputs.ρ_int,
+        scheme,
+    )
+    F_lh = SF.latent_heat_flux(
+        param_set,
+        ζ,
+        u_star,
+        inputs,
+        z0m,
+        z0s,
+        q_vap_sfc,
+        inputs.ρ_int,
+        scheme,
+    )
+    return F_sh + F_lh
+end
+
+"""
     update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
 
 Create a callback for `SurfaceFluxes.jl` that updates surface temperature using
-a semi-implicit linearization of the LW emission term:
+a fully-linearized (Newton) step of the skin balance Jᵃ(Tₛ) + (Tₛ - Tᵢ)/R = 0:
 
-    Tₛⁿ⁺¹ = (Tᵢ - R · (Jᵃ - 4σϵTₛⁿ⁴)) / (1 + 4RσϵTₛⁿ³)
+    Tₛⁿ⁺¹ = (Tᵢ - R · (Jᵃ - Λ Tₛⁿ)) / (1 + R Λ),    Λ = 4σϵTₛⁿ³ + ∂F_turb/∂Tₛ
 
-where Jᵃ = σϵTₛⁿ⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh  (positive upward).
+where Jᵃ = σϵTₛⁿ⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh  (positive upward) and
+F_turb = F_sh + F_lh. 
 
-Single iteration update is safeguarded (following ClimaOcean) by 
+Single iteration update is safeguarded by
 ±ΔT_iter_max, and the result is capped at the melting
 temperature T_melt to prevent the surface temperature from exceeding the
 melting point under heating fluxes.
@@ -42,63 +106,49 @@ melting point under heating fluxes.
 function update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
     return function (ζ, param_set, thermo_params_callback, inputs, scheme, u_star, z0m, z0s)
         T_sfc_n = inputs.T_sfc_guess
+        FT = typeof(T_sfc_n)
 
-        # Surface density and saturation specific humidity at T_sfc_n
-        ρ_sfc = SF.surface_density(
+        F_turb = surface_turbulent_energy_flux(
+            ζ,
             param_set,
-            inputs.T_int,
-            inputs.ρ_int,
-            T_sfc_n,
-            inputs.Δz,
-            inputs.q_tot_int,
-            inputs.q_liq_int,
-            inputs.q_ice_int,
-        )
-        q_vap_sfc = TD.q_vap_saturation(
             thermo_params_callback,
+            inputs,
+            scheme,
+            u_star,
+            z0m,
+            z0s,
             T_sfc_n,
-            ρ_sfc,
-            inputs.q_liq_int,
-            inputs.q_ice_int,
         )
 
-        F_sh = SF.sensible_heat_flux(
-            param_set,
+        # Turbulent sensitivity ∂F_turb/∂Tₛ by one-sided finite difference,
+        # clamped to ≥ 0 so it can only damp the update (the physical
+        # sensitivity is positive: warmer surface ⇒ larger upward fluxes).
+        δT = FT(1)
+        F_turb_δ = surface_turbulent_energy_flux(
             ζ,
-            u_star,
+            param_set,
+            thermo_params_callback,
             inputs,
+            scheme,
+            u_star,
             z0m,
             z0s,
-            T_sfc_n,
-            q_vap_sfc,
-            inputs.ρ_int,
-            scheme,
+            T_sfc_n + δT,
         )
-        F_lh = SF.latent_heat_flux(
-            param_set,
-            ζ,
-            u_star,
-            inputs,
-            z0m,
-            z0s,
-            q_vap_sfc,
-            inputs.ρ_int,
-            scheme,
-        )
+        dF_turb_dT = max((F_turb_δ - F_turb) / δT, zero(FT))
 
         # Net upward flux: Jᵃ = σϵT⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh
-        J_a = σ * ϵ * T_sfc_n^4 - (1 - α_albedo) * SW_d - ϵ * LW_d + F_sh + F_lh
+        J_a = σ * ϵ * T_sfc_n^4 - (1 - α_albedo) * SW_d - ϵ * LW_d + F_turb
 
-        # Semi-implicit solve: linearize σϵT⁴ ≈ -3σϵTₙ⁴ + 4σϵTₙ³T
-        numerator = T_i - R * (J_a - 4 * σ * ϵ * T_sfc_n^4)
-        denominator = 1 + 4 * R * σ * ϵ * T_sfc_n^3
-        T_sfc_new = numerator / denominator
+        # Newton step on Jᵃ(T) + (T - Tᵢ)/R = 0 with
+        # Jᵃ(T) ≈ Jᵃ(Tₙ) + Λ (T - Tₙ)
+        Λ = 4 * σ * ϵ * T_sfc_n^3 + dF_turb_dT
+        T_sfc_new = (T_i - R * (J_a - Λ * T_sfc_n)) / (1 + R * Λ)
 
         T_sfc_new = ifelse(isnan(T_sfc_new), T_sfc_n, T_sfc_new)
         ΔT = T_sfc_new - T_sfc_n
-        FT = typeof(T_sfc_n)
         ΔT_iter_max = FT(5)
-        T_sfc_new = T_sfc_n + min(abs(ΔT),ΔT_iter_max) * sign(ΔT)
+        T_sfc_new = T_sfc_n + min(abs(ΔT), ΔT_iter_max) * sign(ΔT)
         T_sfc_new = min(T_sfc_new, T_melt)
 
         return T_sfc_new

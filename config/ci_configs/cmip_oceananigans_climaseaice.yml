@@ -22,8 +22,8 @@ land_progress_interval: "12hours"
 land_spun_up_ic: false
 mode_name: "cmip"
 netcdf_output_at_levels: true
-ocean_diagnostic_interval: "10days"
-ocean_diagnostic_mode: "instantaneous"
+ocean_diagnostic_interval: "30days"
+ocean_diagnostic_mode: "average"
 ocean_model: "oceananigans"
 ocean_progress_interval: "12hours"
 output_default_diagnostics: true
@@ -35,7 +35,7 @@ seaice_progress_interval: "12hours"
 simple_ocean: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "120days"
+t_end: "720days"
 topo_smoothing: true
 topography: "Earth"
 use_itime: true

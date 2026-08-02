@@ -79,7 +79,11 @@ function horizontal_ocean_grid(
         interpolation_passes,
     )
 
-    return OC.ImmersedBoundaryGrid(grid, OC.GridFittedBottom(bottom_height); active_cells_map)
+    return OC.ImmersedBoundaryGrid(
+        grid,
+        OC.GridFittedBottom(bottom_height);
+        active_cells_map,
+    )
 end
 
 """

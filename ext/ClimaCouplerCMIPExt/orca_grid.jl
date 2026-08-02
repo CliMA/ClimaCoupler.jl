@@ -2,23 +2,36 @@ import NCDatasets
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 
 using Oceananigans.BoundaryConditions:
-    fill_halo_regions!, FPivotZipperBoundaryCondition, NoFluxBoundaryCondition, FieldBoundaryConditions
+    fill_halo_regions!,
+    FPivotZipperBoundaryCondition,
+    NoFluxBoundaryCondition,
+    FieldBoundaryConditions
 using Oceananigans.Grids: RightFaceFolded, generate_coordinate
 using Oceananigans.OrthogonalSphericalShellGrids: Tripolar
 
 const orca_topology = (OC.Periodic, RightFaceFolded, OC.Bounded)
 
 const orca_metrics = (
-    (:λᶜᶜᵃ, "lambda_cca", OC.Center, OC.Center), (:λᶠᶜᵃ, "lambda_fca", OC.Face, OC.Center),
-    (:λᶜᶠᵃ, "lambda_cfa", OC.Center, OC.Face),   (:λᶠᶠᵃ, "lambda_ffa", OC.Face, OC.Face),
-    (:φᶜᶜᵃ, "phi_cca", OC.Center, OC.Center),    (:φᶠᶜᵃ, "phi_fca", OC.Face, OC.Center),
-    (:φᶜᶠᵃ, "phi_cfa", OC.Center, OC.Face),      (:φᶠᶠᵃ, "phi_ffa", OC.Face, OC.Face),
-    (:Δxᶜᶜᵃ, "dx_cca", OC.Center, OC.Center),    (:Δxᶠᶜᵃ, "dx_fca", OC.Face, OC.Center),
-    (:Δxᶜᶠᵃ, "dx_cfa", OC.Center, OC.Face),      (:Δxᶠᶠᵃ, "dx_ffa", OC.Face, OC.Face),
-    (:Δyᶜᶜᵃ, "dy_cca", OC.Center, OC.Center),    (:Δyᶠᶜᵃ, "dy_fca", OC.Face, OC.Center),
-    (:Δyᶜᶠᵃ, "dy_cfa", OC.Center, OC.Face),      (:Δyᶠᶠᵃ, "dy_ffa", OC.Face, OC.Face),
-    (:Azᶜᶜᵃ, "area_cca", OC.Center, OC.Center),  (:Azᶠᶜᵃ, "area_fca", OC.Face, OC.Center),
-    (:Azᶜᶠᵃ, "area_cfa", OC.Center, OC.Face),    (:Azᶠᶠᵃ, "area_ffa", OC.Face, OC.Face),
+    (:λᶜᶜᵃ, "lambda_cca", OC.Center, OC.Center),
+    (:λᶠᶜᵃ, "lambda_fca", OC.Face, OC.Center),
+    (:λᶜᶠᵃ, "lambda_cfa", OC.Center, OC.Face),
+    (:λᶠᶠᵃ, "lambda_ffa", OC.Face, OC.Face),
+    (:φᶜᶜᵃ, "phi_cca", OC.Center, OC.Center),
+    (:φᶠᶜᵃ, "phi_fca", OC.Face, OC.Center),
+    (:φᶜᶠᵃ, "phi_cfa", OC.Center, OC.Face),
+    (:φᶠᶠᵃ, "phi_ffa", OC.Face, OC.Face),
+    (:Δxᶜᶜᵃ, "dx_cca", OC.Center, OC.Center),
+    (:Δxᶠᶜᵃ, "dx_fca", OC.Face, OC.Center),
+    (:Δxᶜᶠᵃ, "dx_cfa", OC.Center, OC.Face),
+    (:Δxᶠᶠᵃ, "dx_ffa", OC.Face, OC.Face),
+    (:Δyᶜᶜᵃ, "dy_cca", OC.Center, OC.Center),
+    (:Δyᶠᶜᵃ, "dy_fca", OC.Face, OC.Center),
+    (:Δyᶜᶠᵃ, "dy_cfa", OC.Center, OC.Face),
+    (:Δyᶠᶠᵃ, "dy_ffa", OC.Face, OC.Face),
+    (:Azᶜᶜᵃ, "area_cca", OC.Center, OC.Center),
+    (:Azᶠᶜᵃ, "area_fca", OC.Face, OC.Center),
+    (:Azᶜᶠᵃ, "area_cfa", OC.Center, OC.Face),
+    (:Azᶠᶠᵃ, "area_ffa", OC.Face, OC.Face),
 )
 
 """
@@ -36,7 +49,8 @@ Read the eORCA1 metric arrays, bottom height and conformal-mapping parameters fr
 function read_orca_mesh(path = orca_one_grid_path())
     return NCDatasets.NCDataset(path) do ds
         metrics = NamedTuple(
-            symbol => Array(ds[variable_name][:, :]) for (symbol, variable_name, _, _) in orca_metrics
+            symbol => Array(ds[variable_name][:, :]) for
+            (symbol, variable_name, _, _) in orca_metrics
         )
         (;
             metrics,
@@ -89,7 +103,8 @@ function ORCAOneGrid(
     Nx, Ny = mesh.Nx, mesh.Ny
     Hx, Hy, Hz = halo
 
-    Lz, z_coordinate = generate_coordinate(FT, orca_topology, (Nx, Ny, Nz), halo, z, :z, 3, OC.CPU())
+    Lz, z_coordinate =
+        generate_coordinate(FT, orca_topology, (Nx, Ny, Nz), halo, z, :z, 3, OC.CPU())
 
     helper_grid = OC.RectilinearGrid(;
         size = (Nx, Ny),
@@ -112,7 +127,13 @@ function ORCAOneGrid(
 
     filled = NamedTuple(
         symbol => to_architecture(
-            halo_filled_metric(mesh.metrics[symbol], helper_grid, boundary_conditions, LX, LY),
+            halo_filled_metric(
+                mesh.metrics[symbol],
+                helper_grid,
+                boundary_conditions,
+                LX,
+                LY,
+            ),
         ) for (symbol, _, LX, LY) in orca_metrics
     )
 
@@ -147,7 +168,11 @@ function ORCAOneGrid(
         filled.Azᶜᶠᵃ,
         filled.Azᶠᶠᵃ,
         convert(FT, mesh.radius),
-        Tripolar(mesh.north_poles_latitude, mesh.first_pole_longitude, mesh.southernmost_latitude),
+        Tripolar(
+            mesh.north_poles_latitude,
+            mesh.first_pole_longitude,
+            mesh.southernmost_latitude,
+        ),
     )
 
     bottom_field = OC.Field{OC.Center, OC.Center, Nothing}(underlying_grid)

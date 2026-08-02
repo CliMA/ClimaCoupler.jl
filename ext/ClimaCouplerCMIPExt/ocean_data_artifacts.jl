@@ -44,7 +44,8 @@ Read `variable_name` and its grid interfaces from the NetCDF file at `path`.
 """
 function read_gridded_dataset(path, variable_name; with_depth = true)
     return NCDatasets.NCDataset(path) do ds
-        data = with_depth ? Array(ds[variable_name][:, :, :]) : Array(ds[variable_name][:, :])
+        data =
+            with_depth ? Array(ds[variable_name][:, :, :]) : Array(ds[variable_name][:, :])
         GriddedDataset(
             data,
             Array(ds["longitude_interfaces"][:]),

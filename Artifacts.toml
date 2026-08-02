@@ -1,8 +1,22 @@
-[calipso_cloudsat]
-git-tree-sha1 = "dae77bc4ff79194ee6e794c1181bec1bebd67ea9"
+[precipitation_obs]
+git-tree-sha1 = "5f0075f042bc83b580d2c4f725f851d8e0b9c20a"
 
-[calipso_cloudsat_lowres]
-git-tree-sha1 = "c1c0a16127bd547124cdf7288140002d74846efe"
+    [[precipitation_obs.download]]
+    sha256 = "1aea361ee1c2636bd5c4cc343202dab814d246a7e0356a9caac9fd9c7cf3821c"
+    url = "https://caltech.box.com/shared/static/j63uak557kw7tlzb3dgwifoaeczekzm4.gz"
+
+[radiation_obs]
+git-tree-sha1 = "945e31f8028a581f7e8435cb691462124484567a"
+
+[era5_monthly_averages_surface_single_level_1979_2024]
+git-tree-sha1 = "6cddb07eeee2dd46dc5a19e9b2f706302ddba2c9"
+
+    [[era5_monthly_averages_surface_single_level_1979_2024.download]]
+    sha256 = "46b422722d98c89c6bc0b8641bff259db1caee253f45389ddf9eb9c2d31ed605"
+    url = "https://caltech.box.com/shared/static/jbgtyt6oq9lxvk8il5zzck6k581q7f3k.gz"
+
+[era5_monthly_averages_pressure_levels_1979_2024]
+git-tree-sha1 = "dd7ee9500805f590f8fc4c00bfc373eeb7a01587"
 
 [cmip_model_rmse]
 git-tree-sha1 = "53a27731c0a2ec60756af24e4c60ac37da4a32bc"
@@ -11,28 +25,12 @@ git-tree-sha1 = "53a27731c0a2ec60756af24e4c60ac37da4a32bc"
     sha256 = "3e8fa41df226dda9d375f8cb9dbeee3e10f9fceabcad2c7b91c9633b489b0437"
     url = "https://caltech.box.com/shared/static/lmzvnjkxctlb0fanieeqxll0vdrbei9e.gz"
 
-[ecco4_SIarea_SIheff_2010_01]
-git-tree-sha1 = "131153e848325a03139ca7966a1857ac3316b564"
+[landsea_mask_60arcseconds]
+git-tree-sha1 = "10ed7ec61def091c44545825cfb4d9599216c3c8"
 
-    [[ecco4_SIarea_SIheff_2010_01.download]]
-    sha256 = "dfcc6f930fd0d182f1076a4fdd81047aafc522eb433b2c6d5b75446307963044"
-    url = "https://caltech.box.com/shared/static/84s5osmyjcpvil5iv4v2qbmyi6i172w2.gz"
-
-[ecco4_seaice_initial_conditions_2010_01]
-git-tree-sha1 = "5e15d385af1838b386c5490f529970e305982f9c"
-
-[en4_ocean_initial_conditions_2010_01]
-git-tree-sha1 = "c8cc433a24246fec509978a0c6a8c874b946a73d"
-
-[en4_temperature_salinity_2010_01]
-git-tree-sha1 = "7fb52a88a1d34e491a302aa4da4e07efae5d8b08"
-
-    [[en4_temperature_salinity_2010_01.download]]
-    sha256 = "5359c8f9d224a98ec7f34fa07c9f555de00f7e2adfe473efe6a2191f0318e201"
-    url = "https://caltech.box.com/shared/static/9tbapu65ibnlafgoikzdffwa2qudojlk.gz"
-
-[era5_inst_model_levels]
-git-tree-sha1 = "8aae2d7330f90a029a4891be658a691e4e3362dc"
+    [[landsea_mask_60arcseconds.download]]
+    sha256 = "eb88455a39a00bfadb77effbc31a4df561158c0ca1578476edb683d45e3c49da"
+    url = "https://caltech.box.com/shared/static/vivf36pih7e0ttahqarc2nd5jxb4q8jr.gz"
 
 [era5_land_fraction]
 git-tree-sha1 = "7f14ef1c7859da1363b8973743b2a376c008f29f"
@@ -40,16 +38,6 @@ git-tree-sha1 = "7f14ef1c7859da1363b8973743b2a376c008f29f"
     [[era5_land_fraction.download]]
     sha256 = "1d6acf98656b50f1a324ee3daa267281fb017314d2169dbfda25208299f44870"
     url = "https://caltech.box.com/shared/static/glqlyb626j3szcjltyuwp534yzzhf770.gz"
-
-[era5_monthly_averages_pressure_levels_1979_2024]
-git-tree-sha1 = "dd7ee9500805f590f8fc4c00bfc373eeb7a01587"
-
-[era5_monthly_averages_surface_single_level_1979_2024]
-git-tree-sha1 = "6cddb07eeee2dd46dc5a19e9b2f706302ddba2c9"
-
-    [[era5_monthly_averages_surface_single_level_1979_2024.download]]
-    sha256 = "46b422722d98c89c6bc0b8641bff259db1caee253f45389ddf9eb9c2d31ed605"
-    url = "https://caltech.box.com/shared/static/jbgtyt6oq9lxvk8il5zzck6k581q7f3k.gz"
 
 [historical_sst_sic]
 git-tree-sha1 = "0d30d71a6f9b6548fe7395ca647e853ec36d1699"
@@ -61,19 +49,8 @@ git-tree-sha1 = "7f7b6d4ae6055c4c2b6a6dfba5be8b4e6ca1b0be"
     sha256 = "b68c0ce6ea682c38e29cb87c9c6ced6736ecac32d0d32dbaba78beb66046a06c"
     url = "https://caltech.box.com/shared/static/ufnesb00zkvlc3sxzhnnmqc3zbatxkb9.gz"
 
-[landsea_mask_60arcseconds]
-git-tree-sha1 = "10ed7ec61def091c44545825cfb4d9599216c3c8"
-
-    [[landsea_mask_60arcseconds.download]]
-    sha256 = "eb88455a39a00bfadb77effbc31a4df561158c0ca1578476edb683d45e3c49da"
-    url = "https://caltech.box.com/shared/static/vivf36pih7e0ttahqarc2nd5jxb4q8jr.gz"
-
-[mac_lwp]
-git-tree-sha1 = "edd3265e3be0938821451c24d411f4dc066bbf0e"
-
-    [[mac_lwp.download]]
-    sha256 = "fd24ea0d4491ef95b0a3a362d9f5faf320e5dd6caf3f4fb8683e9ab71357c13f"
-    url = "https://caltech.box.com/shared/static/4ukyc2pn5mq3zou5f7g2mjfkr86s7vdr.gz"
+[era5_inst_model_levels]
+git-tree-sha1 = "8aae2d7330f90a029a4891be658a691e4e3362dc"
 
 [modis_lai_climatology]
 git-tree-sha1 = "cd070348ab70f5d1b165c814f70e3822c0173eed"
@@ -89,21 +66,46 @@ git-tree-sha1 = "ce2b3b1f113f88956db112c81f8d48a62d9f57ae"
     sha256 = "ca0dce6450a4cb101bd4581b9dfb50164ad6518ffe96f617471d2f23f2b46367"
     url = "https://caltech.box.com/shared/static/bl0efc6st1i0sdmxx8bs70qof0xov4d9.gz"
 
+[calipso_cloudsat]
+git-tree-sha1 = "dae77bc4ff79194ee6e794c1181bec1bebd67ea9"
+
+[calipso_cloudsat_lowres]
+git-tree-sha1 = "c1c0a16127bd547124cdf7288140002d74846efe"
+
+[wxquest_initial_conditions]
+git-tree-sha1 = "85b1e3654fb88f19a715ea6c235e1d66f254d2e6"
+
+[mac_lwp]
+git-tree-sha1 = "edd3265e3be0938821451c24d411f4dc066bbf0e"
+
+    [[mac_lwp.download]]
+    sha256 = "fd24ea0d4491ef95b0a3a362d9f5faf320e5dd6caf3f4fb8683e9ab71357c13f"
+    url = "https://caltech.box.com/shared/static/4ukyc2pn5mq3zou5f7g2mjfkr86s7vdr.gz"
+
+[ecco4_seaice_initial_conditions_2010_01]
+git-tree-sha1 = "da31a2a1c640923aae4f64e756443048200684ec"
+
+    [[ecco4_seaice_initial_conditions_2010_01.download]]
+    sha256 = "f4c79b09378aa70bb309250a222eb3bb33d746d446e7a8897d0474562156ca7d"
+    url = "https://caltech.box.com/shared/static/0bz3xuvqzmaqslwn051jtvttcygub4fv.gz"
+
+[en4_ocean_initial_conditions_2010_01]
+git-tree-sha1 = "c8cc433a24246fec509978a0c6a8c874b946a73d"
+
+    [[en4_ocean_initial_conditions_2010_01.download]]
+    sha256 = "9a08624664b7f92d87074366fa18e8aac6a0972f175523cf3e3c138591df18b1"
+    url = "https://caltech.box.com/shared/static/5fe65xshpkpez1w2trp6eq59mwccezqm.gz"
+
 [orca_one_grid]
 git-tree-sha1 = "181dcdee73128a5cd15dc5a0e5216048a093bb45"
 
-[precipitation_obs]
-git-tree-sha1 = "5f0075f042bc83b580d2c4f725f851d8e0b9c20a"
-
-    [[precipitation_obs.download]]
-    sha256 = "1aea361ee1c2636bd5c4cc343202dab814d246a7e0356a9caac9fd9c7cf3821c"
-    url = "https://caltech.box.com/shared/static/j63uak557kw7tlzb3dgwifoaeczekzm4.gz"
-
-[radiation_obs]
-git-tree-sha1 = "945e31f8028a581f7e8435cb691462124484567a"
+    [[orca_one_grid.download]]
+    sha256 = "0f83181e70719df5deb642fa26d006f4301c6a70606b24388c6b89404fbffa5c"
+    url = "https://caltech.box.com/shared/static/rq8iq35nf80xc9rrumdnxvzsm0zr7rff.gz"
 
 [tripolar_one_degree_bathymetry]
 git-tree-sha1 = "bc3ca2024cc0f2f918fd2685615a9382908fbbe4"
 
-[wxquest_initial_conditions]
-git-tree-sha1 = "85b1e3654fb88f19a715ea6c235e1d66f254d2e6"
+    [[tripolar_one_degree_bathymetry.download]]
+    sha256 = "4ead74da0626f260ded7e2b9797af810d11e6cd774ca4bd25668f6a1f2059c89"
+    url = "https://caltech.box.com/shared/static/1e4cvzlyqglursxsh8ca2km1v04eolvg.gz"

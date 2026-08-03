@@ -5,7 +5,7 @@ import ClimaUtilities.ClimaArtifacts: @clima_artifact
 # Ocean and sea-ice input data is read from pre-generated artifacts. The initial conditions are
 # stored on their source datasets' own longitude-latitude(-depth) grids, together with the grid
 # interfaces needed to rebuild those grids, so a single artifact serves every ocean grid. The
-# generation scripts live in `staging/climaartifacts/`.
+# generation scripts live in `ClimaArtifacts`.
 
 const supported_initial_condition_dates = (Dates.Date(2010, 1, 1),)
 
@@ -119,8 +119,10 @@ Initialize ocean temperature and salinity from the EN4 state estimate for `start
 function set_ocean_initial_conditions!(ocean_model, start_date)
     check_supported_date(start_date)
 
-    directory = @clima_artifact("en4_ocean_initial_conditions_2010_01")
-    path = joinpath(directory, "en4_ocean_initial_conditions_2010_01.nc")
+    year = Dates.year(start_date)
+    month = lpad(Dates.month(start_date), 2, '0') # e.g., 1 → "01"
+    directory = @clima_artifact("en4_ocean_initial_conditions_$(year)_$month")
+    path = joinpath(directory, "en4_ocean_initial_conditions_$(year)_$month.nc")
     @info "Initializing ocean temperature and salinity from $path"
 
     interpolate_onto!(ocean_model.tracers.T, read_gridded_dataset(path, "temperature"))
@@ -137,8 +139,10 @@ Initialize sea-ice concentration and thickness from the ECCO4 state estimate for
 function set_sea_ice_initial_conditions!(sea_ice_model, start_date)
     check_supported_date(start_date)
 
-    directory = @clima_artifact("ecco4_seaice_initial_conditions_2010_01")
-    path = joinpath(directory, "ecco4_seaice_initial_conditions_2010_01.nc")
+    year = Dates.year(start_date)
+    month = lpad(Dates.month(start_date), 2, '0') # e.g., 1 → "01"
+    directory = @clima_artifact("ecco4_seaice_initial_conditions_$(year)_$month")
+    path = joinpath(directory, "ecco4_seaice_initial_conditions_$(year)_$month.nc")
     @info "Initializing sea-ice concentration and thickness from $path"
 
     concentration = read_gridded_dataset(path, "sea_ice_concentration"; with_depth = false)

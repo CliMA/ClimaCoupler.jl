@@ -75,3 +75,7 @@ value = 1.0e-4
 
 [cloud_fraction_steepness_scale]
 value = 0.5
+
+[sedimentation_lateral_coeff]
+value = 1
+type = "float"

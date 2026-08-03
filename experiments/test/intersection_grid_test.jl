@@ -498,21 +498,21 @@ import ClimaCoupler: FluxCalculator, Utilities
     end
 
     @testset "polygon kernel matches scalar SurfaceFluxes" begin
-        fs = CMIPExt.ExchangeFluxState{FT}(OC.CPU(), eg.n_poly)
-        fs.T_atmos .= state.T_atmos
-        fs.q_tot .= state.q_tot
-        fs.q_liq .= state.q_liq
-        fs.q_ice .= state.q_ice
-        fs.ρ_atmos .= state.ρ_atmos
-        fs.u_atmos .= state.u_atmos
-        fs.v_atmos .= state.v_atmos
-        fs.height_int .= state.height_int
-        fs.height_sfc .= state.height_sfc
-        fs.T_sfc .= state.T_sfc
-        fs.sic .= 0
+        flux_state = CMIPExt.ExchangeFluxState{FT}(OC.CPU(), eg.n_poly)
+        flux_state.T_atmos .= state.T_atmos
+        flux_state.q_tot .= state.q_tot
+        flux_state.q_liq .= state.q_liq
+        flux_state.q_ice .= state.q_ice
+        flux_state.ρ_atmos .= state.ρ_atmos
+        flux_state.u_atmos .= state.u_atmos
+        flux_state.v_atmos .= state.v_atmos
+        flux_state.height_int .= state.height_int
+        flux_state.height_sfc .= state.height_sfc
+        flux_state.T_sfc .= state.T_sfc
+        flux_state.sic .= 0
 
         CMIPExt.compute_ocean_polygon_fluxes!(
-            fs,
+            flux_state,
             surface_fluxes_params,
             thermo_params,
             config,
@@ -524,11 +524,11 @@ import ClimaCoupler: FluxCalculator, Utilities
             config,
             state...,
         )
-        @test all(fs.F_sh .== reference.F_sh)
-        @test all(fs.F_lh .== reference.F_lh)
-        @test all(fs.F_moisture .== reference.F_turb_moisture)
-        @test all(fs.F_τu .== reference.F_turb_ρτxz)
-        @test all(fs.F_τv .== reference.F_turb_ρτyz)
+        @test all(flux_state.F_sh .== reference.F_sh)
+        @test all(flux_state.F_lh .== reference.F_lh)
+        @test all(flux_state.F_moisture .== reference.F_turb_moisture)
+        @test all(flux_state.F_τu .== reference.F_turb_ρτxz)
+        @test all(flux_state.F_τv .== reference.F_turb_ρτyz)
 
         # Physical sanity: warm ocean under cool air gives upward heat and
         # moisture fluxes; westerly wind gives negative (downward eastward
@@ -540,8 +540,8 @@ import ClimaCoupler: FluxCalculator, Utilities
         @test abs(reference.F_turb_ρτyz) < abs(reference.F_turb_ρτxz) * 1e-6
 
         # Accumulators hold one contribution.
-        @test fs.n_acc[] == 1
-        @test all(fs.acc_F_sh .== fs.F_sh)
+        @test flux_state.n_acc[] == 1
+        @test all(flux_state.acc_F_sh .== flux_state.F_sh)
 
         @testset "scatter to boundary space" begin
             flux_scratch = (;
@@ -567,8 +567,8 @@ import ClimaCoupler: FluxCalculator, Utilities
             )
 
             # Open-water weighting (SIC = 0 here, so weight ≡ 1).
-            fs.scratch2 .= 1 .- fs.sic
-            CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg, fs, fs.scratch2)
+            flux_state.scratch2 .= 1 .- flux_state.sic
+            CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg, flux_state, flux_state.scratch2)
 
             # Scalar fluxes: uniform per-polygon values must be reproduced on
             # well-covered nodes and zeroed on uncovered ones.
@@ -615,30 +615,30 @@ end
     α_albedo = FT(0.7)
     T_melt = FT(273.15)
 
-    is = CMIPExt.IceExchangeState{FT}(OC.CPU(), eg.n_poly)
-    fs = is.fluxes
+    ice_state = CMIPExt.IceExchangeState{FT}(OC.CPU(), eg.n_poly)
+    flux_state = ice_state.fluxes
     # Cold air over ice near the melting point; weak wind; half the polygons
     # ice covered.
-    fs.T_atmos .= FT(260)
-    fs.q_tot .= FT(0.002)
-    fs.q_liq .= 0
-    fs.q_ice .= 0
-    fs.ρ_atmos .= FT(1.3)
-    fs.u_atmos .= FT(5)
-    fs.v_atmos .= FT(0)
-    fs.height_int .= FT(30)
-    fs.height_sfc .= FT(0)
-    fs.T_sfc .= FT(268)
-    fs.sic .= 0
-    fs.sic[1:2:end] .= FT(0.8)
-    is.R .= FT(1.0) / FT(2.0) # 1 m of ice at conductivity 2 W/m/K
-    is.T_i .= FT(271.2)
-    is.SW_d .= FT(50)
-    is.LW_d .= FT(200)
-    is.T_sfc_new .= 0
+    flux_state.T_atmos .= FT(260)
+    flux_state.q_tot .= FT(0.002)
+    flux_state.q_liq .= 0
+    flux_state.q_ice .= 0
+    flux_state.ρ_atmos .= FT(1.3)
+    flux_state.u_atmos .= FT(5)
+    flux_state.v_atmos .= FT(0)
+    flux_state.height_int .= FT(30)
+    flux_state.height_sfc .= FT(0)
+    flux_state.T_sfc .= FT(268)
+    flux_state.sic .= 0
+    flux_state.sic[1:2:end] .= FT(0.8)
+    ice_state.R .= FT(1.0) / FT(2.0) # 1 m of ice at conductivity 2 W/m/K
+    ice_state.T_i .= FT(271.2)
+    ice_state.SW_d .= FT(50)
+    ice_state.LW_d .= FT(200)
+    ice_state.T_sfc_new .= 0
 
     CMIPExt.compute_ice_polygon_fluxes!(
-        is,
+        ice_state,
         surface_fluxes_params,
         thermo_params,
         config,
@@ -650,26 +650,26 @@ end
 
     # Ice-free polygons short-circuit to zero flux and keep the T_sfc guess.
     for k in 1:(eg.n_poly)
-        if fs.sic[k] == 0
-            @test fs.F_sh[k] == 0
-            @test fs.F_lh[k] == 0
-            @test fs.F_moisture[k] == 0
-            @test fs.F_τu[k] == 0
-            @test is.T_sfc_new[k] == fs.T_sfc[k]
+        if flux_state.sic[k] == 0
+            @test flux_state.F_sh[k] == 0
+            @test flux_state.F_lh[k] == 0
+            @test flux_state.F_moisture[k] == 0
+            @test flux_state.F_τu[k] == 0
+            @test ice_state.T_sfc_new[k] == flux_state.T_sfc[k]
         else
             # The diagnosed surface temperature is bounded by melt and stays
             # physical; the diagnosed fluxes are finite.
-            @test is.T_sfc_new[k] <= T_melt + sqrt(eps(FT))
-            @test FT(200) < is.T_sfc_new[k] < FT(280)
-            @test isfinite(fs.F_sh[k]) && isfinite(fs.F_lh[k])
-            @test fs.F_τu[k] < 0 # westerly wind drag
+            @test ice_state.T_sfc_new[k] <= T_melt + sqrt(eps(FT))
+            @test FT(200) < ice_state.T_sfc_new[k] < FT(280)
+            @test isfinite(flux_state.F_sh[k]) && isfinite(flux_state.F_lh[k])
+            @test flux_state.F_τu[k] < 0 # westerly wind drag
         end
     end
     # Uniform inputs: all icy polygons agree exactly.
-    icy = findall(>(0), fs.sic)
-    @test length(unique(fs.F_sh[icy])) == 1
-    @test length(unique(is.T_sfc_new[icy])) == 1
-    @test all(fs.acc_F_sh .== fs.F_sh)
+    icy = findall(>(0), flux_state.sic)
+    @test length(unique(flux_state.F_sh[icy])) == 1
+    @test length(unique(ice_state.T_sfc_new[icy])) == 1
+    @test all(flux_state.acc_F_sh .== flux_state.F_sh)
 
     @testset "ice-weighted scatter" begin
         flux_scratch = (;
@@ -689,14 +689,14 @@ end
             temp_uv_vec,
             exchange_grid = eg,
         )
-        CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg, fs, fs.sic)
+        CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg, flux_state, flux_state.sic)
 
         # The sic-weighted average of a field that is uniform on icy polygons
         # is exactly that value wherever any ice coverage exists.
         CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
         sh = CRExt.se_field_to_vec(flux_scratch.F_sh)
         cov = CRExt.se_field_to_vec(weight_cov_scratch)
-        F_ice = fs.F_sh[icy[1]]
+        F_ice = flux_state.F_sh[icy[1]]
         for n in 1:(eg.n_nodes)
             if cov[n] > 0.1
                 @test sh[n] ≈ F_ice rtol = 1e-8
@@ -746,20 +746,20 @@ end
         temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space),
         exchange_grid = eg,
     )
-    fs = CMIPExt.ExchangeFluxState{FT}(OC.CPU(), eg.n_poly)
-    fs.T_sfc .= FT(290)
-    fs.sic .= 0
+    flux_state = CMIPExt.ExchangeFluxState{FT}(OC.CPU(), eg.n_poly)
+    flux_state.T_sfc .= FT(290)
+    flux_state.sic .= 0
 
     function ocean_driver!()
-        CMIPExt.gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec)
+        CMIPExt.gather_atmos_state_to_polys!(flux_state, eg, csf, remapping.temp_uv_vec)
         CMIPExt.compute_ocean_polygon_fluxes!(
-            fs,
+            flux_state,
             surface_fluxes_params,
             thermo_params,
             config,
         )
-        fs.scratch2 .= 1 .- fs.sic
-        CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg, fs, fs.scratch2)
+        flux_state.scratch2 .= 1 .- flux_state.sic
+        CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg, flux_state, flux_state.scratch2)
         return nothing
     end
 

@@ -767,19 +767,19 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
 
     FT = CC.Spaces.undertype(axes(csf))
     eg = remapping.exchange_grid
-    fs = remapping.ocean_flux_state
+    flux_state = remapping.ocean_flux_state
     surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
 
     # Gather the atmospheric and ocean-surface state onto the polygons.
-    gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec)
+    gather_atmos_state_to_polys!(flux_state, eg, csf, remapping.temp_uv_vec)
     Nz = size(sim.ocean.model.grid, 3)
     gather_cells_to_polys!(
-        fs.T_sfc,
+        flux_state.T_sfc,
         eg,
         vec(OC.interior(sim.ocean.model.tracers.T, :, :, Nz)),
     )
-    fs.T_sfc .+= FT(sim.ocean_properties.C_to_K)
-    gather_cells_to_polys!(fs.sic, eg, vec(OC.interior(sim.ice_concentration, :, :, 1)))
+    flux_state.T_sfc .+= FT(sim.ocean_properties.C_to_K)
+    gather_cells_to_polys!(flux_state.sic, eg, vec(OC.interior(sim.ice_concentration, :, :, 1)))
 
     # COARE3 roughness is spatially uniform, so the whole flux configuration
     # is a scalar kernel argument.
@@ -787,11 +787,11 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
         SF.COARE3RoughnessParams{FT}(),
         SF.ConstantGustinessSpec(FT(1)),
     )
-    compute_ocean_polygon_fluxes!(fs, surface_fluxes_params, thermo_params, config)
+    compute_ocean_polygon_fluxes!(flux_state, surface_fluxes_params, thermo_params, config)
 
     # The ocean fluxes apply to the open-water part of each polygon.
-    @. fs.scratch2 = 1 - fs.sic
-    scatter_poly_fluxes_to_boundary!(remapping, eg, fs, fs.scratch2)
+    @. flux_state.scratch2 = 1 - flux_state.sic
+    scatter_poly_fluxes_to_boundary!(remapping, eg, flux_state, flux_state.scratch2)
     FluxCalculator.update_flux_fields!(csf, sim, remapping.flux_scratch, accumulator)
     return nothing
 end
@@ -809,18 +809,18 @@ velocity flux BCs, heat and salinity accumulate onto the tracer flux BCs.
 NVTX.@annotate function push_exchange_fluxes_to_ocean!(sim::OceananigansSimulation)
     remapping = sim.remapping
     eg = remapping.exchange_grid
-    fs = remapping.ocean_flux_state
+    flux_state = remapping.ocean_flux_state
     (; reference_density, heat_capacity) = sim.ocean_properties
     grid = sim.ocean.model.grid
 
     # Momentum (UV basis): weight by open-ocean fraction per polygon, scatter
     # to cells, mirror the tripolar fold, then rotate/stagger onto the C-grid.
-    @. fs.scratch1 = fs.F_τu * (1 - fs.sic) / reference_density
-    @. fs.scratch2 = fs.F_τv * (1 - fs.sic) / reference_density
+    @. flux_state.scratch1 = flux_state.F_τu * (1 - flux_state.sic) / reference_density
+    @. flux_state.scratch2 = flux_state.F_τv * (1 - flux_state.sic) / reference_density
     τu_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
     τv_cells = vec(OC.interior(remapping.scratch_field_oc2, :, :, 1))
-    scatter_polys_to_cells!(τu_cells, eg, fs.scratch1)
-    scatter_polys_to_cells!(τv_cells, eg, fs.scratch2)
+    scatter_polys_to_cells!(τu_cells, eg, flux_state.scratch1)
+    scatter_polys_to_cells!(τv_cells, eg, flux_state.scratch2)
     mirror_fold_partners!(τu_cells, grid)
     mirror_fold_partners!(τv_cells, grid)
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
@@ -833,19 +833,19 @@ NVTX.@annotate function push_exchange_fluxes_to_ocean!(sim::OceananigansSimulati
     )
 
     # Heat: (1 - SIC)-weighted turbulent heat flux per polygon.
-    @. fs.scratch1 =
-        (1 - fs.sic) * (fs.F_lh + fs.F_sh) / (reference_density * heat_capacity)
+    @. flux_state.scratch1 =
+        (1 - flux_state.sic) * (flux_state.F_lh + flux_state.F_sh) / (reference_density * heat_capacity)
     heat_cells = vec(OC.interior(remapping.scratch_field_oc3, :, :, 1))
-    scatter_polys_to_cells!(heat_cells, eg, fs.scratch1)
+    scatter_polys_to_cells!(heat_cells, eg, flux_state.scratch1)
     mirror_fold_partners!(heat_cells, grid)
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
     OC.interior(oc_flux_T, :, :, 1) .+= OC.interior(remapping.scratch_field_oc3, :, :, 1)
 
     # Salinity: moisture flux (upward positive) per polygon; multiplied by the
     # local surface salinity at the cell level.
-    @. fs.scratch1 = (1 - fs.sic) * fs.F_moisture / reference_density
+    @. flux_state.scratch1 = (1 - flux_state.sic) * flux_state.F_moisture / reference_density
     moisture_cells = vec(OC.interior(remapping.scratch_field_oc3, :, :, 1))
-    scatter_polys_to_cells!(moisture_cells, eg, fs.scratch1)
+    scatter_polys_to_cells!(moisture_cells, eg, flux_state.scratch1)
     mirror_fold_partners!(moisture_cells, grid)
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
@@ -875,8 +875,8 @@ function FluxCalculator.push_and_reset!(
             acc,
         )
     end
-    fs = sim.remapping.ocean_flux_state
-    average_and_reset_exchange_accumulators!(fs) || return nothing
+    flux_state = sim.remapping.ocean_flux_state
+    average_and_reset_exchange_accumulators!(flux_state) || return nothing
     push_exchange_fluxes_to_ocean!(sim)
     # Keep the (unused but still accumulated) boundary-space accumulator in
     # sync so its averages stay well-defined.

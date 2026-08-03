@@ -102,31 +102,31 @@ function IceExchangeState{FT}(arch, n_poly::Int) where {FT}
 end
 
 """
-    average_and_reset_exchange_accumulators!(fs::ExchangeFluxState) -> Bool
+    average_and_reset_exchange_accumulators!(flux_state::ExchangeFluxState) -> Bool
 
 Write the time-averaged accumulated fluxes into the flux-state outputs
 (`F_*`), zero the accumulators and the contribution counter. Returns `false`
 without touching anything when no contributions have been accumulated.
 """
-function average_and_reset_exchange_accumulators!(fs::ExchangeFluxState)
-    n = fs.n_acc[]
+function average_and_reset_exchange_accumulators!(flux_state::ExchangeFluxState)
+    n = flux_state.n_acc[]
     iszero(n) && return false
-    @. fs.F_sh = fs.acc_F_sh / n
-    @. fs.F_lh = fs.acc_F_lh / n
-    @. fs.F_moisture = fs.acc_F_moisture / n
-    @. fs.F_τu = fs.acc_F_τu / n
-    @. fs.F_τv = fs.acc_F_τv / n
-    fill!(fs.acc_F_sh, 0)
-    fill!(fs.acc_F_lh, 0)
-    fill!(fs.acc_F_moisture, 0)
-    fill!(fs.acc_F_τu, 0)
-    fill!(fs.acc_F_τv, 0)
-    fs.n_acc[] = 0
+    @. flux_state.F_sh = flux_state.acc_F_sh / n
+    @. flux_state.F_lh = flux_state.acc_F_lh / n
+    @. flux_state.F_moisture = flux_state.acc_F_moisture / n
+    @. flux_state.F_τu = flux_state.acc_F_τu / n
+    @. flux_state.F_τv = flux_state.acc_F_τv / n
+    fill!(flux_state.acc_F_sh, 0)
+    fill!(flux_state.acc_F_lh, 0)
+    fill!(flux_state.acc_F_moisture, 0)
+    fill!(flux_state.acc_F_τu, 0)
+    fill!(flux_state.acc_F_τv, 0)
+    flux_state.n_acc[] = 0
     return true
 end
 
 """
-    gather_atmos_state_to_polys!(fs::ExchangeFluxState, eg::ExchangeGrid, csf,
+    gather_atmos_state_to_polys!(flux_state::ExchangeFluxState, eg::ExchangeGrid, csf,
                                  temp_uv_vec)
 
 Gather the atmospheric near-surface state from the coupler fields (SE nodal)
@@ -136,7 +136,7 @@ per-polygon winds and stresses are basis-consistent across the nodes a
 polygon touches.
 """
 NVTX.@annotate function gather_atmos_state_to_polys!(
-    fs::ExchangeFluxState,
+    flux_state::ExchangeFluxState,
     eg::ExchangeGrid,
     csf,
     temp_uv_vec,
@@ -145,15 +145,15 @@ NVTX.@annotate function gather_atmos_state_to_polys!(
     contravariant_to_cartesian!(temp_uv_vec, csf.u_int, csf.v_int)
     u_uv = temp_uv_vec.components.data.:1
     v_uv = temp_uv_vec.components.data.:2
-    gather_nodes_to_polys!(fs.u_atmos, eg, CRExt.se_field_to_vec(u_uv))
-    gather_nodes_to_polys!(fs.v_atmos, eg, CRExt.se_field_to_vec(v_uv))
-    gather_nodes_to_polys!(fs.T_atmos, eg, CRExt.se_field_to_vec(csf.T_atmos))
-    gather_nodes_to_polys!(fs.q_tot, eg, CRExt.se_field_to_vec(csf.q_tot_atmos))
-    gather_nodes_to_polys!(fs.q_liq, eg, CRExt.se_field_to_vec(csf.q_liq_atmos))
-    gather_nodes_to_polys!(fs.q_ice, eg, CRExt.se_field_to_vec(csf.q_ice_atmos))
-    gather_nodes_to_polys!(fs.ρ_atmos, eg, CRExt.se_field_to_vec(csf.ρ_atmos))
-    gather_nodes_to_polys!(fs.height_int, eg, CRExt.se_field_to_vec(csf.height_int))
-    gather_nodes_to_polys!(fs.height_sfc, eg, CRExt.se_field_to_vec(csf.height_sfc))
+    gather_nodes_to_polys!(flux_state.u_atmos, eg, CRExt.se_field_to_vec(u_uv))
+    gather_nodes_to_polys!(flux_state.v_atmos, eg, CRExt.se_field_to_vec(v_uv))
+    gather_nodes_to_polys!(flux_state.T_atmos, eg, CRExt.se_field_to_vec(csf.T_atmos))
+    gather_nodes_to_polys!(flux_state.q_tot, eg, CRExt.se_field_to_vec(csf.q_tot_atmos))
+    gather_nodes_to_polys!(flux_state.q_liq, eg, CRExt.se_field_to_vec(csf.q_liq_atmos))
+    gather_nodes_to_polys!(flux_state.q_ice, eg, CRExt.se_field_to_vec(csf.q_ice_atmos))
+    gather_nodes_to_polys!(flux_state.ρ_atmos, eg, CRExt.se_field_to_vec(csf.ρ_atmos))
+    gather_nodes_to_polys!(flux_state.height_int, eg, CRExt.se_field_to_vec(csf.height_int))
+    gather_nodes_to_polys!(flux_state.height_sfc, eg, CRExt.se_field_to_vec(csf.height_sfc))
     return nothing
 end
 
@@ -209,48 +209,48 @@ end
 
 # The flux-state vectors as a NamedTuple, for passing to GPU kernels (the
 # struct itself holds a host `RefValue` and cannot be a kernel argument).
-@inline _kernel_state(fs::ExchangeFluxState) = (;
-    fs.T_atmos,
-    fs.q_tot,
-    fs.q_liq,
-    fs.q_ice,
-    fs.ρ_atmos,
-    fs.u_atmos,
-    fs.v_atmos,
-    fs.height_int,
-    fs.height_sfc,
-    fs.T_sfc,
-    fs.sic,
-    fs.F_sh,
-    fs.F_lh,
-    fs.F_moisture,
-    fs.F_τu,
-    fs.F_τv,
-    fs.acc_F_sh,
-    fs.acc_F_lh,
-    fs.acc_F_moisture,
-    fs.acc_F_τu,
-    fs.acc_F_τv,
+@inline _kernel_state(flux_state::ExchangeFluxState) = (;
+    flux_state.T_atmos,
+    flux_state.q_tot,
+    flux_state.q_liq,
+    flux_state.q_ice,
+    flux_state.ρ_atmos,
+    flux_state.u_atmos,
+    flux_state.v_atmos,
+    flux_state.height_int,
+    flux_state.height_sfc,
+    flux_state.T_sfc,
+    flux_state.sic,
+    flux_state.F_sh,
+    flux_state.F_lh,
+    flux_state.F_moisture,
+    flux_state.F_τu,
+    flux_state.F_τv,
+    flux_state.acc_F_sh,
+    flux_state.acc_F_lh,
+    flux_state.acc_F_moisture,
+    flux_state.acc_F_τu,
+    flux_state.acc_F_τv,
 )
 
-@inline function _store_ocean_polygon_fluxes!(fs, k, out)
+@inline function _store_ocean_polygon_fluxes!(flux_state, k, out)
     @inbounds begin
-        fs.F_sh[k] = out.F_sh
-        fs.F_lh[k] = out.F_lh
-        fs.F_moisture[k] = out.F_turb_moisture
-        fs.F_τu[k] = out.F_turb_ρτxz
-        fs.F_τv[k] = out.F_turb_ρτyz
-        fs.acc_F_sh[k] += out.F_sh
-        fs.acc_F_lh[k] += out.F_lh
-        fs.acc_F_moisture[k] += out.F_turb_moisture
-        fs.acc_F_τu[k] += out.F_turb_ρτxz
-        fs.acc_F_τv[k] += out.F_turb_ρτyz
+        flux_state.F_sh[k] = out.F_sh
+        flux_state.F_lh[k] = out.F_lh
+        flux_state.F_moisture[k] = out.F_turb_moisture
+        flux_state.F_τu[k] = out.F_turb_ρτxz
+        flux_state.F_τv[k] = out.F_turb_ρτyz
+        flux_state.acc_F_sh[k] += out.F_sh
+        flux_state.acc_F_lh[k] += out.F_lh
+        flux_state.acc_F_moisture[k] += out.F_turb_moisture
+        flux_state.acc_F_τu[k] += out.F_turb_ρτxz
+        flux_state.acc_F_τv[k] += out.F_turb_ρτyz
     end
     return nothing
 end
 
 @kernel function _ocean_polygon_fluxes_kernel!(
-    fs,
+    flux_state,
     surface_fluxes_params,
     thermo_params,
     config,
@@ -260,50 +260,50 @@ end
         surface_fluxes_params,
         thermo_params,
         config,
-        fs.T_atmos[k],
-        fs.q_tot[k],
-        fs.q_liq[k],
-        fs.q_ice[k],
-        fs.ρ_atmos[k],
-        fs.u_atmos[k],
-        fs.v_atmos[k],
-        fs.height_int[k],
-        fs.height_sfc[k],
-        fs.T_sfc[k],
+        flux_state.T_atmos[k],
+        flux_state.q_tot[k],
+        flux_state.q_liq[k],
+        flux_state.q_ice[k],
+        flux_state.ρ_atmos[k],
+        flux_state.u_atmos[k],
+        flux_state.v_atmos[k],
+        flux_state.height_int[k],
+        flux_state.height_sfc[k],
+        flux_state.T_sfc[k],
     )
-    _store_ocean_polygon_fluxes!(fs, k, out)
+    _store_ocean_polygon_fluxes!(flux_state, k, out)
 end
 
 """
-    compute_ocean_polygon_fluxes!(fs::ExchangeFluxState, surface_fluxes_params,
+    compute_ocean_polygon_fluxes!(flux_state::ExchangeFluxState, surface_fluxes_params,
                                   thermo_params, config)
 
 Run the SurfaceFluxes evaluation for every exchange-grid polygon, storing the
 flux outputs and adding them to the running time accumulators (fused;
-increments `fs.n_acc`).
+increments `flux_state.n_acc`).
 """
 NVTX.@annotate function compute_ocean_polygon_fluxes!(
-    fs::ExchangeFluxState,
+    flux_state::ExchangeFluxState,
     surface_fluxes_params,
     thermo_params,
     config,
 )
-    backend = KernelAbstractions.get_backend(fs.F_sh)
+    backend = KernelAbstractions.get_backend(flux_state.F_sh)
     launch_kernel!(
         _ocean_polygon_fluxes_kernel!,
         backend,
-        length(fs.F_sh),
-        _kernel_state(fs),
+        length(flux_state.F_sh),
+        _kernel_state(flux_state),
         surface_fluxes_params,
         thermo_params,
         config,
     )
-    fs.n_acc[] += 1
+    flux_state.n_acc[] += 1
     return nothing
 end
 
-@inline _kernel_state(is::IceExchangeState) =
-    merge(_kernel_state(is.fluxes), (; is.R, is.T_i, is.SW_d, is.LW_d, is.T_sfc_new))
+@inline _kernel_state(ice_state::IceExchangeState) =
+    merge(_kernel_state(ice_state.fluxes), (; ice_state.R, ice_state.T_i, ice_state.SW_d, ice_state.LW_d, ice_state.T_sfc_new))
 
 # SurfaceFluxes evaluation with skin-temperature diagnosis for one sea-ice
 # polygon. Polygons without ice short-circuit to zero flux. Mirrors the nodal
@@ -447,16 +447,16 @@ end
 end
 
 """
-    compute_ice_polygon_fluxes!(is::IceExchangeState, surface_fluxes_params,
+    compute_ice_polygon_fluxes!(ice_state::IceExchangeState, surface_fluxes_params,
                                 thermo_params, config, σ, ϵ, α_albedo, T_melt)
 
 Run the SurfaceFluxes evaluation with skin-temperature diagnosis for every
 exchange-grid polygon with ice (`sic > 0`), storing the flux outputs, the
 diagnosed `T_sfc_new`, and adding the fluxes to the running accumulators
-(increments `is.fluxes.n_acc`).
+(increments `ice_state.fluxes.n_acc`).
 """
 NVTX.@annotate function compute_ice_polygon_fluxes!(
-    is::IceExchangeState,
+    ice_state::IceExchangeState,
     surface_fluxes_params,
     thermo_params,
     config,
@@ -465,12 +465,12 @@ NVTX.@annotate function compute_ice_polygon_fluxes!(
     α_albedo,
     T_melt,
 )
-    backend = KernelAbstractions.get_backend(is.fluxes.F_sh)
+    backend = KernelAbstractions.get_backend(ice_state.fluxes.F_sh)
     launch_kernel!(
         _ice_polygon_fluxes_kernel!,
         backend,
-        length(is.fluxes.F_sh),
-        _kernel_state(is),
+        length(ice_state.fluxes.F_sh),
+        _kernel_state(ice_state),
         surface_fluxes_params,
         thermo_params,
         config,
@@ -479,7 +479,7 @@ NVTX.@annotate function compute_ice_polygon_fluxes!(
         α_albedo,
         T_melt,
     )
-    is.fluxes.n_acc[] += 1
+    ice_state.fluxes.n_acc[] += 1
     return nothing
 end
 
@@ -500,7 +500,7 @@ end
 
 """
     scatter_poly_fluxes_to_boundary!(remapping, eg::ExchangeGrid,
-                                     fs::ExchangeFluxState, weight)
+                                     flux_state::ExchangeFluxState, weight)
 
 Aggregate per-polygon fluxes onto the SE boundary space as a `weight`-weighted
 average, filling the `remapping.flux_scratch` fields for
@@ -511,13 +511,13 @@ the coupler multiplies it by: L2-scatter `weight * F` (momentum in UV) and
 `weight` itself, `weighted_dss!` each scalar, divide by the DSS'd weighted
 coverage, then convert momentum UV → CT1/CT2. Nodes with zero coverage stay
 zero (no contribution to scatter); every positive-coverage node is retained
-so the weighted average does not drop mass. Uses `fs.scratch1` internally;
+so the weighted average does not drop mass. Uses `flux_state.scratch1` internally;
 `weight` must not alias it.
 """
 NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
     remapping,
     eg::ExchangeGrid,
-    fs::ExchangeFluxState,
+    flux_state::ExchangeFluxState,
     weight,
 )
     CRExt = get_ConservativeRegriddingCCExt()
@@ -525,16 +525,16 @@ NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
     cov = remapping.weight_cov_scratch
     scatter_polys_to_nodes!(CRExt.se_field_to_vec(cov), eg, weight)
 
-    @. fs.scratch1 = weight * fs.F_sh
-    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_sh), eg, fs.scratch1)
-    @. fs.scratch1 = weight * fs.F_lh
-    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_lh), eg, fs.scratch1)
-    @. fs.scratch1 = weight * fs.F_moisture
-    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_turb_moisture), eg, fs.scratch1)
-    @. fs.scratch1 = weight * fs.F_τu
-    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_turb_ρτxz), eg, fs.scratch1)
-    @. fs.scratch1 = weight * fs.F_τv
-    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_turb_ρτyz), eg, fs.scratch1)
+    @. flux_state.scratch1 = weight * flux_state.F_sh
+    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_sh), eg, flux_state.scratch1)
+    @. flux_state.scratch1 = weight * flux_state.F_lh
+    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_lh), eg, flux_state.scratch1)
+    @. flux_state.scratch1 = weight * flux_state.F_moisture
+    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_turb_moisture), eg, flux_state.scratch1)
+    @. flux_state.scratch1 = weight * flux_state.F_τu
+    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_turb_ρτxz), eg, flux_state.scratch1)
+    @. flux_state.scratch1 = weight * flux_state.F_τv
+    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_turb_ρτyz), eg, flux_state.scratch1)
 
     Utilities.apply_dss!(cov, remapping.flux_dss_buffer)
     FT = CC.Spaces.undertype(axes(cov))

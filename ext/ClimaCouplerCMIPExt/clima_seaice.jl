@@ -10,9 +10,6 @@ import ClimaUtilities.TimeManager: ITime, date, counter, period
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 using StaticArrays
 
-# Rename ECCO password env variable to match ClimaOcean.jl
-haskey(ENV, "ECCO_PASSWORD") && (ENV["ECCO_WEBDAV_PASSWORD"] = ENV["ECCO_PASSWORD"])
-
 """
     ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP}
 
@@ -103,35 +100,7 @@ function ClimaSeaIceSimulation(
 
     # Initialize nonzero sea ice if start date provided
     if !isnothing(start_date)
-        # set up the `dir` keyword argument for `Metadatum`
-        if start_date == Dates.Date(2010, 1, 1)
-            # we have a ClimaArtifact saved for January 1, 2010 (so that CI can always run)
-            dir_kw = (; dir = @clima_artifact("ecco4_SIarea_SIheff_2010_01"))
-            @info "Using $(dir_kw.dir) ClimaArtifact for sea ice initialization on $(start_date)"
-        else
-            # otherwise, download the data
-            # (or load from scratchspace; ClimaOcean will automatically handle this)
-            dir_kw = (;)
-        end
-
-        sic_metadata = CO.Metadatum(
-            :sea_ice_concentration,
-            dataset = CO.ECCO4Monthly(),
-            date = start_date;
-            dir_kw...,
-        )
-        h_metadata = CO.Metadatum(
-            :sea_ice_thickness,
-            dataset = CO.ECCO4Monthly(),
-            date = start_date;
-            dir_kw...,
-        )
-
-        @info "ECCOv4 sea-ice concentration data path: $(CO.DataWrangling.metadata_path(sic_metadata))"
-        @info "ECCOv4 sea-ice thickness data path: $(CO.DataWrangling.metadata_path(h_metadata))"
-
-        OC.set!(ice.model.ice_concentration, sic_metadata)
-        OC.set!(ice.model.ice_thickness, h_metadata)
+        set_sea_ice_initial_conditions!(ice.model, start_date)
     end
 
     # Get sea ice properties from coupled parameters
@@ -160,7 +129,7 @@ function ClimaSeaIceSimulation(
         y_momentum = y_momentum,
     )
 
-    # `ClimaOcean.compute_sea_ice_ocean_fluxes` expects a NamedTuple containing fluxes,
+    # `compute_sea_ice_ocean_fluxes!` expects a NamedTuple containing fluxes,
     # flux_formulation, temperature, and salinity.
     ocean_ice_interface = (;
         fluxes = ocean_ice_fluxes,

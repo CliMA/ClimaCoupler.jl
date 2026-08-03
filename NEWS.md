@@ -4,6 +4,22 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Exchange (intersection) grid for CMIP surface fractions and fluxes.
+When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange
+grid — the polygons where the cubed-sphere spectral elements intersect the
+ocean's `TripolarGrid` cells (via ConservativeRegridding's operator API) —
+and uses it to (1) derive land/ocean/ice area fractions from the ocean's
+bathymetric wet mask, filtered with the same diffusion recipe ClimaAtmos
+applies to its orography, so fractions and flux weights are consistent with
+where the ocean actually has wet cells (issue
+[#1838](https://github.com/CliMA/ClimaCoupler.jl/issues/1838)); and (2)
+compute ocean and sea-ice turbulent fluxes per polygon, with per-polygon
+sea-ice-concentration weighting, conservative aggregation to both grids, and
+GPU-resident, allocation-free per-step application. Controlled by the new
+`use_intersection_grid` (default `true`; automatically disabled for column
+and distributed setups) and `topography_damping_factor` (default 5, must
+match the ClimaAtmos option of the same name) configuration options.
+
 #### Adapt to the redesigned RRTMGP 0.22 / ClimaAtmos 0.42 radiation API.
 The atmosphere radiation cache now holds an `RRTMGP.RRTMGPSolver`; coupler flux and albedo
 accesses go through `RRTMGP` getters (e.g. `RRTMGP.sw_flux_dn`, `RRTMGP.surface_emissivity`),

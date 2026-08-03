@@ -46,7 +46,7 @@ Poppler_jll = "9c32591e-4766-534b-9725-b71a8799265b"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [extensions]
-ClimaCouplerCMIPExt = ["Adapt", "ClimaOcean", "ClimaSeaIce", "ConservativeRegridding", "KernelAbstractions", "Oceananigans"]
+ClimaCouplerCMIPExt = ["Adapt", "ClimaAtmos", "ClimaOcean", "ClimaSeaIce", "ConservativeRegridding", "KernelAbstractions", "Oceananigans"]
 ClimaCouplerCMIPMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
 ClimaCouplerClimaAtmosExt = ["ClimaAtmos"]
 ClimaCouplerClimaLandExt = ["ClimaLand"]
@@ -68,7 +68,7 @@ ClimaParams = "1.0"
 ClimaSeaIce = "0.5.8, 0.6"
 ClimaTimeSteppers = "0.8.11, 0.9, 0.10"
 ClimaUtilities = "0.1.22"
-ConservativeRegridding = "0.2.5"
+ConservativeRegridding = "0.2.7"
 Dates = "1"
 GeoMakie = "0.7"
 Insolation = "1.1"

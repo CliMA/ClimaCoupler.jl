@@ -1,0 +1,55 @@
+# Coarse-atmosphere stability check for the exchange (intersection) grid:
+# h_elem 6 atmosphere against the one-degree tripolar ocean with ClimaSeaIce
+# and integrated land, run for 30 days (cf. the instability reported in
+# https://github.com/CliMA/ClimaCoupler.jl/issues/1994). Run the same
+# configuration with `use_intersection_grid: false` (or on main) as the
+# control. Diagnostics to watch: SST/T_sfc extrema, turbulent flux extrema
+# and their locations, ocean eta/u/v extrema, coastal sea-ice concentration,
+# and the coupler conservation checks.
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
+atmos_progress_interval: "1days"
+checkpoint_dt: "10days"
+coupler_diagnostics_period: "1days"
+coupler_diagnostics_reduction: "average"
+coupler_toml: ["toml/amip_edonly.toml"]
+dt_atmos: "120secs"
+dt_cpl: "360secs"
+dt_land: "360secs"
+dt_ocean: "1800secs"
+dt_seaice: "1800secs"
+dz_bottom: 100.0
+energy_check: false
+h_elem: 6
+ice_model: "clima_seaice"
+land_diagnostics_period: "1days"
+land_diagnostics_reduction: "average"
+land_model: "integrated"
+land_progress_interval: "1days"
+land_spun_up_ic: false
+mode_name: "cmip"
+netcdf_output_at_levels: true
+ocean_diagnostic_interval: "1days"
+ocean_diagnostic_mode: "average"
+ocean_model: "oceananigans"
+ocean_progress_interval: "1days"
+output_default_diagnostics: true
+radiation_reset_rng_seed: true
+rayleigh_sponge: true
+seaice_diagnostic_interval: "1days"
+seaice_diagnostic_mode: "average"
+seaice_progress_interval: "1days"
+simple_ocean: false
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+t_end: "30days"
+topo_smoothing: true
+topography: "Earth"
+use_intersection_grid: true
+topography_damping_factor: 5.0
+use_itime: true
+viscous_sponge: true
+z_elem: 39
+z_max: 60000.0
+check_nan_every: 10

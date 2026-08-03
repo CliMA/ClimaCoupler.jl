@@ -27,7 +27,8 @@ land_model: "integrated"
 land_spun_up_ic: false
 mode_name: "cmip"
 ocean_model: "oceananigans"
-ocean_grid: "orca"
+#ocean_grid: "orca"
+ocean_grid: "one_degree_tripolar"
 ocean_diagnostic_interval: "30days"
 ocean_diagnostic_mode: "average"
 output_default_diagnostics: true
@@ -36,7 +37,7 @@ seaice_diagnostic_interval: "30days"
 seaice_diagnostic_mode: "average"
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "186days"
+t_end: "120days"
 topo_smoothing: true
 topography: "Earth"
 use_itime: true

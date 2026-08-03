@@ -44,6 +44,7 @@ interface_pages = [
     "timemanager.md",
     "fieldexchanger.md",
     "fluxcalculator.md",
+    "exchange_grid.md",
     "checkpointer.md",
     "conservation.md",
     "utilities.md",

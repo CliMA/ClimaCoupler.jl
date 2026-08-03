@@ -8,6 +8,8 @@ module Input
 import ArgParse
 import YAML
 import Dates
+import ClimaComms
+import InitialConditions.ERA5
 import ClimaUtilities.TimeManager: ITime
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
@@ -267,7 +269,7 @@ function argparse_settings()
         arg_type = String
         default = ""
         "--era5_initial_condition_dir"
-        help = "Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from start_date [none (default)]. Generated with `https://github.com/CliMA/WeatherQuest`"
+        help = "Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from start_date. When not set, the files come from the wxquest_initial_conditions artifact, or from a cached Copernicus Climate Data Store download (needs ~/.cdsapirc credentials) [none (default)]"
         arg_type = String
         default = nothing
         # Ocean model specific
@@ -1061,22 +1063,77 @@ function _apply_scm_surface_type(scm_surface_type, ocean_model, ice_model, land_
 end
 
 """
-    resolve_era5_dir(era5_initial_condition_dir)
+    resolve_era5_dir(era5_initial_condition_dir, start_date; comms_ctx = nothing)
 
-Return `era5_initial_condition_dir` if it is not `nothing`, otherwise attempt to
-use the `wxquest_initial_conditions` ClimaArtifact as a fallback.  Errors if
-neither source is available.
+A directory with the ERA5 initial condition files for `start_date`.
+
+Tries these sources in order:
+1. `era5_initial_condition_dir`, if it is not `nothing`
+2. the `wxquest_initial_conditions` ClimaArtifact, if it holds files for
+   `start_date`. The artifact has a fixed set of dates, pre-generated from
+   the 137 ERA5 model levels, and needs no network or CDS account.
+3. the local cache, or a download from the Copernicus Climate Data Store if
+   the cache does not have the date, through
+   `InitialConditions.ERA5.fetch_initial_conditions`
+
+This is the one place that downloads the files. Call it once per run, through
+[`resolve_era5_dir!`](@ref), so that only the root process downloads.
 """
-function resolve_era5_dir(era5_initial_condition_dir)
+function resolve_era5_dir(era5_initial_condition_dir, start_date; comms_ctx = nothing)
     isnothing(era5_initial_condition_dir) || return era5_initial_condition_dir
-    try
-        return @clima_artifact("wxquest_initial_conditions")
-    catch
-        error(
-            "subseasonal mode requires --era5_initial_condition_dir or the " *
-            "wxquest_initial_conditions ClimaArtifact",
+    artifact_dir = try
+        if isnothing(comms_ctx)
+            @clima_artifact("wxquest_initial_conditions")
+        else
+            @clima_artifact("wxquest_initial_conditions", comms_ctx)
+        end
+    catch err
+        err isa InterruptException && rethrow()
+        nothing
+    end
+    if !isnothing(artifact_dir)
+        sst_name = ERA5.sst_filename(start_date)
+        isfile(joinpath(artifact_dir, sst_name)) && return artifact_dir
+    end
+
+    # InitialConditions.ERA5 knows nothing about MPI, so coordinate the download
+    # here: only the root process fetches, and the others wait and then confirm
+    # the files arrived. The root barriers even when it fails, so no rank hangs.
+    dir = ERA5.cache_dir()
+    if isnothing(comms_ctx)
+        ERA5.fetch_initial_conditions(start_date; dir)
+    elseif ClimaComms.iamroot(comms_ctx)
+        try
+            ERA5.fetch_initial_conditions(start_date; dir)
+        finally
+            ClimaComms.barrier(comms_ctx)
+        end
+    else
+        ClimaComms.barrier(comms_ctx)
+        ERA5.files_complete(dir, start_date) || error(
+            "The root process failed to fetch ERA5 initial conditions for " *
+            "$start_date into $dir. See the root process log for the reason.",
         )
     end
+    return dir
+end
+
+"""
+    resolve_era5_dir!(config_dict; comms_ctx = nothing)
+
+For subseasonal mode, resolve the ERA5 initial condition directory (see
+[`resolve_era5_dir`](@ref)) and write it to
+`config_dict["era5_initial_condition_dir"]`. The ClimaAtmos WeatherModel
+initial condition then reads from the same directory. Other modes leave
+`config_dict` unchanged.
+"""
+function resolve_era5_dir!(config_dict; comms_ctx = nothing)
+    sim_mode = MODE_NAME_DICT[config_dict["mode_name"]]
+    sim_mode <: Interfacer.SubseasonalMode || return config_dict
+    start_date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
+    config_dict["era5_initial_condition_dir"] =
+        resolve_era5_dir(config_dict["era5_initial_condition_dir"], start_date; comms_ctx)
+    return config_dict
 end
 
 """
@@ -1085,8 +1142,9 @@ end
 Build ERA5-based file paths for subseasonal mode simulations.
 Filenames are inferred from the start_date.
 
-If `era5_initial_condition_dir` is `nothing`, the `wxquest_initial_conditions`
-ClimaArtifact is used as a fallback.
+`era5_initial_condition_dir` must be a directory. Call
+[`resolve_era5_dir!`](@ref) first to resolve it, which also downloads the
+files if needed.
 
 # Arguments
 - `sim_mode`: The simulation mode type (must be SubseasonalMode)
@@ -1108,7 +1166,11 @@ function get_era5_filepaths(
     start_date,
     bucket_initial_condition,
 )
-    era5_initial_condition_dir = resolve_era5_dir(era5_initial_condition_dir)
+    isnothing(era5_initial_condition_dir) && error(
+        "The ERA5 initial condition directory is not resolved yet. Call " *
+        "`Input.resolve_era5_dir!(config_dict; comms_ctx)` before " *
+        "`get_coupler_args`, or set --era5_initial_condition_dir.",
+    )
     datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
 
     # Verify that the required files exist for this date

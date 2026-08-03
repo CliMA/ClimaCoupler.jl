@@ -100,13 +100,14 @@ Terraplanet is enabled by setting `mode_name: "slabplanet_terra"`.
 
 ## Subseasonal
 
-Generates 3–4 week forecasts initialized from ERA5 reanalysis data. The setup is otherwise
-similar to AMIP, but uses specific ERA5-derived initial conditions for the land model. The
-`era5_initial_condition_dir` option must point to a directory containing the initial
-condition files described below.
+Generates 3-4 week forecasts initialized from ERA5 reanalysis data. The setup is otherwise
+similar to AMIP, but uses specific ERA5-derived initial conditions for the land model.
 
-Initial condition files can be generated using the
-[WeatherQuest](https://github.com/CliMA/WeatherQuest) package.
+When the `era5_initial_condition_dir` option is not set, the coupler reads the initial
+condition files from the `wxquest_initial_conditions` artifact, or downloads and caches them
+when the artifact does not cover the start date. See
+[InitialConditions.jl](https://clima.github.io/InitialConditions.jl/dev/). Set the option to read the files
+from a directory you provide instead.
 
 Subseasonal mode is enabled by setting `mode_name: "subseasonal"`.
 
@@ -144,8 +145,6 @@ the data is present at the following land level midpoints:
 |---|---|---|---|
 | `swe` | m | `(lat, lon)` | Snow water equivalent |
 | `swvl` | m³/m³ | `(z, lat, lon)` | Volumetric liquid water fraction |
-| `si` | m³/m³ | `(z, lat, lon)` | Volumetric ice fraction |
-| `sie` | J/m³ | `(z, lat, lon)` | Soil volumetric internal energy |
 | `stl` | K | `(z, lat, lon)` | Soil temperature |
 | `tsn` | K | `(lat, lon)` | Snow layer temperature |
 | `skt` | K | `(lat, lon)` | Skin temperature |

@@ -43,6 +43,7 @@ docs/src/generated/
 *.jld2
 *.g
 *.hdf5
+*.tar.gz
 
 # Julia System Images
 *.so

@@ -23,13 +23,13 @@ value = 0
 value = 0.1
 
 [min_area_limiter_scale]
-value = 0.0001
+value = 0.001
 
 [min_area_limiter_power]
 value = 1
 
 [turb_entr_param_vec]
-value = [0.0001, 10000]
+value = [0.001, 1e5]
 
 [entr_detr_limit_inv_tau]
 value = 0
@@ -62,16 +62,19 @@ value = 0
 value = 100
 
 [sublimation_deposition_timescale]
-value = 500
+value = 300
 
 [rain_autoconversion_timescale]
-value = 1800
+value = 1200
 
 [snow_autoconversion_timescale]
-value = 1800
+value = 1360
 
 [cloud_liquid_water_specific_humidity_autoconversion_threshold]
-value = 1.0e-4
+value = 2e-4
 
 [cloud_fraction_steepness_scale]
-value = 0.5
+value = 0.55
+
+[cloud_fraction_eps_rel]
+value = 0.05

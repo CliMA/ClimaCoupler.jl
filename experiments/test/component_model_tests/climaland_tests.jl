@@ -146,16 +146,11 @@ end
     FieldExchanger.import_static_fields!(coupler_fields, model_sims)
     FieldExchanger.exchange!(cs)
 
-    # Update land cache variables with the updated drivers in the cache after the exchange
-    update_aux! = CL.make_update_aux(land_sim.model)
-    update_aux!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
-
-    update_boundary_fluxes! = CL.make_update_boundary_fluxes(land_sim.model)
-    update_boundary_fluxes!(
-        land_sim.integrator.p,
-        land_sim.integrator.u,
-        land_sim.integrator.t,
-    )
+    # Initialize land cache after drivers are exchanged. This sets
+    # `p.snow.T_sfc` (used as the SurfaceFluxes ≥1.2 initial guess for the snow
+    # skin-temperature Newton update) and updates aux / boundary-flux cache
+    # variables.
+    Interfacer.set_cache!(land_sim, coupler_fields)
 
     # Compute the turbulent fluxes for each sub-component
     CL.turbulent_fluxes!(

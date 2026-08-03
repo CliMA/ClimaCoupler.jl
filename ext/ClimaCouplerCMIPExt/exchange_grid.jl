@@ -335,11 +335,11 @@ receiving field. For a per-unit-wet-area result use
 scatter_polys_to_nodes!(nodal_values, eg::ExchangeGrid, poly_values) =
     _csr_matvec!(nodal_values, eg.snode_ptr, eg.spoly, eg.sweight, poly_values)
 
-@kernel function _csr_matvec_normalized_kernel!(dst, ptr, col, w, src, cov, cutoff)
+@kernel function _csr_matvec_normalized_kernel!(dst, ptr, col, w, src, cov)
     r = @index(Global)
     @inbounds begin
         c = cov[r]
-        if c > cutoff
+        if c > 0
             acc = zero(eltype(dst))
             for p in ptr[r]:(ptr[r + 1] - 1)
                 acc += w[p] * src[col[p]]
@@ -352,19 +352,15 @@ scatter_polys_to_nodes!(nodal_values, eg::ExchangeGrid, poly_values) =
 end
 
 """
-    scatter_polys_to_nodes_normalized!(nodal_values, eg::ExchangeGrid, poly_values,
-                                       cov_cutoff)
+    scatter_polys_to_nodes_normalized!(nodal_values, eg::ExchangeGrid, poly_values)
 
 Like [`scatter_polys_to_nodes!`](@ref) but normalized by the nodal wet
 coverage, yielding a per-unit-wet-area value: constants are reproduced exactly
-wherever `node_cov > cov_cutoff`; nodes at or below the cutoff are set to 0.
+wherever `node_cov > 0`; uncovered nodes stay 0. No coverage threshold is
+applied — dropping small-coverage nodes would discard mass and break the
+conservative scatter.
 """
-function scatter_polys_to_nodes_normalized!(
-    nodal_values,
-    eg::ExchangeGrid,
-    poly_values,
-    cov_cutoff,
-)
+function scatter_polys_to_nodes_normalized!(nodal_values, eg::ExchangeGrid, poly_values)
     backend = KernelAbstractions.get_backend(nodal_values)
     launch_kernel!(
         _csr_matvec_normalized_kernel!,
@@ -376,7 +372,6 @@ function scatter_polys_to_nodes_normalized!(
         eg.sweight,
         poly_values,
         eg.node_cov,
-        cov_cutoff,
     )
     return nodal_values
 end

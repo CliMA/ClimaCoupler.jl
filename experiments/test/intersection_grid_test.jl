@@ -263,10 +263,9 @@ import Random
             nodal_scratch,
             eg,
             ones(FT, eg.n_poly),
-            FT(1e-3),
         )
         for n in 1:(eg.n_nodes)
-            if eg.node_cov[n] > 1e-3
+            if eg.node_cov[n] > 0
                 @test nodal_scratch[n] ≈ 1 rtol = 1e-12
             else
                 @test nodal_scratch[n] == 0
@@ -327,7 +326,7 @@ import Random
         CMIPExt.gather_nodes_to_polys!(poly_scratch, eg, nodal)
         CMIPExt.gather_cells_to_polys!(poly_scratch, eg, cell_scratch)
         CMIPExt.scatter_polys_to_nodes!(nodal_scratch, eg, polyv)
-        CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, polyv, FT(1e-3))
+        CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, polyv)
         CMIPExt.scatter_polys_to_cells!(cell_scratch, eg, polyv)
         CMIPExt.mirror_fold_partners!(cell_scratch, coastal_grid)
         @test @allocated(CMIPExt.gather_nodes_to_polys!(poly_scratch, eg, nodal)) <
@@ -337,7 +336,7 @@ import Random
         @test @allocated(CMIPExt.scatter_polys_to_nodes!(nodal_scratch, eg, polyv)) <
               alloc_budget
         @test @allocated(
-            CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, polyv, FT(1e-3))
+            CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, polyv)
         ) < alloc_budget
         @test @allocated(CMIPExt.scatter_polys_to_cells!(cell_scratch, eg, polyv)) <
               alloc_budget
@@ -371,13 +370,12 @@ import Random
                 CMIPExt.scatter_polys_to_nodes!(to_d(nodal_scratch), eg_d, to_d(polyv)),
             ) ≈ nodal_scratch rtol = rt
 
-            CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, polyv, FT(1e-3))
+            CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, polyv)
             @test Array(
                 CMIPExt.scatter_polys_to_nodes_normalized!(
                     to_d(nodal_scratch),
                     eg_d,
                     to_d(polyv),
-                    FT(1e-3),
                 ),
             ) ≈ nodal_scratch rtol = rt
 
@@ -519,7 +517,6 @@ import ClimaCoupler: FluxCalculator, Utilities
             thermo_params,
             config,
         )
-        fs.n_acc[] += 1
 
         reference = CMIPExt._polygon_surface_fluxes(
             surface_fluxes_params,
@@ -580,7 +577,7 @@ import ClimaCoupler: FluxCalculator, Utilities
             for n in 1:(eg.n_nodes)
                 if covd[n] > 0.5
                     @test sh[n] ≈ reference.F_sh rtol = 1e-10
-                elseif covd[n] <= 1e-3
+                elseif covd[n] == 0
                     @test sh[n] == 0
                 end
             end
@@ -650,7 +647,6 @@ end
         α_albedo,
         T_melt,
     )
-    fs.n_acc[] += 1
 
     # Ice-free polygons short-circuit to zero flux and keep the T_sfc guess.
     for k in 1:(eg.n_poly)

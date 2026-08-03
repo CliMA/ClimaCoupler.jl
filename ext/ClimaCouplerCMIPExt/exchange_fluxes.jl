@@ -279,8 +279,8 @@ end
                                   thermo_params, config)
 
 Run the SurfaceFluxes evaluation for every exchange-grid polygon, storing the
-flux outputs and adding them to the running time accumulators (fused; call
-sites increment `fs.n_acc`).
+flux outputs and adding them to the running time accumulators (fused;
+increments `fs.n_acc`).
 """
 NVTX.@annotate function compute_ocean_polygon_fluxes!(
     fs::ExchangeFluxState,
@@ -298,6 +298,7 @@ NVTX.@annotate function compute_ocean_polygon_fluxes!(
         thermo_params,
         config,
     )
+    fs.n_acc[] += 1
     return nothing
 end
 
@@ -451,7 +452,8 @@ end
 
 Run the SurfaceFluxes evaluation with skin-temperature diagnosis for every
 exchange-grid polygon with ice (`sic > 0`), storing the flux outputs, the
-diagnosed `T_sfc_new`, and adding the fluxes to the running accumulators.
+diagnosed `T_sfc_new`, and adding the fluxes to the running accumulators
+(increments `is.fluxes.n_acc`).
 """
 NVTX.@annotate function compute_ice_polygon_fluxes!(
     is::IceExchangeState,
@@ -477,6 +479,7 @@ NVTX.@annotate function compute_ice_polygon_fluxes!(
         α_albedo,
         T_melt,
     )
+    is.fluxes.n_acc[] += 1
     return nothing
 end
 
@@ -497,8 +500,7 @@ end
 
 """
     scatter_poly_fluxes_to_boundary!(remapping, eg::ExchangeGrid,
-                                     fs::ExchangeFluxState, weight;
-                                     cov_cutoff = 1e-3)
+                                     fs::ExchangeFluxState, weight)
 
 Aggregate per-polygon fluxes onto the SE boundary space as a `weight`-weighted
 average, filling the `remapping.flux_scratch` fields for
@@ -507,17 +509,16 @@ fluxes apply to — `1 - sic` for open ocean, `sic` for sea ice — so the nodal
 result is a per-unit-*weighted*-area flux, consistent with the area fraction
 the coupler multiplies it by: L2-scatter `weight * F` (momentum in UV) and
 `weight` itself, `weighted_dss!` each scalar, divide by the DSS'd weighted
-coverage, then convert momentum UV → CT1/CT2. Nodes with relative coverage
-below `cov_cutoff` get zero flux (they are essentially not covered by wet
-ocean; their area fraction vanishes there too, so they never contribute to
-the coupler sums). Uses `fs.scratch1` internally; `weight` must not alias it.
+coverage, then convert momentum UV → CT1/CT2. Nodes with zero coverage stay
+zero (no contribution to scatter); every positive-coverage node is retained
+so the weighted average does not drop mass. Uses `fs.scratch1` internally;
+`weight` must not alias it.
 """
 NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
     remapping,
     eg::ExchangeGrid,
     fs::ExchangeFluxState,
-    weight;
-    cov_cutoff = 1e-3,
+    weight,
 )
     CRExt = get_ConservativeRegriddingCCExt()
     fx = remapping.flux_scratch
@@ -537,10 +538,9 @@ NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
 
     Utilities.apply_dss!(cov, remapping.flux_dss_buffer)
     FT = CC.Spaces.undertype(axes(cov))
-    cutoff = FT(cov_cutoff)
     for field in values(fx)
         Utilities.apply_dss!(field, remapping.flux_dss_buffer)
-        @. field = ifelse(cov > cutoff, field / max(cov, cutoff), FT(0))
+        @. field = ifelse(cov > 0, field / cov, FT(0))
     end
 
     @. remapping.temp_uv_vec = CC.Geometry.UVVector(fx.F_turb_ρτxz, fx.F_turb_ρτyz)

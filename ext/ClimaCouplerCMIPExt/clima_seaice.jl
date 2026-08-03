@@ -600,7 +600,6 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
         α_albedo,
         T_melt,
     )
-    fs.n_acc[] += 1
 
     # The ice fluxes apply to the ice-covered part of each polygon.
     scatter_poly_fluxes_to_boundary!(remapping, eg, fs, fs.sic)

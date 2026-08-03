@@ -35,7 +35,6 @@ CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 ClimaAtmos = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 ClimaCoreMakie = "908f55d8-4145-4867-9c14-5dad1a479e4d"
 ClimaLand = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
-ClimaOcean = "0376089a-ecfe-4b0e-a64f-9c555d74d754"
 ClimaSeaIce = "6ba0ff68-24e6-4315-936c-2e99227c95a4"
 ConservativeRegridding = "8e50ac2c-eb48-49bc-a402-07c87b949343"
 GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
@@ -46,7 +45,7 @@ Poppler_jll = "9c32591e-4766-534b-9725-b71a8799265b"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [extensions]
-ClimaCouplerCMIPExt = ["Adapt", "ClimaOcean", "ClimaSeaIce", "ConservativeRegridding", "KernelAbstractions", "Oceananigans"]
+ClimaCouplerCMIPExt = ["Adapt", "ClimaSeaIce", "ConservativeRegridding", "KernelAbstractions", "Oceananigans"]
 ClimaCouplerCMIPMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
 ClimaCouplerClimaAtmosExt = ["ClimaAtmos"]
 ClimaCouplerClimaLandExt = ["ClimaLand"]
@@ -62,8 +61,7 @@ ClimaComms = "0.6.2"
 ClimaCore = "0.14.46"
 ClimaCoreMakie = "0.4"
 ClimaDiagnostics = "0.2.6, 0.3"
-ClimaLand = "=1.9, 1.10"
-ClimaOcean = "0.10"
+ClimaLand = "1.11"
 ClimaParams = "1.0"
 ClimaSeaIce = "0.5.8, 0.6"
 ClimaTimeSteppers = "0.8.11, 0.9, 0.10"
@@ -88,7 +86,7 @@ Random = "1"
 SparseArrays = "1"
 StaticArrays = "1.9.8"
 Statistics = "1"
-SurfaceFluxes = "0.15.0, 1"
+SurfaceFluxes = "1.2"
 Thermodynamics = "0.15.3, 1"
 YAML = "0.4"
 julia = "1.10"

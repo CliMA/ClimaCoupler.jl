@@ -8,12 +8,18 @@ Extract the top boundary conditions for the given field.
 """
 function surface_flux(f::OC.AbstractField)
     top_bc = f.boundary_conditions.top
-    if top_bc isa OC.BoundaryCondition{<:OC.BoundaryConditions.Flux}
-        return top_bc.condition
-    else
+    if !(top_bc isa OC.BoundaryCondition{<:OC.BoundaryConditions.Flux})
         return nothing
     end
+    return flux_field(top_bc.condition)
 end
+
+flux_field(condition) = condition
+flux_field(bc::OC.BoundaryConditions.DiscreteBoundaryFunction) = flux_field(bc.func)
+
+# `MultipleFluxes` is internal to NumericalEarth, once we detach completely and restore 
+# real salinity fluxes, we will add `MultipleFluxes` that follows this path
+flux_field(func::Function) = func.flux_field
 
 """
     set_from_extrinsic_vector!(vector, grid, u_cc, v_cc)

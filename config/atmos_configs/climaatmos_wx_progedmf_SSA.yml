@@ -1,7 +1,7 @@
 aerosol_radiation: true
 approximate_linear_solve_iters: 2
 cloud_model: "quadrature"
-dt: "120secs"
+dt: "40secs"
 dt_cloud_fraction: "1hours"
 dt_rad: "1hours"
 dt_save_state_to_disk: "30days"
@@ -14,12 +14,13 @@ edmfx_sgs_diffusive_flux: true
 edmfx_sgs_mass_flux: true
 edmfx_upwinding: "first_order"
 edmfx_vertical_diffusion: true
-h_elem: 16
+h_elem: 30
 implicit_diffusion: true
 insolation: "timevarying"
 netcdf_output_at_levels: true
 ode_algo: ARS222
-prescribed_aerosols: ["CB", "DST", "OC", "SO4", "SSLT"]
+prescribed_aerosols: ["CB", "DST", "OC", "SO4"]
+prognostic_aerosols: ["SSLT"]
 prognostic_tke: true
 rad: "allskywithclear"
 rayleigh_sponge: true

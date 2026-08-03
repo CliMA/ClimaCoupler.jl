@@ -228,6 +228,7 @@ function update_sim!(atmos_sim::Interfacer.AbstractAtmosSimulation, csf)
         csf.surface_diffuse_albedo,
     )
     Interfacer.update_field!(atmos_sim, Val(:emissivity), csf.emissivity)
+    Interfacer.update_field!(atmos_sim, Val(:ocean_fraction), csf.ocean_area_fraction)
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf.T_sfc)
     Interfacer.update_field!(atmos_sim, Val(:surface_humidity), csf)
     return nothing

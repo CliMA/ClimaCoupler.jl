@@ -271,12 +271,10 @@ function host_signature(f, args; host_array_type, type_replacements)
         what = name == "f" ? "the function object" : "argument $name"
         push!(
             findings,
-            Finding(
-                "the GPU host type of $what (::$(typeof(x))) is not \
-                 inferrable: `Adapt.adapt($host_array_type, ...)` infers as \
-                 `$T`. Make the `Adapt` rules for this type inferrable, or \
-                 map the type directly with the `type_replacements` keyword.",
-            ),
+            Finding("the GPU host type of $what (::$(typeof(x))) is not \
+                     inferrable: `Adapt.adapt($host_array_type, ...)` infers as \
+                     `$T`. Make the `Adapt` rules for this type inferrable, or \
+                     map the type directly with the `type_replacements` keyword."),
         )
         return nothing
     end
@@ -295,18 +293,16 @@ Adapt.adapt_storage(::KernelArrayStandIn, a::Array{T, N}) where {T, N} =
         reinterpret(Core.LLVMPtr{T, CUDA.AS.Global}, C_NULL),
         size(a),
     )
-Adapt.adapt_storage(::KernelArrayStandIn, x) =
-    Adapt.adapt_storage(CUDA.KernelAdaptor(), x)
+Adapt.adapt_storage(::KernelArrayStandIn, x) = Adapt.adapt_storage(CUDA.KernelAdaptor(), x)
 
 # Two passes: the first converts Array leaves through the stand-in (structure
 # rules specific to `::CUDA.KernelAdaptor` do not fire, since `to` is the
 # stand-in); the second applies those KernelAdaptor-specific structure rules
 # (Array leaves are already device arrays by then, so none remain to allocate).
-kernel_arguments(args) =
-    map(args) do arg
-        standin = Adapt.adapt(KernelArrayStandIn(), arg)
-        Adapt.adapt(CUDA.KernelAdaptor(), standin)
-    end
+kernel_arguments(args) = map(args) do arg
+    standin = Adapt.adapt(KernelArrayStandIn(), arg)
+    Adapt.adapt(CUDA.KernelAdaptor(), standin)
+end
 
 # ─── JET over the CUDA device method table (for kernel-side analysis) ────────
 
@@ -318,8 +314,7 @@ kernel_arguments(args) =
 struct DeviceOptPass <: JET.ReportPass end
 (::DeviceOptPass)(T::Type{<:JET.InferenceErrorReport}, args...) =
     JET.OptAnalysisPass()(T, args...)
-method_table_for(::JET.OptAnalysisPass, world::UInt) =
-    CC.InternalMethodTable(world)
+method_table_for(::JET.OptAnalysisPass, world::UInt) = CC.InternalMethodTable(world)
 method_table_for(::DeviceOptPass, world::UInt) =
     GPUC.get_method_table_view(world, CUDA.method_table)
 CC.method_table(analyzer::JET.OptAnalyzer) =
@@ -327,11 +322,9 @@ CC.method_table(analyzer::JET.OptAnalyzer) =
 
 function add_jet_report!(reports, stage, label, sig; device = false, jetconfigs...)
     result =
-        device ?
-        JET.report_opt(sig; report_pass = DeviceOptPass(), jetconfigs...) :
+        device ? JET.report_opt(sig; report_pass = DeviceOptPass(), jetconfigs...) :
         JET.report_opt(sig; jetconfigs...)
-    isempty(JET.get_reports(result)) ||
-        push!(reports, JETStageReport(stage, label, result))
+    isempty(JET.get_reports(result)) || push!(reports, JETStageReport(stage, label, result))
     return reports
 end
 
@@ -345,11 +338,7 @@ const PTX_ISA = v"7.8"
 is_benign_ir_error(e) =
     e[1] == GPUC.UNKNOWN_FUNCTION &&
     e[3] isa AbstractString &&
-    (
-        startswith(e[3], "__nv") ||
-        startswith(e[3], "gpu_") ||
-        occursin("state_getter", e[3])
-    )
+    (startswith(e[3], "__nv") || startswith(e[3], "gpu_") || occursin("state_getter", e[3]))
 
 # The "file:line" of the first backtrace frame with a real location.
 function ir_error_location(backtrace)
@@ -408,9 +397,7 @@ end
 # would tie with in dispatch) must not be bypassed for `Type`-valued inputs.
 function launch_site(@nospecialize(F), @nospecialize(TT), location)
     kernel_type = F isa Type && Base.isdispatchtuple(Tuple{F}) ? F : nothing
-    arg_types =
-        TT isa DataType && TT <: Tuple && Base.isdispatchtuple(TT) ? TT :
-        nothing
+    arg_types = TT isa DataType && TT <: Tuple && Base.isdispatchtuple(TT) ? TT : nothing
     return KernelLaunchSite(kernel_type, arg_types, location)
 end
 
@@ -423,8 +410,7 @@ kernel_signature(site::KernelLaunchSite) =
 
 # `MethodInstance.def` is a `Module` for top-level thunks and a `Method`
 # otherwise.
-definition_module(mi::Core.MethodInstance) =
-    mi.def isa Method ? mi.def.module : mi.def
+definition_module(mi::Core.MethodInstance) = mi.def isa Method ? mi.def.module : mi.def
 
 # Best effort: the statement's own location, else the nearest preceding one,
 # else the enclosing method definition (optimization can drop locations, and
@@ -565,9 +551,8 @@ explain_nonisbits(@nospecialize(T)) =
     isdefined(GPUC, :explain_nonisbits) ? GPUC.explain_nonisbits(T) :
     join(
         (
-            "  .$(fieldname(T, i)) is of type $(fieldtype(T, i)) which is not isbits"
-            for i in 1:something(definite_fieldcount(T), 0) if
-            !isbitstype(fieldtype(T, i))
+            "  .$(fieldname(T, i)) is of type $(fieldtype(T, i)) which is not isbits" for
+            i in 1:something(definite_fieldcount(T), 0) if !isbitstype(fieldtype(T, i))
         ),
         '\n',
     )
@@ -638,7 +623,8 @@ function llvm_type_findings!(
         return findings
     end
     T isa DataType || return findings
-    (T === Int128 || T === UInt128) && llvm < v"20" &&
+    (T === Int128 || T === UInt128) &&
+        llvm < v"20" &&
         return report(
             "an `i128` in a kernel parameter crashes NVPTX instruction selection \
              before LLVM 20 (llvm/llvm-project#49221, llvm/llvm-project#83179)",
@@ -681,18 +667,15 @@ function host_pointer_findings!(findings, x, path)
     if x isa Array || x isa Ptr
         push!(
             findings,
-            Finding(
-                "$path is a host $(typeof(x).name.wrapper), which would cause \
-                 an illegal memory access in a kernel",
-            ),
+            Finding("$path is a host $(typeof(x).name.wrapper), which would cause \
+                     an illegal memory access in a kernel"),
         )
     elseif x isa CUDA.CuDeviceArray
         return findings
     elseif !isbits(x) && (isstructtype(typeof(x)) || x isa Tuple)
         foreach(1:fieldcount(typeof(x))) do i
             name = x isa Tuple ? "[$i]" : string('.', fieldname(typeof(x), i))
-            isdefined(x, i) &&
-                host_pointer_findings!(findings, getfield(x, i), path * name)
+            isdefined(x, i) && host_pointer_findings!(findings, getfield(x, i), path * name)
         end
     end
     return findings
@@ -935,14 +918,11 @@ macro test_compilation(args...)
     @assert Meta.isexpr(call, :call) "expected a function call as the last argument"
     f = esc(call.args[1])
     call_args = map(esc, call.args[2:end])
-    orig_expr = QuoteNode(
-        Expr(:macrocall, Symbol("@test_compilation"), nothing, args...),
-    )
+    orig_expr = QuoteNode(Expr(:macrocall, Symbol("@test_compilation"), nothing, args...))
     source = QuoteNode(__source__)
     return quote
         testres = try
-            (ok, reports) =
-                compilation_reports($f, ($(call_args...),); $(kwargs...))
+            (ok, reports) = compilation_reports($f, ($(call_args...),); $(kwargs...))
             if ok
                 Test.Pass(:test_compilation, $orig_expr, nothing, nothing, $source)
             else

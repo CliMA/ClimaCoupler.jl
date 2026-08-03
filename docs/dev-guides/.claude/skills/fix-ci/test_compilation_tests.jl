@@ -130,16 +130,13 @@ end
         @test TestCompilation.host_type(Tuple{Vector{FT}, Int}) ==
               Tuple{host_cuarray(FT, 1), Int}
         # The host_array_type hook overrides the conversion target.
-        @test TestCompilation.host_type(Vector{FT}; host_array_type = Array) ==
-              Vector{FT}
+        @test TestCompilation.host_type(Vector{FT}; host_array_type = Array) == Vector{FT}
     end
 
     @testset "type_replacements swaps device singletons" begin
         replacements = (AbstractDummyDevice => DummyGPUDevice,)
-        @test TestCompilation.host_type(
-            DummyCPUDevice;
-            type_replacements = replacements,
-        ) == DummyGPUDevice
+        @test TestCompilation.host_type(DummyCPUDevice; type_replacements = replacements) ==
+              DummyGPUDevice
         # Replacements apply structurally, inside type parameters.
         @test TestCompilation.host_type(
             DeviceHolder{DummyCPUDevice};
@@ -268,11 +265,7 @@ end
     end
 
     @testset "unknown stages are rejected" begin
-        @test_throws ArgumentError compilation_reports(
-            do_nothing,
-            (1,);
-            stages = (:ptx,),
-        )
+        @test_throws ArgumentError compilation_reports(do_nothing, (1,); stages = (:ptx,))
     end
 
     @testset "JET-style failure output" begin
@@ -290,8 +283,7 @@ end
         Test.push_testset(inner_testset)
         local testres
         try
-            testres =
-                @test_compilation stages = (:cpu,) unstable_getindex(Ref{Any}(1))
+            testres = @test_compilation stages = (:cpu,) unstable_getindex(Ref{Any}(1))
         finally
             Test.pop_testset()
             Test.TESTSET_PRINT_ENABLE[] = old_print_enable

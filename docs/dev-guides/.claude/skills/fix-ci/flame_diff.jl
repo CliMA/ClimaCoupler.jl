@@ -59,7 +59,8 @@ function load_flame(path)
     start = last(range)
     for stop in start:lastindex(bytes)
         bytes[stop] == UInt8('{') && (depth += 1)
-        bytes[stop] == UInt8('}') && (depth -= 1) == 0 &&
+        bytes[stop] == UInt8('}') &&
+            (depth -= 1) == 0 &&
             return JSON.parse(text[start:stop])
     end
     error("$path: unbalanced braces in embedded profile data")
@@ -140,8 +141,7 @@ function flame_diff(baseline_path, candidate_path; top_n = 25, io = stdout)
     cand_root, cand_self, cand_total = aggregate_flame(load_flame(candidate_path))
     println(io, "baseline root samples:  $base_root  ($baseline_path)")
     println(io, "candidate root samples: $cand_root  ($candidate_path)")
-    base_root > 0 &&
-        println(io, "ratio: ", round(cand_root / base_root; digits = 2))
+    base_root > 0 && println(io, "ratio: ", round(cand_root / base_root; digits = 2))
 
     frames = union(keys(base_self), keys(cand_self))
     rows = map(collect(frames)) do frame

@@ -41,44 +41,87 @@ function Interfacer.OceanSimulation(::Type{FT}, ::Val{:oceananigans}; kwargs...)
 end
 
 """
-    tripolar_ocean_simulation(arch; clock, stop_time, active_cells_map, kwargs...)
+    horizontal_ocean_grid(arch, ocean_grid; z, halo, active_cells_map, minimum_depth, interpolation_passes)
 
-One-degree tripolar ocean setup matching
-`ClimaOcean.OceanConfigurations.one_degree_tripolar_ocean`, but exposing
-`active_cells_map`. Tripolar immersed grids with `active_cells_map = true`
-exceed the 4 KiB CUDA kernel parameter limit on sm_60 (P100) even with a
-minimal closure; disabling the map keeps the tripolar grid while staying
-within the limit.
+Build the immersed ocean grid named by `ocean_grid`, either `:one_deg_tripolar` or `:orca`.
 
-`clock` and `stop_time` are required and forwarded to `ClimaOcean.ocean_simulation`;
-the coupler builds them from `tspan` so the ocean steps in calendar time when coupled.
+Both grids come with pre-generated bathymetry: the tripolar grid from the
+`tripolar_one_degree_bathymetry` artifact, generated with the `minimum_depth`, `major_basins` and
+`interpolation_passes` given here (validated against the artifact rather than applied), and the eORCA1
+mesh from the `orca_one_grid` artifact.
+
+`active_cells_map` is exposed because tripolar immersed grids with `active_cells_map = true` exceed the
+4 KiB CUDA kernel parameter limit on sm_60 (P100) even with a minimal closure; disabling the map keeps
+the tripolar grid while staying within the limit.
 """
-function tripolar_ocean_simulation(
-    arch;
-    clock,
-    stop_time,
-    active_cells_map = true,
-    zstar = true,
-    Nz = 32,
-    depth = 5500,
-    momentum_advection = OC.WENOVectorInvariant(order = 5),
-    tracer_advection = OC.WENO(order = 5),
-    closure = nothing,
+function horizontal_ocean_grid(
+    arch,
+    ocean_grid::Symbol;
+    z,
+    Nz,
     halo = (5, 5, 4),
+    active_cells_map = true,
     minimum_depth = 10,
     interpolation_passes = 10,
-    substeps = 70,
-    kwargs...,
 )
-    z = OC.ExponentialDiscretization(Nz, -depth, 0; mutable = zstar)
+    if ocean_grid == :orca
+        @info "Using ORCA1 ocean grid"
+        return ORCAOneGrid(arch; Nz, z, halo, active_cells_map)
+    end
 
+    @info "Using one-degree tripolar ocean grid"
     grid = OC.TripolarGrid(arch; size = (360, 180, Nz), z, halo)
 
-    bottom_height =
-        CO.regrid_bathymetry(grid; minimum_depth, major_basins = 2, interpolation_passes)
+    bottom_height = tripolar_one_degree_bottom_height(
+        grid;
+        minimum_depth,
+        major_basins = 2,
+        interpolation_passes,
+    )
 
-    grid =
-        OC.ImmersedBoundaryGrid(grid, OC.GridFittedBottom(bottom_height); active_cells_map)
+    return OC.ImmersedBoundaryGrid(
+        grid,
+        OC.GridFittedBottom(bottom_height);
+        active_cells_map,
+    )
+end
+
+"""
+    ocean_simulation(arch, ocean_grid; simple_ocean, closure, clock, stop_time, depth, kwargs...)
+
+Build an Oceananigans `Simulation` on either the standard one-degree tripolar grid
+or the NEMO eORCA1 mesh (`orca`).
+
+Only the grid depends on `ocean_grid`; every other aspect of the simulation is shared.
+
+`depth` defaults to 5500 m, matching the EN4 vertical extent.
+"""
+function ocean_simulation(
+    arch,
+    ocean_grid::Symbol;
+    simple_ocean,
+    closure,
+    clock,
+    stop_time,
+    depth = 5500,
+    Nz = 60,
+    momentum_advection = OC.WENOVectorInvariant(
+        order = 5,
+        time_discretization = AdaptiveVerticallyImplicitDiscretization(cfl = 0.4),
+    ),
+    tracer_advection = OC.WENO(
+        order = 7,
+        time_discretization = AdaptiveVerticallyImplicitDiscretization(cfl = 0.4),
+    ),
+    kwargs...,
+)
+    substeps = simple_ocean ? 70 : 150
+
+    active_cells_map = !simple_ocean
+    zstar = !simple_ocean
+
+    z = OC.ExponentialDiscretization(Nz, -depth, 0; mutable = zstar)
+    grid = horizontal_ocean_grid(arch, ocean_grid; z, Nz, active_cells_map)
 
     free_surface = OC.SplitExplicitFreeSurface(grid; substeps)
 
@@ -90,59 +133,6 @@ function tripolar_ocean_simulation(
         tracer_advection,
         free_surface,
         closure,
-        kwargs...,
-    )
-end
-
-"""
-    ocean_simulation(arch, ocean_grid; simple_ocean, closure, clock, depth, kwargs...)
-
-Build an Oceananigans `Simulation` on either the standard one-degree tripolar grid
-or the NEMO eORCA1 mesh (`orca`).
-
-`depth` defaults to 5500 m, matching the EN4 vertical extent.
-"""
-function ocean_simulation(
-    arch,
-    ocean_grid::Symbol;
-    simple_ocean,
-    closure,
-    clock,
-    depth = 5500,
-    kwargs...,
-)
-    substeps = simple_ocean ? 70 : 150
-
-    if ocean_grid == :orca
-        if simple_ocean
-            @warn "`simple_ocean=true` not supported for ORCA1 grid,  using one_deg_tripolar grid instead"
-            ocean_grid = :one_deg_tripolar
-        else
-            @info "Using ORCA1 ocean grid"
-            return CO.OceanConfigurations.orca_ocean(
-                arch;
-                closure,
-                clock,
-                depth,
-                substeps,
-                kwargs...,
-            )
-        end
-    end
-
-    @info "Using one-degree tripolar ocean grid"
-    active_cells_map = !simple_ocean
-    zstar = !simple_ocean
-
-    return tripolar_ocean_simulation(
-        arch;
-        zstar,
-        active_cells_map,
-        clock,
-        depth,
-        Nz = 32,
-        closure,
-        substeps,
         kwargs...,
     )
 end
@@ -171,7 +161,7 @@ dispatch in coupling.
 - `ocean_diagnostic_mode`: Mode for ocean diagnostics (default: `:average`)
 
 Specific details about the default model configuration
-can be found in the documentation for `ClimaOcean.ocean_simulation`.
+can be found in the documentation for `ocean_simulation`.
 """
 function OceananigansSimulation(
     ::Type{FT};
@@ -221,26 +211,8 @@ function OceananigansSimulation(
         ocean_simulation(arch, ocean_grid; clock, stop_time, simple_ocean, closure, depth)
     ocean.Δt = float(dt)
 
-    # Set initial condition to EN4 state estimate at start_date (monthly)
-    date = start_date
-    # set up the `dir` keyword argument for `Metadatum`
-    if date == Dates.Date(2010, 1, 1)
-        # we have a ClimaArtifact saved for January 1, 2010 (so that CI can always run)
-        dir_kw = (; dir = @clima_artifact("en4_temperature_salinity_2010_01"))
-        @info "Using $(dir_kw.dir) ClimaArtifact for ocean initialization on $(date)"
-    else
-        # otherwise, download the data
-        # (or load from scratchspace; ClimaOcean will automatically handle this)
-        dir_kw = (;)
-    end
-
-    en4_temperature = CO.Metadatum(:temperature; date, dataset = CO.EN4Monthly(), dir_kw...)
-    en4_salinity = CO.Metadatum(:salinity; date, dataset = CO.EN4Monthly(), dir_kw...)
-
-    @info "EN4 temperature data path: $(CO.DataWrangling.metadata_path(en4_temperature))"
-    @info "EN4 salinity data path: $(CO.DataWrangling.metadata_path(en4_salinity))"
-
-    OC.set!(ocean.model, T = en4_temperature, S = en4_salinity)
+    # Set initial condition to the EN4 state estimate at start_date (monthly)
+    set_ocean_initial_conditions!(ocean.model, start_date)
 
     # Construct the remapper object and allocate scratch space
     grid = ocean.model.grid

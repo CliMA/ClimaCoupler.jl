@@ -83,21 +83,25 @@ value = 100
 type = "float"
 
 [sublimation_deposition_timescale]
-value = 500
+value = 300
 type = "float"
 
 [rain_autoconversion_timescale]
-value = 1800
+value = 1200
 type = "float"
 
 [snow_autoconversion_timescale]
-value = 1800
+value = 1360
 type = "float"
 
 [cloud_liquid_water_specific_humidity_autoconversion_threshold]
-value = 1.0e-4
+value = 2e-4
 type = "float"
 
 [cloud_fraction_steepness_scale]
-value = 0.5
+value = 0.55
+type = "float"
+
+[cloud_fraction_eps_rel]
+value = 0.05
 type = "float"

@@ -26,7 +26,6 @@ import ClimaCoupler:
     Utilities,
     Plotting
 import Oceananigans as OC
-import ClimaOcean as CO
 import ClimaSeaIce as CSI
 import ClimaAtmos as CA # for basis conversions (projected_vector_data)
 import ClimaCore as CC
@@ -47,6 +46,10 @@ get_ConservativeRegriddingOCExt() =
 # ocean and sea-ice models below
 include("ClimaCouplerCMIPExt/exchange_grid.jl")
 include("ClimaCouplerCMIPExt/exchange_fluxes.jl")
+
+# Data readers first: the model files call into them during construction
+include("ClimaCouplerCMIPExt/ocean_data_artifacts.jl")
+include("ClimaCouplerCMIPExt/orca_grid.jl")
 
 # Include the model files first so their types are available to climaocean_helpers.jl
 include("ClimaCouplerCMIPExt/oceananigans.jl")

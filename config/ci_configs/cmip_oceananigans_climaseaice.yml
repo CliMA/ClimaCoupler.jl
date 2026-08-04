@@ -2,6 +2,7 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 atmos_progress_interval: "86400secs"
+cov_cutoff: 1e-3
 coupler_diagnostics_period: "30days"
 coupler_diagnostics_reduction: "instantaneous"
 coupler_toml: ["toml/amip_edonly.toml"]

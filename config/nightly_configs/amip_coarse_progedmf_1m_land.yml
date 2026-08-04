@@ -4,7 +4,7 @@ atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
 checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_progedmf_1m.toml"]
 dt: "180secs"
-walltime_dt: "180secs"
+walltime_dt: "1800secs"
 dt_cpl: "180secs"
 energy_check: false
 extra_atmos_diagnostics:
@@ -26,6 +26,6 @@ topo_smoothing: true
 topography: "Earth"
 fixed_terminal_velocity_liquid: true
 fixed_terminal_velocity_ice: true
-fixed_terminal_velocity_rain: true
+fixed_terminal_velocity_rain: false
 fixed_terminal_velocity_snow: true
-max_newton_iters_ode: 3
+max_newton_iters_ode: 5

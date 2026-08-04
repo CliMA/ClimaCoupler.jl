@@ -131,7 +131,7 @@ function argparse_settings()
         arg_type = Int
         default = 16
         "--h_elem_coupler"
-        help = "Number of horizontal elements to use for the boundary space when `share_surface_space` is false [16 (default)]"
+        help = "Number of horizontal elements to use for the boundary space when `share_surface_space` is false [32 (default)]"
         arg_type = Int
         default = 32
         "--nh_poly"
@@ -139,7 +139,7 @@ function argparse_settings()
         arg_type = Int
         default = 3
         "--nh_poly_coupler"
-        help = "Polynomial order to use for the boundary space when `share_surface_space` is false [3 (default)]"
+        help = "Polynomial order to use for the boundary space when `share_surface_space` is false [2 (default)]"
         arg_type = Int
         default = 2
         "--share_surface_space"
@@ -224,7 +224,7 @@ function argparse_settings()
         help = "List of dictionaries containing information about additional atmosphere diagnostics to output [nothing (default)]"
         arg_type = Vector{Dict{Any, Any}}
         default = Dict{Any, Any}[]
-        ### ClimaLand specific
+        # ClimaLand specific
         "--land_model"
         help = "Land model to use. [`bucket` (default), `integrated`, `nothing`]"
         arg_type = String

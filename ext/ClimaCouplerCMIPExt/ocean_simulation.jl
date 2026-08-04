@@ -1,8 +1,8 @@
 import Oceananigans.BoundaryConditions: DefaultBoundaryCondition
 import Oceananigans.DistributedComputations: all_reduce
-import Oceananigans.Architectures: ReactantState, AbstractArchitecture
+import Oceananigans.Architectures: ReactantState, AbstractArchitecture, architecture
 import Oceananigans.Operators: ℑxyᶠᶜᵃ, ℑxyᶜᶠᵃ, ∂xᶠᶜᶜ, ∂yᶜᶠᶜ
-import Oceananigans.TimeSteppers: AdaptiveVerticallyImplicitDiscretization
+import Oceananigans.TimeSteppers: AdaptiveVerticallyImplicitDiscretization, Clock
 import Oceananigans.Units: hours, minutes
 import Oceananigans.OrthogonalSphericalShellGrids:
     TripolarGridOfSomeKind, north_fold_boundary_condition

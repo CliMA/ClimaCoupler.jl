@@ -361,10 +361,10 @@ function _compute_ice_boundary_fluxes!(
         update_T_sfc_cb,
     )
 
-    FluxCalculator.update_flux_fields!(csf, sim, fluxes, accumulator)
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     # Write diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only where ice exists)
+    # before `update_flux_fields!` so an immediate turbulent push builds Jᵃ with this T.
     csf.scalar_temp2 .= ifelse.(
         area_fraction .≈ 0,
         zero(FT),
@@ -380,6 +380,8 @@ function _compute_ice_boundary_fluxes!(
         remapped_T_sfc,
         OC.interior(top_sfc_T, :, :, 1),
     )
+
+    FluxCalculator.update_flux_fields!(csf, sim, fluxes, accumulator)
 
     return nothing
 end
@@ -600,11 +602,9 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
         fs.sic;
         cov_cutoff = remapping.cov_cutoff,
     )
-    FluxCalculator.update_flux_fields!(csf, sim, remapping.flux_scratch, accumulator)
 
-    # Write the diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only
-    # where ice exists; `sic` is a cell quantity, so all polygons of a cell
-    # with ice carry a valid diagnosis).
+    # Write the diagnosed T_sfc back before `update_flux_fields!` so an
+    # immediate turbulent push builds Jᵃ with this T.
     T_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
     scatter_polys_to_cells!(T_cells, eg, is.T_sfc_new)
     mirror_fold_partners!(T_cells, grid)
@@ -615,6 +615,8 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
         OC.interior(remapping.scratch_field_oc1, :, :, 1) .- C_to_K,
         OC.interior(top_sfc_T, :, :, 1),
     )
+
+    FluxCalculator.update_flux_fields!(csf, sim, remapping.flux_scratch, accumulator)
     return nothing
 end
 

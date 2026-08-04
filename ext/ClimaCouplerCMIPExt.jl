@@ -4,7 +4,7 @@
 Module containing CMIP component models (Oceananigans and ClimaSeaIce models)
 which extend the ClimaCoupler.jl simulation interface.
 
-This extension is loaded when Oceananigans, ClimaSeaIce,
+This extension is loaded when Oceananigans, ClimaSeaIce, ClimaAtmos,
 KernelAbstractions, ConservativeRegridding, and Adapt are loaded with
 either `import` or `using`.
 

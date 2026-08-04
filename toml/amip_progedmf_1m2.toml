@@ -59,31 +59,22 @@ value = 1
 value = 0
 
 [condensation_evaporation_timescale]
-value = 200
-
-[sublimation_deposition_timescale]
-value = 2000
-
-[rain_autoconversion_timescale]
-value = 1800
-
-[snow_autoconversion_timescale]
-value = 1800
-
-[cloud_liquid_water_specific_humidity_autoconversion_threshold]
-value = 1.0e-4
-
-[cloud_fraction_steepness_scale]
-value = 0.5
-
-[mixing_length_Prandtl_maximum]
 value = 100
 
-[fixed_cloud_ice_terminal_velocity]
-value = 0.01
+[sublimation_deposition_timescale]
+value = 300
 
-[fixed_snow_terminal_velocity]
-value = 1
+[rain_autoconversion_timescale]
+value = 4800
+
+[snow_autoconversion_timescale]
+value = 1360
+
+[cloud_liquid_water_specific_humidity_autoconversion_threshold]
+value = 2e-4
+
+[cloud_fraction_steepness_scale]
+value = 0.55
 
 [cloud_fraction_eps_rel]
-value = 0.02
+value = 0.05

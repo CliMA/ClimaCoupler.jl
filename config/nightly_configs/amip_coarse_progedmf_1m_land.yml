@@ -22,7 +22,6 @@ binary_area_fraction: false
 lai_source: "modis_monthly_climatology"
 start_date: "20100924"
 t_end: "39days"
-prescribe_clouds_in_radiation: true
 # divergence_damping_factor: 20.0
 # snow_autoconversion: WithSupersaturation
 

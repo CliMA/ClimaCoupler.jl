@@ -2,7 +2,7 @@
 
 julia_version = "1.11.9"
 manifest_format = "2.0"
-project_hash = "3f70c63cc30923196fb204c5165a09adef5eb206"
+project_hash = "0712c1517b9ae3775e8244db40a4dab2afdac561"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "0a81a018463de6c3f4f2c9360121c562e5add9e4"
@@ -484,10 +484,10 @@ deps = ["ArgParse", "ClimaAnalysis", "ClimaComms", "ClimaCore", "ClimaDiagnostic
 path = "../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.2.2"
-weakdeps = ["Adapt", "CairoMakie", "ClimaAtmos", "ClimaCoreMakie", "ClimaLand", "ClimaSeaIce", "ConservativeRegridding", "GeoMakie", "KernelAbstractions", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
+weakdeps = ["Adapt", "CairoMakie", "ClimaAtmos", "ClimaCoreMakie", "ClimaLand", "ClimaOcean", "ClimaSeaIce", "ConservativeRegridding", "GeoMakie", "KernelAbstractions", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
 
     [deps.ClimaCoupler.extensions]
-    ClimaCouplerCMIPExt = ["Adapt", "ClimaSeaIce", "ConservativeRegridding", "KernelAbstractions", "Oceananigans"]
+    ClimaCouplerCMIPExt = ["Adapt", "ClimaAtmos", "ClimaOcean", "ClimaSeaIce", "ConservativeRegridding", "KernelAbstractions", "Oceananigans"]
     ClimaCouplerCMIPMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
     ClimaCouplerClimaAtmosExt = ["ClimaAtmos"]
     ClimaCouplerClimaLandExt = ["ClimaLand"]
@@ -2380,9 +2380,9 @@ version = "0.4.7"
 
 [[deps.Oceananigans]]
 deps = ["Adapt", "BFloat16s", "Crayons", "CubedSphere", "Dates", "Distances", "DocStringExtensions", "FFTW", "GPUArraysCore", "Glob", "InteractiveUtils", "JLD2", "KernelAbstractions", "Krylov", "LinearAlgebra", "Logging", "MPI", "MuladdMacro", "OffsetArrays", "OrderedCollections", "Pkg", "Printf", "ReactantCore", "Rotations", "SeawaterPolynomials", "SparseArrays", "StaticArrays", "Statistics", "StructArrays"]
-git-tree-sha1 = "70b460d233fadd72096512138a352bb0965dc03f"
+git-tree-sha1 = "58421957f168a31787c1a4bd23f54b35e6fe4b70"
 uuid = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
-version = "0.110.12"
+version = "0.110.13"
 
     [deps.Oceananigans.extensions]
     OceananigansAMDGPUExt = ["AMDGPU", "AbstractFFTs"]
@@ -2662,9 +2662,9 @@ version = "1.5.2"
 
 [[deps.PrettyTables]]
 deps = ["Crayons", "LaTeXStrings", "Markdown", "PrecompileTools", "Printf", "REPL", "Reexport", "StringManipulation", "Tables"]
-git-tree-sha1 = "7cf039cf79bb41afda7336edf2f3ca2115c44f76"
+git-tree-sha1 = "807a56f504aa08838a11e9a0727c3d704f90c44b"
 uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
-version = "3.4.2"
+version = "3.4.4"
 
     [deps.PrettyTables.extensions]
     PrettyTablesExcelExt = "XLSX"

@@ -11,13 +11,11 @@ diagnoses the skin temperature `T_sfc` from the full surface energy balance
 Stefan residual is `δQ = Q_top − Q_conductive`, so `Q_top` must equal the same
 net upward flux `Jᵃ` used in the skin solve. Previously the coupler filled
 `top_heat_flux` with `−(1−α)SW↓ − ϵLW↓ + F_sh + F_lh`, omitting surface emission
-`σϵT_sfc⁴` already used to set `T_sfc`. That left a persistent residual of order
-the emission (~300 W m⁻²), melting tens of metres of ice per year in both the
-remap and exchange-grid paths. The coupler now writes the full
-`Jᵃ = σϵT_sfc⁴ − (1−α)SW↓ − ϵLW↓ + F_sh + F_lh` into the top heat flux `Field`
-(radiative absorption in `update_sim!`; emission from the diagnosed `T_sfc` plus
-turbulent fluxes when fluxes are pushed). At skin equilibrium `δQ = 0`; when
+`σϵT_sfc⁴` already used to set `T_sfc`. At skin equilibrium `δQ = 0`; when
 `T_sfc` is capped at melting, the residual is retained to drive top melt.
+The `update_T_sfc` callback linearized only the LW emission term of the skin
+balance `Jᵃ(T_sfc) + (T_sfc − T_i)/R = 0`, treating the turbulent fluxes
+explicitly. 
 
 #### Exchange (intersection) grid for CMIP surface fractions and fluxes.
 When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange

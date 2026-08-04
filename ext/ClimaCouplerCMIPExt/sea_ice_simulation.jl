@@ -160,6 +160,9 @@ function sea_ice_simulation(
     )
 
     bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    # Coupler writes the full upward surface net flux Jᵃ (see `update_T_sfc`):
+    # Jᵃ = σϵTₛ⁴ − (1−α)SW↓ − ϵLW↓ + F_sh + F_lh, matching the skin balance
+    # Jᵃ + (Tₛ − Tᵢ)/R = 0.
     top_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     snowfall = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 

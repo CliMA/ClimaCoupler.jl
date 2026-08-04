@@ -1,12 +1,12 @@
 """
     TimeManager
 
-This module facilitates calendar functions and temporal interpolations
-of data.
+This module facilitates calendar functions and temporal interpolations of data.
 """
 module TimeManager
 
 import Dates
+import ClimaDiagnostics as CD
 import ..Interfacer
 import ..Utilities: time_to_seconds
 
@@ -62,18 +62,36 @@ simulated_years_per_day(t_start, t_end, walltime) =
 """
     Callback
 
-A small struct containing a schedule, and the function to be executed if the
+A small struct containing a schedule and the function to be executed if the
 schedule is true.
 
-A `schedule` is a callable object (ie, a function) that takes an integrator-type
-of object and returns true or false.
+A `schedule` is a callable object (ie, a function) that returns true or false. It
+is called with an integrator-like object with two fields:
+- `t`: the current simulation time (unwrapped from `cs.t`), and
+- `step`: the number of coupling steps taken so far in this run (see
+  [`coupler_step_number`](@ref)).
+
+This is the interface that the schedules in `ClimaDiagnostics.Schedules` expect,
+so any of them can be used here.
 
 The function `func` calls the coupled state `cs`.
 """
-struct Callback{SCHEDULE, FUNC}
-    schedule::SCHEDULE
-    func::FUNC
+struct Callback{S, F}
+    schedule::S
+    func::F
 end
+
+# TODO: Add `step` to the coupler struct?
+"""
+    coupler_step_number(cs)
+
+Return the number of coupling steps taken so far in this run.
+
+This function works for both floating-point times and `ITime`s. Note that this is 
+counted from `cs.tspan[1]`, which is the start of the *current* run and not of the 
+overall simulation.
+"""
+coupler_step_number(cs) = round(Int, (cs.t[] - cs.tspan[1]) / cs.Δt_cpl)
 
 """
     maybe_trigger_callback(callback, cs)
@@ -82,7 +100,8 @@ Check if it is time to call `callback`, if yes, call its function on `cs`.
 """
 function maybe_trigger_callback(callback, cs)
     t = cs.t[]
-    callback.schedule((; t)) && callback.func(cs)
+    step = coupler_step_number(cs)
+    callback.schedule((; t, step)) && callback.func(cs)
     return nothing
 end
 
@@ -99,15 +118,94 @@ function callbacks!(cs)
     return nothing
 end
 
+#### Schedules
 
 """
+    NeverSchedule()
+
 A schedule that is never true. Useful to disable something.
-
-TODO: Move this to ClimaUtilities once we move Schedules there
 """
-struct NeverSchedule end
+struct NeverSchedule <: CD.Schedules.AbstractSchedule end
 function (::NeverSchedule)(args...)
     return false
+end
+
+CD.Schedules.short_name(::NeverSchedule) = "never"
+CD.Schedules.long_name(::NeverSchedule) = "never"
+
+"""
+    OnceSchedule()
+
+A schedule that is only true at the first step of the simulation.
+"""
+struct OnceSchedule <: CD.Schedules.AbstractSchedule end
+
+function (::OnceSchedule)(integrator)
+    return integrator.step == 1
+end
+
+CD.Schedules.short_name(::OnceSchedule) = "once"
+CD.Schedules.long_name(::OnceSchedule) = "once at the first step of the simulation"
+
+"""
+    PowerOfTwoSchedule()
+
+A schedule that is true on every step whose number is a power of two.
+
+This is useful to sample densely at the beginning of a run and increasingly
+sparsely as it goes on. Note that the step number is counted from the start of
+the current run (see [`coupler_step_number`](@ref)), so a restarted simulation
+starts sampling densely again from the restart.
+"""
+struct PowerOfTwoSchedule <: CD.Schedules.AbstractSchedule end
+
+function (::PowerOfTwoSchedule)(integrator)::Bool
+    return ispow2(integrator.step)
+end
+
+CD.Schedules.short_name(::PowerOfTwoSchedule) = "pow2"
+CD.Schedules.long_name(::PowerOfTwoSchedule) = "every power-of-two iteration"
+
+"""
+    OrSchedule(schedules...)
+
+A schedule that is true whenever any of the given `schedules` is true.
+
+# Examples
+```julia
+julia> schedule = OrSchedule(PowerOfTwoSchedule(), NeverSchedule());
+
+julia> schedule((; t = 8.0, step = 8))
+true
+```
+"""
+struct OrSchedule{S <: Tuple} <: CD.Schedules.AbstractSchedule
+    schedules::S
+
+    function OrSchedule(schedules::Tuple)
+        isempty(schedules) && error(
+            "OrSchedule needs at least one schedule (use a NeverSchedule to disable something)",
+        )
+        return new{typeof(schedules)}(schedules)
+    end
+end
+
+OrSchedule(schedules...) = OrSchedule(schedules)
+
+function (schedule::OrSchedule)(integrator)::Bool
+    # Must call *every* schedule: some of them (e.g., EveryDtSchedule) only 
+    # advance their internal state when they return true. This is why the 
+    # results are collected before being reduced.
+    triggered = map(s -> s(integrator), schedule.schedules)
+    return any(triggered)
+end
+
+function CD.Schedules.short_name(schedule::OrSchedule)
+    return join(map(CD.Schedules.short_name, schedule.schedules), "_or_")
+end
+
+function CD.Schedules.long_name(schedule::OrSchedule)
+    return join(map(CD.Schedules.long_name, schedule.schedules), " or ")
 end
 
 """

@@ -64,7 +64,7 @@ struct CoupledSimulation{
     TT,
     CTT,
     NTMS <: NamedTuple,
-    CALLBACKS,
+    C,
     NTP <: NamedTuple,
     TP,
     DH,
@@ -79,7 +79,7 @@ struct CoupledSimulation{
     t::TT
     prev_checkpoint_t::CTT
     model_sims::NTMS
-    callbacks::CALLBACKS
+    callbacks::C
     dir_paths::NTP
     thermo_params::TP
     diags_handler::DH

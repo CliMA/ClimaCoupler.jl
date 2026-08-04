@@ -24,3 +24,4 @@ t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
 fixed_terminal_velocity: false
+max_newton_iters_ode: 3

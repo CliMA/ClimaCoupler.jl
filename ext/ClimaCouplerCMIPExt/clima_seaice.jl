@@ -593,7 +593,13 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
     fs.n_acc[] += 1
 
     # The ice fluxes apply to the ice-covered part of each polygon.
-    scatter_poly_fluxes_to_boundary!(remapping, eg, fs, fs.sic)
+    scatter_poly_fluxes_to_boundary!(
+        remapping,
+        eg,
+        fs,
+        fs.sic;
+        cov_cutoff = remapping.cov_cutoff,
+    )
     FluxCalculator.update_flux_fields!(csf, sim, remapping.flux_scratch, accumulator)
 
     # Write the diagnosed T_sfc back to ClimaSeaIce (Kelvin → Celsius, only

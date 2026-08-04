@@ -107,7 +107,7 @@ end
         "seaice_progress_interval" => "never",
         "simple_ocean" => false,
         "use_intersection_grid" => true,
-        "topography_damping_factor" => 5.0,
+        "cov_cutoff" => 1e-3,
         "ocean_grid" => "one_deg_tripolar",
         "sst_adjustment" => 2.0,
         "ice_model" => "prescribed",

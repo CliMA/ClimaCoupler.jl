@@ -159,6 +159,8 @@ dispatch in coupling.
 - `coupled_param_dict`: Coupled parameter dictionary (default: created from `ClimaParams.create_toml_dict(FT)`)
 - `ocean_diagnostic_interval`: Interval for ocean diagnostics (default: `"1days"`)
 - `ocean_diagnostic_mode`: Mode for ocean diagnostics (default: `:average`)
+- `use_intersection_grid`: Use the exchange (intersection) grid when supported (default: `true`)
+- `cov_cutoff`: Relative wet-coverage cutoff when scattering polygon fluxes to the SE boundary; set `0` to disable sliver suppression (default: `1e-3`)
 
 Specific details about the default model configuration
 can be found in the documentation for `ocean_simulation`.
@@ -172,7 +174,7 @@ function OceananigansSimulation(
     simple_ocean = false,
     ocean_grid = :one_deg_tripolar,
     use_intersection_grid = true,
-    topography_damping_factor = 5,
+    cov_cutoff = 1e-3,
     depth = 5500,
     dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
@@ -220,7 +222,7 @@ function OceananigansSimulation(
         grid,
         boundary_space;
         use_intersection_grid,
-        topography_damping_factor,
+        cov_cutoff,
     )
 
     # COARE3 roughness params (allocated once, reused each timestep)
@@ -322,7 +324,7 @@ underlying_grid(grid) = grid
 """
     construct_remapper(grid_oc, boundary_space;
                        use_intersection_grid = true,
-                       topography_damping_factor = 5)
+                       cov_cutoff = 1e-3)
 
 Construct the two sparse regridders needed to remap between an Oceananigans
 grid and a ClimaCore boundary space, plus remapping scratch space:
@@ -339,16 +341,17 @@ The `Interfacer.remap!` methods in `climaocean_helpers.jl` accept
 When `use_intersection_grid = true` and the setup supports it (a
 `SpectralElementSpace2D` boundary space on a single process), the returned
 NamedTuple additionally carries the device-resident [`ExchangeGrid`](@ref),
-the static `wet_ocean_fraction` field (filtered consistently with the
-atmosphere's orography smoothing), the per-polygon flux states and
-boundary-space flux scratch, and `use_exchange_grid::Bool` indicating the
-exchange-grid path is active.
+the static `wet_ocean_fraction` field (from the ocean's immersed wet mask),
+the per-polygon flux states and boundary-space flux scratch,
+`use_exchange_grid::Bool` indicating the exchange-grid path is active, and
+`cov_cutoff` for sliver suppression when scattering polygon fluxes onto the
+SE boundary (set to `0` to disable).
 """
 function construct_remapper(
     grid_oc,
     boundary_space;
     use_intersection_grid = true,
-    topography_damping_factor = 5,
+    cov_cutoff = 1e-3,
 )
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), underlying_grid(grid_oc))
     boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
@@ -404,11 +407,7 @@ function construct_remapper(
         ClimaComms.context(boundary_space) isa ClimaComms.SingletonCommsContext
     if use_exchange_grid
         exchange_grid_cpu = build_exchange_grid(boundary_space, grid_oc)
-        wet_ocean_fraction = wet_ocean_fraction_field(
-            boundary_space,
-            exchange_grid_cpu;
-            topography_damping_factor,
-        )
+        wet_ocean_fraction = wet_ocean_fraction_field(boundary_space, exchange_grid_cpu)
         exchange_grid = on_device(arch, exchange_grid_cpu)
 
         # Per-polygon flux scratch, boundary-space flux scratch fields (in the
@@ -455,6 +454,7 @@ function construct_remapper(
         flux_scratch,
         flux_dss_buffer,
         use_exchange_grid,
+        cov_cutoff = FT(cov_cutoff),
     )
 end
 
@@ -488,8 +488,7 @@ end
 Ocean-bathymetry-authoritative surface fractions on the exchange grid.
 
 The static wet-ocean fraction (`remapping.wet_ocean_fraction`, derived from
-the intersection areas with the ocean's immersed wet mask and filtered
-consistently with the atmosphere's orography smoothing) partitions each
+the intersection areas with the ocean's immersed wet mask) partitions each
 boundary node into wet and land parts. Sea ice and open ocean subdivide the
 wet part; land fills the remainder:
 
@@ -764,7 +763,13 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
 
     # The ocean fluxes apply to the open-water part of each polygon.
     @. fs.scratch2 = 1 - fs.sic
-    scatter_poly_fluxes_to_boundary!(remapping, eg, fs, fs.scratch2)
+    scatter_poly_fluxes_to_boundary!(
+        remapping,
+        eg,
+        fs,
+        fs.scratch2;
+        cov_cutoff = remapping.cov_cutoff,
+    )
     FluxCalculator.update_flux_fields!(csf, sim, remapping.flux_scratch, accumulator)
     return nothing
 end

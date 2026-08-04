@@ -4,6 +4,7 @@ atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
 checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_progedmf_1m.toml"]
 dt: "180secs"
+walltime_dt: "180secs"
 dt_cpl: "180secs"
 energy_check: false
 extra_atmos_diagnostics:
@@ -20,8 +21,11 @@ output_default_diagnostics: true
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "366days"
+t_end: "36days" #"366days"
 topo_smoothing: true
 topography: "Earth"
-fixed_terminal_velocity: false
+fixed_terminal_velocity_liquid: true
+fixed_terminal_velocity_ice: true
+fixed_terminal_velocity_rain: true
+fixed_terminal_velocity_snow: true
 max_newton_iters_ode: 3

@@ -301,7 +301,7 @@ function argparse_settings()
         default = "average"
         # Ice model specific
         "--ice_model"
-        help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`, `nothing`]"
+        help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`, `eisenman`, `nothing`]"
         arg_type = String
         default = "prescribed"
         "--seaice_diagnostic_interval"

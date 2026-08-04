@@ -447,25 +447,19 @@ end
 =#
 
 """
-    wet_ocean_fraction_field(boundary_space, eg::ExchangeGrid;
-                             topography_damping_factor = 5)
+    wet_ocean_fraction_field(boundary_space, eg::ExchangeGrid)
 
 Build the wet-ocean surface fraction as a `CC.Fields.Field` on
 `boundary_space` from a CPU-resident [`ExchangeGrid`](@ref): the nodal ratio
-`node_cov / node_cov_total` clamped to [0, 1], made continuous with
-`weighted_dss!`, then smoothed with the same diffusion recipe ClimaAtmos
-applies to its orography (`κ = 0.05 Δh²`, `dt = 1`,
-`maxiter = round(log(damping_factor)/0.05)`; see
-`ClimaAtmos.make_hybrid_spaces`), so the coupler never sees land-sea
-contrasts sharper than the atmosphere's smoothed topography.
-`topography_damping_factor` must match the ClimaAtmos option of the same
-name. The complement is the land fraction; sea ice and open ocean partition
-the wet fraction itself (see `FieldExchanger.align_surface_fractions!`).
+`node_cov / node_cov_total` clamped to [0, 1], then made continuous across
+shared element-boundary nodes with `weighted_dss!` (and re-clamped, since DSS
+of a bounded field can overshoot). The complement is the land fraction; sea
+ice and open ocean partition the wet fraction itself (see
+`FieldExchanger.align_surface_fractions!`).
 """
 function wet_ocean_fraction_field(
     boundary_space,
-    eg::ExchangeGrid{FT, Vector{Int32}};
-    topography_damping_factor = 5,
+    eg::ExchangeGrid{FT, Vector{Int32}},
 ) where {FT}
     frac_nodal = similar(eg.node_cov)
     @. frac_nodal = ifelse(
@@ -479,19 +473,8 @@ function wet_ocean_fraction_field(
     device_array_type = ClimaComms.array_type(ClimaComms.device(boundary_space))
     CRExt.vec_to_se_field!(field, Adapt.adapt(device_array_type, frac_nodal))
 
-    # Reconcile shared element-boundary nodes, then filter exactly like the
-    # atmosphere's Earth orography.
     dss_buffer = Utilities.init_dss_buffer(field)
     Utilities.apply_dss!(field, dss_buffer)
-    @. field = clamp(field, FT(0), FT(1))
-    Δh = CC.Spaces.node_horizontal_length_scale(boundary_space)
-    maxiter = round(Int, log(topography_damping_factor) / 0.05)
-    CC.Hypsography.diffuse_surface_elevation!(
-        field;
-        κ = FT(0.05) * FT(Δh)^2,
-        dt = FT(1),
-        maxiter,
-    )
     @. field = clamp(field, FT(0), FT(1))
     return field
 end

@@ -12,4 +12,5 @@ rad: ~
 microphysics_model: "dry"
 t_end: "1days"
 vert_diff: VerticalDiffusion
+walltime_debug: true
 check_nan_every: 1

@@ -27,3 +27,4 @@ fixed_terminal_velocity_liquid: true
 fixed_terminal_velocity_ice: true
 fixed_terminal_velocity_rain: false
 fixed_terminal_velocity_snow: true
+max_newton_iters_ode: 3

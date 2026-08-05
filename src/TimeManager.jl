@@ -68,8 +68,7 @@ schedule is true.
 A `schedule` is a callable object (i.e., a function) that returns `true` or `false`. It
 is called with an integrator-like object with two fields:
 - `t`: the current simulation time (unwrapped from `cs.t`), and
-- `step`: the number of coupling steps taken so far in this run (see
-  [`coupler_step_number`](@ref)).
+- `step`: the number of coupling steps taken so far (unwrapped from `cs.step`).
 
 This is the interface that the schedules in `ClimaDiagnostics.Schedules` expect,
 so any of them can be used here.
@@ -81,26 +80,13 @@ struct Callback{S, F}
     func::F
 end
 
-# TODO: Add `step` to the coupler struct?
-"""
-    coupler_step_number(cs)
-
-Return the number of coupling steps taken so far in this run.
-
-This function works for both floating-point times and `ITime`s. Note that this is 
-counted from `cs.tspan[1]`, which is the start of the *current* run and not of the 
-overall simulation.
-"""
-coupler_step_number(cs) = round(Int, (cs.t[] - cs.tspan[1]) / cs.Δt_cpl)
-
 """
     maybe_trigger_callback(callback, cs)
 
 Check if it is time to call `callback`, if yes, call its function on `cs`.
 """
 function maybe_trigger_callback(callback, cs)
-    t = cs.t[]
-    step = coupler_step_number(cs)
+    t, step = cs.t[], cs.step[]
     callback.schedule((; t, step)) && callback.func(cs)
     return nothing
 end
@@ -153,9 +139,8 @@ CD.Schedules.long_name(::OnceSchedule) = "once at the first step of the simulati
 A schedule that is true on every step whose number is a power of two.
 
 This is useful to sample densely at the beginning of a run and increasingly
-sparsely as it goes on. Note that the step number is counted from the start of
-the current run (see [`coupler_step_number`](@ref)), so a restarted simulation
-starts sampling densely again from the restart.
+sparsely as it goes on. Note that `cs.step` is not checkpointed, so a restarted
+simulation starts sampling densely again from the restart.
 """
 struct PowerOfTwoSchedule <: CD.Schedules.AbstractSchedule end
 
@@ -260,7 +245,7 @@ function (reporter::WalltimeReporter)(cs)
     date = cs.start_date + Dates.Second(round(Int, t))
 
     # compute the number of steps completed, total number of steps, and percent complete
-    n_steps = max(1, round(Int, (t - t_start) / Δt_cpl))
+    n_steps = cs.step[]
     n_steps_total = ceil(Int, (t_end - t_start) / Δt_cpl) #TODO: This doesn't support t_end = Inf
     percent_complete = round(100 * (t - t_start) / (t_end - t_start); digits = 1)
 

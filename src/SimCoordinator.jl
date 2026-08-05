@@ -93,8 +93,9 @@ calculates fluxes using the selected turbulent fluxes option. Note, one coupling
 require multiple steps in some of the component models.
 """
 function step!(cs::Interfacer.CoupledSimulation)
-    # Update the current time
+    # Update the current time and step number
     cs.t[] += cs.Δt_cpl
+    cs.step[] += 1
 
     # Compute global energy and water conservation checks
     # (only for slabplanet if tracking conservation is enabled)
@@ -505,6 +506,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         [tspan[1], tspan[2]],
         Δt_cpl,
         Ref(tspan[1]),
+        Ref(0),
         prev_checkpoint_t,
         model_sims,
         callbacks,

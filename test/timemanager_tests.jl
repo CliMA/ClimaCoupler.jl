@@ -1,10 +1,9 @@
-#=
-    Unit tests for ClimaCoupler TimeManager module
-=#
+#
+#   Unit tests for ClimaCoupler TimeManager module
+#
 import Test: @testset, @test, @test_logs, @test_throws
 import Dates
 import ClimaDiagnostics as CD
-import ClimaUtilities.TimeManager: ITime
 import ClimaCoupler: TimeManager
 
 @testset "time_to_period" begin
@@ -14,8 +13,8 @@ import ClimaCoupler: TimeManager
     @test_throws ErrorException TimeManager.time_to_period("never")
 end
 
-# A minimal integrator-like object, as built by `maybe_trigger_callback`
-fake_integrator(t, Δt_cpl = 0.5) = (; t = Ref(t), tspan = (0.0, 100.0), Δt_cpl)
+# A minimal coupled simulation, of which `maybe_trigger_callback` only reads `t` and `step`
+fake_cs(t, step = 1) = (; t = Ref(t), step = Ref(step))
 
 # A schedule that is never true, but records how many times it was asked
 struct CountingSchedule <: CD.Schedules.AbstractSchedule
@@ -29,63 +28,14 @@ CD.Schedules.long_name(::CountingSchedule) = "counting"
     n_triggered = Ref(0)
     cb = TimeManager.Callback(integrator -> integrator.t > 1.0, cs -> n_triggered[] += 1)
 
-    TimeManager.maybe_trigger_callback(cb, fake_integrator(0.5))
+    TimeManager.maybe_trigger_callback(cb, fake_cs(0.5))
     @test n_triggered[] == 0
-    TimeManager.maybe_trigger_callback(cb, fake_integrator(2.0))
+    TimeManager.maybe_trigger_callback(cb, fake_cs(2.0))
     @test n_triggered[] == 1
 
     never_cb = TimeManager.Callback(TimeManager.NeverSchedule(), cs -> n_triggered[] += 1)
-    TimeManager.maybe_trigger_callback(never_cb, fake_integrator(2.0))
+    TimeManager.maybe_trigger_callback(never_cb, fake_cs(2.0))
     @test n_triggered[] == 1
-end
-
-@testset "coupler_step_number" begin
-    # Floating-point times
-    @test TimeManager.coupler_step_number((;
-        t = Ref(0.0),
-        tspan = (0.0, 10.0),
-        Δt_cpl = 2.0,
-    )) == 0
-    @test TimeManager.coupler_step_number((;
-        t = Ref(2.0),
-        tspan = (0.0, 10.0),
-        Δt_cpl = 2.0,
-    )) == 1
-    @test TimeManager.coupler_step_number((;
-        t = Ref(8.0),
-        tspan = (0.0, 10.0),
-        Δt_cpl = 2.0,
-    )) == 4
-    # Counted from the start of the current run, not of the simulation
-    @test TimeManager.coupler_step_number((;
-        t = Ref(8.0),
-        tspan = (6.0, 10.0),
-        Δt_cpl = 2.0,
-    )) == 1
-    # Robust to floating-point error (0.1 is not exactly representable)
-    @test TimeManager.coupler_step_number((;
-        t = Ref(sum(fill(0.1, 7))),
-        tspan = (0.0, 10.0),
-        Δt_cpl = 0.1,
-    )) == 7
-
-    # ITimes: dividing two ITimes gives an exact Rational
-    itime(s) = ITime(s, epoch = Dates.DateTime(2010))
-    @test TimeManager.coupler_step_number((;
-        t = Ref(itime(0)),
-        tspan = (itime(0), itime(100)),
-        Δt_cpl = itime(20),
-    )) == 0
-    @test TimeManager.coupler_step_number((;
-        t = Ref(itime(80)),
-        tspan = (itime(0), itime(100)),
-        Δt_cpl = itime(20),
-    )) == 4
-    @test TimeManager.coupler_step_number((;
-        t = Ref(itime(80)),
-        tspan = (itime(60), itime(100)),
-        Δt_cpl = itime(20),
-    )) == 1
 end
 
 @testset "NeverSchedule" begin
@@ -116,7 +66,7 @@ end
     n_triggered = Ref(0)
     cb = TimeManager.Callback(schedule, cs -> n_triggered[] += 1)
     for step in 1:8
-        TimeManager.maybe_trigger_callback(cb, fake_integrator(0.5 * step))
+        TimeManager.maybe_trigger_callback(cb, fake_cs(0.5 * step, step))
     end
     @test n_triggered[] == 4 # steps 1, 2, 4, 8
 end
@@ -152,7 +102,7 @@ end
     triggered_steps = Int[]
     for step in 1:8
         n_before = n_triggered[]
-        TimeManager.maybe_trigger_callback(cb, fake_integrator(1.0 * step, 1.0))
+        TimeManager.maybe_trigger_callback(cb, fake_cs(1.0 * step, step))
         n_triggered[] > n_before && push!(triggered_steps, step)
     end
     # steps 1, 2, 4, 8 from PowerOfTwoSchedule; 4 and 8 also from EveryDtSchedule.
@@ -200,26 +150,29 @@ end
     @test TimeManager.compact_time_str(2 * 86400.0) == "2 d"
 
     reporter = TimeManager.WalltimeReporter()
-    fake_cs(t) = (;
+    reporter_cs(t) = (;
         t = Ref(t),
+        step = Ref(round(Int, t / 400.0)),
         Δt_cpl = 400.0,
         tspan = (0.0, 86400.0),
         start_date = Dates.DateTime(2010),
     )
 
     # The first call reports progress but discards the wall time (compilation)
-    @test_logs (:info, r"^Progress\n  time = 2010-01-01T00:06:40") reporter(fake_cs(400.0))
+    @test_logs (:info, r"^Progress\n  time = 2010-01-01T00:06:40") reporter(
+        reporter_cs(400.0),
+    )
     @test reporter.wall_time_elapsed[] == 0.0
 
     # The second call reports timing estimates; its measurement is scaled by
     # (t - t_start) / (t - t_previous) = 2 to cover the pre-compilation steps
     sleep(0.1)
-    @test_logs (:info, r"walltime remaining ≈ .*\n  sypd ≈ ") reporter(fake_cs(800.0))
+    @test_logs (:info, r"walltime remaining ≈ .*\n  sypd ≈ ") reporter(reporter_cs(800.0))
     @test reporter.wall_time_elapsed[] >= 2 * 0.09
 
     # Later calls accumulate wall time without scaling
     elapsed_before = reporter.wall_time_elapsed[]
     sleep(0.1)
-    @test_logs (:info, r"^Progress") reporter(fake_cs(1200.0))
+    @test_logs (:info, r"^Progress") reporter(reporter_cs(1200.0))
     @test 0.09 <= reporter.wall_time_elapsed[] - elapsed_before <= 1.0
 end

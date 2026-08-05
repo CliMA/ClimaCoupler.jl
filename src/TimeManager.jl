@@ -217,7 +217,7 @@ reporting is disabled.
 Reporting happens every `walltime_dt` (a string, as described in
 [`time_to_period`](@ref)), or never if `walltime_dt` is `"never"`.
 
-If `walltime_debug` is true, reporting also happens on every coupling step whose
+If `walltime_debug` is `true`, reporting also happens on every coupling step whose
 number is a power of two (see [`PowerOfTwoSchedule`](@ref)). Note that this is the
 only reporting if `walltime_dt` is `"never"`.
 """

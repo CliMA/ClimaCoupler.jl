@@ -65,7 +65,7 @@ simulated_years_per_day(t_start, t_end, walltime) =
 A small struct containing a schedule and the function to be executed if the
 schedule is true.
 
-A `schedule` is a callable object (ie, a function) that returns true or false. It
+A `schedule` is a callable object (i.e., a function) that returns `true` or `false`. It
 is called with an integrator-like object with two fields:
 - `t`: the current simulation time (unwrapped from `cs.t`), and
 - `step`: the number of coupling steps taken so far in this run (see

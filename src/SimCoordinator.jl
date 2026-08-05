@@ -193,6 +193,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         saveat,
         checkpoint_dt,
         walltime_dt,
+        walltime_debug,
         atmos_progress_interval,
         detect_restart_files,
         restart_dir,
@@ -449,11 +450,11 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         TimeManager.Callback(schedule_checkpoint, sim -> Checkpointer.checkpoint_sims(sim))
 
     # walltime reporting
-    if walltime_dt == "never"
+    schedule_walltime =
+        TimeManager.walltime_schedule(walltime_dt, walltime_debug, start_date)
+    if isnothing(schedule_walltime)
         callbacks = (checkpoint_cb,)
     else
-        schedule_walltime =
-            EveryCalendarDtSchedule(TimeManager.time_to_period(walltime_dt); start_date)
         walltime_cb =
             TimeManager.Callback(schedule_walltime, TimeManager.WalltimeReporter())
         callbacks = (checkpoint_cb, walltime_cb)

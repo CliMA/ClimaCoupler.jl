@@ -166,6 +166,34 @@ end
     @test CD.Schedules.long_name(named) == "every power-of-two iteration or never"
 end
 
+@testset "walltime_schedule" begin
+    start_date = Dates.DateTime(2010)
+    periodic = CD.Schedules.EveryCalendarDtSchedule(
+        TimeManager.time_to_period("1days");
+        start_date,
+    )
+
+    # Without walltime_debug, reporting is purely periodic
+    @test TimeManager.walltime_schedule("1days", false, start_date) == periodic
+    @test isnothing(TimeManager.walltime_schedule("never", false, start_date))
+
+    # With walltime_debug, the powers of two are added on top
+    schedule = TimeManager.walltime_schedule("1days", true, start_date)
+    @test schedule isa TimeManager.OrSchedule
+    # `time_to_period` builds the period in milliseconds, hence the name
+    @test CD.Schedules.short_name(schedule) == "86400000millis_or_pow2"
+    # ... reports on step 2, which is not a multiple of a day
+    @test schedule((; t = 800.0, step = 2)) == true
+    # ... and still reports periodically, on a step that is not a power of two
+    @test schedule((; t = 3 * 86400.0, step = 3)) == true
+
+    # If walltime_dt is "never", the powers of two are the only reporting
+    schedule = TimeManager.walltime_schedule("never", true, start_date)
+    @test schedule == TimeManager.PowerOfTwoSchedule()
+    @test schedule((; t = 800.0, step = 2)) == true
+    @test schedule((; t = 1200.0, step = 3)) == false
+end
+
 @testset "WalltimeReporter" begin
     @test TimeManager.compact_time_str(0.0) == "0 s"
     @test TimeManager.compact_time_str(59580.0) == "16 h 33 m"

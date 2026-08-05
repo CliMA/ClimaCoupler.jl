@@ -209,6 +209,29 @@ function CD.Schedules.long_name(schedule::OrSchedule)
 end
 
 """
+    walltime_schedule(walltime_dt, walltime_debug, start_date)
+
+Return the schedule to be used for walltime reporting, or `nothing` if walltime
+reporting is disabled.
+
+Reporting happens every `walltime_dt` (a string, as described in
+[`time_to_period`](@ref)), or never if `walltime_dt` is `"never"`.
+
+If `walltime_debug` is true, reporting also happens on every coupling step whose
+number is a power of two (see [`PowerOfTwoSchedule`](@ref)). Note that this is the
+only reporting if `walltime_dt` is `"never"`.
+"""
+function walltime_schedule(walltime_dt, walltime_debug, start_date)
+    if walltime_dt == "never"
+        return walltime_debug ? PowerOfTwoSchedule() : nothing
+    end
+    schedule_periodic =
+        CD.Schedules.EveryCalendarDtSchedule(time_to_period(walltime_dt); start_date)
+    walltime_debug || return schedule_periodic
+    return OrSchedule(schedule_periodic, PowerOfTwoSchedule())
+end
+
+"""
     WalltimeReporter()
 
 A callable object that logs the progress of a coupled simulation.

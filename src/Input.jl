@@ -125,6 +125,10 @@ function argparse_settings()
         help = "Time interval for walltime reporting [nothing (default): a tenth of the simulation length, at most 1 day and at least one coupling step; allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
         arg_type = String
         default = nothing
+        "--walltime_debug"
+        help = "Boolean flag indicating whether to also report the walltime on every coupling step whose number is a power of two (1, 2, 4, 8, ...), in addition to the `walltime_dt` interval [`false` (default), `true`]"
+        arg_type = Bool
+        default = false
         # Space information
         "--h_elem"
         help = "Number of horizontal elements to use for the atmosphere horizontal space [16 (default)]"
@@ -551,6 +555,7 @@ function get_coupler_args(config_dict::Dict)
         walltime_dt_secs = max(min(float(t_end - t_start) / 10, 2592000.0), float(Δt_cpl))
         walltime_dt = "$(walltime_dt_secs)secs"
     end
+    walltime_debug = get(config_dict, "walltime_debug", false)
 
     # Atmos progress reporting information
     atmos_progress_interval = config_dict["atmos_progress_interval"]
@@ -675,6 +680,7 @@ function get_coupler_args(config_dict::Dict)
         saveat,
         checkpoint_dt,
         walltime_dt,
+        walltime_debug,
         atmos_progress_interval,
         detect_restart_files,
         restart_dir,

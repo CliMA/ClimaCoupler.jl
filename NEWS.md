@@ -4,12 +4,13 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
-#### Add `OrSchedule`, `PowerOfTwoSchedule`, and a `walltime_debug` flag.
+#### Add `OrSchedule`, `PowerOfTwoSchedule`, `cs.step`, and a `walltime_debug` flag.
 Callback schedules now receive `(; t, step)` instead of just `(; t)`, so any
-`ClimaDiagnostics` schedule can be used as a coupler callback. `step` counts the
-coupling steps of the current run, restarting from 1 after a restart. The new
-`walltime_debug` config flag (default `false`) also reports the walltime on the
-steps that are a power of two, in addition to every `walltime_dt`.
+`ClimaDiagnostics` schedule can be used as a coupler callback. `step` is a new
+`CoupledSimulation` field that counts the coupling steps of the current run, 
+restarting from 1 after a restart. The new `walltime_debug` config flag (default 
+`false`) also reports the walltime on the steps that are a power of two, in 
+addition to every `walltime_dt`.
 
 #### Adapt to the redesigned RRTMGP 0.22 / ClimaAtmos 0.42 radiation API.
 The atmosphere radiation cache now holds an `RRTMGP.RRTMGPSolver`; coupler flux and albedo

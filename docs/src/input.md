@@ -115,6 +115,7 @@ Note: the `mode_name` determines which Julia environment to use. Use `experiment
 | `--dt_seaice` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Sea ice simulation time step (alternative to `dt`) |
 | `--checkpoint_dt` | String | `"90days"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Time interval for checkpointing |
 | `--walltime_dt` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for walltime reporting. Defaults to a tenth of the simulation length, at most 30 days. Set to `"never"` to disable. |
+| `--walltime_debug` | Bool | `false` | `true`, `false` | Also report the walltime on every coupling step whose number is a power of two (1, 2, 4, 8, ...), in addition to the `walltime_dt` interval. If `walltime_dt` is `"never"`, this is the only reporting. |
 
 Note: If any component model-specific timestep is specified, _all_ component-model
 specific timesteps should be specified, rather than only `dt`.

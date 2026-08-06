@@ -50,5 +50,6 @@ moist: equil
 # toml: [toml/diagnostic_edmfx_1M.toml]
 
 cloud_model: "quadrature_sgs"
+# toml: [toml/amip.toml]
 use_itime: true
 deep_atmosphere: false

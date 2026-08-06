@@ -28,7 +28,7 @@ start_date: "20250907"
 surface_setup: "PrescribedSurface"
 topo_smoothing: true
 topography: "Earth"
-t_end: "7days"
+t_end: "1days"
 netcdf_output_at_levels: true
 extra_atmos_diagnostics:
   - short_name: [tas, mslp, pr, ua, va, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke]

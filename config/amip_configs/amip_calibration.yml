@@ -43,11 +43,17 @@ output_default_diagnostics: false
 use_coupler_diagnostics: false
 use_land_diagnostics: false
 extra_atmos_diagnostics:
-  - short_name: [tas, pr, mslp, rsut, rsutcs, rlut, rlutcs, rsdt, lwp]
+  - short_name: [tas, pr, mslp, rsut, rsutcs, rlut, rlutcs, rsdt, lwp, clt]
     period: monthly
     reduction_time: average
   - short_name: [ta, hur, pfull]
     period: monthly
     reduction_time: average
     pressure_coordinates: true
+    compute_every: 6hours
+  # Cloud fraction on model z-levels (netcdf_output_at_levels: true), compared to
+  # CALIPSO/CloudSat `cl` on altitude levels (see ALTITUDE_LEVELS / calibration).
+  - short_name: [cl]
+    period: monthly
+    reduction_time: average
     compute_every: 6hours

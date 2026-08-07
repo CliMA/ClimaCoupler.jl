@@ -194,7 +194,25 @@ function CD.Schedules.long_name(schedule::OrSchedule)
 end
 
 """
-    walltime_schedule(walltime_dt, walltime_debug, start_date)
+    calendar_dt_schedule(period, start_date, t_start)
+
+Build an `EveryCalendarDtSchedule` for `period` (a time string or a
+`Dates.Period`) whose `date_last` is seeded from `t_start`.
+
+Without the seeding, a schedule built at `t_start > 0` believes it is overdue and
+fires on the first step of a restarted simulation, staying one coupling step out
+of phase from then on. Seeding `date_last` keeps a restarted schedule on the same
+calendar boundaries as the original run. For a fresh simulation `t_start` is 0 and
+the behavior is unchanged.
+"""
+function calendar_dt_schedule(period, start_date, t_start)
+    period isa Dates.Period || (period = time_to_period(period))
+    date_last = start_date + Dates.Millisecond(round(Int64, 1000 * float(t_start)))
+    return CD.Schedules.EveryCalendarDtSchedule(period; start_date, date_last)
+end
+
+"""
+    walltime_schedule(walltime_dt, walltime_debug, start_date, t_start = 0)
 
 Return the schedule to be used for walltime reporting, or `nothing` if walltime
 reporting is disabled.
@@ -206,12 +224,11 @@ If `walltime_debug` is `true`, reporting also happens on every coupling step who
 number is a power of two (see [`PowerOfTwoSchedule`](@ref)). Note that this is the
 only reporting if `walltime_dt` is `"never"`.
 """
-function walltime_schedule(walltime_dt, walltime_debug, start_date)
+function walltime_schedule(walltime_dt, walltime_debug, start_date, t_start = 0)
     if walltime_dt == "never"
         return walltime_debug ? PowerOfTwoSchedule() : nothing
     end
-    schedule_periodic =
-        CD.Schedules.EveryCalendarDtSchedule(time_to_period(walltime_dt); start_date)
+    schedule_periodic = calendar_dt_schedule(walltime_dt, start_date, t_start)
     walltime_debug || return schedule_periodic
     return OrSchedule(schedule_periodic, PowerOfTwoSchedule())
 end

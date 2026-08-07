@@ -116,6 +116,27 @@ end
     @test CD.Schedules.long_name(named) == "every power-of-two iteration or never"
 end
 
+@testset "calendar_dt_schedule" begin
+    start_date = Dates.DateTime(2010)
+
+    # A fresh simulation is unchanged: nothing fires at t = 0, first firing at day 1
+    fresh = TimeManager.calendar_dt_schedule("1days", start_date, 0.0)
+    @test !fresh((; t = 0.0))
+    @test fresh((; t = 86400.0))
+
+    # A simulation restarted at day 2 stays on the calendar boundaries of the
+    # original run: nothing fires one coupling step after the restart, the first
+    # firing is at day 3 exactly, and not again one step later
+    restarted = TimeManager.calendar_dt_schedule("1days", start_date, 172800.0)
+    @test !restarted((; t = 172980.0))
+    @test restarted((; t = 259200.0))
+    @test !restarted((; t = 259380.0))
+
+    # A Dates.Period is accepted as well as a time string
+    periodic = TimeManager.calendar_dt_schedule(Dates.Day(1), start_date, 0.0)
+    @test periodic((; t = 86400.0))
+end
+
 @testset "walltime_schedule" begin
     start_date = Dates.DateTime(2010)
     periodic = CD.Schedules.EveryCalendarDtSchedule(

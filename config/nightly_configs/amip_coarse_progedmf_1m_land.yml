@@ -36,7 +36,7 @@ extra_atmos_diagnostics:
     period: monthly
     reduction_time: average
     compute_every: 1hours
-  - short_name: [ssatl, ssati]
+  - short_name: [ssatl, ssati, clw, cli]
     period: daily
   - short_name: [pr, rsdt, rsut, rlut, rsds, rsus, rlds, rlus, rsutcs, rlutcs, rsdscs, rsuscs, rldscs, hfss, hfls, lwp, iwp, rwp, swp, clwvi, clivi, clt]
     period: monthly

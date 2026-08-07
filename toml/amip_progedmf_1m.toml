@@ -78,3 +78,6 @@ value = 0.55
 
 [cloud_fraction_eps_rel]
 value = 0.05
+
+[Frostenberg2023_a_coefficient]
+value = 0.1

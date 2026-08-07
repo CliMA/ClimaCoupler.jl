@@ -375,6 +375,28 @@ preprocess(::ERA5DataLoader, var, ::Val{:hfss}) = _preprocess_var(var; flip_sign
 preprocess(::ERA5DataLoader, var, ::Val{:rsus}) = _preprocess_var(var)
 preprocess(::ERA5DataLoader, var, ::Val{:rlus}) = _preprocess_var(var)
 
+"""
+    standardize_sim_units(var)
+
+Convert a simulation diagnostic to the units of its calibration observation.
+Model `cl` and `clt` are percentages; the CALIPSO observations are fractions
+in [0, 1]. Model `pr` is in kg m^-2 s^-1; the GPCP observation is in mm/day
+(1 kg m^-2 s^-1 of water = 86400 mm/day; both carry CliMA's downward-negative
+sign convention, so no sign change is needed). Other variables pass through
+unchanged.
+"""
+function standardize_sim_units(var)
+    short_name = ClimaAnalysis.short_name(var)
+    if short_name in ("cl", "clt")
+        var = ClimaAnalysis.remake(var; data = var.data ./ 100)
+        var = ClimaAnalysis.set_units(var, "unitless")
+    elseif short_name == "pr"
+        var = ClimaAnalysis.remake(var; data = var.data .* 86400)
+        var = ClimaAnalysis.set_units(var, "mm/day")
+    end
+    return var
+end
+
 function _preprocess_var(var; flip_sign = false)
     short_name = ClimaAnalysis.short_name(var)
 
@@ -694,14 +716,93 @@ function Base.get(loader::ModisDataLoader, short_name::String)
     return preprocess(loader, var, Val(Symbol(short_name)))
 end
 
-function preprocess(::ModisDataLoader, var, ::Union{Val{:clivi}, Val{:lwp}})
-    var = _preprocess_var(var)
-    not_nans = filter(!isnan, var.data)
-    global_mean = sum(not_nans) / length(not_nans)
-    @info "$(ClimaAnalysis.short_name(var)): Imputing global mean $global_mean for NaNs"
-    replace!(x -> isnan(x) ? global_mean : x, var)
-    return var
+# NaNs (unobserved bins) are RETAINED, not imputed. Imputing the global mean
+# fabricates observations where the satellite never looked and blinds the
+# coverage-mask machinery (`coverage_mask` sees full coverage, so the simulation
+# is never restricted to the observed sampling — the same inconsistency that
+# flipped the sign of the MAC lwp bias). The preprocessing pipeline handles NaNs
+# explicitly: `harmonize_nan_mask_over_dates!` equalizes them across covariance
+# dates and `apply_coverage_mask` mirrors them onto the simulation.
+preprocess(::ModisDataLoader, var, ::Union{Val{:clivi}, Val{:lwp}}) =
+    _preprocess_var(var)
+
+"""
+    ModisCloudDataLoader
+
+A struct for loading preprocessed MODIS cloud properties as `OutputVar`s.
+"""
+struct ModisCloudDataLoader <: AbstractDataLoader
+    catalog::NCCatalog
+    available_vars::Set{String}
 end
+
+const MODIS_CLOUD_TO_CLIMA_NAMES = [
+    "lwp" => "lwp",
+    "iwp" => "clivi",
+    "reliq" => "reliq",
+    "reice" => "reice",
+    "clt" => "clt",
+]
+
+"""
+    ModisCloudDataLoader(;
+        modis_to_clima_names = MODIS_CLOUD_TO_CLIMA_NAMES,
+    )
+
+Construct a data loader for the monthly MODIS cloud properties (MCD06COSP_M3,
+2002-07 onward, 1 degree): liquid/ice water path, cloud-top particle
+effective radii (`reliq`/`reice`, meters), and the cloud-mask cloud fraction
+(`clt`, a 0-1 fraction). The preprocessed `OutputVar`s follow CliMA
+conventions:
+- the short name matches the CliMA name,
+- the longitudes are shifted to -180 to 180 degrees,
+- the times are at the start of the time period.
+
+All fields are daytime retrievals (the source product masks by day), and
+`clt` is the cloud-mask fraction, so it counts all detected cloud including
+scenes without a successful optical retrieval. `NaN`s (unobserved bins) are
+retained, not imputed; the coverage-mask machinery handles them.
+
+The data comes from the `modis_cloud_properties` artifact, which supersedes
+`modis_lwp_iwp` (same MCD06COSP_M3 source). Note the CALIPSO/CloudSat loader
+also provides `clt`; when both are in a `CompositeDataLoader`, disambiguate
+with `varname_to_loader`.
+
+The keyword argument `modis_to_clima_names` is a vector of pairs mapping
+MODIS name to CliMA name.
+"""
+function ModisCloudDataLoader(; modis_to_clima_names = MODIS_CLOUD_TO_CLIMA_NAMES)
+    artifact_dir = @clima_artifact"modis_cloud_properties"
+    modis_file = joinpath(artifact_dir, "modis_cloud_properties.nc")
+
+    catalog = NCCatalog()
+    ClimaAnalysis.add_file!(catalog, modis_file, modis_to_clima_names...)
+    return ModisCloudDataLoader(catalog, Set(last.(modis_to_clima_names)))
+end
+
+"""
+    get(loader::ModisCloudDataLoader, short_name::String)
+
+Get the preprocessed `OutputVar` with the name `short_name` from the MODIS
+cloud properties dataset.
+"""
+function Base.get(loader::ModisCloudDataLoader, short_name::String)
+    (; catalog, available_vars) = loader
+    short_name in available_vars || error(
+        "$short_name is not available to load. To add this variable, pass it to modis_to_clima_names as a pair mapping MODIS name to CliMA name and create a new ModisCloudDataLoader",
+    )
+    var = get(catalog, short_name; var_kwargs = (shift_by = Dates.firstdayofmonth,))
+    return preprocess(loader, var, Val(Symbol(short_name)))
+end
+
+# The artifact is already in CliMA units (SI water paths and radii, clt as a
+# 0-1 fraction), so preprocessing only standardizes coordinates. NaNs are
+# retained (see ModisDataLoader's preprocess note).
+preprocess(
+    ::ModisCloudDataLoader,
+    var,
+    ::Union{Val{:clivi}, Val{:lwp}, Val{:reliq}, Val{:reice}, Val{:clt}},
+) = _preprocess_var(var)
 
 """
     CalipsoDataLoader
@@ -714,7 +815,10 @@ struct CalipsoDataLoader <: AbstractDataLoader
     available_vars::Set{String}
 end
 
-const CALIPSO_TO_CLIMA_NAMES = ["cloud_fraction_on_levels" => "cl"]
+const CALIPSO_TO_CLIMA_NAMES = [
+    "cloud_fraction_on_levels" => "cl",
+    "cloud_cover_in_column" => "clt",
+]
 
 """
     CalipsoDataLoader(; calipso_to_clima_names = CALIPSO_TO_CLIMA_NAMES)
@@ -770,14 +874,37 @@ function preprocess(::CalipsoDataLoader, var, ::Val{:cl})
     var = _preprocess_var(var)
     # Convert from percentage (0–100) to fraction (0–1)
     var = ClimaAnalysis.convert_units(var, "unitless"; conversion_function = x -> x / 100)
-    # Impute missing and NaN values with the global mean in one pass
+    # Missing/unobserved bins (polar caps beyond the ~82° orbit limit, gappy
+    # cells) become NaN and are RETAINED — imputing the global mean fabricated
+    # observations where the satellite never looked and blinded the coverage-mask
+    # machinery (cl reported 0% missing coverage). Downstream handles NaNs
+    # explicitly: `harmonize_nan_mask_over_dates!` + `apply_coverage_mask` restrict
+    # obs and sim to the same observed sampling. Only the eltype is narrowed
+    # (Missing -> NaN) so later array ops stay concrete.
     T = nonmissingtype(eltype(var.data))
-    valid = filter(x -> !ismissing(x) && !isnan(x), vec(var.data))
-    global_mean = T(sum(valid) / length(valid))
-    @info "$(ClimaAnalysis.short_name(var)): Imputing global mean $global_mean for missing/NaN values"
     return ClimaAnalysis.remake(
         var;
-        data = map(x -> (ismissing(x) || isnan(x)) ? global_mean : T(x), var.data),
+        data = map(x -> ismissing(x) ? T(NaN) : T(x), var.data),
+    )
+end
+
+"""
+    preprocess(::CalipsoDataLoader, var, ::Val{:clt})
+
+Preprocess total column cloud cover (`cloud_cover_in_column`). Selects the
+"any cloud in profile" definition (first `type` index) and the "All cases"
+doop slice, converts percent to fraction, and retains NaNs for unobserved
+bins (see the `cl` method).
+"""
+function preprocess(::CalipsoDataLoader, var, ::Val{:clt})
+    var = ClimaAnalysis.slice(var; type = 1, by = ClimaAnalysis.Index())
+    var = ClimaAnalysis.slice(var; doop = 1, by = ClimaAnalysis.Index())
+    var = _preprocess_var(var)
+    var = ClimaAnalysis.convert_units(var, "unitless"; conversion_function = x -> x / 100)
+    T = nonmissingtype(eltype(var.data))
+    return ClimaAnalysis.remake(
+        var;
+        data = map(x -> ismissing(x) ? T(NaN) : T(x), var.data),
     )
 end
 
@@ -1010,6 +1137,73 @@ function emulate_diagnostics!(sim, t_end)
     # writers ourselves
     foreach(close, output_writers)
     return nothing
+end
+
+"""
+    find_partial_members(output_dir)
+
+Return member directories whose checkpoint says started but not completed. A
+member resumed from a mid-run model checkpoint writes wrong-dated monthly
+diagnostics and crashes the observation map, so a resume must clean these
+first.
+"""
+function find_partial_members(output_dir)
+    partial = String[]
+    isdir(output_dir) || return partial
+    for it in filter(d -> startswith(d, "iteration_"), readdir(output_dir))
+        itdir = joinpath(output_dir, it)
+        isdir(itdir) || continue
+        for mem in filter(d -> startswith(d, "member_"), readdir(itdir))
+            ckpt = joinpath(itdir, mem, "checkpoint.txt")
+            isfile(ckpt) || continue
+            strip(read(ckpt, String)) == "completed" && continue
+            push!(partial, joinpath(itdir, mem))
+        end
+    end
+    return partial
+end
+
+"""
+    numeric_leaf_diff(a, b; path = "", out = String[])
+
+Recursively compare two objects of the same type and collect the field paths
+where a numeric leaf (a number or a numeric array) differs. Non-numeric leaves
+(strings, symbols, booleans, `nothing`) are ignored. The pre-flight wiring
+check uses this on two ClimaAtmos parameter structs: an empty result means the
+perturbed parameter never lands in the model.
+"""
+function numeric_leaf_diff(a, b; path = "", out = String[])
+    label(suffix) = isempty(path) ? suffix : path * " " * suffix
+    typeof(a) == typeof(b) || (push!(out, label("(type)")); return out)
+    if isnothing(a) || a isa Bool || a isa Symbol || a isa AbstractString
+        # Not numeric (Bool subtypes Number, so it must be excluded first).
+    elseif a isa Number
+        (a == b || (isnan(a) && isnan(b))) || push!(out, path)
+    elseif a isa AbstractArray
+        if eltype(a) <: Number
+            isequal(a, b) || push!(out, path)
+        else
+            length(a) == length(b) || (push!(out, label("(length)")); return out)
+            for (i, (x, y)) in enumerate(zip(a, b))
+                numeric_leaf_diff(x, y; path = "$path[$i]", out)
+            end
+        end
+    elseif a isa AbstractDict
+        keys(a) == keys(b) || (push!(out, label("(keys)")); return out)
+        for k in keys(a)
+            numeric_leaf_diff(a[k], b[k]; path = "$path[$k]", out)
+        end
+    elseif nfields(a) > 0
+        for f in fieldnames(typeof(a))
+            numeric_leaf_diff(
+                getfield(a, f),
+                getfield(b, f);
+                path = isempty(path) ? string(f) : path * "." * string(f),
+                out,
+            )
+        end
+    end
+    return out
 end
 
 end

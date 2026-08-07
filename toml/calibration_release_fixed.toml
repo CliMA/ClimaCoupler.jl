@@ -1,0 +1,51 @@
+# Parameters held fixed for the floor-release calibration
+# (lwp_clt_swcre_release.jl). Layer after toml/wxquest_progedmf.toml.
+#
+# These are the settled microphysics values: q_liq replicated at 1.33-1.49e-4
+# across three parameter sets (fixed at 1.35e-4), rain_tau never moved
+# (+0.04 prior sigma in sep_multi), the phase timescales stable since relax,
+# v_rain consistent at 5.4, v_ice ignored by the data in four runs.
+#
+# steepness_scale is fixed ON PURPOSE despite having been calibrated before:
+# alpha = 1/steepness multiplies the WHOLE augmented sigma in the
+# cloud-fraction closure (sigma_aug = alpha*sqrt(sigma_S^2+sigma_floor^2)),
+# making it degenerate with eps_rel, and it also enters the microphysics
+# condensate closure via sigma_S_eff = alpha*sigma_S, so calibrating it
+# moves rain formation as a side effect. 0.55 is the relax posterior and,
+# since coupler commit 887c4d7d, the upstream default.
+
+[cloud_liquid_water_specific_humidity_autoconversion_threshold]
+value = 1.35e-4
+type = "float"
+
+[rain_autoconversion_timescale]
+value = 1800
+type = "float"
+
+[snow_autoconversion_timescale]
+value = 1360
+type = "float"
+
+[condensation_evaporation_timescale]
+value = 100
+type = "float"
+
+[sublimation_deposition_timescale]
+value = 500
+type = "float"
+
+[cloud_fraction_steepness_scale]
+value = 0.55
+type = "float"
+
+[fixed_cloud_ice_terminal_velocity]
+value = 0.1
+type = "float"
+
+[fixed_rain_terminal_velocity]
+value = 5.4
+type = "float"
+
+[fixed_snow_terminal_velocity]
+value = 1.22
+type = "float"

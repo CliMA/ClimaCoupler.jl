@@ -1,0 +1,39 @@
+# Example experiment for run_amip.jl. Copy, edit, then run:
+#
+#   julia --project=experiments/AMIP \
+#       experiments/calibration/amip/run_amip.jl my_experiment.toml
+#
+# Three inputs: config_file (which model), priors (what to calibrate),
+# observations (what to compare against). Everything else is optional.
+
+config_file = "config/amip_configs/amip_calibration.yml"
+
+# Absolute path on scratch. Model output is large, never use home.
+output_dir = "/glade/derecho/scratch/CHANGE_ME/amip_my_experiment"
+
+# Short names resolved through the satellite catalog: lwp (MAC), cl
+# (CALIPSO), pr (GPCP), swcre/lwcre (CERES), ta/hur (ERA5). Or give a path
+# to a prebuilt observation_vec.jld2 (then also set short_names).
+observations = ["lwp", "pr"]
+
+# "zonal" (default), or an integer block-coarsening factor of the 2.5 degree
+# comparison grid: 4 = 10 degree blocks, 6 = 15 degree blocks.
+reduction = "zonal"
+
+# One [[priors]] table per free parameter. TransformUnscented runs
+# 2p + 1 ensemble members per iteration for p parameters.
+n_iterations = 8
+
+[[priors]]
+name = "cloud_liquid_water_specific_humidity_autoconversion_threshold"
+mean = 5e-4
+sigma = 3e-4
+lower = 0.0
+upper = 1.5e-3
+
+[[priors]]
+name = "rain_autoconversion_timescale"
+mean = 1800.0
+sigma = 700.0
+lower = 300.0
+upper = 3600.0

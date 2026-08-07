@@ -75,54 +75,29 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     coupler_model_interface = CouplerModelInterface(CALIBRATE_CONFIG)
 
-    modules = ["climacommon"]
-    env_vars = ["CLIMACOMMS_CONTEXT" => "SINGLETON", "CLIMACOMMS_DEVICE" => "CUDA"]
+    (; n_iterations) = CALIBRATE_CONFIG
 
-    if TEST_CALIBRATION
-        addprocs(ClimaCalibrate.SlurmManager())
-        @everywhere include($model_interface_filepath)
-        (; n_iterations, output_dir) = CALIBRATE_CONFIG
-        ClimaCalibrate.calibrate(
-            ClimaCalibrate.WorkerBackend(),
-            ekp,
-            coupler_model_interface,
-            n_iterations,
-            PRIORS,
-            output_dir,
-        )
-        return nothing
-    elseif ClimaCalibrate.get_backend() == ClimaCalibrate.DerechoBackend
-        backend = ClimaCalibrate.DerechoBackend(;
-            directives = [
-                # Options include "premium", "regular", "economy", "preempt"
-                :job_priority => "regular",
-                :time => 720,
-                :ntasks => 1,
-                :cpus_per_task => 12,
-                :gpus_per_task => 1,
-            ],
-            modules = ["climacommon/2025_02_25"],
-            env_vars,
-        )
-    elseif ClimaCalibrate.get_backend() == ClimaCalibrate.GCPBackend
-        backend = ClimaCalibrate.GCPBackend(;
-            directives = [
-                :ntasks => 1,
-                :gpus_per_task => 1,
-                :cpus_per_task => 12,
-                :time => 720,
-                :partition => "a3mega",
-            ],
-            modules,
-            env_vars,
-        )
-    else
-        error("Unsupported backend: $(ClimaCalibrate.get_backend())")
-    end
+    # The smoke test runs on CPU within an existing allocation, while a full
+    # calibration puts one ensemble member on each GPU.
+    device = TEST_CALIBRATION ? :cpu : :gpu
+    walltime =
+        @isdefined(WORKER_WALLTIME) ? WORKER_WALLTIME :
+        TEST_CALIBRATION ? 60 : 720
+    env_vars = [
+        "CLIMACOMMS_CONTEXT" => "SINGLETON",
+        "CLIMACOMMS_DEVICE" => TEST_CALIBRATION ? "CPU" : "CUDA",
+    ]
 
-    (; n_iterations, output_dir) = CALIBRATE_CONFIG
+    ClimaCalibrate.add_workers(
+        EKP.get_N_ens(ekp);
+        device,
+        time = walltime,
+        env = env_vars,
+    )
+    @everywhere include($model_interface_filepath)
+
     eki = ClimaCalibrate.calibrate(
-        backend,
+        ClimaCalibrate.WorkerBackend(),
         ekp,
         coupler_model_interface,
         n_iterations,

@@ -9,8 +9,11 @@ topo_smoothing: true
 topography: "Earth"
 
 ### Time and Simulation ###
-start_date: "20100101"
+# Placeholder only (calibration members override it); must exist in
+# era5_initial_condition_dir for config validation.
+start_date: "20100901"
 initial_condition: "WeatherModel"
+era5_initial_condition_dir: "/glade/derecho/scratch/nefrathe/son_ic"
 t_end: "39days"
 dt: "180secs"
 dt_cpl: "180secs"

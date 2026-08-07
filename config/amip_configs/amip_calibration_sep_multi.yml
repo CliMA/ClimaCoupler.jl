@@ -9,7 +9,9 @@ topo_smoothing: true
 topography: "Earth"
 
 ### Time and Simulation ###
-start_date: "20100101"
+# Placeholder only (calibration members override it); must exist in
+# era5_initial_condition_dir for config validation.
+start_date: "20100825"
 initial_condition: "WeatherModel"
 t_end: "39days"
 dt: "180secs"
@@ -21,7 +23,8 @@ checkpoint_dt: "900days"
 mode_name: "subseasonal"
 binary_area_fraction: false
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
-coupler_toml: ["toml/wxquest_progedmf.toml"]
+coupler_toml: ["toml/wxquest_progedmf.toml", "toml/calibration_multiyear_fixed.toml"]
+era5_initial_condition_dir: "/glade/derecho/scratch/nefrathe/son_ic"
 energy_check: false
 
 ### Atmosphere ###

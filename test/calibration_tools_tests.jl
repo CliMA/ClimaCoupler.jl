@@ -298,3 +298,43 @@ end
     )
 
 end
+
+@testset "find_partial_members" begin
+    mktempdir() do outdir
+        @test isempty(CalibrationTools.find_partial_members(outdir))
+        @test isempty(CalibrationTools.find_partial_members(joinpath(outdir, "absent")))
+
+        complete = joinpath(outdir, "iteration_001", "member_001")
+        partial = joinpath(outdir, "iteration_001", "member_002")
+        no_ckpt = joinpath(outdir, "iteration_002", "member_001")
+        mkpath.((complete, partial, no_ckpt))
+        write(joinpath(complete, "checkpoint.txt"), "completed\n")
+        write(joinpath(partial, "checkpoint.txt"), "started\n")
+
+        @test CalibrationTools.find_partial_members(outdir) == [partial]
+    end
+end
+
+@testset "numeric_leaf_diff" begin
+    a = (; x = 1.0, y = [1.0, 2.0], s = "same", n = nothing, flag = true)
+    @test isempty(CalibrationTools.numeric_leaf_diff(a, a))
+
+    b = (; x = 2.0, y = [1.0, 2.0], s = "same", n = nothing, flag = true)
+    @test CalibrationTools.numeric_leaf_diff(a, b) == ["x"]
+
+    c = (; x = 1.0, y = [1.0, 3.0], s = "other", n = nothing, flag = false)
+    @test CalibrationTools.numeric_leaf_diff(a, c) == ["y"]
+
+    nested = (; inner = (; a = 1.0, b = Dict("k" => 5.0)), z = 0.0)
+    changed = (; inner = (; a = 1.0, b = Dict("k" => 6.0)), z = 0.0)
+    @test CalibrationTools.numeric_leaf_diff(nested, changed) == ["inner.b[k]"]
+
+    withnan = (; x = NaN)
+    @test isempty(CalibrationTools.numeric_leaf_diff(withnan, withnan))
+
+    @test CalibrationTools.numeric_leaf_diff((; x = 1.0), (; x = 1)) == ["(type)"]
+
+    tup = (; v = (1.0f0, 2.0f0, 3.0f0))
+    tup2 = (; v = (1.0f0, 2.5f0, 3.0f0))
+    @test CalibrationTools.numeric_leaf_diff(tup, tup2) == ["v.2"]
+end

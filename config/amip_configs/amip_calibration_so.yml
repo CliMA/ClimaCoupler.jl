@@ -21,7 +21,7 @@ checkpoint_dt: "900days"
 mode_name: "subseasonal"
 binary_area_fraction: false
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
-coupler_toml: ["toml/wxquest_progedmf.toml"]
+coupler_toml: ["toml/wxquest_progedmf.toml", "toml/calibration_relax_posterior.toml", "toml/calibration_so_fixed.toml"]
 energy_check: false
 
 ### Atmosphere ###

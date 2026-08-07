@@ -1,3 +1,7 @@
+# AMIP-mode variant of amip_calibration.yml for free-running calibrations:
+# no ERA5 weather initial condition (atmos default IC + AMIP SST/SIC), so
+# members need a long spinup (set in the calibration config). start_date
+# and t_end are placeholders that update_timespan! overrides per member.
 FLOAT_TYPE: "Float32"
 
 ### Grid ###
@@ -9,16 +13,15 @@ topo_smoothing: true
 topography: "Earth"
 
 ### Time and Simulation ###
-start_date: "20100101"
-initial_condition: "WeatherModel"
-t_end: "39days"
+start_date: "20100701"
+t_end: "123days"
 dt: "180secs"
 dt_cpl: "180secs"
 dt_seaice: "180secs"
 checkpoint_dt: "900days"
 
 ### Coupler ###
-mode_name: "subseasonal"
+mode_name: "amip"
 binary_area_fraction: false
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
 coupler_toml: ["toml/wxquest_progedmf.toml"]

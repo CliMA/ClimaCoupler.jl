@@ -89,6 +89,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         device,
         time = walltime,
         env = env_vars,
+        mem = TEST_CALIBRATION ? "16GB" : "32GB",
     )
     ClimaCalibrate.@worker_setup include($model_interface_filepath)
 

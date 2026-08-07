@@ -69,6 +69,9 @@ git-tree-sha1 = "ce2b3b1f113f88956db112c81f8d48a62d9f57ae"
 [calipso_cloudsat]
 git-tree-sha1 = "dae77bc4ff79194ee6e794c1181bec1bebd67ea9"
 
+[modis_cloud_properties]
+git-tree-sha1 = "c9f24fd740b2e65335758ebf83031d5634941a51"
+
 [calipso_cloudsat_lowres]
 git-tree-sha1 = "c1c0a16127bd547124cdf7288140002d74846efe"
 

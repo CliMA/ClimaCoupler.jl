@@ -1,0 +1,12 @@
+# Autoconversion threshold held at 2e-4 for the Southern Ocean band run.
+# Layer this after toml/calibration_relax_posterior.toml, which freezes the
+# cloud-fraction shape and the phase timescales. Together they leave the
+# three fall speeds, the rain autoconversion timescale and the
+# sublimation-deposition timescale free.
+#
+# 2e-4 sits just above the 1.49e-4 posterior of the global vterm run and
+# inside the 1.6-1.9e-4 cluster that four earlier 2D runs reproduced.
+
+[cloud_liquid_water_specific_humidity_autoconversion_threshold]
+value = 2.0e-4
+type = "float"

@@ -1,0 +1,40 @@
+# Parameters held fixed for the January Southern Ocean lwp/swcre run.
+# Layer after toml/wxquest_progedmf.toml. Free in that run: q_liq,
+# rain_autoconversion_timescale, and the rain and snow fall speeds.
+#
+# The cloud-fraction shape parameters are fixed here, unlike in the
+# multi-year September run, because clt is not an observable in this run and
+# nothing would constrain them; left free they would absorb lwp error.
+
+[snow_autoconversion_timescale]
+value = 1360
+type = "float"
+
+[condensation_evaporation_timescale]
+value = 100
+type = "float"
+
+[sublimation_deposition_timescale]
+value = 500
+type = "float"
+
+[cloud_fraction_eps_rel]
+value = 0.05
+type = "float"
+
+[cloud_fraction_steepness_scale]
+value = 0.55
+type = "float"
+
+# Not in ClimaParams: read through the create_parameters release-params hook.
+[cloud_fraction_floor_release_abs_margin]
+value = 1
+type = "float"
+
+# The data has never moved this (-0.06 prior sigma globally, -0.17 in the
+# October Southern Ocean band). Held at 0.1 for comparability with the vterm
+# and band runs, NOT because 0.1 is supported; the ClimaParams baseline is
+# 0.01.
+[fixed_cloud_ice_terminal_velocity]
+value = 0.1
+type = "float"

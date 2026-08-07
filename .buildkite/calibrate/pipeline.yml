@@ -26,6 +26,9 @@ steps:
       depends_on: "gen_obs"
       command:
         - julia --project=experiments/AMIP/ experiments/calibration/amip/run_calibration.jl
+      artifact_paths:
+        - "amip_calibration/constrained_params_and_error.png"
+        - "amip_calibration/iteration_*/bias_sample_dates.png"
       agents:
         pbs_l_walltime: "12:00:00"
       retry:

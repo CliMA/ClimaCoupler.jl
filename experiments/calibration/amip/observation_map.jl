@@ -37,11 +37,41 @@ function preprocess_sim_vars(vars)
     vars = set_unitless_units!.(vars)
 
     vars = select_pressure_levels.(vars, Ref(PRESSURE_LEVELS))
+    vars = select_altitude_levels.(vars, Ref(ALTITUDE_LEVELS))
+    # Convert sim diagnostics to the units of their observations (cl and clt
+    # percent to fraction, pr to mm/day).
+    vars = map(ClimaCoupler.CalibrationTools.standardize_sim_units, vars)
     # We do not resample since the simulation variables are already on the
     # simulation grid
-    lat_left = -90
-    lat_right = 90
+    lat_left, lat_right = lat_window()
     vars = apply_lat_window.(vars, lat_left, lat_right)
+
+    # Restrict the simulation to the points the observation actually covers, BEFORE
+    # the zonal mean. Satellite retrievals are not global (MAC `lwp` is ocean-only,
+    # NaN over ~54% of grid points), and since zonal_average ignores NaNs the
+    # observed zonal mean is an ocean-only average. Without this mask the simulated
+    # zonal mean would average all longitudes instead — a different spatial sample.
+    # For lwp that is not a small effect: it flips the sign of the area-weighted
+    # bias (11.5% low vs 9.1% high), because modelled LWP over land is far lower
+    # than over ocean. See apply_coverage_mask.
+    coverage_fp = coverage_mask_path(CALIBRATE_CONFIG.output_dir)
+    if isfile(coverage_fp)
+        coverage_masks = JLD2.load_object(coverage_fp)
+        vars = map(vars) do var
+            entry = get(coverage_masks, ClimaAnalysis.short_name(var), nothing)
+            isnothing(entry) && return var
+            return apply_coverage_mask(var, entry...)
+        end
+    else
+        @warn "No coverage masks found; simulation zonal means will average all \
+               longitudes even where the observation has no data. Regenerate the \
+               observations to create them." coverage_fp
+    end
+
+    # Spatial reduction. Must match the observation-side preprocessing in
+    # generate_observations.jl so the flattened G aligns with the observation
+    # vector (see reduce_spatial).
+    vars = reduce_spatial.(vars)
 
     if isfile(NORMALIZATION_STATS_FP)
         # Note: This should not be used with SVDplusDCovariance matrix

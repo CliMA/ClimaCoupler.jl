@@ -34,8 +34,16 @@ function ClimaCalibrate.forward_model(interface::CouplerModelInterface, iter, me
     output_dir_root = config.output_dir
 
     (; sample_date_ranges, spinup, extend) = config
-    start_date = first(sample_date_ranges[iter + 1]) - spinup
-    end_date = last(sample_date_ranges[iter + 1]) + extend
+    # Use sample_date_ranges[iter], NOT [iter + 1]: at calibration loop-iteration
+    # `iter` the EKP update compares this member's G against observation `iter`
+    # (the minibatcher yields batch [iter], advancing after each update). Running
+    # sample_date_ranges[iter + 1] here compares model output for one sample
+    # against the observation for the previous sample — a harmless no-op when all
+    # sample_date_ranges are identical (as in fixed-target runs), but it pairs the
+    # wrong year with the wrong observation once the samples differ (e.g. a
+    # multi-year minibatch). Indexing with `iter` keeps G and obs on the same sample.
+    start_date = first(sample_date_ranges[iter]) - spinup
+    end_date = last(sample_date_ranges[iter]) + extend
     CalibrationTools.update_timespan!(config_dict, start_date, end_date)
 
     # Set member parameter file

@@ -6,32 +6,51 @@ atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
 strict_params: false
 mode_name: "subseasonal"
 
-# clima machine data paths
+# clima machine data paths (kept for reference)
 # era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
 # era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_0p25deg_dev"
-era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_0p25deg_dev/logp_fix"
+# era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_0p25deg_dev/logp_fix"
 # era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev_with_w"
 # coupler_output_dir: "/net/sampo/data1/cchristo/weatherbench2/coupuler_runs_with_w"
+# era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_0p25deg_dev/logp_fix"
+era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_0p25deg_dev/no_hz"
+coupler_output_dir: "/glade/derecho/scratch/cchristo/coupler_runs_v2/weatherbench"
 initial_condition: "WeatherModel"
 checkpoint_dt: "1000days"
 # dt: "100secs"
 # dt_cpl: "100secs"
 # dt_seaice: "100secs"
-dt: "50secs"
-dt_cpl: "50secs"
+# dt: "40secs"
+# dt_cpl: "40secs"
+dt: "40secs"
+dt_cpl: "40secs"
 dt_seaice: "50secs"
+# dt: "10secs"
+# dt_cpl: "10secs"
+# dt_seaice: "50secs"
+
 energy_check: false
 h_elem: 30
-z_elem: 100
+# dz_bottom: 20.0
+dz_bottom: 30.0
+# h_elem: 110
+# h_elem: 370
+# z_elem: 100
+z_elem: 130
+z_max: 70000.0
 
+divergence_damping_factor: 20.0
+topography_damping_factor: 1.15
+# topography_damping_factor: 1.2
 ### Microphysics
 ### 0M Microphysics ##
 microphysics_model: "0M"
 coupler_toml: ["toml/amip_progedmf.toml"]
 ### 1M Microphysics ###
 # microphysics_model: "1M"
-# toml: ["toml/prognostic_edmfx_1M.toml"]
+# coupler_toml: ["toml/amip_progedmf_1m.toml"]
 
+# cloud_model: "MLCloud"
 
 land_fraction_source: "era5"
 binary_area_fraction: false
@@ -51,27 +70,29 @@ radiation_reset_rng_seed: true
 # start_date: "20101001"
 start_date: "20200101"
 surface_setup: "PrescribedSurface"
-topo_smoothing: true
+topo_smoothing: false
 topography: "Earth"
 # t_end: "3days"
-t_end: "10days"
+# t_end: "10days"
+t_end: "7days"
 netcdf_output_at_levels: true
 output_default_diagnostics: false
 use_coupler_diagnostics: true
 extra_atmos_diagnostics:
-  ### daily average (surface + model-level)
-  - short_name: [zg, orog, tas, mslp, pr, lwp, iwp, clt, ta, hus, ua, va, zg, clw, cli, cl, pfull] #rwp, swp,
+  # ### daily average (surface + model-level)
+  - short_name: [zg, orog, tas, lwp, clt, ta, hus, ua, va, zg, cl, pfull, pr, clw, cli] #rwp, swp,  mslp, clw, cli, cl, pr, iwp,
     period: 1days
     reduction_time: average
-  - short_name: [tas, mslp, ta, hus, zg, ua, va, pfull]
+    # weatherbench2 vars
+  - short_name: [tas, mslp, ta, hus, zg, ua, va, pfull, clw, cli, cl, clt]
     period: 1days
     reduction_time: inst
   ### daily average on pressure levels (3D fields)
-  - short_name: [ta, hus, ua, va, zg, clw, cli, cl, pfull]
-    period: 1days
-    reduction_time: average
-    pressure_coordinates: true
-  #   ### hourly inst (surface + model-level)
+  # - short_name: [ta, hus, ua, va, zg, clw, cli, cl, pfull]
+  #   period: 1days
+  #   reduction_time: average
+  #   pressure_coordinates: true
+    ### hourly inst (surface + model-level)
   # - short_name: [tas, uas, vas, ts, tas, mslp, pr, prra, clt, prw, lwp, iwp, clwvi] #rwp]
   #   reduction_time: inst
   #   period: 1hours

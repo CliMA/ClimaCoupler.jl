@@ -312,6 +312,15 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water}) =
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature}) =
     sim.integrator.p.T_sfc
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:roughness_model}) = :constant
+# Thermal / momentum roughness for coupler diagnostics (e.g. 2 m `tas`).
+# Integrated land exchanges with the atmosphere primarily through the canopy
+# MOST scheme; soil and snow have their own roughness lengths used internally
+# when computing per-component fluxes, but the canopy values are the right
+# choice for the single land-column roughness handed to the atmosphere.
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:roughness_buoyancy}) =
+    sim.model.canopy.boundary_conditions.turbulent_flux_parameterization.z_0b
+Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:roughness_momentum}) =
+    sim.model.canopy.boundary_conditions.turbulent_flux_parameterization.z_0m
 
 # Update fields stored in land drivers
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:diffuse_fraction}, field)

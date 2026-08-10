@@ -3,6 +3,14 @@ ClimaCoupler.jl Release Notes
 
 `main`
 -------
+#### Pass area-weighted surface roughness to the atmosphere for the 2 m `tas` diagnostic.
+`import_combined_surface_fields!` now area-weights each surface model's
+`:roughness_buoyancy` into the coupler field of the same name, and
+`update_sim!(atmos_sim, csf)` pushes it to the atmosphere (stored in
+`sfc_conditions.z0b`). This lets ClimaAtmos diagnose the 2 m air temperature
+(`tas`) with Monin-Obukhov similarity theory using the true surface roughness in
+coupled runs (`surface_setup: "PrescribedSurface"`), instead of falling back to
+the lowest model level or a constant default roughness.
 
 #### Add `OrSchedule`, `PowerOfTwoSchedule`, `cs.step`, and a `walltime_debug` flag.
 Callback schedules now receive `(; t, step)` instead of just `(; t)`, so any

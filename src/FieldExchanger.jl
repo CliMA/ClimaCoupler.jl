@@ -164,7 +164,8 @@ import_atmos_fields!(csf, ::Interfacer.AbstractComponentSimulation, atmos_sim) =
 
 Updates the coupler with the surface properties. The `Interfacer.get_field`
 functions for (`:emissivity`, `:surface_temperature`, `:surface_direct_albedo`,
-`:surface_diffuse_albedo`) need to be specified for each surface model.
+`:surface_diffuse_albedo`, `:roughness_buoyancy`) need to be specified for each
+surface model.
 
 Note: Not all surface fields are imported here. Some quantities are retrieved
 from each surface model when surface fluxes are computed, in `compute_surface_fluxes!`.
@@ -178,6 +179,10 @@ function import_combined_surface_fields!(csf, model_sims)
     combine_surfaces!(csf, model_sims, Val(:surface_temperature))
     combine_surfaces!(csf, model_sims, Val(:surface_direct_albedo))
     combine_surfaces!(csf, model_sims, Val(:surface_diffuse_albedo))
+    # Area-weighted thermal roughness, pushed to the atmosphere for the 2 m
+    # temperature diagnostic (`tas`). The coupler field `:roughness_buoyancy` is
+    # registered by the atmosphere's `add_coupler_fields!`.
+    combine_surfaces!(csf, model_sims, Val(:roughness_buoyancy))
     return nothing
 end
 
@@ -210,7 +215,8 @@ end
 """
     update_sim!(atmos_sim::Interfacer.AbstractAtmosSimulation, csf)
 
-Updates the atmosphere's fields for surface direct and diffuse albedos, emissivity,and temperature.
+Updates the atmosphere's fields for surface direct and diffuse albedos, emissivity,
+temperature, humidity, and (area-weighted) thermal roughness.
 
 # Arguments
 - `atmos_sim`: [Interfacer.AbstractAtmosSimulation] containing an atmospheric model simulation object.
@@ -230,6 +236,11 @@ function update_sim!(atmos_sim::Interfacer.AbstractAtmosSimulation, csf)
     Interfacer.update_field!(atmos_sim, Val(:emissivity), csf.emissivity)
     Interfacer.update_field!(atmos_sim, Val(:surface_temperature), csf.T_sfc)
     Interfacer.update_field!(atmos_sim, Val(:surface_humidity), csf)
+    Interfacer.update_field!(
+        atmos_sim,
+        Val(:roughness_buoyancy),
+        csf.roughness_buoyancy,
+    )
     return nothing
 end
 

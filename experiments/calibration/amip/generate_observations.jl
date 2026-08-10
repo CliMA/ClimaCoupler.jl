@@ -1,6 +1,7 @@
 import ClimaAnalysis
 import ClimaAnalysis: OutputVar
 import ClimaCalibrate
+import ClimaCalibrate: ObservationRecipe, SampleBuilder
 import ClimaCoupler
 import ClimaCoupler: CalibrationTools
 import JLD2
@@ -31,10 +32,15 @@ include(
         scalar = 1.0,
         use_latitude_weights = true,
         min_cosd_lat = 0.1,
+        FT = Float32,
     )
 
-Make a scalar covariance matrix using `vars` for each sample corresponding to
-the dates in `sample_date_ranges`.
+Make a vector of `EKP.Observation`s with a scalar covariance matrix, one for
+each sample corresponding to the dates in `sample_date_ranges`.
+
+The `OutputVar`s in `vars` are windowed by the date ranges in
+`sample_date_ranges` to build the samples, and each sample in turn is used as
+the observation. The matrix of samples has element type `FT`.
 """
 function make_scalar_covariance_observation_vector(
     vars,
@@ -42,25 +48,21 @@ function make_scalar_covariance_observation_vector(
     scalar = 1.0,
     use_latitude_weights = true,
     min_cosd_lat = 0.1,
+    FT = Float32,
 )
-    obs_vec = map(sample_date_ranges) do sample_date_range
-        start_date = first(sample_date_range)
-        end_date = last(sample_date_range)
-        @info "Using scalar covariance matrix with"
-        @info "Scalar: $scalar"
-        @info "Latitude weighting: $use_latitude_weights"
-        @info "Min cosd lat: $min_cosd_lat"
-        covar_estimator = ClimaCalibrate.ObservationRecipe.ScalarCovariance(;
-            scalar,
-            use_latitude_weights,
-            min_cosd_lat,
-        )
-        ClimaCalibrate.ObservationRecipe.observation(
-            covar_estimator,
-            vars,
-            start_date,
-            end_date,
-        )
+    @info "Using scalar covariance matrix with"
+    @info "Scalar: $scalar"
+    @info "Latitude weighting: $use_latitude_weights"
+    @info "Min cosd lat: $min_cosd_lat"
+    covar_estimator =
+        ObservationRecipe.ScalarCovariance(; scalar, use_latitude_weights, min_cosd_lat)
+
+    # Each date range becomes one sample (one column of the sample collection)
+    sample_collection = SampleBuilder.build_samples_by_times(vars, sample_date_ranges; FT)
+    @info "Built samples" sample_collection
+
+    obs_vec = map(1:SampleBuilder.num_samples(sample_collection)) do i
+        ObservationRecipe.observation(covar_estimator, sample_collection, i)
     end
     return obs_vec
 end
@@ -128,6 +130,6 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Reconstruct the variables from the observation and show them for debugging
     for (i, obs) in enumerate(observation_vec)
         @info "Observation $i"
-        @info ClimaCalibrate.ObservationRecipe.reconstruct_vars(observation_vec[i])
+        @info ObservationRecipe.reconstruct_vars(obs)
     end
 end

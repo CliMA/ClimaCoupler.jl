@@ -1,4 +1,5 @@
 [deps]
+AMIPWarmup = "6f3a6b1e-2c4d-4b7a-9e3f-1d8c5a2b7e40"
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Cairo = "159f3aea-2a34-519c-b102-8c37f9878175"

@@ -2,7 +2,7 @@
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "14ac8d455fd75d3a31c077f89732df217caf374a"
+project_hash = "5caf879b7b645d5570f05b7fc91beaff10a20a66"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "0a81a018463de6c3f4f2c9360121c562e5add9e4"
@@ -20,6 +20,12 @@ deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse_jll"]
 git-tree-sha1 = "45a1272e3f809d36431e57ab22703c6896b8908f"
 uuid = "14f7f29c-3bd6-536c-9a0b-7339e30b5a3e"
 version = "0.5.3"
+
+[[deps.AMIPWarmup]]
+deps = ["CUDA", "ClimaComms", "ClimaCore", "PrecompileTools"]
+path = "/home/pbachant/calkit/clima-gpu-profiling/AMIPWarmup"
+uuid = "6f3a6b1e-2c4d-4b7a-9e3f-1d8c5a2b7e40"
+version = "0.1.0"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -561,7 +567,7 @@ version = "0.1.30"
 deps = ["ClimaParams", "DocStringExtensions", "FastGaussQuadrature", "ForwardDiff", "InteractiveUtils", "LazyArtifacts", "LogExpFunctions", "RootSolvers", "SpecialFunctions", "StaticArrays", "Thermodynamics", "UnrolledUtilities"]
 path = "../../../CloudMicrophysics.jl-mod"
 uuid = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
-version = "0.38.0"
+version = "0.38.1"
 
     [deps.CloudMicrophysics.extensions]
     EmulatorModelsExt = ["DataFrames", "MLJ"]

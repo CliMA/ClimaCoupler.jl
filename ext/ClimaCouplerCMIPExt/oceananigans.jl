@@ -104,7 +104,7 @@ function ocean_simulation(
     clock,
     stop_time,
     depth = 5500,
-    Nz = 32,
+    Nz = 60,
     momentum_advection = OC.WENOVectorInvariant(
         order = 5,
         time_discretization = AdaptiveVerticallyImplicitDiscretization(cfl = 0.4),

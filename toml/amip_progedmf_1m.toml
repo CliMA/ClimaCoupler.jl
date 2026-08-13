@@ -55,9 +55,6 @@ value = 0.001
 [max_area_limiter_power]
 value = 1
 
-[tracer_vertical_diffusion_factor]
-value = 0
-
 [condensation_evaporation_timescale]
 value = 100
 

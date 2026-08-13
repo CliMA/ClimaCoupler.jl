@@ -29,12 +29,12 @@ ocean_progress_interval: "12hours"
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
 rayleigh_sponge: true
-restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-longruns/1187/climacoupler-longruns/output/cmip_oceananigans_climaseaice/checkpoints"
-restart_t: 7776000
+#restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-longruns/1187/climacoupler-longruns/output/cmip_oceananigans_climaseaice/checkpoints"
+#restart_t: 7776000
 seaice_diagnostic_interval: "10days"
 seaice_diagnostic_mode: "instantaneous"
 seaice_progress_interval: "12hours"
-simple_ocean: true
+simple_ocean: false
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "720days"
@@ -42,6 +42,7 @@ topo_smoothing: true
 topography: "Earth"
 use_itime: true
 viscous_sponge: true
+walltime_debug: true
 z_elem: 39
 z_max: 60000.0
 check_nan_every: 1000

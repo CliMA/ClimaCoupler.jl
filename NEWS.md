@@ -4,32 +4,27 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
-#### Fix spurious sea-ice top melt under the prognostic ClimaSeaIce coupling.
-The prognostic sea-ice top boundary is a `PrescribedTemperature`: the coupler
-diagnoses the skin temperature `T_sfc` from the full surface energy balance
-`Jᵃ(T_sfc) + (T_sfc − T_i)/R = 0` and writes it into the ice model. The ice
-Stefan residual is `δQ = Q_top − Q_conductive`, so `Q_top` must equal the same
-net upward flux `Jᵃ` used in the skin solve. Previously the coupler filled
-`top_heat_flux` with `−(1−α)SW↓ − ϵLW↓ + F_sh + F_lh`, omitting surface emission
-`σϵT_sfc⁴` already used to set `T_sfc`. At skin equilibrium `δQ = 0`; when
-`T_sfc` is capped at melting, the residual is retained to drive top melt.
-The `update_T_sfc` callback linearized only the LW emission term of the skin
-balance `Jᵃ(T_sfc) + (T_sfc − T_i)/R = 0`, treating the turbulent fluxes
-explicitly. 
-
 #### Exchange (intersection) grid for CMIP surface fractions and fluxes.
 When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange
 grid — the polygons where the cubed-sphere spectral elements intersect the
 ocean's `TripolarGrid` cells (via ConservativeRegridding's operator API) —
-and uses it to (1) derive land/ocean/ice area fractions from the ocean's
+and uses it to 
+(1) derive land/ocean/ice area fractions from the ocean's
 bathymetric wet mask (DSS'd nodal coverage ratio), so fractions and flux
-weights are consistent with where the ocean actually has wet cells (issue
-[#1838](https://github.com/CliMA/ClimaCoupler.jl/issues/1838)); and (2)
-compute ocean and sea-ice turbulent fluxes per polygon, with per-polygon
+weights are consistent with where the ocean actually has wet cells 
+(2) compute ocean and sea-ice turbulent fluxes per polygon, with per-polygon
 sea-ice-concentration weighting, conservative aggregation to both grids, and
 GPU-resident, allocation-free per-step application. Controlled by the new
 `use_intersection_grid` configuration option (default `true`; automatically
 disabled for column and distributed setups).
+
+#### Add `OrSchedule`, `PowerOfTwoSchedule`, `cs.step`, and a `walltime_debug` flag.
+Callback schedules now receive `(; t, step)` instead of just `(; t)`, so any
+`ClimaDiagnostics` schedule can be used as a coupler callback. `step` is a new
+`CoupledSimulation` field that counts the coupling steps of the current run, 
+restarting from 1 after a restart. The new `walltime_debug` config flag (default 
+`false`) also reports the walltime on the steps that are a power of two, in 
+addition to every `walltime_dt`.
 
 #### Adapt to the redesigned RRTMGP 0.22 / ClimaAtmos 0.42 radiation API.
 The atmosphere radiation cache now holds an `RRTMGP.RRTMGPSolver`; coupler flux and albedo

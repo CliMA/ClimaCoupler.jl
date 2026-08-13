@@ -93,8 +93,9 @@ calculates fluxes using the selected turbulent fluxes option. Note, one coupling
 require multiple steps in some of the component models.
 """
 function step!(cs::Interfacer.CoupledSimulation)
-    # Update the current time
+    # Update the current time and step number
     cs.t[] += cs.Δt_cpl
+    cs.step[] += 1
 
     # Compute global energy and water conservation checks
     # (only for slabplanet if tracking conservation is enabled)
@@ -193,6 +194,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         saveat,
         checkpoint_dt,
         walltime_dt,
+        walltime_debug,
         atmos_progress_interval,
         detect_restart_files,
         restart_dir,
@@ -451,11 +453,11 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         TimeManager.Callback(schedule_checkpoint, sim -> Checkpointer.checkpoint_sims(sim))
 
     # walltime reporting
-    if walltime_dt == "never"
+    schedule_walltime =
+        TimeManager.walltime_schedule(walltime_dt, walltime_debug, start_date)
+    if isnothing(schedule_walltime)
         callbacks = (checkpoint_cb,)
     else
-        schedule_walltime =
-            EveryCalendarDtSchedule(TimeManager.time_to_period(walltime_dt); start_date)
         walltime_cb =
             TimeManager.Callback(schedule_walltime, TimeManager.WalltimeReporter())
         callbacks = (checkpoint_cb, walltime_cb)
@@ -506,6 +508,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         [tspan[1], tspan[2]],
         Δt_cpl,
         Ref(tspan[1]),
+        Ref(0),
         prev_checkpoint_t,
         model_sims,
         callbacks,

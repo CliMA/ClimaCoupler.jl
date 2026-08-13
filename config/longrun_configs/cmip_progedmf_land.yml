@@ -41,3 +41,4 @@ t_end: "120days"
 topo_smoothing: true
 topography: "Earth"
 use_itime: true
+walltime_debug: true

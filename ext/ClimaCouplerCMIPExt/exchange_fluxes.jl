@@ -80,6 +80,12 @@ common [`ExchangeFluxState`](@ref) plus the ice-specific inputs of the
 skin-temperature flux balance (`R` — conductive resistance, `T_i` — ice
 internal/interface temperature [K], downwelling `SW_d`/`LW_d`) and the
 diagnosed surface temperature output `T_sfc_new` [K].
+
+For the slow-surface path, `acc_Ja` and `acc_T_sfc` hold running sums of the
+*complete* net top heat flux Jᵃ = σϵTₛ⁴ − (1−α)SW↓ − ϵLW↓ + F_sh + F_lh and of
+the diagnosed Tₛ [K] of each coupling window, so the push can deliver the
+window-mean Jᵃ and Tₛ as a mutually consistent pair (each window's terms
+satisfy the skin balance jointly; averaging them separately would not).
 """
 struct IceExchangeState{FT, VF <: AbstractVector{FT}}
     fluxes::ExchangeFluxState{FT, VF}
@@ -88,6 +94,8 @@ struct IceExchangeState{FT, VF <: AbstractVector{FT}}
     SW_d::VF
     LW_d::VF
     T_sfc_new::VF
+    acc_Ja::VF
+    acc_T_sfc::VF
 end
 
 Adapt.@adapt_structure IceExchangeState
@@ -301,8 +309,10 @@ NVTX.@annotate function compute_ocean_polygon_fluxes!(
     return nothing
 end
 
-@inline _kernel_state(is::IceExchangeState) =
-    merge(_kernel_state(is.fluxes), (; is.R, is.T_i, is.SW_d, is.LW_d, is.T_sfc_new))
+@inline _kernel_state(is::IceExchangeState) = merge(
+    _kernel_state(is.fluxes),
+    (; is.R, is.T_i, is.SW_d, is.LW_d, is.T_sfc_new, is.acc_Ja, is.acc_T_sfc),
+)
 
 # SurfaceFluxes evaluation with skin-temperature diagnosis for one sea-ice
 # polygon. Polygons without ice short-circuit to zero flux. Mirrors the nodal
@@ -418,6 +428,22 @@ end
         vecs.LW_d[k],
     )
     _store_ice_polygon_fluxes!(vecs, k, out)
+    # Accumulate this window's complete net top heat flux and diagnosed Tₛ,
+    # so the slow-surface push can deliver their window means as a consistent
+    # pair. Where Tₛ was capped at melt, Jᵃ − Q_conductive is the melt flux;
+    # accumulating Jᵃ whole preserves the mean melt flux, which re-assembling
+    # Jᵃ from separately averaged terms would lose.
+    @inbounds begin
+        T_new = out.T_sfc_new
+        Ja = ifelse(
+            vecs.sic[k] > 0,
+            σ * ϵ * T_new^4 - (1 - α_albedo) * vecs.SW_d[k] - ϵ * vecs.LW_d[k] +
+            out.F_sh + out.F_lh,
+            zero(T_new),
+        )
+        vecs.acc_Ja[k] += Ja
+        vecs.acc_T_sfc[k] += T_new
+    end
     return nothing
 end
 
@@ -451,7 +477,8 @@ end
 
 Run the SurfaceFluxes evaluation with skin-temperature diagnosis for every
 exchange-grid polygon with ice (`sic > 0`), storing the flux outputs, the
-diagnosed `T_sfc_new`, and adding the fluxes to the running accumulators.
+diagnosed `T_sfc_new`, and adding the fluxes — as well as the complete top
+heat flux Jᵃ and diagnosed Tₛ — to the running accumulators.
 """
 NVTX.@annotate function compute_ice_polygon_fluxes!(
     is::IceExchangeState,

@@ -613,14 +613,31 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
 end
 
 """
-    push_exchange_fluxes_to_ice!(sim::ClimaSeaIceSimulation)
+    push_exchange_fluxes_to_ice!(sim::ClimaSeaIceSimulation; Ja = nothing, T_sfc = nothing)
 
 Push the per-polygon ice turbulent fluxes currently held in
 `sim.remapping.ice_flux_state` into the ClimaSeaIce boundary conditions
 (momentum stresses when dynamics are active; complete top heat flux Jᵃ).
 Fluxes are per unit ice area, matching `_update_ice_turbulent_fluxes_boundary!`.
+
+With the default `Ja = nothing` (fast-surface path, one coupling window per
+ice step), Jᵃ is assembled in place via `compute_ice_top_heat_flux!`: surface
+emission at the current diagnosed Tₛ plus the turbulent fluxes, added onto the
+radiative part written by `update_sim!` — all from the same window, so the
+skin balance is consistent.
+
+For the slow-surface path, pass the window-mean per-polygon complete top heat
+flux `Ja` and diagnosed surface temperature `T_sfc` [K] (see
+`FluxCalculator.push_and_reset!`): Jᵃ is then *set* from `Ja` (overwriting the
+radiative part `update_sim!` wrote for this window), and `T_sfc` is written
+back to ClimaSeaIce's `top_surface_temperature` so the prescribed temperature
+the ice conducts against matches the mean flux it integrates.
 """
-NVTX.@annotate function push_exchange_fluxes_to_ice!(sim::ClimaSeaIceSimulation)
+NVTX.@annotate function push_exchange_fluxes_to_ice!(
+    sim::ClimaSeaIceSimulation;
+    Ja = nothing,
+    T_sfc = nothing,
+)
     remapping = sim.remapping
     eg = remapping.exchange_grid
     fs = remapping.ice_flux_state.fluxes
@@ -643,19 +660,50 @@ NVTX.@annotate function push_exchange_fluxes_to_ice!(sim::ClimaSeaIceSimulation)
         )
     end
 
-    # Scatter F_lh / F_sh to cells and complete Jᵃ (emission + radiative from
-    # update_sim! + turbulent), consistent with the skin-temperature balance.
-    F_lh_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
-    F_sh_cells = vec(OC.interior(remapping.scratch_field_oc2, :, :, 1))
-    scatter_polys_to_cells!(F_lh_cells, eg, fs.F_lh)
-    scatter_polys_to_cells!(F_sh_cells, eg, fs.F_sh)
-    mirror_fold_partners!(F_lh_cells, grid)
-    mirror_fold_partners!(F_sh_cells, grid)
-    compute_ice_top_heat_flux!(
-        sim,
-        OC.interior(remapping.scratch_field_oc1, :, :, 1),
-        OC.interior(remapping.scratch_field_oc2, :, :, 1),
+    if isnothing(Ja)
+        # Scatter F_lh / F_sh to cells and complete Jᵃ (emission + radiative from
+        # update_sim! + turbulent), consistent with the skin-temperature balance.
+        F_lh_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
+        F_sh_cells = vec(OC.interior(remapping.scratch_field_oc2, :, :, 1))
+        scatter_polys_to_cells!(F_lh_cells, eg, fs.F_lh)
+        scatter_polys_to_cells!(F_sh_cells, eg, fs.F_sh)
+        mirror_fold_partners!(F_lh_cells, grid)
+        mirror_fold_partners!(F_sh_cells, grid)
+        compute_ice_top_heat_flux!(
+            sim,
+            OC.interior(remapping.scratch_field_oc1, :, :, 1),
+            OC.interior(remapping.scratch_field_oc2, :, :, 1),
+        )
+        return nothing
+    end
+
+    FT = CC.Spaces.undertype(axes(sim.area_fraction))
+    C_to_K = FT(sim.ice_properties.C_to_K)
+    ice_concentration = sim.ice.model.ice_concentration
+    ice_mask = OC.interior(ice_concentration, :, :, 1) .> 0
+
+    # Write the window-mean diagnosed Tₛ back (Kelvin → Celsius, only where
+    # ice exists) so the prescribed temperature matches the pushed mean Jᵃ.
+    T_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
+    scatter_polys_to_cells!(T_cells, eg, T_sfc)
+    mirror_fold_partners!(T_cells, grid)
+    top_sfc_T = top_thermodynamics(sim).top_surface_temperature
+    OC.interior(top_sfc_T, :, :, 1) .= ifelse.(
+        ice_mask,
+        OC.interior(remapping.scratch_field_oc1, :, :, 1) .- C_to_K,
+        OC.interior(top_sfc_T, :, :, 1),
     )
+
+    # Set the complete window-mean Jᵃ, replacing the last-window radiative
+    # part `update_sim!` wrote.
+    si_flux_heat = sim.ice.model.external_heat_fluxes.top
+    if si_flux_heat isa OC.Field
+        Ja_cells = vec(OC.interior(remapping.scratch_field_oc2, :, :, 1))
+        scatter_polys_to_cells!(Ja_cells, eg, Ja)
+        mirror_fold_partners!(Ja_cells, grid)
+        OC.interior(si_flux_heat, :, :, 1) .=
+            ice_mask .* OC.interior(remapping.scratch_field_oc2, :, :, 1)
+    end
     return nothing
 end
 
@@ -666,6 +714,14 @@ Slow-surface push for the exchange-grid path: time-average the per-polygon
 ice flux accumulators, push them to the ClimaSeaIce boundary conditions, and
 reset both the per-polygon and the boundary-space accumulators. Falls back to
 the generic boundary-space behavior when the exchange grid is not active.
+
+The top heat flux is pushed as the window mean of the *complete* per-window
+Jᵃ (emission at that window's diagnosed Tₛ, that window's radiation and
+turbulent fluxes), together with the window-mean Tₛ. Each window's terms
+satisfy the skin balance jointly, so their mean equals the mean conductive
+flux plus the mean melt residual — re-assembling Jᵃ at push time from the
+averaged turbulent fluxes, the last window's radiation, and emission at the
+last Tₛ would leave a spurious residual that drives melt/growth.
 """
 function FluxCalculator.push_and_reset!(
     sim::ClimaSeaIceSimulation,
@@ -679,9 +735,19 @@ function FluxCalculator.push_and_reset!(
             acc,
         )
     end
-    fs = sim.remapping.ice_flux_state.fluxes
-    average_and_reset_exchange_accumulators!(fs) || return nothing
-    push_exchange_fluxes_to_ice!(sim)
+    is = sim.remapping.ice_flux_state
+    fs = is.fluxes
+    n = fs.n_acc[]
+    iszero(n) && return nothing
+    # Window-mean complete Jᵃ (carried in `fs.scratch2`, which the ice push
+    # does not use) and window-mean diagnosed Tₛ (overwriting `T_sfc_new`,
+    # which is rebuilt by the kernel every window).
+    @. fs.scratch2 = is.acc_Ja / n
+    @. is.T_sfc_new = is.acc_T_sfc / n
+    fill!(is.acc_Ja, 0)
+    fill!(is.acc_T_sfc, 0)
+    average_and_reset_exchange_accumulators!(fs)
+    push_exchange_fluxes_to_ice!(sim; Ja = fs.scratch2, T_sfc = is.T_sfc_new)
     # Keep the (unused but still accumulated) boundary-space accumulator in
     # sync so its averages stay well-defined.
     FluxCalculator.reset!(acc)

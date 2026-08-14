@@ -20,7 +20,7 @@ value = 0.7
 value = 0
 
 [entr_coeff]
-value = 0.1
+value = 0.3
 
 [min_area_limiter_scale]
 value = 0.001
@@ -54,6 +54,9 @@ value = 0.001
 
 [max_area_limiter_power]
 value = 1
+
+[mixing_length_Prandtl_maximum]
+value = 100
 
 [condensation_evaporation_timescale]
 value = 100

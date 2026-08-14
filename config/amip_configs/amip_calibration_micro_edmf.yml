@@ -39,6 +39,14 @@ radiation_reset_rng_seed: true
 albedo_model: "CouplerAlbedo"
 surface_setup: "PrescribedSurface"
 strict_params: false
+# Per-member simulation log. Without this, a member's stdout goes to the
+# worker's PBS spool, which is only delivered when the 12-hour worker job
+# ends - and ClimaCalibrate deletes .julia_worker_*/ on driver exit, so a
+# failed member's progress output is lost (this is how the 2026-08-14 NaN
+# run left only driver-side stack traces). ClimaComms.FileLogger tees to
+# stdout AND writes output.log in the member's atmos output directory with
+# always_flush = true, so it is readable live and survives the run.
+log_to_file: true
 
 ### Land ###
 lai_source: "modis_monthly_climatology"

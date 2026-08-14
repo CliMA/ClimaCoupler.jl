@@ -49,6 +49,32 @@
 # 1 - confirm the current entrainment closure expects O(1) coefficients
 # before launch (do not assume campaign-era scaling).
 #
+# RUN HISTORY (record before reading any result):
+# ATTEMPT 1 (2026-08-13 17:55-19:04 MDT): all 17 members died at
+#   CoupledSimulation construction, KeyError("type") raised from
+#   ClimaParams' TOML-override WARNING (it indexes entry["type"] on both
+#   sides). toml/amip_progedmf_1m.toml had dropped its type fields; the
+#   member files carry them. Fixed in commit f3a27e71. Preflight could
+#   not see it: the default logger swallows message-construction errors,
+#   the worker logger rethrows them.
+# ATTEMPT 2 (2026-08-14 10:55-11:58 MDT): the TOML fix held (members
+#   built full coupled simulations and integrated 18-35 min, roughly the
+#   first 1-2 simulated weeks), then ALL 17 NaN'd - 10 "Found NaN", 7
+#   CUDA.KernelException in hyperdiffusion_tendency!/weighted_dss!, the
+#   same blow-up seen from the GPU side. The CENTER member failed too, so
+#   the prior mean itself was an unstable model state, not a tail draw.
+#   Cause: entr_coeff and detr_massflux_vertdiv_coeff were centered at
+#   the ClimaParams registry defaults (1.0), about 10x and 3x this
+#   configuration's tuned 0.1 / 0.3 - and entr's mean sat above the
+#   campaign's entire explored range (bounds 0.005-0.5). Priors
+#   re-centered below; nothing else changed. v_ice 0.01 was ALSO
+#   suspected and is exonerated: production amip.yml runs the identical
+#   parameter layer (toml/amip_progedmf_1m.toml alone) and is exercised
+#   nightly, so 0.01 is the shipped value, not a novel excursion.
+#   GATE ADDED: preflight never integrates the model, so it cannot catch
+#   instability. Run a single center member on the develop queue before
+#   any 17-worker launch.
+#
 # Predictions (DRAFT - edit before launch, then record a verdict after):
 # 1. Go/no-go at iteration 1: every observable's leverage ratio
 #    (residual / ensemble response spread) is <= ~3. lwcre in particular is
@@ -149,8 +175,17 @@ const CALIBRATION_PRIORS = [
         "mixing_length_eddy_viscosity_coefficient",
         0.2, 0.1, 0, 1.0,
     ),
-    checked_constrained_gaussian("entr_coeff", 1, 0.3, 0, 10.0),
-    checked_constrained_gaussian("detr_massflux_vertdiv_coeff", 1, 0.3, 0, 10.0),
+    # Re-centered 2026-08-14 after the first launch NaN'd all 17 members
+    # (see the ATTEMPT 2 note in the header). Means 1.0 came from the
+    # ClimaParams registry defaults, which are generic placeholders: this
+    # configuration tunes entr to 0.1 and dmfvd to 0.3 in BOTH the
+    # production TOML and ClimaAtmos main's own prognostic_edmfx_1M.toml,
+    # and #4762's entrainment rework did not rescale them. The relative
+    # spread (sigma = 30% of the mean) and the ~10x upper bound are kept
+    # from the original priors; lower bounds are small positive rather
+    # than 0 because a vanishing entrainment coefficient is degenerate.
+    checked_constrained_gaussian("entr_coeff", 0.1, 0.03, 0.005, 1.0),
+    checked_constrained_gaussian("detr_massflux_vertdiv_coeff", 0.3, 0.09, 0.02, 3.0),
 ]
 
 const PRIORS = EKP.combine_distributions(CALIBRATION_PRIORS)

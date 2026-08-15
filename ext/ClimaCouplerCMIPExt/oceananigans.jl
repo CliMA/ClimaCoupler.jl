@@ -156,6 +156,7 @@ dispatch in coupling.
 - `depth`: Maximum ocean depth in metres (default: 5500 m for EN4 compatibility)
 - `dt`: Time step (default: `1800.0` seconds, or 30 minutes)
 - `comms_ctx`: Communication context (default: `ClimaComms.context()`)
+- `FT_ocean`: Float type for the ocean simulation (default: `Float64`)
 - `coupled_param_dict`: Coupled parameter dictionary (default: created from `ClimaParams.create_toml_dict(FT)`)
 - `ocean_diagnostic_interval`: Interval for ocean diagnostics (default: `"1days"`)
 - `ocean_diagnostic_mode`: Mode for ocean diagnostics (default: `:average`)
@@ -174,17 +175,19 @@ function OceananigansSimulation(
     depth = 5500,
     dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
-    coupled_param_dict = CP.create_toml_dict(FT),
+    FT_ocean = Float64, # Use Float64 for the ocean to avoid precision issues
+    coupled_param_dict = CP.create_toml_dict(FT_ocean),
     ocean_diagnostic_interval = "1days",
     ocean_diagnostic_mode = :average,
     extra_kwargs...,
 ) where {FT}
     arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
-    OC.Oceananigans.defaults.FloatType = FT
-
-    # Use Float64 for the ocean to avoid precision issues
-    FT_ocean = Float64
     OC.Oceananigans.defaults.FloatType = FT_ocean
+
+    # Use ClimaParams for Oceananigans planetary constants
+    OC.Oceananigans.defaults.gravitational_acceleration = coupled_param_dict["gravitational_acceleration"]
+    OC.Oceananigans.defaults.planet_rotation_rate = coupled_param_dict["angular_velocity_planet_rotation"]
+    OC.Oceananigans.defaults.planet_radius = coupled_param_dict["planet_radius"]
 
     # Create ocean simulation
     closure = if simple_ocean
@@ -205,8 +208,32 @@ function OceananigansSimulation(
         error("Unsupported time type: $(typeof(tspan[1]))")
     end
 
-    ocean =
-        ocean_simulation(arch, ocean_grid; clock, stop_time, simple_ocean, closure, depth)
+
+    # Precompute COARE3 roughness parameters
+    # (These live on the coupler's exchange grid, so they must use `FT`)
+    coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
+    coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
+
+    # Get some ocean properties and parameters (including COARE3 roughness params)
+    ocean_properties = (;
+        reference_density = coupled_param_dict["density_ocean_reference"],
+        heat_capacity = coupled_param_dict["specific_heat_ocean"],
+        σ = coupled_param_dict["stefan_boltzmann_constant"],
+        C_to_K = coupled_param_dict["temperature_water_freeze"],
+        coare3_roughness_params,
+    )
+
+    ocean = ocean_simulation(
+        arch,
+        ocean_grid;
+        clock,
+        stop_time,
+        simple_ocean,
+        closure,
+        depth,
+        # need to pass ρ₀ explicitly because it isn't in `Oceananigans.defaults`:
+        reference_density = ocean_properties.reference_density,
+    )
     ocean.Δt = float(dt)
 
     # Set initial condition to the EN4 state estimate at start_date (monthly)
@@ -215,19 +242,6 @@ function OceananigansSimulation(
     # Construct the remapper object and allocate scratch space
     grid = ocean.model.grid
     remapping = construct_remapper(grid, boundary_space)
-
-    # COARE3 roughness params (allocated once, reused each timestep)
-    coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
-    coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
-
-    # Get some ocean properties and parameters (including COARE3 roughness params)
-    ocean_properties = (;
-        reference_density = 1026,
-        heat_capacity = 3991,
-        σ = coupled_param_dict["stefan_boltzmann_constant"],
-        C_to_K = coupled_param_dict["temperature_water_freeze"],
-        coare3_roughness_params,
-    )
 
     # Initialize with 0 ice concentration; this will be updated in `resolve_area_fractions!`
     # if the ocean is coupled to a non-prescribed sea ice model.
@@ -441,7 +455,7 @@ end
 
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
 
-# TODO: Better values for this
+# TODO: Better values for these, read from ClimaParams
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_model}) = :coare3
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:coare3_roughness_params}) =
     sim.ocean_properties.coare3_roughness_params

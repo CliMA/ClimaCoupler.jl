@@ -16,10 +16,9 @@ env:
   # UPSTREAM_PACKAGES environment variable. For example, if you pass
   # `UPSTREAM_PACKAGES="ClimaAtmos SurfaceFluxes@1.1.0", then the main branch
   # of ClimaAtmos and SurfaceFluxes v1.1.0 will be used.
-  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore ClimaCoreMakie ClimaTimeSteppers Thermodynamics ClimaLand SurfaceFluxes RRTMGP}"
+  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore ClimaCoreMakie ClimaTimeSteppers Thermodynamics ClimaLand SurfaceFluxes RRTMGP CloudMicrophysics}"
 
 timeout_in_minutes: 840
-
 
 steps:
   - label: "init :GPU:"
@@ -62,7 +61,6 @@ steps:
   - group: "Coarse AMIPs"
 
     steps:
-
       - label: "Coarse current AMIP: progedmf + 0M + integrated land"
         key: "amip_progedmf_land"
         command:

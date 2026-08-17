@@ -52,6 +52,9 @@ value = 0.001
 [max_area_limiter_power]
 value = 1
 
+[mixing_length_Prandtl_maximum]
+value = 100
+
 [precipitation_timescale]
 value = 1200
 

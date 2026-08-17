@@ -40,13 +40,22 @@ EXPECTED_IC_PREFIXES = [
 
 def parse_start_date(raw: str) -> dt.datetime:
     raw = raw.strip()
-    formats = ["%Y%m%d", "%Y%m%d%H", "%Y%m%d%H%M"]
+    formats = ["%Y%m%d-%H%M", "%Y%m%d%H%M", "%Y%m%d%H", "%Y%m%d"]
     for fmt in formats:
         try:
             return dt.datetime.strptime(raw, fmt)
         except ValueError:
             continue
-    raise ValueError(f"Unrecognized date format: {raw}. Expected YYYYMMDD[HH[MM]]")
+    raise ValueError(
+        f"Unrecognized date format: {raw}. Expected YYYYMMDD, YYYYMMDDHHMM, or YYYYMMDD-HHMM"
+    )
+
+
+def format_start_date(start: dt.datetime) -> str:
+    """Coupler/Atmos config string: YYYYMMDD at 00Z, else YYYYMMDD-HHMM."""
+    if start.hour == 0 and start.minute == 0:
+        return start.strftime("%Y%m%d")
+    return start.strftime("%Y%m%d-%H%M")
 
 
 def read_text(path: Path) -> str:
@@ -366,13 +375,14 @@ def main() -> None:
     for sd in parsed_dates:
         ymd = sd.strftime("%Y%m%d")
         hhmm = sd.strftime("%H%M")
-        start_date_str = ymd
-        output_dir = f"{base_out_dir.rstrip('/')}/{ymd}" if base_out_dir else None
+        start_date_str = format_start_date(sd)
+        out_tag = start_date_str.replace("-", "_")
+        output_dir = f"{base_out_dir.rstrip('/')}/{out_tag}" if base_out_dir else None
 
         config_out = out_base / "configs" / f"wxquest_progedmf_{ymd}_{hhmm}.yml"
         pbs_out = out_base / "pbs" / f"runner_wxquest_progedmf_{ymd}_{hhmm}.pbs"
         log_out = out_base / "logs" / f"ccwx_progedmf_{ymd}_{hhmm}.out"
-        job_name = f"cc_wx_prog_{ymd}"
+        job_name = f"cc_wx_prog_{ymd}" if hhmm == "0000" else f"cc_wx_prog_{ymd}_{hhmm}"
 
         planned.append({
             "start": sd,

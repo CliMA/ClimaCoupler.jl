@@ -3,6 +3,13 @@ ClimaCoupler.jl Release Notes
 
 `main`
 -------
+#### Support non-00Z `start_date` for subseasonal / WeatherQuest ICs.
+`start_date` now accepts `YYYYMMDD-HHMM` (in addition to `YYYYMMDD`), matching
+ClimaAtmos. Subseasonal ERA5 land/SST/SIC/albedo/bucket paths use that HHMM
+instead of always `_0000`, so 12Z (and other) initializations find the correct
+WeatherQuest files. Batch/sweep submit scripts preserve the time in generated
+configs and output directory tags.
+
 #### Pass area-weighted surface roughness to the atmosphere for the 2 m `tas` diagnostic.
 `import_combined_surface_fields!` now area-weights each surface model's
 `:roughness_buoyancy` into the coupler field of the same name, and

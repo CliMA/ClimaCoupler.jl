@@ -106,7 +106,7 @@ Note: the `mode_name` determines which Julia environment to use. Use `experiment
 | `--use_itime` | Bool | `true` | `true`, `false` | Whether to use ClimaUtilities ITime (integer time) or Float64 |
 | `--t_end` | String | `"800secs"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | End time of the simulation, relative to the start date |
 | `--t_start` | String | `"0secs"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Start time of the simulation, relative to the start date |
-| `--start_date` | String | `"20000101"` | `"YYYYMMDD"` format | Start date of the simulation |
+| `--start_date` | String | `"20000101"` | `"YYYYMMDD"` or `"YYYYMMDD-HHMM"` | Start date (and optional UTC time) of the simulation |
 | `--dt_cpl` | String | `"400secs"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Coupling time step |
 | `--dt` | String | `"400secs"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Component model time step (used if individual component dt's not specified) |
 | `--dt_atmos` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Atmos simulation time step (alternative to `dt`) |

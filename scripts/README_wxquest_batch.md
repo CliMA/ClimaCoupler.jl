@@ -123,7 +123,8 @@ Per date, the script writes:
 - Logs: `generated/batch_wxquest_progedmf/logs/ccwx_progedmf_<YYYYMMDD>_<HHMM>.out`
 
 Each generated config updates only `start_date` and appends the date to
-`coupler_output_dir`. It does **not** change `era5_initial_condition_dir`.
+`coupler_output_dir`. Dates may include a UTC hour (`YYYYMMDD-HHMM`);
+non-00Z times are preserved in the config and in the output directory tag. It does **not** change `era5_initial_condition_dir`.
 
 ## Common options
 

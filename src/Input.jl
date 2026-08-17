@@ -94,7 +94,7 @@ function argparse_settings()
         arg_type = String
         default = "0secs"
         "--start_date"
-        help = "Start date of the simulation, in format \"YYYYMMDD\" [\"20100101\" (default)]"
+        help = "Start date of the simulation, in format \"YYYYMMDD\" or \"YYYYMMDD-HHMM\" [\"20100101\" (default)]"
         arg_type = String
         default = "20000101"
         "--dt_cpl"
@@ -510,7 +510,7 @@ function get_coupler_args(config_dict::Dict)
     # Time information
     t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))
     t_start = Float64(Utilities.time_to_seconds(config_dict["t_start"]))
-    start_date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
+    start_date = Utilities.parse_date(config_dict["start_date"])
     Δt_cpl = Float64(Utilities.time_to_seconds(config_dict["dt_cpl"]))
 
     if use_itime
@@ -1089,7 +1089,8 @@ end
     get_era5_filepaths(::Type{<:Interfacer.SubseasonalMode}, era5_initial_condition_dir, start_date, bucket_initial_condition)
 
 Build ERA5-based file paths for subseasonal mode simulations.
-Filenames are inferred from the start_date.
+Filenames are inferred from the start_date, including hour/minute for non-00Z
+initializations (e.g. `sst_processed_20191231_1200.nc`).
 
 If `era5_initial_condition_dir` is `nothing`, the `wxquest_initial_conditions`
 ClimaArtifact is used as a fallback.
@@ -1116,33 +1117,36 @@ function get_era5_filepaths(
 )
     era5_initial_condition_dir = resolve_era5_dir(era5_initial_condition_dir)
     datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
+    timestr = Dates.format(start_date, Dates.dateformat"HHMM")
+    stamp = "$(datestr)_$(timestr)"
 
-    # Verify that the required files exist for this date
-    sst_path = joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc")
+    # Verify that the required files exist for this date/time
+    sst_path = joinpath(era5_initial_condition_dir, "sst_processed_$(stamp).nc")
     isfile(sst_path) || error(
-        "ERA5 initial condition files for date $datestr not found in " *
+        "ERA5 initial condition files for date/time $stamp not found in " *
         "$era5_initial_condition_dir. Check that start_date matches an " *
-        "available date in the initial condition directory.",
+        "available initialization in the initial condition directory " *
+        "(expected e.g. sst_processed_$(stamp).nc).",
     )
 
     # Use ERA5-derived bucket IC if user didn't specify one
     isempty(bucket_initial_condition) && (
         bucket_initial_condition = joinpath(
             era5_initial_condition_dir,
-            "era5_bucket_processed_$(datestr)_0000.nc",
+            "era5_bucket_processed_$(stamp).nc",
         )
     )
 
     return (;
         sst_path,
-        sic_path = joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc"),
+        sic_path = joinpath(era5_initial_condition_dir, "sic_processed_$(stamp).nc"),
         land_ic_path = joinpath(
             era5_initial_condition_dir,
-            "era5_land_processed_$(datestr)_0000.nc",
+            "era5_land_processed_$(stamp).nc",
         ),
         albedo_path = joinpath(
             era5_initial_condition_dir,
-            "albedo_processed_$(datestr)_0000.nc",
+            "albedo_processed_$(stamp).nc",
         ),
         bucket_initial_condition,
     )

@@ -106,7 +106,7 @@ function BucketSimulation(
             varname = "sw_alb_clr",
         )
     elseif albedo_type == "era5" # Read in albedo from ERA5 processed file
-        # File path is inferred from start_date following the naming convention: albedo_processed_YYYYMMDD_0000.nc
+        # File path is inferred from start_date following the naming convention: albedo_processed_YYYYMMDD_HHMM.nc
         (isnothing(era5_albedo_file_path) || isempty(era5_albedo_file_path)) &&
             error("era5 albedo type requires era5_albedo_file_path to be specified")
         @info "Using ERA5 albedo from" era5_albedo_file_path

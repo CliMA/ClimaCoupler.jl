@@ -463,3 +463,50 @@ end
         scm_surface_type = "invalid_surface",
     )
 end
+
+@testset "get_era5_filepaths uses HHMM from start_date" begin
+    mktempdir() do dir
+        stamp = "20191231_1200"
+        for prefix in (
+            "sst_processed",
+            "sic_processed",
+            "era5_land_processed",
+            "albedo_processed",
+            "era5_bucket_processed",
+        )
+            touch(joinpath(dir, "$(prefix)_$(stamp).nc"))
+        end
+        start = Dates.DateTime(2019, 12, 31, 12)
+        paths = Input.get_era5_filepaths(
+            Interfacer.SubseasonalMode,
+            dir,
+            start,
+            "",
+        )
+        @test paths.sst_path == joinpath(dir, "sst_processed_$(stamp).nc")
+        @test paths.sic_path == joinpath(dir, "sic_processed_$(stamp).nc")
+        @test paths.land_ic_path == joinpath(dir, "era5_land_processed_$(stamp).nc")
+        @test paths.albedo_path == joinpath(dir, "albedo_processed_$(stamp).nc")
+        @test paths.bucket_initial_condition ==
+              joinpath(dir, "era5_bucket_processed_$(stamp).nc")
+
+        # Date-only start_date still resolves to _0000
+        stamp00 = "20200101_0000"
+        for prefix in (
+            "sst_processed",
+            "sic_processed",
+            "era5_land_processed",
+            "albedo_processed",
+            "era5_bucket_processed",
+        )
+            touch(joinpath(dir, "$(prefix)_$(stamp00).nc"))
+        end
+        paths00 = Input.get_era5_filepaths(
+            Interfacer.SubseasonalMode,
+            dir,
+            Dates.DateTime(2020, 1, 1),
+            "",
+        )
+        @test endswith(paths00.sst_path, "sst_processed_$(stamp00).nc")
+    end
+end

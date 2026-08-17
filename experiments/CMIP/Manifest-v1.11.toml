@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.8"
+julia_version = "1.11.9"
 manifest_format = "2.0"
-project_hash = "cb0e85be57bba1302a32b4b37714d222feec867a"
+project_hash = "b274e3540de2e81fa6adf792e13b637d2c7e5696"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "5970c86505ae9c07bf5bc521ef2bbbb3849e8b7b"
@@ -464,7 +464,7 @@ version = "0.2.2"
 weakdeps = ["Adapt", "CairoMakie", "ClimaAtmos", "ClimaCoreMakie", "ClimaLand", "ClimaSeaIce", "ConservativeRegridding", "GeoMakie", "KernelAbstractions", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
 
     [deps.ClimaCoupler.extensions]
-    ClimaCouplerCMIPExt = ["Adapt", "ClimaAtmos", "ClimaSeaIce", "ConservativeRegridding", "KernelAbstractions", "Oceananigans"]
+    ClimaCouplerCMIPExt = ["Adapt", "ClimaSeaIce", "ConservativeRegridding", "KernelAbstractions", "Oceananigans"]
     ClimaCouplerCMIPMakieExt = ["CairoMakie", "ClimaCoreMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
     ClimaCouplerClimaAtmosExt = ["ClimaAtmos"]
     ClimaCouplerClimaLandExt = ["ClimaLand"]

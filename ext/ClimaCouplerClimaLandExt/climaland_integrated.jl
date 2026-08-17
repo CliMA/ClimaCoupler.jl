@@ -141,16 +141,9 @@ function ClimaLandSimulation(
         )
     elseif lai_source == "modis_monthly_climatology"
         # MODIS LAI monthly climatology
-        modis_lai_clim_path = joinpath(
-            @clima_artifact("modis_lai_climatology", ClimaComms.context(surface_space)),
-            "modis_lai_climatology.nc",
-        )
-        LAI = CL.prescribed_lai_modis(
+        LAI = CL.prescribed_climatological_lai_modis(
             surface_space,
-            sim_start_date,
-            sim_stop_date;
-            modis_lai_ncdata_path = modis_lai_clim_path,
-            time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
+            LinearInterpolation(PeriodicCalendar(Dates.Year(1), Dates.DateTime(2000))),
         )
     else
         error(

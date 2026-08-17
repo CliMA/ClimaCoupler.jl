@@ -25,6 +25,7 @@ steps:
       - "julia -O0 --project -e 'using Pkg; Pkg.status()'"
 
       - echo "--- Instantiate AMIP experiments env"
+      - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.develop(path=\".\")'"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
@@ -32,6 +33,7 @@ steps:
       # Precompile CMIP with strict bounds checking to avoid precompilation in individual
       # runs that use strict bounds checking.
       - echo "--- Instantiate CMIP experiments env with strict bounds checking"
+      - "julia -O0 --check-bounds=yes --project=experiments/CMIP/ -e 'using Pkg; Pkg.develop(path=\".\")'"
       - "julia -O0 --check-bounds=yes --project=experiments/CMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia -O0 --check-bounds=yes --project=experiments/CMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia -O0 --check-bounds=yes --project=experiments/CMIP/ -e 'using Pkg; Pkg.status()'"
@@ -317,16 +319,14 @@ steps:
     steps:
       - label: "CPU exchange (intersection) grid unit tests"
         key: "cpu_intersection_grid_tests"
-        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/t
-st/intersection_grid_test.jl"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/test/intersection_grid_test.jl"
         retry: *retry_policy
         agents:
           slurm_mem: 16GB
 
       - label: "GPU exchange (intersection) grid unit tests"
         key: "gpu_intersection_grid_tests"
-        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/t
-st/intersection_grid_test.jl"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/test/intersection_grid_test.jl"
         retry: *retry_policy
         env:
           CLIMACOMMS_DEVICE: "CUDA"

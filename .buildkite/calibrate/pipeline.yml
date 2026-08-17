@@ -8,6 +8,7 @@ steps:
     key: "init_env"
     command:
       - echo "--- Instantiate AMIP env"
+      - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.develop(path=".")'
       - julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true); Pkg.status()'
 
     env:

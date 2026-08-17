@@ -83,6 +83,10 @@ end
     CalibrationTools.update_timespan!(config_dict, start_date, end_date)
     @test config_dict["start_date"] == "20101213"
     @test config_dict["t_end"] == "$((Dates.Second(end_date - start_date)).value)secs"
+
+    noon = Dates.DateTime(2019, 12, 31, 12)
+    CalibrationTools.update_timespan!(config_dict, noon, noon + Dates.Day(1))
+    @test config_dict["start_date"] == "20191231-1200"
 end
 
 """

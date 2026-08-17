@@ -428,7 +428,11 @@ This adds surface emission (from the diagnosed `top_surface_temperature`) and
 the turbulent fluxes. At skin equilibrium `Jᵃ = Q_conductive`, so the Stefan
 residual vanishes; when `Tₛ` is capped at `T_melt`, the residual drives melt.
 """
-function compute_ice_top_heat_flux!(sim::ClimaSeaIceSimulation, remapped_F_lh, remapped_F_sh)
+function compute_ice_top_heat_flux!(
+    sim::ClimaSeaIceSimulation,
+    remapped_F_lh,
+    remapped_F_sh,
+)
     si_flux_heat = sim.ice.model.external_heat_fluxes.top
     si_flux_heat isa OC.Field || return nothing
 

@@ -43,13 +43,8 @@ function surface_turbulent_energy_flux(
         inputs.q_liq_int,
         inputs.q_ice_int,
     )
-    q_vap_sfc = TD.q_vap_saturation(
-        thermo_params,
-        T_sfc,
-        ρ_sfc,
-        inputs.q_liq_int,
-        inputs.q_ice_int,
-    )
+    q_vap_sfc =
+        TD.q_vap_saturation(thermo_params, T_sfc, ρ_sfc, inputs.q_liq_int, inputs.q_ice_int)
 
     F_sh = SF.sensible_heat_flux(
         param_set,

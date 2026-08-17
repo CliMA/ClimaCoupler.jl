@@ -215,11 +215,7 @@ function OceananigansSimulation(
 
     # Construct the remapper object and allocate scratch space
     grid = ocean.model.grid
-    remapping = construct_remapper(
-        grid,
-        boundary_space;
-        use_intersection_grid,
-    )
+    remapping = construct_remapper(grid, boundary_space; use_intersection_grid)
 
     # COARE3 roughness params (allocated once, reused each timestep)
     coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
@@ -340,11 +336,7 @@ the static `wet_ocean_fraction` field (DSS'd nodal ratio of wet to geometric
 coverage), the per-polygon flux states and boundary-space flux scratch, and
 `use_exchange_grid::Bool` indicating the exchange-grid path is active.
 """
-function construct_remapper(
-    grid_oc,
-    boundary_space;
-    use_intersection_grid = true,
-)
+function construct_remapper(grid_oc, boundary_space; use_intersection_grid = true)
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), underlying_grid(grid_oc))
     boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
 
@@ -399,8 +391,7 @@ function construct_remapper(
         ClimaComms.context(boundary_space) isa ClimaComms.SingletonCommsContext
     if use_exchange_grid
         exchange_grid_cpu = build_exchange_grid(boundary_space, grid_oc)
-        wet_ocean_fraction =
-            wet_ocean_fraction_field(boundary_space, exchange_grid_cpu)
+        wet_ocean_fraction = wet_ocean_fraction_field(boundary_space, exchange_grid_cpu)
         exchange_grid = on_device(arch, exchange_grid_cpu)
 
         # Per-polygon flux scratch, boundary-space flux scratch fields (in the

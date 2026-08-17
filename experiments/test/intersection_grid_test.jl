@@ -34,13 +34,8 @@ context = ClimaComms.context()
 ClimaComms.init(context)
 
 radius = FT(6.371e6)
-boundary_space = CC.CommonSpaces.CubedSphereSpace(
-    FT;
-    radius,
-    n_quad_points = 4,
-    h_elem = 4,
-    context,
-)
+boundary_space =
+    CC.CommonSpaces.CubedSphereSpace(FT; radius, n_quad_points = 4, h_elem = 4, context)
 Nq = 4
 n_elem = 6 * 4^2
 
@@ -230,10 +225,8 @@ end
         # exactly 1 at nodes all of whose polygons are wet, exactly 0 at
         # interior dry nodes, intermediate (with Gibbs overshoot, clamped by
         # consumers) at the coastline.
-        wet_frac = [
-            t > 0 ? w / t : zero(w) for
-            (w, t) in zip(eg_c.node_cov, eg_c.node_cov_total)
-        ]
+        wet_frac =
+            [t > 0 ? w / t : zero(w) for (w, t) in zip(eg_c.node_cov, eg_c.node_cov_total)]
         @test count(==(1), wet_frac) > 0.2 * length(wet_frac)
         @test count(==(0), wet_frac) > 0.2 * length(wet_frac)
         @test any(f -> 0.05 < f < 0.95, wet_frac)
@@ -344,12 +337,7 @@ import Random
         @test @allocated(CMIPExt.scatter_polys_to_nodes!(nodal_scratch, eg, polyv)) <
               alloc_budget
         @test @allocated(
-            CMIPExt.scatter_polys_to_nodes_normalized!(
-                nodal_scratch,
-                eg,
-                polyv,
-                FT(1e-3),
-            )
+            CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, polyv, FT(1e-3))
         ) < alloc_budget
         @test @allocated(CMIPExt.scatter_polys_to_cells!(cell_scratch, eg, polyv)) <
               alloc_budget
@@ -369,24 +357,21 @@ import Random
             rt = sqrt(eps(FT))
 
             CMIPExt.gather_nodes_to_polys!(poly_scratch, eg, nodal)
-            @test Array(CMIPExt.gather_nodes_to_polys!(to_d(poly_scratch), eg_d, to_d(nodal))) ≈
-                  poly_scratch rtol = rt
+            @test Array(
+                CMIPExt.gather_nodes_to_polys!(to_d(poly_scratch), eg_d, to_d(nodal)),
+            ) ≈ poly_scratch rtol = rt
 
             CMIPExt.gather_cells_to_polys!(poly_scratch, eg, cellv)
-            @test Array(CMIPExt.gather_cells_to_polys!(to_d(poly_scratch), eg_d, to_d(cellv))) ==
-                  poly_scratch
+            @test Array(
+                CMIPExt.gather_cells_to_polys!(to_d(poly_scratch), eg_d, to_d(cellv)),
+            ) == poly_scratch
 
             CMIPExt.scatter_polys_to_nodes!(nodal_scratch, eg, polyv)
             @test Array(
                 CMIPExt.scatter_polys_to_nodes!(to_d(nodal_scratch), eg_d, to_d(polyv)),
             ) ≈ nodal_scratch rtol = rt
 
-            CMIPExt.scatter_polys_to_nodes_normalized!(
-                nodal_scratch,
-                eg,
-                polyv,
-                FT(1e-3),
-            )
+            CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, polyv, FT(1e-3))
             @test Array(
                 CMIPExt.scatter_polys_to_nodes_normalized!(
                     to_d(nodal_scratch),
@@ -457,7 +442,8 @@ import ClimaCoupler: FluxCalculator, Utilities
     CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
 
     thermo_params = TDP.ThermodynamicsParameters(FT)
-    surface_fluxes_params = SF.Parameters.SurfaceFluxesParameters(FT, SF.UniversalFunctions.BusingerParams)
+    surface_fluxes_params =
+        SF.Parameters.SurfaceFluxesParameters(FT, SF.UniversalFunctions.BusingerParams)
     config = SF.SurfaceFluxConfig(
         SF.COARE3RoughnessParams{FT}(),
         SF.ConstantGustinessSpec(FT(1)),
@@ -508,7 +494,12 @@ import ClimaCoupler: FluxCalculator, Utilities
         fs.T_sfc .= state.T_sfc
         fs.sic .= 0
 
-        CMIPExt.compute_ocean_polygon_fluxes!(fs, surface_fluxes_params, thermo_params, config)
+        CMIPExt.compute_ocean_polygon_fluxes!(
+            fs,
+            surface_fluxes_params,
+            thermo_params,
+            config,
+        )
         fs.n_acc[] += 1
 
         reference = CMIPExt._polygon_surface_fluxes(
@@ -597,7 +588,8 @@ end
 @testset "Per-polygon ice fluxes" begin
     eg = CMIPExt.build_exchange_grid(boundary_space, coastal_grid)
     thermo_params = TDP.ThermodynamicsParameters(FT)
-    surface_fluxes_params = SF.Parameters.SurfaceFluxesParameters(FT, SF.UniversalFunctions.BusingerParams)
+    surface_fluxes_params =
+        SF.Parameters.SurfaceFluxesParameters(FT, SF.UniversalFunctions.BusingerParams)
     config = SF.SurfaceFluxConfig(
         SF.ConstantRoughnessParams(FT(5.8e-5), FT(5.8e-5)),
         SF.ConstantGustinessSpec(FT(1)),
@@ -704,7 +696,8 @@ end
     eg = CMIPExt.build_exchange_grid(boundary_space, coastal_grid)
     CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
     thermo_params = TDP.ThermodynamicsParameters(FT)
-    surface_fluxes_params = SF.Parameters.SurfaceFluxesParameters(FT, SF.UniversalFunctions.BusingerParams)
+    surface_fluxes_params =
+        SF.Parameters.SurfaceFluxesParameters(FT, SF.UniversalFunctions.BusingerParams)
     config = SF.SurfaceFluxConfig(
         SF.COARE3RoughnessParams{FT}(),
         SF.ConstantGustinessSpec(FT(1)),

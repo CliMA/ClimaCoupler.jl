@@ -152,8 +152,7 @@ function build_exchange_grid(boundary_space, grid_oc)
         for k in eachindex(keep)
             c = oc_of_poly[k]
             i, j = mod1(c, Nx_oc), (c - 1) ÷ Nx_oc + 1
-            keep[k] =
-                !OC.ImmersedBoundaries.immersed_cell(i, j, Nz_oc, grid_with_mask_cpu)
+            keep[k] = !OC.ImmersedBoundaries.immersed_cell(i, j, Nz_oc, grid_with_mask_cpu)
         end
     end
 

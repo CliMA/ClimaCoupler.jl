@@ -11,6 +11,7 @@ import Dates
 import ClimaAnalysis
 import ClimaAnalysis: NCCatalog
 import ClimaCoupler
+import ClimaCoupler.Utilities
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaDiagnostics
 import ClimaUtilities.TimeManager: ITime
@@ -927,12 +928,10 @@ Update "start\\_date" and "t\\_end" in `config_dict` to match `start_date` and
 `end_date`.
 
 The `start\\_date` and `end\\_date` are converted to strings and the keys
-"start_date" and "t_end" in `config_dict` are updated accordingly. Note that any
-precision beyond days (e.g. hours, seconds, etc.) are not used for setting the
-start date.
+"start_date" and "t_end" in `config_dict` are updated accordingly.
 """
 function update_timespan!(config_dict, start_date::Dates.DateTime, end_date::Dates.DateTime)
-    start_date_str = Dates.format(start_date, "yyyymmdd")
+    start_date_str = Utilities.format_start_date(start_date)
     config_dict["start_date"] = start_date_str
     sim_length = Dates.Second(end_date - start_date)
     config_dict["t_end"] = "$(sim_length.value)secs"

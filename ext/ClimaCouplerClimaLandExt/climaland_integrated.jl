@@ -150,7 +150,9 @@ function ClimaLandSimulation(
             sim_start_date,
             sim_stop_date;
             modis_lai_ncdata_path = modis_lai_clim_path,
-            time_interpolation_method = LinearInterpolation(PeriodicCalendar()),
+            time_interpolation_method = LinearInterpolation(
+                PeriodicCalendar(Dates.Year(1), Dates.DateTime(2000)),
+            ),
         )
     else
         error(

@@ -108,10 +108,20 @@ function Plotting.debug(
 )
     isdir(dir) || mkpath(dir)
     @info "plotting debug in $dir"
-    for sim in cs.model_sims
-        Plotting.debug(sim, dir)
+    # Guarded: these heatmaps crash on current Makie with
+    # `BoundsError: attempt to access NTuple{4, Int64} at index [5]`, which would
+    # otherwise abort an otherwise-healthy AMIP run at its first debug output.
+    # Debug plots are diagnostics, not results, so degrade to a warning.
+    # NB: `scripts/update-coupler-to-main.sh` checks out origin/main over this
+    # file, so this guard must be re-applied after every coupler update.
+    try
+        for sim in cs.model_sims
+            Plotting.debug(sim, dir)
+        end
+        Plotting.debug(cs.fields, dir, cs_fields_ref)
+    catch err
+        @warn "debug plotting failed; continuing without debug plots" err
     end
-    Plotting.debug(cs.fields, dir, cs_fields_ref)
 end
 
 """

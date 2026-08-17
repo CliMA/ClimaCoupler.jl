@@ -168,6 +168,12 @@ end
     config_dict["walltime_dt"] = "never"
     @test Input.get_coupler_args(config_dict).walltime_dt == "never"
     delete!(config_dict, "walltime_dt") # undo
+
+    # walltime_debug is off by default and passed through when set
+    @test args.walltime_debug == false
+    config_dict["walltime_debug"] = true
+    @test Input.get_coupler_args(config_dict).walltime_debug == true
+    delete!(config_dict, "walltime_debug") # undo
 end
 
 @testset "get_diag_period" begin

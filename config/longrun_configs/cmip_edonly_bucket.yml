@@ -31,6 +31,7 @@ t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
 use_itime: true
+walltime_debug: true
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]
     period: 30days

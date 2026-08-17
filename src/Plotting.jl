@@ -133,17 +133,8 @@ function postprocess(
     # Note: slab ocean doesn't have diagnostics, so we only handle Oceananigans here
     make_ocean_diagnostics_plots(ocean_output_dir, artifacts_dir, output_prefix = "ocean_")
 
-    # Plot all model states and coupler fields (useful for debugging).
-    # Guarded: the ClimaCoreMakie/Makie debug heatmaps currently crash on this
-    # stack (ComputePipeline BoundsError); skip them so postprocess completes.
-    if ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext
-        try
-            debug(cs, artifacts_dir)
-        catch err
-            @warn "Skipping debug plots; plotting stack error in postprocess" exception =
-                (err, catch_backtrace())
-        end
-    end
+    # Plot all model states and coupler fields (useful for debugging)
+    ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext && debug(cs, artifacts_dir)
 
     # Helper function to find a tuple of (short_name, reduction, period, coord_type)
     # whose period is "1M".

@@ -1,5 +1,5 @@
 import ClimaDiagnostics as CD
-import ClimaCoupler: Interfacer, Utilities
+import ClimaCoupler: Interfacer, TimeManager, Utilities
 import Dates
 
 export diagnostics_setup, get_reduction
@@ -21,22 +21,6 @@ get_reduction(val) = error(
     "Diagnostic reduction $val not supported. " *
     "Supported reductions are: `:instantaneous`, `:average`, `:max`, `:min`.",
 )
-
-#### Custom Schedule for diagnostics that only get output once at the beginning of the simulation
-
-struct OnceSchedule <: CD.Schedules.AbstractSchedule end
-
-function (::OnceSchedule)(integrator)
-    return integrator.step == 1
-end
-
-function CD.Schedules.short_name(::OnceSchedule)
-    return "once"
-end
-
-function CD.Schedules.long_name(::OnceSchedule)
-    return "once at the first step of the simulation"
-end
 
 #### Diagnostics orchestration and setup functions
 
@@ -147,8 +131,8 @@ function diagnostics_setup(
     )
 
     # Schedule the land fraction to save and output at the first step only
-    compute_sched = OnceSchedule()
-    output_sched = OnceSchedule()
+    compute_sched = TimeManager.OnceSchedule()
+    output_sched = TimeManager.OnceSchedule()
     land_fraction_diag_sched = CD.ScheduledDiagnostic(
         variable = land_fraction_diag,
         output_writer = netcdf_writer,

@@ -10,7 +10,7 @@ dt_land: "120secs" # 2 minutes
 dt_ocean: "360secs" # 6 minutes
 dt_rad: "1hours"
 dt_seaice: "360secs" # 6 minutes
-energy_check: false
+conservation_check: false
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]
     period: 30days

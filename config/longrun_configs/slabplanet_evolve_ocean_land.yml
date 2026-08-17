@@ -1,5 +1,5 @@
+albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
-bucket_albedo_type: "function"
 dt: "240secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: "240secs"
@@ -13,9 +13,9 @@ extra_atmos_diagnostics:
     compute_every: 6hours
 evolving_ocean: true
 h_elem: 8
-mode_name: "slabplanet_aqua"
+land_model: "integrated"
+mode_name: "slabplanet"
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "5days"
-use_land_diagnostics: false
 walltime_debug: true

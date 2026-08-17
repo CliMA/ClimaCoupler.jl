@@ -142,7 +142,7 @@ Plotting.make_ocean_diagnostics_plots
 Plotting.debug
 Plotting.debug_plot_fields
 Plotting.debug_plot!
-Plotting.plot_global_conservation
+Plotting.plot_conservation
 Plotting.compute_leaderboard
 Plotting.compute_pfull_leaderboard
 ```

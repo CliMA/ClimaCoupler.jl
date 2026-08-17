@@ -4,6 +4,20 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Rename `energy_check` to `conservation_check` and rework `ConservationChecker`.
+The config flag is renamed, since it has always enabled both the energy and the
+water check, and more may be added in the future. The separate
+`EnergyConservationCheck` and `WaterConservationCheck` types are replaced by a
+single `ConservationCheck` parameterized on a conserved quantity (so far just
+`TotalEnergy` and `TotalWater` are defined), and `check_conservation!` is now 
+one generic method over any conserved quantity. Crucially, integrals of the
+conserved quantities are now computed on each model's *native grid* rather than
+on the boundary space. The running total is also no longer stored; each
+component's contribution in `cc.components` (previously `cc.sums`) is logged
+with the sign that makes summing them give the total.
+`Plotting.plot_global_conservation` has also been updated and renamed to
+`Plotting.plot_conservation`.
+
 #### Add `OrSchedule`, `PowerOfTwoSchedule`, `cs.step`, and a `walltime_debug` flag.
 Callback schedules now receive `(; t, step)` instead of just `(; t)`, so any
 `ClimaDiagnostics` schedule can be used as a coupler callback. `step` is a new

@@ -68,12 +68,11 @@ julia --project=experiments/AMIP -E "using Pkg; Pkg.instantiate()"
 julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl \
     --config_file config/ci_configs/amip_default.yml --job_id amip_default
 
-### Slabplanet (conservation testing)
+### Slabplanet
 ```bash
 julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl \
     --config_file config/ci_configs/slabplanet_default.yml --job_id slabplanet_default
 ```
-Set `energy_check: true` in the config to enable conservation tracking.
 
 ### Environment variables
 | Variable | Values | Effect |

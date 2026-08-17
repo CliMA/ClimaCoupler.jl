@@ -4,7 +4,7 @@ dt: "240secs"
 dt_cloud_fraction: "1hours"
 dt_cpl: "240secs"
 dt_rad: "1hours"
-energy_check: true
+conservation_check: true
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]
     period: 1months

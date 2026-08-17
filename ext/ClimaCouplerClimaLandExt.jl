@@ -16,7 +16,7 @@ import ClimaParams as CP
 import ClimaLand.Parameters as LP
 import Dates
 import ClimaUtilities.TimeVaryingInputs:
-    LinearInterpolation, PeriodicCalendar, TimeVaryingInput
+    LinearInterpolation, PeriodicCalendar, TimeVaryingInput, TimeVaryingInputs
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaCoupler:

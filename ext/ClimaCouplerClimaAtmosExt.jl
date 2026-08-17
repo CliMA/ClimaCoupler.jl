@@ -276,9 +276,18 @@ moisture_flux(
 ) = CC.Geometry.WVector.(integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot)
 
 ρq_tot(::CA.DryModel, integrator) = eltype(integrator.u)(0)
+
+# With the 0-moment scheme, precipitation is removed from `ρq_tot` within the
+# timestep, so we add back the water removed over the current step. This mirrors
+# the correction applied to `ρe_tot` in the `:energy` extension above; ClimaAtmos
+# computes the two as a matched pair (`ᶜρ_de_tot_dt = ᶜρ_dq_tot_dt * e_tot_hlpr`).
+function ρq_tot(::CA.EquilibriumMicrophysics0M, integrator)
+    (; ᶜρ_dq_tot_dt) = integrator.p.precomputed
+    return integrator.u.c.ρq_tot .- ᶜρ_dq_tot_dt .* float(integrator.dt)
+end
+
 ρq_tot(
     ::Union{
-        CA.EquilibriumMicrophysics0M,
         CA.NonEquilibriumMicrophysics1M,
         CA.NonEquilibriumMicrophysics2M,
         CA.NonEquilibriumMicrophysics2MP3,

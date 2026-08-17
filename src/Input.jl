@@ -190,8 +190,8 @@ function argparse_settings()
         arg_type = Bool
         default = true
         # Conservation and RMSE check information
-        "--energy_check"
-        help = "Boolean flag indicating whether to check energy conservation [`false` (default), `true`]"
+        "--conservation_check"
+        help = "Boolean flag indicating whether to check energy and water conservation [`false` (default), `true`]"
         arg_type = Bool
         default = false
         "--conservation_softfail"
@@ -582,7 +582,7 @@ function get_coupler_args(config_dict::Dict)
     evolving_ocean = config_dict["evolving_ocean"]
 
     # Conservation information
-    energy_check = config_dict["energy_check"]
+    conservation_check = config_dict["conservation_check"]
     conservation_softfail = config_dict["conservation_softfail"]
     rmse_check = config_dict["rmse_check"]
 
@@ -691,7 +691,7 @@ function get_coupler_args(config_dict::Dict)
         coupler_diagnostics_period,
         coupler_diagnostics_reduction,
         evolving_ocean,
-        energy_check,
+        conservation_check,
         conservation_softfail,
         rmse_check,
         output_dir_root,

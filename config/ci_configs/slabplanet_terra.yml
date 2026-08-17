@@ -3,7 +3,7 @@ bucket_albedo_type: "function"
 conservation_softfail: true
 dt: "200secs"
 dt_cpl: "200secs"
-energy_check: true
+conservation_check: true
 h_elem: 4
 mode_name: "slabplanet_terra"
 rad: "gray"

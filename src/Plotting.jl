@@ -29,7 +29,7 @@ function debug_plot! end
 
 function print_extrema end
 
-function plot_global_conservation end
+function plot_conservation end
 
 function compute_leaderboard end
 
@@ -44,7 +44,7 @@ extension_fns = [
         :debug_plot_fields,
         :debug_plot!,
         :print_extrema,
-        :plot_global_conservation,
+        :plot_conservation,
         :compute_leaderboard,
         :compute_pfull_leaderboard,
     ],
@@ -183,19 +183,15 @@ function postprocess(
     # Perform conservation checks if they exist
     if !isnothing(cs.conservation_checks)
         @info "Conservation Check Plots"
-        plot_global_conservation(
+        plot_conservation(
             cs.conservation_checks.energy,
             cs,
-            conservation_softfail,
-            figname1 = joinpath(artifacts_dir, "total_energy_bucket.png"),
-            figname2 = joinpath(artifacts_dir, "total_energy_log_bucket.png"),
+            figname = joinpath(artifacts_dir, "energy_conservation.png"),
         )
-        plot_global_conservation(
+        plot_conservation(
             cs.conservation_checks.water,
             cs,
-            conservation_softfail,
-            figname1 = joinpath(artifacts_dir, "total_water_bucket.png"),
-            figname2 = joinpath(artifacts_dir, "total_water_log_bucket.png"),
+            figname = joinpath(artifacts_dir, "water_conservation.png"),
         )
     end
 

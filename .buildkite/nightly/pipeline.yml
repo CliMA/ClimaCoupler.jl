@@ -59,6 +59,7 @@ steps:
   - wait
 
   - group: "Coarse AMIPs"
+    steps:
       - label: "Coarse current AMIP: progedmf + 1M + integrated land"
         key: "amip_progedmf_1m_land"
         command:

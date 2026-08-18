@@ -418,6 +418,7 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
         flux_scratch = nothing
         flux_dss_buffer = nothing
     end
+    uv_basis = uv_basis_coefficients(boundary_space)
 
     # `TripolarGrid` covers the full sphere by construction, so no polar
     # masking is needed on either the OC or CC side. The FV → SE projection
@@ -437,6 +438,7 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
         weight_cov_scratch,
         flux_scratch,
         flux_dss_buffer,
+        uv_basis,
         use_exchange_grid,
     )
 end
@@ -618,7 +620,12 @@ function _update_turbulent_fluxes_boundary!(sim::OceananigansSimulation, fields)
     ice_concentration_field = sim.ice_concentration
 
     # Convert the momentum fluxes from contravariant to Cartesian basis
-    contravariant_to_cartesian!(sim.remapping.temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz)
+    contravariant_to_cartesian!(
+        sim.remapping.temp_uv_vec,
+        F_turb_ρτxz,
+        F_turb_ρτyz,
+        sim.remapping.uv_basis,
+    )
     F_turb_ρτxz_uv = sim.remapping.temp_uv_vec.components.data.:1
     F_turb_ρτyz_uv = sim.remapping.temp_uv_vec.components.data.:2
 
@@ -725,7 +732,7 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
 
     # Gather the atmospheric and ocean-surface state onto the polygons.
-    gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec)
+    gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec, remapping.uv_basis)
     Nz = size(sim.ocean.model.grid, 3)
     gather_cells_to_polys!(
         fs.T_sfc,

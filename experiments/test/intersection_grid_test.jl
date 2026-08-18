@@ -31,6 +31,10 @@ CMIPExt = Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPExt)
 const FT = Float64
 context = ClimaComms.context()
 ClimaComms.init(context)
+to_cpu(x::Array) = x
+to_cpu(x) = Array(x)
+exchange_arch() = ClimaComms.device() isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
+on_exchange_device(x) = CMIPExt.on_device(exchange_arch(), x)
 
 radius = FT(6.371e6)
 boundary_space =
@@ -67,6 +71,7 @@ coastal_grid = OC.ImmersedBoundaryGrid(
     OC.GridFittedBottom((x, y) -> mod(x, 360) < 180 ? 100.0 : -200.0);
     active_cells_map = false,
 )
+uv_basis = CMIPExt.uv_basis_coefficients(boundary_space)
 
 # Ground-truth wet area of an immersed grid: the sum of the cell areas of
 # non-immersed cells, excluding the duplicated (shadow) half of the tripolar
@@ -121,9 +126,9 @@ end
         # the nodal quadrature weights Jw over each element) wherever the
         # element lies fully inside the ocean grid (north of 80°S).
         CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
-        Jw = CRExt.se_node_weights(boundary_space)
+        Jw = to_cpu(CRExt.se_node_weights(boundary_space))
         coords = CC.Fields.coordinate_field(boundary_space)
-        node_lat = CRExt.flat_nodal_data(CC.Fields.field_values(coords.lat))
+        node_lat = to_cpu(CRExt.flat_nodal_data(CC.Fields.field_values(coords.lat)))
         elem_area_from_Jw = zeros(FT, n_elem)
         elem_min_lat = fill(FT(90), n_elem)
         for n in 1:(eg.n_nodes)
@@ -181,7 +186,7 @@ end
         @test eg.node_cov == eg.node_cov_total
         CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
         coords = CC.Fields.coordinate_field(boundary_space)
-        node_lat = CRExt.flat_nodal_data(CC.Fields.field_values(coords.lat))
+        node_lat = to_cpu(CRExt.flat_nodal_data(CC.Fields.field_values(coords.lat)))
         for n in 1:(eg.n_nodes)
             if node_lat[n] > -75
                 # Interior nodes: geometric coverage is ≈ 1 to within the
@@ -240,7 +245,7 @@ import Random
 @testset "Gather/scatter operations" begin
     eg = CMIPExt.build_exchange_grid(boundary_space, coastal_grid)
     CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
-    Jw = CRExt.se_node_weights(boundary_space)
+    Jw = to_cpu(CRExt.se_node_weights(boundary_space))
     rng = Random.Xoshiro(42)
 
     poly_scratch = zeros(FT, eg.n_poly)
@@ -398,11 +403,11 @@ end
 
     CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
     coords = CC.Fields.coordinate_field(boundary_space)
-    node_lat = CRExt.flat_nodal_data(CC.Fields.field_values(coords.lat))
-    node_lon = CRExt.flat_nodal_data(CC.Fields.field_values(coords.long))
+    node_lat = to_cpu(CRExt.flat_nodal_data(CC.Fields.field_values(coords.lat)))
+    node_lon = to_cpu(CRExt.flat_nodal_data(CC.Fields.field_values(coords.long)))
 
     f = CMIPExt.wet_ocean_fraction_field(boundary_space, eg_c)
-    vals = CRExt.se_field_to_vec(f)
+    vals = to_cpu(CRExt.se_field_to_vec(f))
 
     # Bounds and non-triviality.
     @test all(v -> 0 <= v <= 1, vals)
@@ -423,7 +428,7 @@ end
 
     # Fully wet grid: fraction ≈ 1 everywhere the ocean grid reaches.
     f_wet = CMIPExt.wet_ocean_fraction_field(boundary_space, eg_wet)
-    wet_vals = CRExt.se_field_to_vec(f_wet)
+    wet_vals = to_cpu(CRExt.se_field_to_vec(f_wet))
     for n in 1:(eg_wet.n_nodes)
         if node_lat[n] > -60
             @test wet_vals[n] > 0.95
@@ -468,15 +473,15 @@ import ClimaCoupler: FluxCalculator, Utilities
         rng = Random.Xoshiro(7)
         ct1 = CC.Fields.zeros(boundary_space)
         ct2 = CC.Fields.zeros(boundary_space)
-        parent(ct1) .= randn(rng, FT, size(parent(ct1)))
-        parent(ct2) .= randn(rng, FT, size(parent(ct2)))
-        ct1_orig = copy(parent(ct1))
-        ct2_orig = copy(parent(ct2))
+        copyto!(parent(ct1), randn(rng, FT, size(parent(ct1))))
+        copyto!(parent(ct2), randn(rng, FT, size(parent(ct2))))
+        ct1_orig = to_cpu(parent(ct1))
+        ct2_orig = to_cpu(parent(ct2))
         uv = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
         CMIPExt.contravariant_to_cartesian!(uv, ct1, ct2)
         CMIPExt.cartesian_to_contravariant!(ct1, ct2, uv)
-        @test parent(ct1) ≈ ct1_orig rtol = 1e-10
-        @test parent(ct2) ≈ ct2_orig rtol = 1e-10
+        @test to_cpu(parent(ct1)) ≈ ct1_orig rtol = 1e-10
+        @test to_cpu(parent(ct2)) ≈ ct2_orig rtol = 1e-10
     end
 
     @testset "polygon kernel matches scalar SurfaceFluxes" begin
@@ -527,6 +532,11 @@ import ClimaCoupler: FluxCalculator, Utilities
         @test all(fs.acc_F_sh .== fs.F_sh)
 
         @testset "scatter to boundary space" begin
+            # Fields live on `boundary_space`'s device; gather/scatter kernels
+            # take the destination's backend, so the exchange grid and flux
+            # state must match (GPU CI uses CUDA Fields).
+            eg_d = on_exchange_device(eg)
+            fs_d = on_exchange_device(fs)
             flux_scratch = (;
                 F_turb_ρτxz = CC.Fields.zeros(boundary_space),
                 F_turb_ρτyz = CC.Fields.zeros(boundary_space),
@@ -536,7 +546,7 @@ import ClimaCoupler: FluxCalculator, Utilities
             )
             flux_dss_buffer = Utilities.init_dss_buffer(flux_scratch.F_sh)
             node_cov_dss = CC.Fields.zeros(boundary_space)
-            CRExt.vec_to_se_field!(node_cov_dss, eg.node_cov)
+            CRExt.vec_to_se_field!(node_cov_dss, on_exchange_device(eg.node_cov))
             Utilities.apply_dss!(node_cov_dss, flux_dss_buffer)
             temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
             weight_cov_scratch = CC.Fields.zeros(boundary_space)
@@ -546,17 +556,18 @@ import ClimaCoupler: FluxCalculator, Utilities
                 node_cov_dss,
                 weight_cov_scratch,
                 temp_uv_vec,
-                exchange_grid = eg,
+                uv_basis,
+                exchange_grid = eg_d,
             )
 
             # Open-water weighting (SIC = 0 here, so weight ≡ 1).
-            fs.scratch2 .= 1 .- fs.sic
-            CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg, fs, fs.scratch2)
+            fs_d.scratch2 .= 1 .- fs_d.sic
+            CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg_d, fs_d, fs_d.scratch2)
 
             # Scalar fluxes: uniform per-polygon values must be reproduced on
             # well-covered nodes and zeroed on uncovered ones.
-            sh = CRExt.se_field_to_vec(flux_scratch.F_sh)
-            covd = CRExt.se_field_to_vec(node_cov_dss)
+            sh = to_cpu(CRExt.se_field_to_vec(flux_scratch.F_sh))
+            covd = to_cpu(CRExt.se_field_to_vec(node_cov_dss))
             for n in 1:(eg.n_nodes)
                 if covd[n] > 0.5
                     @test sh[n] ≈ reference.F_sh rtol = 1e-10
@@ -572,8 +583,8 @@ import ClimaCoupler: FluxCalculator, Utilities
                 flux_scratch.F_turb_ρτxz,
                 flux_scratch.F_turb_ρτyz,
             )
-            τu = CRExt.se_field_to_vec(temp_uv_vec.components.data.:1)
-            τv = CRExt.se_field_to_vec(temp_uv_vec.components.data.:2)
+            τu = to_cpu(CRExt.se_field_to_vec(temp_uv_vec.components.data.:1))
+            τv = to_cpu(CRExt.se_field_to_vec(temp_uv_vec.components.data.:2))
             for n in 1:(eg.n_nodes)
                 if covd[n] > 0.5
                     @test τu[n] ≈ reference.F_turb_ρτxz rtol = 1e-8
@@ -656,6 +667,8 @@ end
     @test all(fs.acc_F_sh .== fs.F_sh)
 
     @testset "ice-weighted scatter" begin
+        eg_d = on_exchange_device(eg)
+        fs_d = on_exchange_device(fs)
         flux_scratch = (;
             F_turb_ρτxz = CC.Fields.zeros(boundary_space),
             F_turb_ρτyz = CC.Fields.zeros(boundary_space),
@@ -671,15 +684,16 @@ end
             flux_dss_buffer,
             weight_cov_scratch,
             temp_uv_vec,
-            exchange_grid = eg,
+            uv_basis,
+            exchange_grid = eg_d,
         )
-        CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg, fs, fs.sic)
+        CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg_d, fs_d, fs_d.sic)
 
         # The sic-weighted average of a field that is uniform on icy polygons
         # is exactly that value wherever any ice coverage exists.
         CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
-        sh = CRExt.se_field_to_vec(flux_scratch.F_sh)
-        cov = CRExt.se_field_to_vec(weight_cov_scratch)
+        sh = to_cpu(CRExt.se_field_to_vec(flux_scratch.F_sh))
+        cov = to_cpu(CRExt.se_field_to_vec(weight_cov_scratch))
         F_ice = fs.F_sh[icy[1]]
         for n in 1:(eg.n_nodes)
             if cov[n] > 0.1
@@ -692,8 +706,10 @@ end
 end
 
 @testset "Full ocean flux driver allocations (CPU)" begin
-    eg = CMIPExt.build_exchange_grid(boundary_space, coastal_grid)
-    CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
+    eg_cpu = CMIPExt.build_exchange_grid(boundary_space, coastal_grid)
+    # Gather/scatter kernels follow the destination backend; Fields are on
+    # `boundary_space`'s device, so the exchange grid and flux state match it.
+    eg = on_exchange_device(eg_cpu)
     thermo_params = TDP.ThermodynamicsParameters(FT)
     surface_fluxes_params =
         SF.Parameters.SurfaceFluxesParameters(FT, SF.UniversalFunctions.BusingerParams)
@@ -728,14 +744,21 @@ end
         flux_dss_buffer = Utilities.init_dss_buffer(flux_scratch.F_sh),
         weight_cov_scratch = CC.Fields.zeros(boundary_space),
         temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space),
+        uv_basis,
         exchange_grid = eg,
     )
-    fs = CMIPExt.ExchangeFluxState{FT}(OC.CPU(), eg.n_poly)
+    fs = CMIPExt.ExchangeFluxState{FT}(exchange_arch(), eg.n_poly)
     fs.T_sfc .= FT(290)
     fs.sic .= 0
 
     function ocean_driver!()
-        CMIPExt.gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec)
+        CMIPExt.gather_atmos_state_to_polys!(
+            fs,
+            eg,
+            csf,
+            remapping.temp_uv_vec,
+            remapping.uv_basis,
+        )
         CMIPExt.compute_ocean_polygon_fluxes!(
             fs,
             surface_fluxes_params,
@@ -748,10 +771,9 @@ end
     end
 
     ocean_driver!()
-    allocated = @allocated ocean_driver!()
-    # The steady-state driver may only allocate small wrappers (array views,
-    # broadcast objects, KernelAbstractions CPU launches) — no O(n_poly) or
-    # O(n_nodes) buffers.
-    @test allocated < 100_000
-    @test all(isfinite, parent(flux_scratch.F_sh))
+    if exchange_arch() isa OC.CPU
+        allocated = @allocated ocean_driver!()
+        @test allocated < 100_000
+    end
+    @test all(isfinite, to_cpu(parent(flux_scratch.F_sh)))
 end

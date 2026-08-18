@@ -457,7 +457,12 @@ function _update_ice_turbulent_fluxes_boundary!(sim::ClimaSeaIceSimulation, fiel
     # We only need to provide momentum fluxes if the sea ice model has dynamics
     if !isnothing(sim.ice.model.dynamics)
         # Convert the momentum fluxes from contravariant to Cartesian basis
-        contravariant_to_cartesian!(sim.remapping.temp_uv_vec, F_turb_ρτxz, F_turb_ρτyz)
+        contravariant_to_cartesian!(
+            sim.remapping.temp_uv_vec,
+            F_turb_ρτxz,
+            F_turb_ρτyz,
+            sim.remapping.uv_basis,
+        )
         F_turb_ρτxz_uv = sim.remapping.temp_uv_vec.components.data.:1
         F_turb_ρτyz_uv = sim.remapping.temp_uv_vec.components.data.:2
 
@@ -524,13 +529,12 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
     grid = sim.ice.model.grid
     C_to_K = FT(sim.ice_properties.C_to_K)
     surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
-    CRExt = get_ConservativeRegriddingCCExt()
 
     # Atmospheric state, including the downwelling radiation entering the
     # skin-temperature balance.
-    gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec)
-    gather_nodes_to_polys!(is.SW_d, eg, CRExt.se_field_to_vec(csf.SW_d))
-    gather_nodes_to_polys!(is.LW_d, eg, CRExt.se_field_to_vec(csf.LW_d))
+    gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec, remapping.uv_basis)
+    gather_nodes_to_polys!(is.SW_d, eg, se_nodal_vec(csf.SW_d))
+    gather_nodes_to_polys!(is.LW_d, eg, se_nodal_vec(csf.LW_d))
 
     # Ice state from the owning cells. Conductive resistance
     # R = h_ice/k_ice + h_snow/k_snow (series; reduces to h_ice/k_ice with no

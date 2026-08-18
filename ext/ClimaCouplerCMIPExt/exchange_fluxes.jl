@@ -18,6 +18,7 @@ the compute device.
 
 import StaticArrays
 import NVTX
+import ClimaComms
 
 """
     ExchangeFluxState{FT, VF}
@@ -127,33 +128,33 @@ end
 
 """
     gather_atmos_state_to_polys!(fs::ExchangeFluxState, eg::ExchangeGrid, csf,
-                                 temp_uv_vec)
+                                 temp_uv_vec, uv_basis)
 
 Gather the atmospheric near-surface state from the coupler fields (SE nodal)
 onto the exchange-grid polygons. `csf.u_int`/`csf.v_int` are converted from
 the local CT1/CT2 basis to the global UV basis before gathering, so
 per-polygon winds and stresses are basis-consistent across the nodes a
-polygon touches.
+polygon touches. `uv_basis` is the output of [`uv_basis_coefficients`](@ref).
 """
 NVTX.@annotate function gather_atmos_state_to_polys!(
     fs::ExchangeFluxState,
     eg::ExchangeGrid,
     csf,
     temp_uv_vec,
+    uv_basis,
 )
-    CRExt = get_ConservativeRegriddingCCExt()
-    contravariant_to_cartesian!(temp_uv_vec, csf.u_int, csf.v_int)
+    contravariant_to_cartesian!(temp_uv_vec, csf.u_int, csf.v_int, uv_basis)
     u_uv = temp_uv_vec.components.data.:1
     v_uv = temp_uv_vec.components.data.:2
-    gather_nodes_to_polys!(fs.u_atmos, eg, CRExt.se_field_to_vec(u_uv))
-    gather_nodes_to_polys!(fs.v_atmos, eg, CRExt.se_field_to_vec(v_uv))
-    gather_nodes_to_polys!(fs.T_atmos, eg, CRExt.se_field_to_vec(csf.T_atmos))
-    gather_nodes_to_polys!(fs.q_tot, eg, CRExt.se_field_to_vec(csf.q_tot_atmos))
-    gather_nodes_to_polys!(fs.q_liq, eg, CRExt.se_field_to_vec(csf.q_liq_atmos))
-    gather_nodes_to_polys!(fs.q_ice, eg, CRExt.se_field_to_vec(csf.q_ice_atmos))
-    gather_nodes_to_polys!(fs.ρ_atmos, eg, CRExt.se_field_to_vec(csf.ρ_atmos))
-    gather_nodes_to_polys!(fs.height_int, eg, CRExt.se_field_to_vec(csf.height_int))
-    gather_nodes_to_polys!(fs.height_sfc, eg, CRExt.se_field_to_vec(csf.height_sfc))
+    gather_nodes_to_polys!(fs.u_atmos, eg, se_nodal_vec(u_uv))
+    gather_nodes_to_polys!(fs.v_atmos, eg, se_nodal_vec(v_uv))
+    gather_nodes_to_polys!(fs.T_atmos, eg, se_nodal_vec(csf.T_atmos))
+    gather_nodes_to_polys!(fs.q_tot, eg, se_nodal_vec(csf.q_tot_atmos))
+    gather_nodes_to_polys!(fs.q_liq, eg, se_nodal_vec(csf.q_liq_atmos))
+    gather_nodes_to_polys!(fs.q_ice, eg, se_nodal_vec(csf.q_ice_atmos))
+    gather_nodes_to_polys!(fs.ρ_atmos, eg, se_nodal_vec(csf.ρ_atmos))
+    gather_nodes_to_polys!(fs.height_int, eg, se_nodal_vec(csf.height_int))
+    gather_nodes_to_polys!(fs.height_sfc, eg, se_nodal_vec(csf.height_sfc))
     return nothing
 end
 
@@ -481,17 +482,64 @@ NVTX.@annotate function compute_ice_polygon_fluxes!(
 end
 
 """
+    cartesian_to_contravariant!(ρτxz, ρτyz, uv_field, uv_basis)
     cartesian_to_contravariant!(ρτxz, ρτyz, uv_field)
 
 Convert a `UVVector` field into the local CT1/CT2 unit-basis components
-expected by the coupler flux fields (`csf.F_turb_ρτxz/yz`), via
-`CA.projected_vector_data` — the same projection that defines `csf.u_int` in
-the ClimaAtmos extension. Exact inverse of `contravariant_to_cartesian!`.
+expected by the coupler flux fields (`csf.F_turb_ρτxz/yz`). Exact inverse of
+`contravariant_to_cartesian!`. The 4-argument form applies precomputed
+[`uv_basis_coefficients`](@ref); the 3-argument form builds them on the fly.
 """
-function cartesian_to_contravariant!(ρτxz, ρτyz, uv_field)
-    local_geometry = CC.Fields.local_geometry_field(ρτxz)
-    @. ρτxz = CA.projected_vector_data(CT1, uv_field, local_geometry)
-    @. ρτyz = CA.projected_vector_data(CT2, uv_field, local_geometry)
+cartesian_to_contravariant!(ρτxz, ρτyz, uv_field) =
+    cartesian_to_contravariant!(ρτxz, ρτyz, uv_field, uv_basis_coefficients(axes(ρτxz)))
+
+function cartesian_to_contravariant!(ρτxz, ρτyz, uv_field, uv_basis)
+    a = parent(ρτxz)
+    b = parent(ρτyz)
+    u = parent(uv_field.components.data.:1)
+    v = parent(uv_field.components.data.:2)
+    p11 = parent(uv_basis.u_to_ct1)
+    p12 = parent(uv_basis.v_to_ct1)
+    p21 = parent(uv_basis.u_to_ct2)
+    p22 = parent(uv_basis.v_to_ct2)
+    @. a = p11 * u + p12 * v
+    @. b = p21 * u + p22 * v
+    return nothing
+end
+
+"""
+    scalar_weighted_dss!(field::CC.Fields.Field, buffer)
+
+Weighted DSS for a scalar field, bit-identical to `Spaces.weighted_dss!` but
+without loading `LocalGeometry` (which `dss_transform` does even for scalars,
+boxing a 22-float struct per perimeter node at `-O0`). Multiplies by
+`dss_weights` then reuses `buffer` for the unweighted topology DSS.
+"""
+function scalar_weighted_dss!(field::CC.Fields.Field, buffer)
+    isnothing(buffer) && return nothing
+    data = CC.Fields.field_values(field)
+    space = axes(field)
+    topo = CC.Spaces.topology(space)
+    device = ClimaComms.device(topo)
+    perimeter = CC.Topologies.Perimeter2D(size(data, 2))
+    dp = parent(data)
+    wp = parent(CC.Spaces.dss_weights(space))
+    @. dp = dp * wp
+    CC.Topologies.dss_load_perimeter_data!(device, buffer, data, perimeter)
+    CC.Topologies.dss_local_ghost!(device, buffer.perimeter_data, perimeter, topo)
+    CC.Topologies.fill_send_buffer!(device, buffer)
+    ClimaComms.start(buffer.graph_context)
+    CC.Topologies.dss_local!(device, buffer.perimeter_data, perimeter, topo)
+    ClimaComms.finish(buffer.graph_context)
+    CC.Topologies.load_from_recv_buffer!(device, buffer)
+    CC.Topologies.dss_ghost!(device, buffer.perimeter_data, perimeter, topo)
+    CC.Topologies.dss_unload_perimeter_data!(device, data, buffer, perimeter)
+    return nothing
+end
+
+function _dss_and_normalize!(field, cov, buffer, cutoff, z)
+    scalar_weighted_dss!(field, buffer)
+    @. field = ifelse(cov > cutoff, field / max(cov, cutoff), z)
     return nothing
 end
 
@@ -519,31 +567,39 @@ NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
     weight;
     cov_cutoff = 1e-3,
 )
-    CRExt = get_ConservativeRegriddingCCExt()
     fx = remapping.flux_scratch
     cov = remapping.weight_cov_scratch
-    scatter_polys_to_nodes!(CRExt.se_field_to_vec(cov), eg, weight)
+    scatter_polys_to_nodes!(se_nodal_vec(cov), eg, weight)
 
     @. fs.scratch1 = weight * fs.F_sh
-    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_sh), eg, fs.scratch1)
+    scatter_polys_to_nodes!(se_nodal_vec(fx.F_sh), eg, fs.scratch1)
     @. fs.scratch1 = weight * fs.F_lh
-    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_lh), eg, fs.scratch1)
+    scatter_polys_to_nodes!(se_nodal_vec(fx.F_lh), eg, fs.scratch1)
     @. fs.scratch1 = weight * fs.F_moisture
-    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_turb_moisture), eg, fs.scratch1)
+    scatter_polys_to_nodes!(se_nodal_vec(fx.F_turb_moisture), eg, fs.scratch1)
     @. fs.scratch1 = weight * fs.F_τu
-    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_turb_ρτxz), eg, fs.scratch1)
+    scatter_polys_to_nodes!(se_nodal_vec(fx.F_turb_ρτxz), eg, fs.scratch1)
     @. fs.scratch1 = weight * fs.F_τv
-    scatter_polys_to_nodes!(CRExt.se_field_to_vec(fx.F_turb_ρτyz), eg, fs.scratch1)
+    scatter_polys_to_nodes!(se_nodal_vec(fx.F_turb_ρτyz), eg, fs.scratch1)
 
-    Utilities.apply_dss!(cov, remapping.flux_dss_buffer)
     FT = CC.Spaces.undertype(axes(cov))
     cutoff = FT(cov_cutoff)
-    for field in values(fx)
-        Utilities.apply_dss!(field, remapping.flux_dss_buffer)
-        @. field = ifelse(cov > cutoff, field / max(cov, cutoff), FT(0))
-    end
+    z = zero(FT)
+    buf = remapping.flux_dss_buffer
+    scalar_weighted_dss!(cov, buf)
+    _dss_and_normalize!(fx.F_sh, cov, buf, cutoff, z)
+    _dss_and_normalize!(fx.F_lh, cov, buf, cutoff, z)
+    _dss_and_normalize!(fx.F_turb_moisture, cov, buf, cutoff, z)
+    _dss_and_normalize!(fx.F_turb_ρτxz, cov, buf, cutoff, z)
+    _dss_and_normalize!(fx.F_turb_ρτyz, cov, buf, cutoff, z)
 
-    @. remapping.temp_uv_vec = CC.Geometry.UVVector(fx.F_turb_ρτxz, fx.F_turb_ρτyz)
-    cartesian_to_contravariant!(fx.F_turb_ρτxz, fx.F_turb_ρτyz, remapping.temp_uv_vec)
+    parent(remapping.temp_uv_vec.components.data.:1) .= parent(fx.F_turb_ρτxz)
+    parent(remapping.temp_uv_vec.components.data.:2) .= parent(fx.F_turb_ρτyz)
+    cartesian_to_contravariant!(
+        fx.F_turb_ρτxz,
+        fx.F_turb_ρτyz,
+        remapping.temp_uv_vec,
+        remapping.uv_basis,
+    )
     return nothing
 end

@@ -32,7 +32,6 @@ end
 A getter function, that should not allocate. If undefined, it returns a descriptive error.
 """
 get_field(sim::AbstractSurfaceStub, ::Val{:area_fraction}) = sim.cache.area_fraction
-get_field(sim::AbstractSurfaceStub, ::Val{:energy}) = nothing
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_buoyancy}) = sim.cache.z0b
 get_field(sim::AbstractSurfaceStub, ::Val{:roughness_momentum}) = sim.cache.z0m
 get_field(sim::AbstractSurfaceStub, ::Val{:surface_direct_albedo}) = sim.cache.α_direct

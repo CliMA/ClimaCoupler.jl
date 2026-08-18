@@ -303,37 +303,35 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature}) =
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:roughness_model}) = :constant
 
 """
-    Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:energy})
+    Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:total_energy})
 
-Extension of Interfacer.get_field that provides the total energy per unit ground area
-of the integrated land model, summed over all of its prognostic components (soil,
-canopy, snow, and the lake model if one is present).
-
-This method is required by the ConservationChecker to check energy conservation.
+Extension of Interfacer.get_field that provides the total energy held by the
+integrated land model (in J), summed over all of its prognostic components (soil,
+canopy, snow, and the lake model if one is present) and integrated over the area
+the land covers.
 """
-function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:energy})
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:total_energy})
     (; u, p, t) = sim.integrator
     # `total_energy_per_area!` needs a surface field to fill and one for scratch space
     total_energy = CC.Fields.zeros(axes(p.T_sfc))
     sfc_cache = CC.Fields.zeros(axes(p.T_sfc))
     CL.total_energy_per_area!(total_energy, sim.model, u, p, t, sfc_cache)
-    return total_energy # J / m^2
+    area_fraction = area_fraction_on(sim, axes(total_energy))
+    return Utilities.area_weighted_integral(total_energy, area_fraction)
 end
 
 """
-    Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water})
+    Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:total_water})
 
-Extension of Interfacer.get_field that provides the total water contained in the
-integrated land model, summed over all of its prognostic components (soil, canopy,
-snow, and the lake model if one is present).
+Extension of Interfacer.get_field that provides the total water held by the
+integrated land model (in kg), summed over all of its prognostic components and
+integrated over the area the land covers.
 
-ClimaLand reports this as the liquid water volume per unit ground area that would
-result if all the water were in the liquid phase, so we convert to a mass per unit
-area using the density of liquid water.
-
-This method is required by the ConservationChecker to check water conservation.
+ClimaLand reports this as the liquid water volume per unit ground area that
+would result if all the water were in the liquid phase, so we convert to a mass
+using the density of liquid water.
 """
-function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water})
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:total_water})
     (; u, p, t) = sim.integrator
     ρ_cloud_liq = LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set)
     # `total_liq_water_vol_per_area!` needs a surface field to fill and one for scratch space
@@ -341,27 +339,18 @@ function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water})
     sfc_cache = CC.Fields.zeros(axes(p.T_sfc))
     CL.total_liq_water_vol_per_area!(total_water, sim.model, u, p, t, sfc_cache)
     total_water .*= ρ_cloud_liq
-    return total_water # kg water / m^2
+    area_fraction = area_fraction_on(sim, axes(total_water))
+    return Utilities.area_weighted_integral(total_water, area_fraction)
 end
 
-"""
-    Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:runoff})
-
-Extension of Interfacer.get_field that provides the total runoff out of the land
-model, i.e. the sum of the surface and subsurface runoff. Runoff is not routed to
-the ocean, so this water leaves the coupled system entirely; a positive value is a
-loss of water from the land.
-
-Returns `nothing` if the soil model is configured without runoff.
-
-This method is required by the ConservationChecker to check water conservation.
-"""
+# Compute the sum of the surface and subsurface runoff; this is not yet routed to
+# the ocean, so it leaves the coupled system entirely
 function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:runoff})
     (; u, p) = sim.integrator
     runoff_model = sim.model.soil.boundary_conditions.top.runoff
     R_s = CL.Soil.Runoff.get_surface_runoff(runoff_model, u, p)
     R_ss = CL.Soil.Runoff.get_subsurface_runoff(runoff_model, u, p)
-    (isnothing(R_s) && isnothing(R_ss)) && return nothing
+    (isnothing(R_s) && isnothing(R_ss)) && return nothing # model configured without runoff
 
     ρ_cloud_liq = LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set)
     # Runoff is reported as a volume flux of liquid water per unit ground area
@@ -369,31 +358,17 @@ function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:runoff})
     isnothing(R_s) || (total_runoff .+= R_s)
     isnothing(R_ss) || (total_runoff .+= R_ss)
     total_runoff .*= ρ_cloud_liq
-    return total_runoff # kg water / m^2 / s
+    area_fraction = area_fraction_on(sim, axes(total_runoff))
+    return Utilities.area_weighted_integral(total_runoff, area_fraction) # kg / s
 end
 
-"""
-    Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:nonflux_water})
-
-Extension of Interfacer.get_field that provides the water counted in the canopy
-that never arrived as a flux.
-
-The canopy water content is reported by ClimaLand as `height * LAI * ϑ_l`, and LAI
-is prescribed (e.g. from MODIS) rather than prognostic. The canopy reservoir
-therefore grows and shrinks as the prescribed LAI does, with no corresponding water
-flux, which shows up in the coupler as a spurious source or sink. This returns the
-cumulative size of that artifact, `height * (LAI(t) - LAI(0)) * ϑ_l(t)`, so that the
-ConservationChecker can remove it.
-
-Note that this is the difference between the current canopy water and what it would
-be with LAI held fixed, which differs from the exact time integral `∫ height * ϑ_l
-dLAI` at second order in the variation of `ϑ_l`. The proper fix is for the canopy
-water to be prognostic; this is bookkeeping around a diagnostic that is not a
-conserved quantity.
-
-This method is required by the ConservationChecker to check water conservation.
-"""
-function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:nonflux_water})
+# The canopy water content is reported by ClimaLand as `height * LAI * ϑ_l`, and LAI
+# is prescribed (e.g. from MODIS) rather than prognostic. The canopy reservoir
+# therefore grows and shrinks as the prescribed LAI does, with no corresponding water
+# flux, which shows up in the coupler as a spurious source or sink. This returns the
+# cumulative size of that artifact, `height * (LAI(t) - LAI(0)) * ϑ_l(t)`, so that the
+# ConservationChecker can remove it.
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:lai_leakage})
     (; u, p) = sim.integrator
     biomass = sim.model.canopy.biomass
 
@@ -403,7 +378,10 @@ function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:nonflux_water})
 
     ρ_cloud_liq = LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set)
     lai = p.canopy.biomass.area_index.leaf
-    return @. biomass.height * (lai - lai_initial) * u.canopy.hydraulics.ϑ_l * ρ_cloud_liq # kg water / m^2
+    leakage =
+        @. biomass.height * (lai - lai_initial) * u.canopy.hydraulics.ϑ_l * ρ_cloud_liq
+    area_fraction = area_fraction_on(sim, axes(leakage))
+    return Utilities.area_weighted_integral(leakage, area_fraction) # kg
 end
 
 # Update fields stored in land drivers

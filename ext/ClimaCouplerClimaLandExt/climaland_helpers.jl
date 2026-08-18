@@ -1,4 +1,17 @@
 """
+    area_fraction_on(sim, space)
+
+Return `sim`'s area fraction on `space`.
+
+The land models can run on their own surface space, while the area fraction the
+coupler hands them lives on the boundary space. These are the same space when
+`share_surface_space` is enabled (the default), in which case the `remap` is a
+no-op.
+"""
+area_fraction_on(sim, space) =
+    Interfacer.remap(space, Interfacer.get_field(sim, Val(:area_fraction)))
+
+"""
     temp_anomaly_aquaplanet(coord)
 
 Introduce a temperature IC anomaly for the aquaplanet case.

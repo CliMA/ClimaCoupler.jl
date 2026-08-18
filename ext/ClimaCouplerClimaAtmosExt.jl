@@ -178,7 +178,7 @@ end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
 
 Extension of Interfacer.get_field to get the net TOA radiation, which is a sum of the
-upward and downward longwave and shortwave radiation.
+upward and downward longwave and shortwave radiation, integrated over the globe (W).
 """
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
     FT = eltype(sim.integrator.u)
@@ -212,23 +212,29 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy
             nz_faces - CC.Utilities.half,
         )
 
-        return @. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA)
+        return Utilities.integral(@. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA))
     else
-        return FT[0]
+        return zero(FT)
     end
 end
 
-function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:energy})
+"""
+    Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:total_energy})
+
+Extension of Interfacer.get_field that provides the total energy of the atmosphere,
+`∫ ρe_tot dV`, integrated over the whole domain (in Joules).
+"""
+function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:total_energy})
     integrator = sim.integrator
     p = integrator.p
 
-    # return total energy and (if EquilibriumMicrophysics0M) the energy lost due to precipitation removal
     microphysics_model = integrator.p.atmos.microphysics_model
     if microphysics_model isa CA.EquilibriumMicrophysics0M
+        # Add back in the energy removed by precipitation over the current timestep for 0-moment scheme
         (; ᶜρ_de_tot_dt) = p.precomputed
-        return integrator.u.c.ρe_tot .- ᶜρ_de_tot_dt .* float(integrator.dt)
+        return sum(integrator.u.c.ρe_tot .- ᶜρ_de_tot_dt .* float(integrator.dt))
     else
-        return integrator.u.c.ρe_tot
+        return sum(integrator.u.c.ρe_tot)
     end
 end
 
@@ -374,8 +380,18 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})
         CC.Utilities.half,
     )
 end
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:water}) =
-    ρq_tot(sim.integrator.p.atmos.microphysics_model, sim.integrator)
+
+"""
+    Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:total_water})
+
+Extension of Interfacer.get_field that provides the total water of the atmosphere,
+`∫ ρq_tot dV`, integrated over the whole domain (in kilograms). Returns zero for a dry model.
+"""
+function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:total_water})
+    ρq = ρq_tot(sim.integrator.p.atmos.microphysics_model, sim.integrator)
+    ρq isa Number && return ρq # the dry model has no water to integrate
+    return sum(ρq)
+end
 
 function Interfacer.update_field!(
     sim::ClimaAtmosSimulation,

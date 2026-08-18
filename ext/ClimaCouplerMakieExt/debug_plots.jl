@@ -72,35 +72,28 @@ function Plotting.plot_conservation(
     Makie.resize_to_layout!(f)
     Makie.save(figname, f)
 
-    # Summarize the budget as a table, with the total on the last row
-    header = ("Component", "Value", "Change", "Change (%)")
+    # Summarize the budget at the end of the simulation with a table
+    header = ("Component", "Value ($units)", "Change ($units)", "Change (%)")
     rows = [header]
     for (component, timeseries) in pairs((; components..., total))
         value = timeseries[end]
         change = timeseries[end] - timeseries[1]
-        # terms stored negated can hold `-0.0`, which would print as `-0.000e+00`
-        iszero(value) && (value = zero(value))
-        iszero(change) && (change = zero(change))
         push!(
             rows,
             (
                 string(component),
                 Printf.@sprintf("%.3e", value),
                 Printf.@sprintf("%.3e", change),
-                # a component that holds none of the quantity has no relative change
                 iszero(value) ? "n/a" : Printf.@sprintf("%.2f", change / value * 100),
             ),
         )
     end
-
-    # pad every column to its widest entry, with the numbers right-aligned
     widths = [maximum(length(row[i]) for row in rows) for i in eachindex(header)]
     format_row(row) =
         "\n  " *
         rpad(row[1], widths[1]) *
         join("  " * lpad(row[i], widths[i]) for i in 2:lastindex(widths))
-
-    info_msg = "Total $name ($units) at end of simulation:"
+    info_msg = "Total $name at end of simulation:"
     info_msg *= format_row(header)
     info_msg *= "\n  " * repeat("-", sum(widths) + 2 * (length(widths) - 1))
     for row in rows[2:end]

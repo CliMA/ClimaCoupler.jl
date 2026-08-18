@@ -97,8 +97,7 @@ function step!(cs::Interfacer.CoupledSimulation)
     cs.t[] += cs.Δt_cpl
     cs.step[] += 1
 
-    # Compute global energy and water conservation checks
-    # (only for slabplanet if tracking conservation is enabled)
+    # Compute checks on conserved quantities
     ConservationChecker.check_conservation!(cs)
 
     # Step component model simulations sequentially for one coupling timestep (Δt_cpl)

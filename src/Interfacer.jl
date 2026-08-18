@@ -44,13 +44,6 @@ export CoupledSimulation,
     is_column_mode
 
 """
-    AbstractSimulation
-
-An abstract super-type representing a simulation.
-"""
-abstract type AbstractSimulation{FT} end
-
-"""
     CoupledSimulation
 
 Stores information needed to run a simulation with the coupler.
@@ -289,10 +282,11 @@ get_field_error(sim, val::Val{X}) where {X} =
     error("undefined field `$X` for $(nameof(sim))")
 
 # Set default values for fields that are not defined in all component models
-get_field(::AbstractComponentSimulation, ::Val{:energy}) = nothing
-get_field(::AbstractComponentSimulation, ::Val{:water}) = nothing
-get_field(::AbstractComponentSimulation, ::Val{:runoff}) = nothing
-get_field(::AbstractComponentSimulation, ::Val{:nonflux_water}) = nothing
+get_field(::AbstractComponentSimulation, ::Val{:total_energy}) = nothing # J
+get_field(::AbstractComponentSimulation, ::Val{:total_water}) = nothing # kg
+get_field(::AbstractComponentSimulation, ::Val{:runoff}) = nothing # kg / s
+get_field(::AbstractComponentSimulation, ::Val{:lai_leakage}) = nothing # kg
+get_field(::AbstractSurfaceSimulation, ::Val{:radiative_energy_flux_toa}) = nothing # W
 get_field(sim::AbstractSurfaceSimulation, ::Val{:emissivity}) =
     convert(eltype(sim.integrator.u), 1.0)
 get_field(sim::AbstractSurfaceSimulation, ::Val{:height_disp}) =

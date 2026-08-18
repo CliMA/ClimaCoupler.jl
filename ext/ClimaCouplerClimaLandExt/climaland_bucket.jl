@@ -264,29 +264,31 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
 Interfacer.get_field(sim::BucketSimulation, ::Val{:roughness_model}) = :constant
 
 """
-    Interfacer.get_field(sim::BucketSimulation, ::Val{:energy})
+    Interfacer.get_field(sim::BucketSimulation, ::Val{:total_energy})
 
-Extension of Interfacer.get_field that provides the total energy contained in the bucket,
-computed from the temperature of the bucket and also including the latent heat of fusion
-of frozen water in the snow.
-
-This method is required by the ConservationChecker to check energy conservation.
+Extension of Interfacer.get_field that provides the total energy contained in the bucket
+(in J), computed from the temperature of the bucket and also including the latent heat of
+fusion of frozen water in the snow, integrated over the area the bucket covers.
 """
-Interfacer.get_field(sim::BucketSimulation, ::Val{:energy}) =
-    sim.integrator.p.bucket.total_energy
+function Interfacer.get_field(sim::BucketSimulation, ::Val{:total_energy})
+    total_energy = sim.integrator.p.bucket.total_energy
+    area_fraction = area_fraction_on(sim, axes(total_energy))
+    return Utilities.area_weighted_integral(total_energy, area_fraction)
+end
 
 """
-    Interfacer.get_field(sim::BucketSimulation, ::Val{:water})
+    Interfacer.get_field(sim::BucketSimulation, ::Val{:total_water})
 
-Extension of Interfacer.get_field that provides the total water contained in the bucket.
-The total water contained in the bucket is the sum of the subsurface water storage `W`,
-the snow water equivalent `σS`, and surface water content `Ws`.
-
-This method is required by the ConservationChecker to check water conservation.
+Extension of Interfacer.get_field that provides the total water contained in the bucket
+(in kg), integrated over the area the bucket covers. The total water contained in the
+bucket is the sum of the subsurface water storage `W`, the snow water equivalent `σS`,
+and surface water content `Ws`.
 """
-function Interfacer.get_field(sim::BucketSimulation, ::Val{:water})
+function Interfacer.get_field(sim::BucketSimulation, ::Val{:total_water})
     ρ_cloud_liq = CL.LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
-    return sim.integrator.p.bucket.total_water .* ρ_cloud_liq # kg water / m2
+    total_water = sim.integrator.p.bucket.total_water .* ρ_cloud_liq
+    area_fraction = area_fraction_on(sim, axes(total_water))
+    return Utilities.area_weighted_integral(total_water, area_fraction)
 end
 
 function Interfacer.update_field!(

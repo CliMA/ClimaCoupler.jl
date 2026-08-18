@@ -382,14 +382,17 @@ ice_surface_temperature(T_bulk, T_base, T_sfc_min, T_freeze) =
     clamp(2 * T_bulk - T_base, T_sfc_min, T_freeze)
 
 """
-    Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:energy})
+    Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:total_energy})
 
-Extension of Interfacer.get_field to get the energy of the ocean.
-It multiplies the the slab temperature by the heat capacity, density, and depth.
+Extension of Interfacer.get_field to get the total energy of the prescribed
+sea-ice slab (in Joules) as ∫_sea-ice (h * ρ * c * T_bulk) dA
 """
-Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:energy}) =
-    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_bulk .*
-    sim.integrator.p.params.h
+Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:total_energy}) =
+    Utilities.area_weighted_integral(
+        sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_bulk .*
+        sim.integrator.p.params.h,
+        Interfacer.get_field(sim, Val(:area_fraction)),
+    )
 
 function Interfacer.update_field!(
     sim::PrescribedIceSimulation,

@@ -46,8 +46,17 @@ function ClimaCalibrate.forward_model(interface::CouplerModelInterface, iter, me
     end_date = last(sample_date_ranges[iter]) + extend
     CalibrationTools.update_timespan!(config_dict, start_date, end_date)
 
-    # Set member parameter file
+    # Set member parameter file. Sampled `<base>_E<index>` scalars calibrate
+    # single elements of the vector parameter <base>: they are spliced into the
+    # base vector from the run's own coupler_toml files before ClimaParams sees
+    # them (any name/index mismatch errors, failing the member). Without `_E#`
+    # entries the sampled file is used as is.
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)
+    sampled_parameter_file = CalibrationTools.write_spliced_parameter_file(
+        sampled_parameter_file,
+        CalibrationTools.parameter_dict(config_dict),
+        joinpath(dirname(sampled_parameter_file), "parameters_spliced.toml"),
+    )
     CalibrationTools.add_parameter_filepath!(config_dict, sampled_parameter_file)
 
     # Set member output directory

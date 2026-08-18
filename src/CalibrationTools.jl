@@ -7,6 +7,7 @@ simulation.
 module CalibrationTools
 
 import Dates
+import TOML
 
 import ClimaAnalysis
 import ClimaAnalysis: NCCatalog
@@ -1075,6 +1076,129 @@ function add_parameter_filepath!(config_dict, parameter_filepath)
     parameter_filepaths = get!(config_dict, "coupler_toml", String[])
     push!(parameter_filepaths, parameter_filepath)
     return nothing
+end
+
+# Names like `<base>_E<index>` (e.g. `entr_param_vec_E3`) calibrate element
+# <index> of the vector parameter <base>. The `E` marker is reserved so that
+# ordinary names ending in `_<digit>` never match by accident.
+const ELEMENT_NAME_REGEX = r"^(.+)_E(\d+)$"
+
+"""
+    parse_element_name(name)
+
+Return `(base, index)` for a name following the `<base>_E<index>` convention,
+or `nothing` otherwise.
+"""
+function parse_element_name(name::AbstractString)
+    m = match(ELEMENT_NAME_REGEX, name)
+    return isnothing(m) ? nothing : (String(m.captures[1]), parse(Int, m.captures[2]))
+end
+
+"""
+    parameter_dict(config_dict)
+
+Merge the parameter TOML files in `config_dict["coupler_toml"]` into a single
+parameter dict. As in the coupled simulation, later files win per parameter.
+"""
+function parameter_dict(config_dict)
+    params = Dict{String, Any}()
+    for file in get(config_dict, "coupler_toml", String[])
+        path = isfile(file) ? file : joinpath(pkgdir(ClimaCoupler), file)
+        merge!(params, TOML.parsefile(path))
+    end
+    return params
+end
+
+"""
+    splice_element_parameters(sampled, base_params)
+
+Replace the `_E#` entries of the parameter dict `sampled` with whole-vector
+entries: each `<base>_E<index>` value is spliced into the vector value of
+`base_params[base]`, the run's merged parameter files (see
+[`parameter_dict`](@ref)). All other entries pass through unchanged.
+
+Return `(spliced, spliced_indices)`, where `spliced_indices` maps each base
+name to the element indices that came from `sampled`. Error on any mismatch
+between `sampled` and `base_params`, so a member can never run on a partially
+assembled vector.
+"""
+function splice_element_parameters(sampled, base_params)
+    spliced = Dict{String, Any}()
+    vectors = Dict{String, Vector{Float64}}()
+    spliced_indices = Dict{String, Vector{Int}}()
+    for (name, entry) in sampled
+        parsed = parse_element_name(name)
+        if isnothing(parsed)
+            spliced[name] = entry
+            continue
+        end
+        base_name, idx = parsed
+        if !haskey(vectors, base_name)
+            haskey(sampled, base_name) &&
+                error("$base_name is sampled both whole and element-wise ($name)")
+            base = get(get(base_params, base_name, Dict()), "value", nothing)
+            base isa AbstractVector || error(
+                "$name needs a vector parameter $base_name in the parameter files, got $base",
+            )
+            vectors[base_name] = Vector{Float64}(base)
+            spliced_indices[base_name] = Int[]
+        end
+        value = get(entry, "value", nothing)
+        value isa Real && isfinite(value) ||
+            error("$name should have a finite scalar value, got $value")
+        idx in eachindex(vectors[base_name]) || error(
+            "$name is out of range: $base_name has length $(length(vectors[base_name]))",
+        )
+        idx in spliced_indices[base_name] &&
+            error("Element $idx of $base_name is sampled twice")
+        vectors[base_name][idx] = value
+        push!(spliced_indices[base_name], idx)
+    end
+    for (base_name, idxs) in spliced_indices
+        sort!(idxs)
+        spliced[base_name] = Dict("value" => vectors[base_name], "type" => "float")
+    end
+    return spliced, spliced_indices
+end
+
+"""
+    check_element_priors(prior_names, base_params)
+
+Error if the `_E#` prior names do not splice cleanly into the parameters
+`base_params` (see [`splice_element_parameters`](@ref)). Run this before
+submitting a calibration: nothing else checks the `_E#` convention, so a
+mismatch would otherwise fail on a worker mid-calibration.
+"""
+function check_element_priors(prior_names, base_params)
+    sampled = Dict(name => Dict("value" => 0.0) for name in prior_names)
+    length(sampled) == length(prior_names) ||
+        error("The prior names contain duplicates: $prior_names")
+    splice_element_parameters(sampled, base_params)
+    return nothing
+end
+
+"""
+    write_spliced_parameter_file(sampled_path, base_params, output_path)
+
+Write the parameter TOML at `sampled_path` to `output_path` with its `_E#`
+entries assembled into whole vectors (see
+[`splice_element_parameters`](@ref)), and return `output_path`. When there are
+no `_E#` entries, no file is written and `sampled_path` is returned. The
+written file is parsed back and compared against the intended parameters, and
+the assembled vectors are logged, so a member can never run on a silently
+wrong parameter file.
+"""
+function write_spliced_parameter_file(sampled_path, base_params, output_path)
+    sampled = TOML.parsefile(sampled_path)
+    spliced, spliced_indices = splice_element_parameters(sampled, base_params)
+    isempty(spliced_indices) && return sampled_path
+    open(io -> TOML.print(io, spliced), output_path, "w")
+    TOML.parsefile(output_path) == spliced ||
+        error("$output_path does not match the intended parameters ($spliced)")
+    for (base_name, idxs) in spliced_indices
+        @info "Assembled vector parameter $base_name" value = spliced[base_name]["value"] calibrated_elements = idxs
+    end
+    return output_path
 end
 
 """

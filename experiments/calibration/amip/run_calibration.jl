@@ -7,6 +7,7 @@ import ClimaCoupler: CalibrationTools
 import EnsembleKalmanProcesses as EKP
 import EnsembleKalmanProcesses.ParameterDistributions as PD
 import JLD2
+import YAML
 
 model_interface_filepath = joinpath(
     pkgdir(ClimaCoupler),
@@ -37,6 +38,14 @@ end
 
 @info "Using calibration configuration in: $config_path"
 include(config_path)
+
+# Fail before submitting anything if the `_E#` element priors do not splice
+# cleanly into the run's parameter files; a mismatch caught later would fail
+# on a worker mid-calibration.
+CalibrationTools.check_element_priors(
+    PD.get_name(PRIORS),
+    CalibrationTools.parameter_dict(YAML.load_file(CALIBRATE_CONFIG.config_file)),
+)
 
 (; output_dir) = CALIBRATE_CONFIG
 isdir(output_dir) || mkdir(output_dir)

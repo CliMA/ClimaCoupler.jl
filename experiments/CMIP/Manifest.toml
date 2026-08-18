@@ -2,7 +2,7 @@
 
 julia_version = "1.10.11"
 manifest_format = "2.0"
-project_hash = "cb0e85be57bba1302a32b4b37714d222feec867a"
+project_hash = "7e60c2b77cfd49a6cad09fc33ab7c34587f9f9ce"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "5970c86505ae9c07bf5bc521ef2bbbb3849e8b7b"
@@ -289,9 +289,9 @@ version = "1.0.1+0"
 
 [[deps.CUDA]]
 deps = ["AbstractFFTs", "Adapt", "BFloat16s", "CEnum", "CUDA_Compiler_jll", "CUDA_Driver_jll", "CUDA_Runtime_Discovery", "CUDA_Runtime_jll", "Crayons", "ExprTools", "GPUArrays", "GPUCompiler", "GPUToolbox", "KernelAbstractions", "LLVM", "LLVMLoopInfo", "LazyArtifacts", "Libdl", "LinearAlgebra", "Logging", "NVTX", "Preferences", "PrettyTables", "Printf", "Random", "Random123", "RandomNumbers", "Reexport", "SparseArrays", "StaticArrays", "Statistics", "demumble_jll"]
-git-tree-sha1 = "54751d09f9acf05ea7b7ee6baa6a99677c788880"
+git-tree-sha1 = "ea6a2ab8307059b6c9ea186ff7dfcd032a13b731"
 uuid = "052768ef-5323-5732-b1bb-66c8b64840ba"
-version = "5.11.3"
+version = "5.11.0"
 
     [deps.CUDA.extensions]
     ChainRulesCoreExt = "ChainRulesCore"
@@ -319,9 +319,9 @@ version = "13.3.1+0"
 
 [[deps.CUDA_Runtime_Discovery]]
 deps = ["Libdl"]
-git-tree-sha1 = "79312abe5261a660f94e746e449d2cb2fe3284d9"
+git-tree-sha1 = "f9a521f52d236fe49f1028d69e549e7f2644bb72"
 uuid = "1af6417a-86b4-443c-805f-a4643ffb695f"
-version = "2.1.0"
+version = "1.0.0"
 
 [[deps.CUDA_Runtime_jll]]
 deps = ["Artifacts", "CUDA_Driver_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "TOML"]
@@ -2293,9 +2293,9 @@ weakdeps = ["MathOptInterface"]
 
 [[deps.Optimisers]]
 deps = ["ChainRulesCore", "Compat", "ConstructionBase", "Functors", "LinearAlgebra", "Random", "Statistics"]
-git-tree-sha1 = "2003f54e119bd921923f2a08c52dd34140d8ea9d"
+git-tree-sha1 = "b6a586b581eccc60a181145ffd4382099e32e2df"
 uuid = "3bd65402-5787-11e9-1adc-39752487f4e2"
-version = "0.4.8"
+version = "0.4.9"
 
     [deps.Optimisers.extensions]
     OptimisersAdaptExt = ["Adapt"]
@@ -2431,9 +2431,9 @@ version = "1.5.2"
 
 [[deps.PrettyTables]]
 deps = ["Crayons", "LaTeXStrings", "Markdown", "PrecompileTools", "Printf", "REPL", "Reexport", "StringManipulation", "Tables"]
-git-tree-sha1 = "4ac881f5432bd93463a41767a814a45245be22b6"
+git-tree-sha1 = "69a6c6b1ba14f89970d8d8838551b6d5efa6a685"
 uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
-version = "3.4.6"
+version = "3.4.7"
 
     [deps.PrettyTables.extensions]
     PrettyTablesExcelExt = "XLSX"
@@ -2887,9 +2887,9 @@ version = "0.3.7"
 
 [[deps.StringManipulation]]
 deps = ["PrecompileTools"]
-git-tree-sha1 = "8a90c1d77c3277a5d43b83927b3cbe2c70a37484"
+git-tree-sha1 = "773065c6e0e903924a9d838259be74338422aef2"
 uuid = "892a3eda-7b42-436c-8928-eab12a02cf0e"
-version = "0.4.7"
+version = "0.5.0"
 
 [[deps.StructArrays]]
 deps = ["ConstructionBase", "DataAPI", "Tables"]

@@ -36,7 +36,7 @@ Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
-CUDA = "5"
+CUDA = "=5.11.0"
 ClimaCalibrate = "0.4"
 ClimaLand = "1.11"
 ClimaParams = "1.0"

@@ -17,7 +17,6 @@ import ClimaComms
 ClimaComms.@import_required_backends
 import ClimaCore as CC
 import Oceananigans as OC
-import ClimaOcean
 import ClimaSeaIce
 import ClimaAtmos
 import KernelAbstractions

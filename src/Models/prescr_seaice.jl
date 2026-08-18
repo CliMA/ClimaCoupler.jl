@@ -5,7 +5,8 @@ import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Thermodynamics as TD
-import ..Checkpointer, ..FluxCalculator, ..Interfacer, ..Utilities, ..TimeManager
+import ..Checkpointer, ..ConservationChecker, ..FluxCalculator, ..Interfacer
+import ..Utilities, ..TimeManager
 import ClimaComms
 import NCDatasets
 import ClimaDiagnostics as CD
@@ -382,17 +383,26 @@ ice_surface_temperature(T_bulk, T_base, T_sfc_min, T_freeze) =
     clamp(2 * T_bulk - T_base, T_sfc_min, T_freeze)
 
 """
-    Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:total_energy})
+    total_energy(sim::PrescribedIceSimulation)
 
-Extension of Interfacer.get_field to get the total energy of the prescribed
-sea-ice slab (in Joules) as ∫_sea-ice (h * ρ * c * T_bulk) dA
+Compute total energy of the prescribed sea-ice slab (in Joules) as ∫_sea-ice (h * ρ * c * T_bulk) dA
 """
-Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:total_energy}) =
-    Utilities.area_weighted_integral(
-        sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_bulk .*
-        sim.integrator.p.params.h,
-        Interfacer.get_field(sim, Val(:area_fraction)),
-    )
+total_energy(sim::PrescribedIceSimulation) = Utilities.area_weighted_integral(
+    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_bulk .*
+    sim.integrator.p.params.h,
+    Interfacer.get_field(sim, Val(:area_fraction)),
+)
+
+"""
+    ConservationChecker.contributions(cq, sim::PrescribedIceSimulation)
+
+The sea ice holds energy. Its water content is prescribed rather than prognostic, so
+it reports no water.
+"""
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalEnergy,
+    sim::PrescribedIceSimulation,
+) = (; reservoir = total_energy(sim)) # J
 
 function Interfacer.update_field!(
     sim::PrescribedIceSimulation,

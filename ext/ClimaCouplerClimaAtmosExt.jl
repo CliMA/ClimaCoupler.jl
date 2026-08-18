@@ -24,6 +24,7 @@ import LinearAlgebra
 import Statistics
 import ClimaCoupler:
     Checkpointer,
+    ConservationChecker,
     FieldExchanger,
     FluxCalculator,
     Interfacer,
@@ -175,12 +176,13 @@ end
 
 
 """
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
+    radiative_energy_flux_toa(sim::ClimaAtmosSimulation)
 
-Extension of Interfacer.get_field to get the net TOA radiation, which is a sum of the
-upward and downward longwave and shortwave radiation, integrated over the globe (W).
+Compute the net TOA radiation, the sum of the upward and downward longwave and
+shortwave radiation, integrated over the globe (W). A positive value means the
+coupled system is losing energy to space.
 """
-function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
+function radiative_energy_flux_toa(sim::ClimaAtmosSimulation)
     FT = eltype(sim.integrator.u)
 
     if hasradiation(sim.integrator)
@@ -219,12 +221,12 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy
 end
 
 """
-    Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:total_energy})
+    total_energy(sim::ClimaAtmosSimulation)
 
-Extension of Interfacer.get_field that provides the total energy of the atmosphere,
-`∫ ρe_tot dV`, integrated over the whole domain (in Joules).
+Compute the total energy of the atmosphere, `∫ ρe_tot dV`, integrated over the whole
+domain (in Joules).
 """
-function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:total_energy})
+function total_energy(sim::ClimaAtmosSimulation)
     integrator = sim.integrator
     p = integrator.p
 
@@ -382,16 +384,35 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})
 end
 
 """
-    Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:total_water})
+    total_water(sim::ClimaAtmosSimulation)
 
-Extension of Interfacer.get_field that provides the total water of the atmosphere,
-`∫ ρq_tot dV`, integrated over the whole domain (in kilograms). Returns zero for a dry model.
+Return the total water of the atmosphere, `∫ ρq_tot dV`, integrated over the whole
+domain (in kilograms). Returns zero for a dry model.
 """
-function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:total_water})
+function total_water(sim::ClimaAtmosSimulation)
     ρq = ρq_tot(sim.integrator.p.atmos.microphysics_model, sim.integrator)
     ρq isa Number && return ρq # the dry model has no water to integrate
     return sum(ρq)
 end
+
+"""
+    ConservationChecker.contributions(cq, sim::ClimaAtmosSimulation)
+
+The atmosphere holds energy and water, and loses energy to space through the top of
+the atmosphere. The TOA radiation is a rate, so it is accumulated by the checker.
+"""
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalEnergy,
+    sim::ClimaAtmosSimulation,
+) = (;
+    reservoir = total_energy(sim), # J
+    toa_net = ConservationChecker.Accumulated(radiative_energy_flux_toa(sim)), # W
+)
+
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalWater,
+    sim::ClimaAtmosSimulation,
+) = (; reservoir = total_water(sim)) # kg
 
 function Interfacer.update_field!(
     sim::ClimaAtmosSimulation,

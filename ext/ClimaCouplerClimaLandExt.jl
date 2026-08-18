@@ -20,7 +20,13 @@ import ClimaUtilities.TimeVaryingInputs:
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaCoupler:
-    Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities, Plotting
+    Checkpointer,
+    ConservationChecker,
+    FieldExchanger,
+    FluxCalculator,
+    Interfacer,
+    Utilities,
+    Plotting
 import ClimaTimeSteppers as CTS
 import ClimaDiagnostics as CD
 import ClimaUtilities.TimeManager: ITime

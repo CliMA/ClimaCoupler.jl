@@ -3,7 +3,8 @@ import ClimaTimeSteppers as CTS
 import ClimaUtilities
 import ClimaUtilities.TimeManager: ITime, date
 import SurfaceFluxes as SF
-import ..Checkpointer, ..FluxCalculator, ..Interfacer, ..Utilities, ..FieldExchanger
+import ..Checkpointer, ..ConservationChecker, ..FluxCalculator, ..Interfacer
+import ..Utilities, ..FieldExchanger
 
 ###
 ### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
@@ -206,32 +207,44 @@ Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:coare3_roughness_params}) 
     sim.integrator.p.coare3_roughness_params
 
 """
-    Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:total_energy})
+    total_energy(sim::SlabOceanSimulation)
 
-Extension of Interfacer.get_field to get the total energy of the slab ocean (in
-Joules) as ∫_ocean (h * ρ * c * T_sfc) dA
+Compute total energy of the slab ocean (in Joules) as ∫_ocean (h * ρ * c * T_sfc) dA
 """
-Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:total_energy}) =
-    Utilities.area_weighted_integral(
-        sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .*
-        sim.integrator.p.params.h,
-        Interfacer.get_field(sim, Val(:area_fraction)),
-    )
+total_energy(sim::SlabOceanSimulation) = Utilities.area_weighted_integral(
+    sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .*
+    sim.integrator.p.params.h,
+    Interfacer.get_field(sim, Val(:area_fraction)),
+)
 
 """
-    Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:total_water})
+    total_water(sim::SlabOceanSimulation)
 
-Extension of Interfacer.get_field to get the total water of the slab ocean (in kilograms).
+Compute total water of the slab ocean (in kilograms).
 
 The slab ocean holds no water reservoir, so this is the net water it has received
-(precipitation minus evaporation) accumulated since the start of the simulation,
-integrated over the area the ocean covers. 
+(precipitation minus evaporation) accumulated since the start of the simulation
+integrated over the ocean area. 
 """
-Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:total_water}) =
-    Utilities.area_weighted_integral(
-        sim.integrator.u.water,
-        Interfacer.get_field(sim, Val(:area_fraction)),
-    )
+total_water(sim::SlabOceanSimulation) = Utilities.area_weighted_integral(
+    sim.integrator.u.water,
+    Interfacer.get_field(sim, Val(:area_fraction)),
+)
+
+"""
+    ConservationChecker.contributions(cq, sim::SlabOceanSimulation)
+
+The slab ocean holds energy. It holds no water reservoir, so its water contribution
+is the net water it has received accumulated since the start of the simulation.
+"""
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalEnergy,
+    sim::SlabOceanSimulation,
+) = (; reservoir = total_energy(sim)) # J
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalWater,
+    sim::SlabOceanSimulation,
+) = (; reservoir = total_water(sim)) # kg
 
 function Interfacer.update_field!(
     sim::SlabOceanSimulation,

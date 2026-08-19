@@ -72,6 +72,7 @@ type = "float"
 
 [max_area_limiter_power]
 value = 1
+type = "float"
 
 [mixing_length_Prandtl_maximum]
 value = 100

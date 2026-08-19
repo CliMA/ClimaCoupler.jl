@@ -424,6 +424,7 @@ function get_coupler_config_dict(config_file)
     return config_dict
 end
 
+
 """
     atmos_default_config_dict(...)
 

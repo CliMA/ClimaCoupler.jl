@@ -17,6 +17,7 @@ edmfx_upwinding: "first_order"
 edmfx_vertical_diffusion: true
 h_elem: 16
 implicit_diffusion: true
+initial_condition: "WeatherModel"
 insolation: "timevarying"
 netcdf_output_at_levels: true
 ode_algo: ARS222

@@ -62,4 +62,4 @@ value = 1200
 value = 0.5
 
 [supersaturation_precipitation_threshold]
-value = 0
+value = -0.2

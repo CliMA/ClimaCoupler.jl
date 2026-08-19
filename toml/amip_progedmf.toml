@@ -60,3 +60,6 @@ value = 1200
 
 [cloud_fraction_steepness_scale]
 value = 0.5
+
+[supersaturation_precipitation_threshold]
+value = -0.1

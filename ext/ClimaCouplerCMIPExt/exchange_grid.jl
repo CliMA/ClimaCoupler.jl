@@ -36,9 +36,12 @@ SE-side weights come from the SEM basis integrals
     where `node_cov_total` is the same sum over *all* polygons before the
     wet-mask filter — the ratio cancels the geometric error.
 
-Flat index conventions: SE node `n = (e-1) Nq² + (j-1) Nq + i` (the `IJFH`
-layout flattened by `data2array`); FV cell `c = (j-1) Nx + i`
-(`vec(OC.interior(field, :, :, Nz))` and the CR column index).
+Flat index conventions: SE node `n = (e-1) Nq² + (j-1) Nq + i` (i fastest
+within each element, then elements — the order of
+`ConservativeRegriddingClimaCoreExt.flat_nodal_data` /
+`Fields.field2array` on ClimaCore 0.15 `(v, i, j, h)` / `VIJFH` storage);
+FV cell `c = (j-1) Nx + i` (`vec(OC.interior(field, :, :, Nz))` and the CR
+column index).
 
 # Fields
 - `n_poly`, `n_nodes`, `n_elem`, `n_oc`: entity counts

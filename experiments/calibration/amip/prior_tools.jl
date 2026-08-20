@@ -42,7 +42,14 @@ function checked_constrained_gaussian(name, mu, sigma, lo, hi)
     )
     m = PriorToolsStatistics.mean(c)
     s = PriorToolsStatistics.std(c)
-    isapprox(m, mu; rtol = 0.05) ||
+    # atol scaled to sigma: with a zero-mean target (e.g. the Pi-groups c2/c3
+    # priors) a pure rtol check can never pass - the tolerance collapses to
+    # 0.05*|m| - even though a mean within a few percent of a sigma is an
+    # excellent fit. For |mu| >> sigma the rtol term still dominates. The
+    # silent-unit-normal failure this function exists to catch puts the mean
+    # at the bounds center, which IS mu for symmetric zero-mean priors, so
+    # there the std check below is the real guard either way.
+    isapprox(m, mu; rtol = 0.05, atol = 0.05 * sigma) ||
         error("prior for $name missed its mean: target $mu, got $m")
     isapprox(s, sigma; rtol = 0.15) ||
         error("prior for $name missed its std: target $sigma, got $s")

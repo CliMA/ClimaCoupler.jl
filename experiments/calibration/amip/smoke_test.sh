@@ -32,6 +32,7 @@ JULIA=${CALIBRATION_JULIA:-/glade/campaign/univ/ucit0011/software/julia/julia-1.
 : "${SMOKE_DIR:?set SMOKE_DIR}"
 export CALIBRATION_CONFIG SMOKE_DIR
 export SMOKE_DAYS=${SMOKE_DAYS:-3}
+export SMOKE_SIM_SECONDS=${SMOKE_SIM_SECONDS:-0}   # >0: construction-only window of this many seconds
 export CLIMACOMMS_CONTEXT=SINGLETON
 export CLIMACOMMS_DEVICE=CUDA
 
@@ -42,6 +43,7 @@ echo "=== $(date) smoke test"
 echo "    config    : $CALIBRATION_CONFIG"
 echo "    output    : $SMOKE_DIR"
 echo "    extra days: $SMOKE_DAYS (on top of the config's spinup)"
+echo "    sim seconds: $SMOKE_SIM_SECONDS (0 = full days mode)"
 echo "    julia     : $JULIA"
 
 # --startup-file=no: the user's ~/.julia/config/startup.jl errors under this

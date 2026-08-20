@@ -54,8 +54,21 @@ smoke_dir = get(ENV, "SMOKE_DIR") do
     error("Set SMOKE_DIR to a scratch directory for the smoke test output")
 end
 smoke_days = parse(Int, get(ENV, "SMOKE_DAYS", "3"))
+# Construction-only mode: SMOKE_SIM_SECONDS > 0 shrinks the WHOLE window
+# (spinup included) to that many seconds from the spinup start date, e.g. 360
+# = two coupling steps. That still exercises the TOML merge + `_E#` splice,
+# the initial-condition read, full CoupledSimulation construction, and the
+# entrainment closure branch (tendencies evaluate on the first step) - it
+# only gives up multi-day stability, the attempt-2 failure mode.
+sim_seconds = parse(Int, get(ENV, "SMOKE_SIM_SECONDS", "0"))
 
 cfg = CALIBRATE_CONFIG
+# Seconds mode re-anchors the sample on the spinup START (the IC date) with a
+# ZERO spinup and a positive extend - CalibrateConfig rejects negative
+# periods, so the window cannot be shrunk by subtracting the spinup from
+# extend. The simulated window is [ic_date, ic_date + sim_seconds] and reads
+# the same initial-condition files the real members will.
+ic_date = first(cfg.sample_date_ranges[1]) - cfg.spinup
 smoke_config = CalibrationTools.CalibrateConfig(;
     config_file = cfg.config_file,
     short_names = cfg.short_names,
@@ -63,16 +76,18 @@ smoke_config = CalibrationTools.CalibrateConfig(;
     n_iterations = 1,
     # Only the first entry is used (forward_model indexes [iter] with iter=1),
     # but keep two so any +1 indexing elsewhere stays in bounds.
-    sample_date_ranges = cfg.sample_date_ranges[1:min(2, end)],
-    extend = Dates.Day(smoke_days),
-    spinup = cfg.spinup,
+    sample_date_ranges = sim_seconds > 0 ? fill((ic_date, ic_date), 2) :
+                         cfg.sample_date_ranges[1:min(2, end)],
+    extend = sim_seconds > 0 ? Dates.Second(sim_seconds) : Dates.Day(smoke_days),
+    spinup = sim_seconds > 0 ? Dates.Second(0) : cfg.spinup,
     output_dir = smoke_dir,
     rng_seed = cfg.rng_seed,
 )
 
 start_date = first(smoke_config.sample_date_ranges[1]) - smoke_config.spinup
 end_date = last(smoke_config.sample_date_ranges[1]) + smoke_config.extend
-@info "Smoke window" start_date end_date total_days = Dates.value(Dates.Day(end_date - start_date))
+window = Dates.canonicalize(Dates.CompoundPeriod(end_date - start_date))
+@info "Smoke window" start_date end_date simulated = window
 
 # Prior centre in constrained (physical) space - the same point member 1 of a
 # TransformUnscented ensemble runs. Written under the SAMPLED names; the `_E#`
@@ -98,5 +113,4 @@ ClimaCalibrate.forward_model(CouplerModelInterface(smoke_config), 1, 1)
 
 # forward_model throws on failure, so reaching here means the member built a
 # coupled simulation and integrated the whole window without a NaN abort.
-@info "SMOKE TEST PASSED: $(Dates.value(Dates.Day(end_date - start_date))) " *
-      "simulated days at the prior centre, no NaN"
+@info "SMOKE TEST PASSED: $window simulated at the prior centre, no NaN"

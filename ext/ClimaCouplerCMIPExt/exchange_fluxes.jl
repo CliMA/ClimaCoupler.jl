@@ -313,6 +313,7 @@ end
     surface_fluxes_params,
     thermo_params,
     config,
+    solver_opts,
     σ,
     ϵ,
     α_albedo,
@@ -345,7 +346,7 @@ end
             T_sfc_new = T_sfc_guess,
         )
     end
-    update_T_sfc_cb = update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
+    update_T_sfc_cb = UpdateTSfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
     ρ_sfc = SF.surface_density(
         surface_fluxes_params,
         T_atmos,
@@ -373,7 +374,8 @@ end
         height_sfc,
         FT(0), # d
         config,
-        update_T_sfc_cb,
+        update_T_sfc_cb;
+        solver_opts,
     )
 end
 
@@ -389,6 +391,7 @@ end
     surface_fluxes_params,
     thermo_params,
     config,
+    solver_opts,
     σ,
     ϵ,
     α_albedo,
@@ -398,6 +401,7 @@ end
         surface_fluxes_params,
         thermo_params,
         config,
+        solver_opts,
         σ,
         ϵ,
         α_albedo,
@@ -427,6 +431,7 @@ end
     surface_fluxes_params,
     thermo_params,
     config,
+    solver_opts,
     σ,
     ϵ,
     α_albedo,
@@ -439,6 +444,7 @@ end
         surface_fluxes_params,
         thermo_params,
         config,
+        solver_opts,
         σ,
         ϵ,
         α_albedo,
@@ -464,6 +470,8 @@ NVTX.@annotate function compute_ice_polygon_fluxes!(
     α_albedo,
     T_melt,
 )
+    FT = eltype(is.fluxes.F_sh)
+    solver_opts = ice_surface_flux_solver_opts(FT)
     backend = KernelAbstractions.get_backend(is.fluxes.F_sh)
     launch_kernel!(
         _ice_polygon_fluxes_kernel!,
@@ -473,6 +481,7 @@ NVTX.@annotate function compute_ice_polygon_fluxes!(
         surface_fluxes_params,
         thermo_params,
         config,
+        solver_opts,
         σ,
         ϵ,
         α_albedo,

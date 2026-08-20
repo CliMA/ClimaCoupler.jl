@@ -55,7 +55,7 @@ If a start date is provided, we initialize the sea ice concentration and thickne
 using the ECCO4Monthly dataset. If no start date is provided, we initialize with zero sea ice.
 
 The top heat boundary condition is `PrescribedTemperature`: the coupler iteratively
-diagnoses T_sfc via the `update_T_sfc_cb` closure passed to `FluxCalculator.get_surface_fluxes!`
+diagnoses T_sfc via the `UpdateTSfc` functor passed to `FluxCalculator.get_surface_fluxes!`
 and writes it back to the ice model after each flux computation (see `compute_surface_fluxes!`).
 
 # Arguments
@@ -251,8 +251,8 @@ Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
     FluxCalculator.compute_surface_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim, thermo_params)
 
 Compute surface fluxes for `ClimaSeaIceSimulation`, iteratively diagnosing T_sfc
-via the per-column `update_T_sfc_cb` closure (from `ClimaCouplerCMIPExt.update_T_sfc`) to satisfy
-the skin-temperature flux balance.
+via the per-column [`UpdateTSfc`](@ref) functor (from
+`ClimaCouplerCMIPExt.update_T_sfc`) to satisfy the skin-temperature flux balance.
 
 The diagnosed T_sfc is written back to ClimaSeaIce's `top_surface_temperature`
 (used by `PrescribedTemperature`) so the ice thermodynamics stays consistent.
@@ -285,8 +285,8 @@ function _compute_ice_boundary_fluxes!(
 
     uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
 
-    # Sea ice parameters for `update_T_sfc_cb` (load into boundary-space scratch Fields first
-    # to avoid GPU scalar indexing when building the closure)
+    # Sea ice parameters for `UpdateTSfc` (load into boundary-space scratch Fields first
+    # to avoid GPU scalar indexing when building the functor)
 
     # Conductive resistance of the column R = h_ice/k_ice + h_snow/k_snow [m² K W⁻¹].
     # Snow and ice add in series; with no snow layer (or h_snow = 0) this reduces to h_ice/k_ice.
@@ -316,7 +316,7 @@ function _compute_ice_boundary_fluxes!(
     LW_d = csf.LW_d
     T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
 
-    # Build element-wise `update_T_sfc_cb` closures (each closes over local ice parameters)
+    # Per-column skin-temperature functors (isbits; each holds local ice parameters)
     update_T_sfc_cb =
         ClimaCouplerCMIPExt.update_T_sfc.(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
 
@@ -342,6 +342,7 @@ function _compute_ice_boundary_fluxes!(
     gustiness = ones(boundary_space)
     roughness_params = FluxCalculator.get_roughness_params(csf, sim)
     config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
+    solver_opts = ice_surface_flux_solver_opts(FT)
 
     fluxes = FluxCalculator.get_surface_fluxes.(
         surface_fluxes_params,
@@ -358,7 +359,8 @@ function _compute_ice_boundary_fluxes!(
         csf.height_sfc,
         FT(0),
         config,
-        update_T_sfc_cb,
+        update_T_sfc_cb;
+        solver_opts,
     )
 
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))

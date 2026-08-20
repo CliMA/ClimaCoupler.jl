@@ -18,9 +18,11 @@ GPU-resident, allocation-free per-step application. Controlled by the new
 `use_intersection_grid` configuration option (default `true`; automatically
 disabled for column and distributed setups).
 
-The ice skin-temperature Newton solve now linearizes turbulent fluxes as well
-as longwave emission, limits each iteration to a ±5 K update, and falls back
-to the previous guess if the update is NaN.
+The ice skin-temperature Newton solve now linearizes turbulent fluxes via an
+analytic bulk `∂F_turb/∂Tₛ` on the `UpdateTSfc` functor, as well as longwave emission; limits each
+iteration to a ±5 K update; falls back to the previous guess if the update is
+NaN; and runs the MOST ζ-solve with fixed iteration count
+(`SolverOptions(; forced_fixed_iters = true)`).
 
 This PR also addresses a boundary condition bug in the
 sea-ice component, using the diagnosed skin temperature to compute the radiative emission term.(Previously the incorrect energy balance would result in rapid ice melt).

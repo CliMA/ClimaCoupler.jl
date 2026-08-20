@@ -13,6 +13,7 @@ through the column. `R` is the conductive resistance [m² K W⁻¹]: for bare ic
 
 import SurfaceFluxes as SF
 import Thermodynamics as TD
+import Thermodynamics.Parameters as TDP
 
 """
     surface_turbulent_energy_flux(ζ, param_set, thermo_params, inputs, scheme,
@@ -20,9 +21,10 @@ import Thermodynamics as TD
 
 Total upward turbulent energy flux `F_sh + F_lh` at a trial surface temperature
 `T_sfc`, with surface density and saturation specific humidity evaluated
-consistently at `T_sfc`.
+consistently at `T_sfc`. Prefer [`turbulent_energy_flux_and_sensitivity`](@ref)
+when the skin-temperature Newton step also needs `∂F_turb/∂Tₛ`.
 """
-function surface_turbulent_energy_flux(
+@inline function surface_turbulent_energy_flux(
     ζ,
     param_set,
     thermo_params,
@@ -33,6 +35,49 @@ function surface_turbulent_energy_flux(
     z0s,
     T_sfc,
 )
+    F_turb, _ = turbulent_energy_flux_and_sensitivity(
+        ζ,
+        param_set,
+        thermo_params,
+        inputs,
+        scheme,
+        u_star,
+        z0m,
+        z0s,
+        T_sfc,
+    )
+    return F_turb
+end
+
+"""
+    turbulent_energy_flux_and_sensitivity(ζ, param_set, thermo_params, inputs,
+                                          scheme, u_star, z0m, z0s, T_sfc)
+
+Return `(F_turb, ∂F_turb/∂Tₛ)` at `T_sfc` from a single conductance evaluation.
+
+`F_turb = F_sh + F_lh` uses the SurfaceFluxes bulk formulas. The sensitivity
+holds `g_h` and `ρ_sfc` fixed (standard Newton linearization of the bulk
+scheme):
+
+```
+∂F_turb/∂Tₛ = ρ_sfc g_h (cₚ,d + (Lᵥ₀ + VSE_sfc) ∂q*/∂T) + cₚ,v E
+```
+
+clamped to `≥ 0` so it can only damp the skin-temperature update.
+"""
+@inline function turbulent_energy_flux_and_sensitivity(
+    ζ,
+    param_set,
+    thermo_params,
+    inputs,
+    scheme,
+    u_star,
+    z0m,
+    z0s,
+    T_sfc,
+)
+    FT = typeof(T_sfc)
+    g_h = SF.heat_conductance(param_set, ζ, u_star, inputs, z0m, z0s, scheme)
     ρ_sfc = SF.surface_density(
         param_set,
         inputs.T_int,
@@ -43,52 +88,69 @@ function surface_turbulent_energy_flux(
         inputs.q_liq_int,
         inputs.q_ice_int,
     )
-    q_vap_sfc =
-        TD.q_vap_saturation(thermo_params, T_sfc, ρ_sfc, inputs.q_liq_int, inputs.q_ice_int)
-
+    q_vap_sfc = TD.q_vap_saturation(
+        thermo_params,
+        T_sfc,
+        ρ_sfc,
+        inputs.q_liq_int,
+        inputs.q_ice_int,
+    )
+    q_vap_int = inputs.q_tot_int - inputs.q_liq_int - inputs.q_ice_int
+    E = SF.evaporation(
+        param_set,
+        inputs,
+        g_h,
+        q_vap_int,
+        q_vap_sfc,
+        ρ_sfc,
+        inputs.moisture_model,
+    )
     F_sh = SF.sensible_heat_flux(
         param_set,
-        ζ,
-        u_star,
         inputs,
-        z0m,
-        z0s,
+        g_h,
+        inputs.T_int,
         T_sfc,
-        q_vap_sfc,
-        inputs.ρ_int,
-        scheme,
+        ρ_sfc,
+        E,
     )
-    F_lh = SF.latent_heat_flux(
-        param_set,
-        ζ,
-        u_star,
-        inputs,
-        z0m,
-        z0s,
-        q_vap_sfc,
-        inputs.ρ_int,
-        scheme,
+    F_lh = SF.latent_heat_flux(param_set, inputs, E, inputs.moisture_model)
+    F_turb = F_sh + F_lh
+
+    # Analytic ∂F_turb/∂Tₛ from the bulk formulas (g_h, ρ_sfc held fixed).
+    cp_d = TDP.cp_d(thermo_params)
+    cp_v = TDP.cp_v(thermo_params)
+    LH_v0 = TDP.LH_v0(thermo_params)
+    dq_dT = TD.∂q_vap_sat_∂T(
+        thermo_params,
+        T_sfc,
+        ρ_sfc,
+        inputs.q_liq_int,
+        inputs.q_ice_int,
     )
-    return F_sh + F_lh
+    VSE_sfc = TD.vapor_static_energy(thermo_params, T_sfc, inputs.Φ_sfc)
+    dF_dT = ρ_sfc * g_h * (cp_d + (LH_v0 + VSE_sfc) * dq_dT) + cp_v * E
+    return F_turb, max(dF_dT, zero(FT))
 end
 
 """
-    update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
+    UpdateTSfc{FT}
 
-Create a callback for `SurfaceFluxes.jl` that updates surface temperature using
-a fully-linearized (Newton) step of the skin balance Jᵃ(Tₛ) + (Tₛ - Tᵢ)/R = 0:
+Callable skin-temperature updater for `SurfaceFluxes.jl` (SDP 18 functor;
+replaces a capturing closure). One Newton step of
 
-    Tₛⁿ⁺¹ = (Tᵢ - R · (Jᵃ - Λ Tₛⁿ)) / (1 + R Λ),    Λ = 4σϵTₛⁿ³ + ∂F_turb/∂Tₛ
+    Jᵃ(Tₛ) + (Tₛ - Tᵢ)/R = 0
 
-where Jᵃ = σϵTₛⁿ⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh  (positive upward) and
-F_turb = F_sh + F_lh. 
+with
 
-Single iteration update is safeguarded by
-±ΔT_iter_max, and the result is capped at the melting
-temperature T_melt to prevent the surface temperature from exceeding the
-melting point under heating fluxes.
+    Tₛⁿ⁺¹ = (Tᵢ - R · (Jᵃ - Λ Tₛⁿ)) / (1 + R Λ),
+    Λ = 4σϵTₛⁿ³ + ∂F_turb/∂Tₛ
 
-# Arguments
+where `∂F_turb/∂Tₛ` is the analytic bulk sensitivity from
+[`turbulent_energy_flux_and_sensitivity`](@ref) (no finite-difference second
+turbulent-flux evaluation). The step is clamped to ±5 K and capped at `T_melt`.
+
+# Fields
 - `R`: Conductive resistance of the column [m² K W⁻¹] (snow and ice in series)
 - `T_i`: Internal (ice-ocean interface) temperature [K]
 - `σ`: Stefan-Boltzmann constant [W m⁻² K⁻⁴]
@@ -96,56 +158,83 @@ melting point under heating fluxes.
 - `SW_d`: Downward shortwave radiation [W m⁻²]
 - `LW_d`: Downward longwave radiation [W m⁻²]
 - `α_albedo`: Surface albedo [-]
-- `T_melt`: Melting temperature [K] (typically 273.15 K for freshwater ice)
+- `T_melt`: Melting temperature [K]
 """
-function update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
-    return function (ζ, param_set, thermo_params_callback, inputs, scheme, u_star, z0m, z0s)
-        T_sfc_n = inputs.T_sfc_guess
-        FT = typeof(T_sfc_n)
-
-        F_turb = surface_turbulent_energy_flux(
-            ζ,
-            param_set,
-            thermo_params_callback,
-            inputs,
-            scheme,
-            u_star,
-            z0m,
-            z0s,
-            T_sfc_n,
-        )
-
-        # Turbulent sensitivity ∂F_turb/∂Tₛ by one-sided finite difference,
-        # clamped to ≥ 0 so it can only damp the update (the physical
-        # sensitivity is positive: warmer surface ⇒ larger upward fluxes).
-        δT = FT(1)
-        F_turb_δ = surface_turbulent_energy_flux(
-            ζ,
-            param_set,
-            thermo_params_callback,
-            inputs,
-            scheme,
-            u_star,
-            z0m,
-            z0s,
-            T_sfc_n + δT,
-        )
-        dF_turb_dT = max((F_turb_δ - F_turb) / δT, zero(FT))
-
-        # Net upward flux: Jᵃ = σϵT⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh
-        J_a = σ * ϵ * T_sfc_n^4 - (1 - α_albedo) * SW_d - ϵ * LW_d + F_turb
-
-        # Newton step on Jᵃ(T) + (T - Tᵢ)/R = 0 with
-        # Jᵃ(T) ≈ Jᵃ(Tₙ) + Λ (T - Tₙ)
-        Λ = 4 * σ * ϵ * T_sfc_n^3 + dF_turb_dT
-        T_sfc_new = (T_i - R * (J_a - Λ * T_sfc_n)) / (1 + R * Λ)
-
-        T_sfc_new = ifelse(isnan(T_sfc_new), T_sfc_n, T_sfc_new)
-        ΔT = T_sfc_new - T_sfc_n
-        ΔT_iter_max = FT(5)
-        T_sfc_new = T_sfc_n + min(abs(ΔT), ΔT_iter_max) * sign(ΔT)
-        T_sfc_new = min(T_sfc_new, T_melt)
-
-        return T_sfc_new
-    end
+struct UpdateTSfc{FT}
+    R::FT
+    T_i::FT
+    σ::FT
+    ϵ::FT
+    SW_d::FT
+    LW_d::FT
+    α_albedo::FT
+    T_melt::FT
 end
+
+"""
+    update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
+
+Construct an [`UpdateTSfc`](@ref) functor. Broadcast-friendly so
+`update_T_sfc.(R, T_i, σ, …)` builds a field of functors on the boundary-space
+path.
+"""
+update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt) =
+    UpdateTSfc(promote(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)...)
+
+"""
+    (cb::UpdateTSfc)(ζ, param_set, thermo_params, inputs, scheme, u_star, z0m, z0s)
+
+Apply one safeguarded Newton skin-temperature update. See [`UpdateTSfc`](@ref).
+"""
+@inline function (cb::UpdateTSfc)(
+    ζ,
+    param_set,
+    thermo_params,
+    inputs,
+    scheme,
+    u_star,
+    z0m,
+    z0s,
+)
+    T_sfc_n = inputs.T_sfc_guess
+    FT = typeof(T_sfc_n)
+
+    F_turb, dF_turb_dT = turbulent_energy_flux_and_sensitivity(
+        ζ,
+        param_set,
+        thermo_params,
+        inputs,
+        scheme,
+        u_star,
+        z0m,
+        z0s,
+        T_sfc_n,
+    )
+
+    # Net upward flux: Jᵃ = σϵT⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh
+    J_a =
+        cb.σ * cb.ϵ * T_sfc_n^4 - (1 - cb.α_albedo) * cb.SW_d - cb.ϵ * cb.LW_d +
+        F_turb
+
+    # Newton step on Jᵃ(T) + (T - Tᵢ)/R = 0 with Jᵃ(T) ≈ Jᵃ(Tₙ) + Λ (T - Tₙ)
+    Λ = 4 * cb.σ * cb.ϵ * T_sfc_n^3 + dF_turb_dT
+    T_sfc_new = (cb.T_i - cb.R * (J_a - Λ * T_sfc_n)) / (1 + cb.R * Λ)
+
+    T_sfc_new = ifelse(isnan(T_sfc_new), T_sfc_n, T_sfc_new)
+    ΔT = T_sfc_new - T_sfc_n
+    ΔT_iter_max = FT(5)
+    T_sfc_new = T_sfc_n + min(abs(ΔT), ΔT_iter_max) * sign(ΔT)
+    T_sfc_new = min(T_sfc_new, cb.T_melt)
+
+    return T_sfc_new
+end
+
+"""
+    ice_surface_flux_solver_opts(::Type{FT})
+
+`SurfaceFluxes.SolverOptions` for the sea-ice flux path: fixed iteration count
+(`forced_fixed_iters = true`, default `maxiter`) so every polygon/column runs
+identical MOST work with no tolerance early-exit (branchless / GPU-uniform).
+"""
+@inline ice_surface_flux_solver_opts(::Type{FT}) where {FT} =
+    SF.SolverOptions{FT}(forced_fixed_iters = true)

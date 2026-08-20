@@ -42,6 +42,9 @@ get_ConservativeRegriddingCCExt() =
 get_ConservativeRegriddingOCExt() =
     Base.get_extension(CR, :ConservativeRegriddingOceananigansExt)
 
+# Skin-temperature functor used by both boundary-space and exchange-grid ice fluxes
+include("ClimaCouplerCMIPExt/skin_temperature.jl")
+
 # Exchange-grid geometry/weights and per-polygon flux machinery, used by the
 # ocean and sea-ice models below
 include("ClimaCouplerCMIPExt/exchange_grid.jl")
@@ -55,9 +58,6 @@ include("ClimaCouplerCMIPExt/orca_grid.jl")
 include("ClimaCouplerCMIPExt/oceananigans.jl")
 include("ClimaCouplerCMIPExt/clima_seaice.jl")
 include("ClimaCouplerCMIPExt/climaocean_helpers.jl")
-
-# Include skin temperature utilities
-include("ClimaCouplerCMIPExt/skin_temperature.jl")
 
 # Include Ocean and sea ice helpers
 include("ClimaCouplerCMIPExt/ocean_closures.jl")

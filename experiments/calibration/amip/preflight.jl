@@ -366,7 +366,21 @@ function check_wiring(CA, scratch)
         isdefined(Main, :PREFLIGHT_NON_ATMOS_PARAMS) ? Main.PREFLIGHT_NON_ATMOS_PARAMS :
         String[]
 
-    center_toml = write_param_toml(joinpath(scratch, "center.toml"), names, center)
+    # `<base>_E<index>` priors calibrate single elements of a vector
+    # parameter. write_param_toml emits them as scalars under their sampled
+    # names, which ClimaAtmos has never heard of, so the wiring check would
+    # report "changes nothing" and FAIL every element prior. Splice them into
+    # the base vector exactly as model_interface.jl does before a member runs.
+    # This is a no-op for configs without `_E#` names: the splice returns the
+    # input path unchanged when there is nothing to assemble.
+    base_params = CalibrationTools.parameter_dict(config_dict)
+    splice(path) = CalibrationTools.write_spliced_parameter_file(
+        path,
+        base_params,
+        path * ".spliced.toml",
+    )
+
+    center_toml = splice(write_param_toml(joinpath(scratch, "center.toml"), names, center))
     base = atmos_params_from_toml(CA, base_tomls, center_toml, FT, gw_flags)
 
     for (i, name) in enumerate(names)
@@ -377,8 +391,9 @@ function check_wiring(CA, scratch)
         u = copy(u0)
         u[i] += su[i]
         perturbed = _asvec(PD.transform_unconstrained_to_constrained(Main.PRIORS, u))
-        pert_toml =
-            write_param_toml(joinpath(scratch, "perturbed_$i.toml"), names, perturbed)
+        pert_toml = splice(
+            write_param_toml(joinpath(scratch, "perturbed_$i.toml"), names, perturbed),
+        )
         params = atmos_params_from_toml(CA, base_tomls, pert_toml, FT, gw_flags)
         diff = CalibrationTools.numeric_leaf_diff(base, params)
         if isempty(diff)

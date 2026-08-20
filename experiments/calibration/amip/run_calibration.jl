@@ -124,6 +124,13 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # workers bind to the HSN, which login and compute nodes share.
     exename_kwargs = haskey(ENV, "CALIBRATION_WORKER_EXENAME") ?
         (; exename = ENV["CALIBRATION_WORKER_EXENAME"]) : (;)
+    # Keep worker PBS logs with the run. Without `o`, ClimaCalibrate puts them
+    # under a mktempdir (.julia_worker_*) whose default cleanup=true deletes
+    # them when the driver exits - which is how the rlut_pigroups member-2 NaN
+    # left no worker-side record. `o` is a filename PREFIX: workers write
+    # <prefix>-<job>-<slot>.out next to driver.log.
+    worker_log_prefix = joinpath(output_dir, "worker_logs", "worker")
+    mkpath(dirname(worker_log_prefix))
     if TEST_CALIBRATION
         # CPU workers inside the current allocation; no packing (local
         # processing starts each worker as its own process).
@@ -133,6 +140,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
             time = walltime,
             env = env_vars,
             mem = "16GB",
+            o = worker_log_prefix,
             exename_kwargs...,
         )
     else
@@ -144,6 +152,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
             time = walltime,
             workers_per_node,
             env = env_vars,
+            o = worker_log_prefix,
             exename_kwargs...,
         )
     end

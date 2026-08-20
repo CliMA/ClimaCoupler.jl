@@ -19,6 +19,11 @@ bias_plot_extrema = Dict(
     "clt" => (-0.5, 0.5),
     "swcre" => (-120, 120),
     "lwcre" => (-120, 120),
+    # Without an entry the fallback uses the SIM FIELD's extrema (~0-320 W/m^2)
+    # as the bias colour range, which renders the ~+-40 W/m^2 rlut bias as one
+    # uniform colour band ("everything looks positive"). Measured rlut member
+    # bias: RMS ~11-13 W/m^2, ~55/45 positive/negative split.
+    "rlut" => (-40, 40),
     "ta_850hPa" => (-2, 2),
     "ta_500hPa" => (-2, 2),
     "ta_200hPa" => (-2, 2),

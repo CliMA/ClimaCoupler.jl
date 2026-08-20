@@ -29,7 +29,7 @@ dry (immersed) cells dropped. For each polygon ``\\Omega_k`` in SE element
 ``e``, the SEM basis integrals ``B_{kn} = \\int_{\\Omega_k} \\phi_n \\, dA``
 provide:
 
-- a **gather** (SE nodes → polygons): ``\\bar f_k = \\sum_n (B_{kn}/\\sum_n
+- a **gather** (SE nodes → FV polygons): ``\\bar f_k = \\sum_n (B_{kn}/\\sum_n
   B_{kn}) f_n`` — rows sum to 1, constants preserved exactly;
 - a **scatter** (FV polygons → SE nodes): the per-element L2 projection
   ``F_n = \\sum_k (B_{kn}/(Jw)_n) F_k``, followed by `weighted_dss!`;

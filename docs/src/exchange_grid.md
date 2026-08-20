@@ -31,7 +31,7 @@ provide:
 
 - a **gather** (SE nodes → polygons): ``\\bar f_k = \\sum_n (B_{kn}/\\sum_n
   B_{kn}) f_n`` — rows sum to 1, constants preserved exactly;
-- a **scatter** (polygons → SE nodes): the per-element L2 projection
+- a **scatter** (FV polygons → SE nodes): the per-element L2 projection
   ``F_n = \\sum_k (B_{kn}/(Jw)_n) F_k``, followed by `weighted_dss!`;
 - the **nodal wet coverage** `node_cov` (the L2 projection of the ocean wet
   mask) and its unmasked counterpart `node_cov_total`; their ratio cancels the

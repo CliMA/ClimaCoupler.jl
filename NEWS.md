@@ -4,7 +4,7 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
-#### Exchange (intersection) grid for CMIP surface fractions and fluxes.
+#### Exchange (intersection) grid for CMIP surface fractions and fluxes. PR [#2051](https://github.com/CliMA/ClimaCoupler.jl/pull/2051)
 When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange
 grid — the polygons where the cubed-sphere spectral elements intersect the
 ocean's `TripolarGrid` cells (via ConservativeRegridding's operator API) —
@@ -17,6 +17,13 @@ sea-ice-concentration weighting, conservative aggregation to both grids, and
 GPU-resident, allocation-free per-step application. Controlled by the new
 `use_intersection_grid` configuration option (default `true`; automatically
 disabled for column and distributed setups).
+
+The ice skin-temperature Newton solve now linearizes turbulent fluxes as well
+as longwave emission, limits each iteration to a ±5 K update, and falls back
+to the previous guess if the update is NaN.
+
+This PR also addresses a boundary condition bug in the
+sea-ice component, using the diagnosed skin temperature to compute the radiative emission term.(Previously the incorrect energy balance would result in rapid ice melt).
 
 v0.2.3
 -------

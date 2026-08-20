@@ -122,6 +122,16 @@ function leverage(output_dir; iteration = nothing, whiten = false)
     g = JLD2.load_object(
         joinpath(output_dir, @sprintf("iteration_%03d", it), "G_ensemble.jld2"),
     )
+    # Drop members with no finite output at all. A crashed member's all-NaN
+    # column otherwise fails the per-point `all(isfinite, ...)` mask at EVERY
+    # point, so the whole observable silently vanishes from the report -
+    # precisely when a diagnostic is most needed (rlut_pigroups iteration 1).
+    alive = [m for m in 1:size(g, 2) if any(isfinite, view(g, :, m))]
+    if length(alive) < size(g, 2)
+        @warn "leverage: dropping $(size(g, 2) - length(alive)) dead member(s) " *
+              "of $(size(g, 2)) at iteration $it"
+        g = g[:, alive]
+    end
     y, sigma, covs, blocks = _leverage_blocks(ekp, it)
     # One covariance per minibatch member; whitening needs a single block.
     whiten &&

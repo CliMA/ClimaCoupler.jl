@@ -25,12 +25,12 @@
 #   Only elements 1-6 are read by the closure; 7-12 exist because the
 #   registry declares length 12 and the splice preserves the base length.
 #
-# ADDITION 2 - fixed_cloud_liquid_terminal_velocity = 0.0 (was 0.01).
-#   Disables cloud liquid sedimentation. `fixed_terminal_velocity_liquid`
-#   defaults to true in ClimaAtmos, so this value is live; the flag must stay
-#   true for it to take effect. This is why the file is a copy rather than an
-#   edit in place - the same change in amip_progedmf_1m.toml would silently
-#   alter production, nightly, longrun and both benchmark configurations.
+# HISTORY - fixed_cloud_liquid_terminal_velocity = 0.0 applied ONLY to the
+#   archived rlut_pigroups run (2026-08-19/20) and was reverted afterwards
+#   (rlut_pigroups_ocean and later ride at the ClimaParams default 0.01, i.e.
+#   cloud liquid sediments again, matching production and micro_edmf). The
+#   exact zero-fclv file is preserved in git (commit 238b0b10) and in every
+#   member's resolved parameter dump.
 #
 # entr_coeff is retained below but is DEAD under PiGroups (read only by
 # InvZEntrainment). It is left in place so this file stays a clean, diffable
@@ -146,8 +146,4 @@ type = "float"
 
 [cloud_fraction_eps_rel]
 value = 0.05
-type = "float"
-
-[fixed_cloud_liquid_terminal_velocity]
-value = 0.0
 type = "float"

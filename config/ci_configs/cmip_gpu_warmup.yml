@@ -1,0 +1,39 @@
+# Minimal 3D CMIP warm-up config for GPU CI / interactive init.
+# Primes GPUCompiler caches for global spectral-element CMIP paths that
+# SCM warm-up cannot cover (horizontal operators, remapping, Oceananigans
+# + ClimaSeaIce coupling). Cheaper than cmip_oceananigans_climaseaice_bucket
+# via coarse h_elem/z_elem, short t_end, simple_ocean, and diagnostics off.
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
+bucket_albedo_type: "map_temporal"
+coupler_toml: ["toml/amip_edonly.toml"]
+dt_atmos: "120secs"
+dt_cpl: "360secs"
+dt_land: "360secs"
+dt_ocean: "360secs"
+dt_seaice: "360secs"
+dz_bottom: 100.0
+energy_check: false
+h_elem: 4
+ice_model: "clima_seaice"
+land_model: "bucket"
+mode_name: "cmip"
+ocean_model: "oceananigans"
+ocean_grid: "standard_tripolar"
+simple_ocean: true
+output_default_diagnostics: false
+use_coupler_diagnostics: false
+use_land_diagnostics: false
+radiation_reset_rng_seed: true
+rayleigh_sponge: true
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+t_end: "720secs" # 2 coupling steps
+topo_smoothing: true
+topography: "Earth"
+use_intersection_grid: true
+use_itime: false
+viscous_sponge: true
+z_elem: 16
+z_max: 60000.0

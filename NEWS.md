@@ -4,6 +4,9 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+v0.2.3
+-------
+
 #### Add `OrSchedule`, `PowerOfTwoSchedule`, `cs.step`, and a `walltime_debug` flag.
 Callback schedules now receive `(; t, step)` instead of just `(; t)`, so any
 `ClimaDiagnostics` schedule can be used as a coupler callback. `step` is a new
@@ -12,10 +15,40 @@ restarting from 1 after a restart. The new `walltime_debug` config flag (default
 `false`) also reports the walltime on the steps that are a power of two, in 
 addition to every `walltime_dt`.
 
+#### Remove ClimaOcean dependency PR[#2039](https://github.com/CliMA/ClimaCoupler.jl/pull/2039), PR[#2059](https://github.com/CliMA/ClimaCoupler.jl/pull/2059)
+The ocean and sea-ice setup previously provided by ClimaOcean (ocean/sea-ice
+simulation construction, closures, sea-ice/ocean flux computations, ORCA grid
+support, and ocean initial-condition data handling) now lives directly in
+ClimaCoupler's CMIP extension. `ClimaOcean` has been dropped from the
+dependencies and extension list of both `ClimaCoupler` and the CMIP experiment
+environment; CMIP runs now depend only on `Oceananigans` and `ClimaSeaIce`.
+Ocean initial-condition data are loaded from ClimaCoupler artifacts, and the
+simulation start date is more flexible.
+
 #### Adapt to the redesigned RRTMGP 0.22 / ClimaAtmos 0.42 radiation API.
 The atmosphere radiation cache now holds an `RRTMGP.RRTMGPSolver`; coupler flux and albedo
 accesses go through `RRTMGP` getters (e.g. `RRTMGP.sw_flux_dn`, `RRTMGP.surface_emissivity`),
 and the radiation method is queried via `RRTMGP.radiation_method`.
+
+#### Use artifacts for EN4 temperature/salinity initial conditions PR[#2034](https://github.com/CliMA/ClimaCoupler.jl/pull/2034)
+The EN4 initial-condition data used by the ocean and sea-ice models are now
+provided as an artifact instead of being downloaded at run time.
+
+#### Add per-component progress callbacks PR[#2021](https://github.com/CliMA/ClimaCoupler.jl/pull/2021)
+New config arguments `--atmos_progress_interval`, `--land_progress_interval`,
+`--seaice_progress_interval`, and `--ocean_progress_interval` control how often
+each component prints progress information. All default to `"never"`.
+This is a breaking config change for `ocean_progress_interval`, which used to be
+an integer iteration count and is now a time-interval string (e.g. `"10days"`).
+
+#### Add `--ocean_grid` config argument PR[#2001](https://github.com/CliMA/ClimaCoupler.jl/pull/2001)
+Selects the horizontal grid of the Oceananigans ocean model, either
+`one_deg_tripolar` (default) or the higher-resolution `orca` grid, which is now
+used in the CMIP longrun configurations.
+
+#### Add a snow model to the sea-ice model PR[#1998](https://github.com/CliMA/ClimaCoupler.jl/pull/1998)
+
+#### Walltime reporter revamped PR[#2026](https://github.com/CliMA/ClimaCoupler.jl/pull/2026)
 
 v0.2.2
 -------

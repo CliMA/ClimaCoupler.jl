@@ -225,38 +225,35 @@ function ClimaLandSimulation(
     # Define functions to set initial conditions
     if !land_spun_up_ic && !isnothing(land_ic_path)
         @info "ClimaLand: using land IC file" land_ic_path
-        # Note: This `set_ic!` function does not require `p.drivers.T` to be set,
-        # so we do not need to use `_coupler_set_ic!` here.
-        set_ic! = CL.Simulations.make_set_subseasonal_initial_conditions(land_ic_path)
+        set_ic_land! = CL.Simulations.make_set_initial_state_from_era5land(land_ic_path)
+        extrapolation_bc =
+            (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
+        interpolation_method = Interpolations.Linear() # this matches the Linear interpolation used in the land IC function as well
+        surface_T = SpaceVaryingInput(
+            land_ic_path,
+            "skt",
+            domain.space.surface;
+            regridder_type = :InterpolationsRegridder,
+            regridder_kwargs = (; extrapolation_bc, interpolation_method),
+        )
     elseif land_spun_up_ic
-        # Use artifact spun-up initial conditions
+           # Use artifact spun-up initial conditions
         ic_path = CL.Artifacts.soil_ic_2008_50m_path()
         @info "ClimaLand: using land IC file" ic_path
-
-        # Set initial conditions from file, and set air temperature to the input atmospheric temperature
-        spun_up_set_ic! = CL.Simulations.make_set_initial_state_from_file(
+        set_ic_land! = CL.Simulations.make_set_initial_state_from_file(
             ic_path,
             model;
             enforce_constraints = true,
         )
-        set_ic! =
-            (Y, p, t, model) ->
-                _coupler_set_ic!(Y, p, t, model, orog_adjusted_T_surface, spun_up_set_ic!)
-
+        surface_T = orog_adjusted_T_surface
     else
-        set_ic_from_atmos_and_parameters! =
+     set_ic_land! =
             CL.Simulations.make_set_initial_state_from_atmos_and_parameters(model)
-        set_ic! =
-            (Y, p, t, model) -> _coupler_set_ic!(
-                Y,
-                p,
-                t,
-                model,
-                orog_adjusted_T_surface,
-                set_ic_from_atmos_and_parameters!,
-            )
+        surface_T = orog_adjusted_T_surface
     end
-
+    set_ic! =
+        (Y, p, t, model) ->
+            _coupler_set_ic!(Y, p, t, model, surface_T, surface_elevation, set_ic_land!)
     # Convert start_date and stop_date to ITime if using ITime
     if dt isa ITime
         start_date = tspan[1]

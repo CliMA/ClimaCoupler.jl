@@ -4,18 +4,20 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
-#### Rename `energy_check` to `conservation_check` and rework `ConservationChecker`.
-The config flag is renamed, since it has always enabled both the energy and the
-water check, and more may be added in the future. The separate
-`EnergyConservationCheck` and `WaterConservationCheck` types are replaced by a
-single `ConservationCheck` parameterized on a conserved quantity (so far just
-`TotalEnergy` and `TotalWater` are defined), and `check_conservation!` is now 
-one generic method over any conserved quantity. Crucially, integrals of the
-conserved quantities are now computed on each model's *native grid* rather than
-on the boundary space. The running total is also no longer stored; each
-component's contribution in `cc.components` (previously `cc.sums`) is logged
-with the sign that makes summing them give the total.
-`Plotting.plot_global_conservation` has also been updated and renamed to
+#### Route rain to the ocean.
+Rain now reaches the ocean everywhere rather than only over open water.
+Previously the ocean received `(1 - ℵ)(P_liq + P_snow)` while the sea ice
+received only snow.
+
+#### Update `ConservationChecker`.
+The config flag `energy_check` is renamed to `conservation_check` and the
+separate `EnergyConservationCheck`/`WaterConservationCheck` types are replaced
+by a single `ConservationCheck` parameterized on a conserved quantity.
+`check_conservation!` is now one generic method over any conserved quantity, and
+each component model defines its own set of `contributions` to the conserved
+quantity and methods to calculate them. Integrals of the conserved quantities
+are now computed on each model's *native grid* rather than on the boundary
+space. `Plotting.plot_global_conservation` has also been updated and renamed to
 `Plotting.plot_conservation`.
 
 #### Add `OrSchedule`, `PowerOfTwoSchedule`, `cs.step`, and a `walltime_debug` flag.

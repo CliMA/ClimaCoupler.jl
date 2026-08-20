@@ -31,21 +31,22 @@ function Plotting.plot_conservation(
     days = collect(1:length(components[1])) * float(coupler_sim.Δt_cpl) / 86400
     total = zeros(length(components[1]))
     abs_sum = 0.0 # this will be ∑ᵢ|xᵢ| at the final time step, used for relative error
-    f = Makie.Figure()
-    ax1 = Makie.Axis(
-        f[1, 1],
-        xlabel = "time (days)",
-        ylabel = "Δ$name ($units)",
-        aspect = 1.62,
-    )
+    f = Makie.Figure(size = (800, 500))
+    ax1 = Makie.Axis(f[1, 1], xlabel = "time (days)", ylabel = "Δ$name ($units)")
     for (component, timeseries) in pairs(components)
         Makie.lines!(ax1, days, timeseries .- timeseries[1], label = string(component))
         abs_sum += abs(timeseries[end])
         total .+= timeseries
     end
-    Makie.lines!(ax1, days, total .- total[1], label = "total"; linewidth = 3)
-    # legend beside the axis, so that it can't cover the lines
-    Makie.Legend(f[1, 2], ax1)
+    Makie.lines!(
+        ax1,
+        days,
+        total .- total[1],
+        label = "total",
+        color = :black,
+        linestyle = :dash,
+    )
+    Makie.Legend(f[1, 2], ax1, framevisible = false)
 
     # use ∑ᵢ|xᵢ| at the final time step as a reference for the error
     err = abs.((total .- total[1]) ./ abs_sum)
@@ -54,7 +55,6 @@ function Plotting.plot_conservation(
         f[2, 1],
         xlabel = "time (days)",
         ylabel = "log( |Δtotal| / ∑|components| )",
-        aspect = 1.62,
     )
     Makie.lines!(ax2, days, l_err, color = :black)
     l_err_valid = filter(x -> !isinf(x) && !isnan(x), l_err)

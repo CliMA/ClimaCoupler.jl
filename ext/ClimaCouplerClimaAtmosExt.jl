@@ -111,6 +111,13 @@ function ClimaAtmosSimulation(atmos_config)
         integrator.p.precomputed.surface_snow_flux .= FT(0)
     end
 
+    # Make sure the precomputed fields for the 0-moment scheme are initialized to zero so that 
+    # ConservationChecker doesn't read uninitialized memory for the first conservation check
+    if integrator.p.atmos.microphysics_model isa CA.EquilibriumMicrophysics0M
+        integrator.p.precomputed.ᶜρ_de_tot_dt .= FT(0)
+        integrator.p.precomputed.ᶜρ_dq_tot_dt .= FT(0)
+    end
+
     microphysics_model = integrator.p.atmos.microphysics_model
     if microphysics_model isa CA.EquilibriumMicrophysics0M
         integrator.p.precomputed.ᶜρ_dq_tot_dt .= FT(0)
@@ -234,7 +241,10 @@ function total_energy(sim::ClimaAtmosSimulation)
     if microphysics_model isa CA.EquilibriumMicrophysics0M
         # Add back in the energy removed by precipitation over the current timestep for 0-moment scheme
         (; ᶜρ_de_tot_dt) = p.precomputed
-        return sum(integrator.u.c.ρe_tot .- ᶜρ_de_tot_dt .* float(integrator.dt))
+        # I think this can be changed to: 
+        # `return sum(integrator.u.c.ρe_tot - ᶜρ_de_tot_dt * integrator.dt)` 
+        # once ClimaCore is updated to v0.15?
+        return sum(integrator.u.c.ρe_tot) - sum(ᶜρ_de_tot_dt) * float(integrator.dt)
     else
         return sum(integrator.u.c.ρe_tot)
     end
@@ -283,25 +293,27 @@ moisture_flux(
     integrator,
 ) = CC.Geometry.WVector.(integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot)
 
-ρq_tot(::CA.DryModel, integrator) = eltype(integrator.u)(0)
+# A dry model holds no water to integrate
+integrated_ρq_tot(::CA.DryModel, integrator) = eltype(integrator.u)(0)
 
 # With the 0-moment scheme, precipitation is removed from `ρq_tot` within the
 # timestep, so we add back the water removed over the current step. This mirrors
-# the correction applied to `ρe_tot` in the `:energy` extension above; ClimaAtmos
-# computes the two as a matched pair (`ᶜρ_de_tot_dt = ᶜρ_dq_tot_dt * e_tot_hlpr`).
-function ρq_tot(::CA.EquilibriumMicrophysics0M, integrator)
+# the correction applied to `ρe_tot` in `total_energy` above (and can probably
+# also be changed to `return sum(integrator.u.c.ρq_tot - ᶜρ_dq_tot_dt * integrator.dt)`
+# once ClimaCore is updated to v0.15).
+function integrated_ρq_tot(::CA.EquilibriumMicrophysics0M, integrator)
     (; ᶜρ_dq_tot_dt) = integrator.p.precomputed
-    return integrator.u.c.ρq_tot .- ᶜρ_dq_tot_dt .* float(integrator.dt)
+    return sum(integrator.u.c.ρq_tot) - sum(ᶜρ_dq_tot_dt) * float(integrator.dt)
 end
 
-ρq_tot(
+integrated_ρq_tot(
     ::Union{
         CA.NonEquilibriumMicrophysics1M,
         CA.NonEquilibriumMicrophysics2M,
         CA.NonEquilibriumMicrophysics2MP3,
     },
     integrator,
-) = integrator.u.c.ρq_tot
+) = sum(integrator.u.c.ρq_tot)
 
 # extensions required by the Interfacer
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_pressure}) =
@@ -389,11 +401,8 @@ end
 Return the total water of the atmosphere, `∫ ρq_tot dV`, integrated over the whole
 domain (in kilograms). Returns zero for a dry model.
 """
-function total_water(sim::ClimaAtmosSimulation)
-    ρq = ρq_tot(sim.integrator.p.atmos.microphysics_model, sim.integrator)
-    ρq isa Number && return ρq # the dry model has no water to integrate
-    return sum(ρq)
-end
+total_water(sim::ClimaAtmosSimulation) =
+    integrated_ρq_tot(sim.integrator.p.atmos.microphysics_model, sim.integrator)
 
 """
     ConservationChecker.contributions(cq, sim::ClimaAtmosSimulation)

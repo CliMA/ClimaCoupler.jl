@@ -32,7 +32,9 @@ units(::TotalEnergy) = "J"
     Accumulated(rate)
 
 Wrapper marking a contribution that is a rate rather than an amount, so that the
-checker integrates it in time instead of logging it directly.
+checker integrates it in time instead of logging it directly. `rate` is the rate
+that applies over the coupling step *about to be taken*, since components are
+asked for their contributions before they step.
 """
 struct Accumulated{T}
     rate::T
@@ -85,6 +87,7 @@ reported by the component simulations. See [`contributions`](@ref).
 struct ConservationCheck{CQ <: ConservedQuantity, C}
     conserved_quantity::CQ
     components::C
+    pending_rates::Dict{Symbol, Float64}
 
     function ConservationCheck(cq::ConservedQuantity, model_sims)
         keys = Symbol[]
@@ -93,21 +96,26 @@ struct ConservationCheck{CQ <: ConservedQuantity, C}
         end
         # just using Float64 here because it's a diagnostic
         components = NamedTuple{Tuple(keys)}(ntuple(_ -> Float64[], length(keys)))
-        return new{typeof(cq), typeof(components)}(cq, components)
+        return new{typeof(cq), typeof(components)}(cq, components, Dict{Symbol, Float64}())
     end
 end
 
 """
-    log_value(contribution, timeseries, Δt_cpl)
+    log_value!(cc, key, contribution, timeseries, Δt_cpl)
 
-Return the value to append to `timeseries` for `contribution`.
+Return the value to append to `timeseries` for the term logged under `key`.
 
-Amounts are logged as they are; an [`Accumulated`](@ref) rate is integrated onto the
-running total, so that its timeseries holds the time integral of the rate.
+Amounts are logged as they are; an [`Accumulated`](@ref) rate is integrated onto
+the running total (starting from 0), so that its timeseries holds the time
+integral of the rate.
 """
-log_value(contribution, _timeseries, _Δt_cpl) = contribution
-log_value(contribution::Accumulated, timeseries, Δt_cpl) =
-    (isempty(timeseries) ? 0.0 : timeseries[end]) + float(Δt_cpl) * contribution.rate
+log_value!(_cc, _key, contribution, _timeseries, _Δt_cpl) = contribution
+function log_value!(cc, key, contribution::Accumulated, timeseries, Δt_cpl)
+    running_total = isempty(timeseries) ? 0.0 : timeseries[end]
+    applied_rate = get(cc.pending_rates, key, 0.0)
+    cc.pending_rates[key] = float(contribution.rate)
+    return running_total + float(Δt_cpl) * applied_rate
+end
 
 """
     check_conservation!(coupler_sim::Interfacer.CoupledSimulation; runtime_check = false)
@@ -143,8 +151,9 @@ function check_conservation!(
 
     for sim in cs.model_sims
         for (term, contribution) in pairs(contributions(cq, sim))
-            timeseries = getproperty(components, term_key(sim, term))
-            push!(timeseries, log_value(contribution, timeseries, cs.Δt_cpl))
+            key = term_key(sim, term)
+            timeseries = getproperty(components, key)
+            push!(timeseries, log_value!(cc, key, contribution, timeseries, cs.Δt_cpl))
         end
     end
 

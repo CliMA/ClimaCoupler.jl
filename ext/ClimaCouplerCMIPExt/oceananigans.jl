@@ -7,7 +7,7 @@ import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Dates
 
 """
-    OceananigansSimulation{SIM, A, OPROP, REMAP, SIC}
+    OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, MDT, WFLUX}
 
 The ClimaCoupler simulation object used to run with Oceananigans.
 This type is used by the coupler to indicate that this simulation
@@ -19,8 +19,10 @@ It contains the following objects:
 - `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters (including COARE3 roughness params).
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ice_concentration::SIC`: An Oceananigans Field representing the sea ice concentration on the ocean/sea ice grid.
+- `model_Δt::MDT`: The time step of the Oceananigans model in seconds.
+- `water_flux::WFLUX`: An Oceananigans Field holding the water entering the ocean in kg/m²/s.
 """
-struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, MDT} <:
+struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, MDT, WFLUX} <:
        Interfacer.AbstractOceanSimulation
     ocean::SIM
     area_fraction::A
@@ -28,6 +30,7 @@ struct OceananigansSimulation{SIM, A, OPROP, REMAP, SIC, MDT} <:
     remapping::REMAP
     ice_concentration::SIC
     model_Δt::MDT
+    water_flux::WFLUX
 end
 
 """
@@ -233,6 +236,10 @@ function OceananigansSimulation(
     # if the ocean is coupled to a non-prescribed sea ice model.
     ice_concentration = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 
+    # Water entering the ocean in kg/m²/s. Accumulated over a coupling step alongside
+    # the surface salinity flux, since the ocean never gains this water as mass
+    water_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+
     # Create a dummy area fraction that will get overwritten in `update_surface_fractions!`
     area_fraction = ones(boundary_space)
 
@@ -243,6 +250,7 @@ function OceananigansSimulation(
         remapping,
         ice_concentration,
         dt,
+        water_flux,
     )
 
     add_ocean_diagnostics!(
@@ -541,6 +549,11 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
     surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
     OC.interior(oc_flux_S, :, :, 1) .-=
         (1.0 .- ice_concentration) .* surface_salinity .* moisture_fresh_water_flux
+
+    # Record the water that salinity flux stands in for. Evaporation is an upward
+    # moisture flux, so this removes water from the ocean.
+    OC.interior(sim.water_flux, :, :, 1) .-=
+        (1.0 .- ice_concentration) .* moisture_fresh_water_flux .* reference_density
     return nothing
 end
 
@@ -579,6 +592,7 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     OC.interior(oc_flux_T, :, :, 1) .= 0
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     OC.interior(oc_flux_S, :, :, 1) .= 0
+    OC.interior(sim.water_flux, :, :, 1) .= 0
 
     # Remap shortwave and longwave onto separate scratch fields
     Interfacer.remap!(sim.remapping.scratch_field_oc3, csf.SW_d, sim.remapping)
@@ -612,12 +626,53 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     Interfacer.remap!(sim.remapping.scratch_field_oc2, csf.P_snow, sim.remapping) # snow precipitation
     remapped_P_snow = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
 
+    # Rain reaches the ocean everywhere, draining through the ice rather than ponding on
+    # it, while snow falling on ice accumulates there instead (see the sea ice `update_sim!`)
+    ocean_precipitation = remapped_P_liq .+ (1.0 .- ice_concentration) .* remapped_P_snow
+
     # Note the negative sign here to account for the sign change from precipitation to salinity flux
     OC.interior(oc_flux_S, :, :, 1) .-=
-        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
-        (remapped_P_liq .+ remapped_P_snow) ./ reference_density
+        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* ocean_precipitation ./
+        reference_density
+
+    # Record the water that salinity flux stands in for
+    OC.interior(sim.water_flux, :, :, 1) .-= ocean_precipitation
     return nothing
 end
+
+"""
+    total_energy(sim::OceananigansSimulation)
+
+Compute total energy of the ocean (in Joules) as ∫_ocean (ρ * c * T) dV relative to 0°C. 
+"""
+function total_energy(sim::OceananigansSimulation)
+    (; reference_density, heat_capacity) = sim.ocean_properties
+    return reference_density *
+           heat_capacity *
+           sum(sim.ocean.model.tracers.T * OC.AbstractOperations.volume)
+end
+
+"""
+    net_water_flux(sim::OceananigansSimulation)
+
+Compute the rate (in kilograms per second) at which water is entering the ocean.
+"""
+net_water_flux(sim::OceananigansSimulation) = sum(sim.water_flux * OC.AbstractOperations.Az)
+
+"""
+    ConservationChecker.contributions(cq, sim::OceananigansSimulation)
+
+The ocean holds energy. It holds no water reservoir, so its water contribution is the
+rate at which it is receiving water, which the checker accumulates in time.
+"""
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalEnergy,
+    sim::OceananigansSimulation,
+) = (; reservoir = total_energy(sim)) # J
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalWater,
+    sim::OceananigansSimulation,
+) = (; reservoir = ConservationChecker.Accumulated(net_water_flux(sim))) # kg / s
 
 # Additional OceananigansSimulation getter methods for plotting debug fields
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:salinity}) =

@@ -23,6 +23,8 @@ areas define
 
 ## Geometry and weights
 
+For a more in-depth derivation of the regridding operations, see [the 
+ConservativeRegridding.jl documentation](https://juliageo.org/ConservativeRegridding.jl/stable/extensions/climacore/).
 `build_exchange_grid` constructs the polygons once on the CPU (in `Float64`)
 via ConservativeRegridding.jl's intersection-operator API, with polygons over
 dry (immersed) cells dropped. For each polygon ``\\Omega_k`` in SE element

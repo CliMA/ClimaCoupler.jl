@@ -263,6 +263,10 @@ end
 Segmented reductions over the CSR structures above: race-free and
 deterministic. Each wrapper launches a single KernelAbstractions kernel on
 the destination's backend, so the same code path runs on CPU and GPU.
+
+Hot paths use multi-RHS matvecs (one CSR traversal, many destinations) and a
+weighted scatter that folds `weight * F` into the reduction so callers do not
+materialize a scratch product vector.
 =#
 
 import KernelAbstractions
@@ -292,14 +296,107 @@ function _csr_matvec!(dst, ptr, col, w, src)
     return dst
 end
 
+# Multi-RHS: one CSR pass, N destinations. `N` is a type parameter so the
+# accumulator ntuple unrolls on GPU.
+@kernel function _csr_matvec_n_kernel!(dsts::NTuple{N}, ptr, col, w, srcs::NTuple{N}) where {N}
+    r = @index(Global)
+    FT = eltype(dsts[1])
+    acc = ntuple(_ -> zero(FT), Val(N))
+    @inbounds begin
+        for p in ptr[r]:(ptr[r + 1] - 1)
+            j = col[p]
+            wp = w[p]
+            acc = ntuple(i -> acc[i] + wp * srcs[i][j], Val(N))
+        end
+        for i in 1:N
+            dsts[i][r] = acc[i]
+        end
+    end
+end
+
+function _csr_matvec_n!(
+    dsts::NTuple{N, <:AbstractVector},
+    ptr,
+    col,
+    w,
+    srcs::NTuple{N, <:AbstractVector},
+) where {N}
+    backend = KernelAbstractions.get_backend(dsts[1])
+    launch_kernel!(_csr_matvec_n_kernel!, backend, length(dsts[1]), dsts, ptr, col, w, srcs)
+    return dsts
+end
+
+# Weighted multi-RHS scatter:
+#   dst_wt[r] = Σ_p w[p] * weight[col[p]]
+#   dsts[i][r] = Σ_p w[p] * weight[col[p]] * srcs[i][col[p]]
+@kernel function _csr_matvec_weighted_n_kernel!(
+    dsts::NTuple{N},
+    dst_wt,
+    ptr,
+    col,
+    w,
+    weight,
+    srcs::NTuple{N},
+) where {N}
+    r = @index(Global)
+    FT = eltype(dst_wt)
+    acc = ntuple(_ -> zero(FT), Val(N))
+    acc_wt = zero(FT)
+    @inbounds begin
+        for p in ptr[r]:(ptr[r + 1] - 1)
+            j = col[p]
+            wp = w[p] * weight[j]
+            acc_wt += wp
+            acc = ntuple(i -> acc[i] + wp * srcs[i][j], Val(N))
+        end
+        dst_wt[r] = acc_wt
+        for i in 1:N
+            dsts[i][r] = acc[i]
+        end
+    end
+end
+
+function _csr_matvec_weighted_n!(
+    dsts::NTuple{N, <:AbstractVector},
+    dst_wt,
+    ptr,
+    col,
+    w,
+    weight,
+    srcs::NTuple{N, <:AbstractVector},
+) where {N}
+    backend = KernelAbstractions.get_backend(dst_wt)
+    launch_kernel!(
+        _csr_matvec_weighted_n_kernel!,
+        backend,
+        length(dst_wt),
+        dsts,
+        dst_wt,
+        ptr,
+        col,
+        w,
+        weight,
+        srcs,
+    )
+    return dsts
+end
+
 """
     gather_nodes_to_polys!(poly_values, eg::ExchangeGrid, nodal_values)
+    gather_nodes_to_polys!(dsts::NTuple, eg::ExchangeGrid, srcs::NTuple)
 
-Average a flat SE nodal vector onto each polygon: `f̄_k = Σ_n gweight f_n`.
-Rows sum to 1, so constants are preserved exactly.
+Average flat SE nodal vector(s) onto each polygon: `f̄_k = Σ_n gweight f_n`.
+Rows sum to 1, so constants are preserved exactly. The `NTuple` form runs a
+single CSR pass for all fields.
 """
 gather_nodes_to_polys!(poly_values, eg::ExchangeGrid, nodal_values) =
     _csr_matvec!(poly_values, eg.gpoly_ptr, eg.gnode, eg.gweight, nodal_values)
+
+gather_nodes_to_polys!(
+    dsts::NTuple{N, <:AbstractVector},
+    eg::ExchangeGrid,
+    srcs::NTuple{N, <:AbstractVector},
+) where {N} = _csr_matvec_n!(dsts, eg.gpoly_ptr, eg.gnode, eg.gweight, srcs)
 
 @kernel function _gather_cells_kernel!(dst, oc_of_poly, src)
     k = @index(Global)
@@ -327,15 +424,40 @@ end
 
 """
     scatter_polys_to_nodes!(nodal_values, eg::ExchangeGrid, poly_values)
+    scatter_polys_to_nodes!(dsts::NTuple, eg::ExchangeGrid, srcs::NTuple)
 
-Project per-polygon values onto SE nodes via the per-element L2 projection:
+Project per-polygon value(s) onto SE nodes via the per-element L2 projection:
 `F_n = Σ_k sweight F_k`. The result is *coverage-weighted*: scattering a
 constant yields `constant × node_cov`. Follow with `weighted_dss!` on the
 receiving field. For a per-unit-wet-area result use
-[`scatter_polys_to_nodes_normalized!`](@ref).
+[`scatter_polys_to_nodes_normalized!`](@ref). The `NTuple` form runs a single
+CSR pass for all fields.
 """
 scatter_polys_to_nodes!(nodal_values, eg::ExchangeGrid, poly_values) =
     _csr_matvec!(nodal_values, eg.snode_ptr, eg.spoly, eg.sweight, poly_values)
+
+scatter_polys_to_nodes!(
+    dsts::NTuple{N, <:AbstractVector},
+    eg::ExchangeGrid,
+    srcs::NTuple{N, <:AbstractVector},
+) where {N} = _csr_matvec_n!(dsts, eg.snode_ptr, eg.spoly, eg.sweight, srcs)
+
+"""
+    scatter_polys_to_nodes_weighted!(dsts, dst_weight, eg, srcs, weight)
+
+Fused L2 scatter of `weight` and `weight * srcs[i]` onto SE nodes in one CSR
+pass: `dst_weight[n] = Σ_k sweight weight_k` and
+`dsts[i][n] = Σ_k sweight weight_k srcs[i]_k`. Avoids a temporary
+`weight * F` product vector.
+"""
+scatter_polys_to_nodes_weighted!(
+    dsts::NTuple{N, <:AbstractVector},
+    dst_weight,
+    eg::ExchangeGrid,
+    srcs::NTuple{N, <:AbstractVector},
+    weight,
+) where {N} =
+    _csr_matvec_weighted_n!(dsts, dst_weight, eg.snode_ptr, eg.spoly, eg.sweight, weight, srcs)
 
 @kernel function _csr_matvec_normalized_kernel!(dst, ptr, col, w, src, cov, cutoff)
     r = @index(Global)

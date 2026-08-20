@@ -23,13 +23,10 @@ import ClimaComms
 """
     ExchangeFluxState{FT, VF}
 
-Device-resident per-polygon scratch for the exchange-grid flux computation of
-one surface model (one instance for the ocean, one for sea ice): the gathered
-atmospheric and surface state (momentum in the UV basis; `T_sfc` in [K]), the
-flux outputs (`F_*`), running time accumulators for the slow-surface path
-(`acc_*`, with `n_acc` counting contributions), and two generic scratch
-vectors. Ocean and ice instances built by [`paired_exchange_flux_states`](@ref)
-share the nine atmospheric vectors so atmos is gathered once per coupling step.
+Per-polygon scratch for ocean or ice exchange-grid fluxes: atmos + surface
+state, fluxes `F_*`, accumulators `acc_*` / `n_acc`, and two scratch vectors.
+Paired ocean/ice states share the nine atmos vectors
+([`paired_exchange_flux_states`](@ref)).
 """
 struct ExchangeFluxState{FT, VF <: AbstractVector{FT}}
     T_atmos::VF
@@ -60,12 +57,21 @@ end
 
 Adapt.@adapt_structure ExchangeFluxState
 
-# CPU-resident, zero-initialized flux state. Every field is a per-polygon
-# vector except the trailing `n_acc` counter. Optional `atmos` reuses an
-# existing 9-tuple of atmos vectors (`T_atmos`…`height_sfc`, so ocean and ice
-# can share one gather).
+# Leading atmos fields through `height_sfc` (shared by paired ocean/ice states).
+@inline _atmos_fields(fs::ExchangeFluxState) = (
+    fs.T_atmos,
+    fs.q_tot,
+    fs.q_liq,
+    fs.q_ice,
+    fs.ρ_atmos,
+    fs.u_atmos,
+    fs.v_atmos,
+    fs.height_int,
+    fs.height_sfc,
+)
+
 function _cpu_exchange_flux_state(FT, n_poly::Int; atmos = nothing)
-    n_atmos = 9 # leading atmos fields through `height_sfc`
+    n_atmos = 9
     n_rest = fieldcount(ExchangeFluxState) - 1 - n_atmos
     atmos_vecs = isnothing(atmos) ? ntuple(_ -> zeros(FT, n_poly), n_atmos) : atmos
     @assert length(atmos_vecs) == n_atmos
@@ -82,11 +88,8 @@ ExchangeFluxState{FT}(arch, n_poly::Int) where {FT} =
 """
     IceExchangeState{FT, VF}
 
-Per-polygon scratch for the sea-ice exchange-grid flux computation: the
-common [`ExchangeFluxState`](@ref) plus the ice-specific inputs of the
-skin-temperature flux balance (`R` — conductive resistance, `T_i` — ice
-internal/interface temperature [K], downwelling `SW_d`/`LW_d`) and the
-diagnosed surface temperature output `T_sfc_new` [K].
+[`ExchangeFluxState`](@ref) plus ice skin-balance inputs (`R`, `T_i`, `SW_d`,
+`LW_d`) and diagnosed `T_sfc_new`.
 """
 struct IceExchangeState{FT, VF <: AbstractVector{FT}}
     fluxes::ExchangeFluxState{FT, VF}
@@ -100,10 +103,10 @@ end
 Adapt.@adapt_structure IceExchangeState
 
 function IceExchangeState{FT}(arch, n_poly::Int) where {FT}
-    n_vec = fieldcount(IceExchangeState) - 1 # ice-specific vectors (all but `fluxes`)
+    n_ice = fieldcount(IceExchangeState) - 1
     state = IceExchangeState(
         _cpu_exchange_flux_state(FT, n_poly),
-        ntuple(_ -> zeros(FT, n_poly), n_vec)...,
+        ntuple(_ -> zeros(FT, n_poly), n_ice)...,
     )
     return on_device(arch, state)
 end
@@ -111,52 +114,28 @@ end
 """
     paired_exchange_flux_states(FT, arch, n_poly)
 
-Allocate the ocean [`ExchangeFluxState`](@ref) and ice [`IceExchangeState`](@ref)
-so they **share** the nine atmospheric polygon vectors. `turbulent_fluxes!`
-iterates ice before ocean, so ice gathers atmos once and ocean reuses it
-(`ensure_atmos_gathered!` / `atmos_gathered`).
+Ocean + ice flux state sharing atmos polygon vectors. Ice gathers first in
+`turbulent_fluxes!`; ocean reuses via `ensure_atmos_gathered!`.
 """
 function paired_exchange_flux_states(::Type{FT}, arch, n_poly::Int) where {FT}
     ocean = ExchangeFluxState{FT}(arch, n_poly)
     AT = typeof(ocean.T_atmos)
     z() = similar(ocean.T_atmos)
+    n_atmos = 9
+    n_rest = fieldcount(ExchangeFluxState) - 1 - n_atmos
     ice_fluxes = ExchangeFluxState{FT, AT}(
-        ocean.T_atmos,
-        ocean.q_tot,
-        ocean.q_liq,
-        ocean.q_ice,
-        ocean.ρ_atmos,
-        ocean.u_atmos,
-        ocean.v_atmos,
-        ocean.height_int,
-        ocean.height_sfc,
-        z(),
-        z(), # T_sfc, sic
-        z(),
-        z(),
-        z(),
-        z(),
-        z(), # F_*
-        z(),
-        z(),
-        z(),
-        z(),
-        z(), # acc_*
-        z(),
-        z(), # scratch
+        _atmos_fields(ocean)...,
+        ntuple(_ -> z(), n_rest)...,
         Ref(0),
     )
-    ice = IceExchangeState{FT, AT}(ice_fluxes, z(), z(), z(), z(), z())
+    ice = IceExchangeState{FT, AT}(
+        ice_fluxes,
+        ntuple(_ -> z(), fieldcount(IceExchangeState) - 1)...,
+    )
     return ocean, ice
 end
 
-"""
-    ensure_atmos_gathered!(remapping, csf)
-
-Gather atmospheric coupler fields onto the exchange-grid polygons if this
-coupling step has not done so yet. Writes into the shared atmos vectors of
-`remapping.ocean_flux_state` (aliased by `ice_flux_state.fluxes`).
-"""
+# Gather atmos onto shared polygon vectors once per coupling step.
 NVTX.@annotate function ensure_atmos_gathered!(remapping, csf)
     remapping.atmos_gathered[] && return nothing
     gather_atmos_state_to_polys!(
@@ -171,11 +150,9 @@ NVTX.@annotate function ensure_atmos_gathered!(remapping, csf)
 end
 
 """
-    average_and_reset_exchange_accumulators!(fs::ExchangeFluxState) -> Bool
+    average_and_reset_exchange_accumulators!(fs) -> Bool
 
-Write the time-averaged accumulated fluxes into the flux-state outputs
-(`F_*`), zero the accumulators and the contribution counter. Returns `false`
-without touching anything when no contributions have been accumulated.
+Average `acc_*` into `F_*`, then zero accumulators. Returns `false` if `n_acc == 0`.
 """
 function average_and_reset_exchange_accumulators!(fs::ExchangeFluxState)
     n = fs.n_acc[]
@@ -194,16 +171,8 @@ function average_and_reset_exchange_accumulators!(fs::ExchangeFluxState)
     return true
 end
 
-"""
-    gather_atmos_state_to_polys!(fs::ExchangeFluxState, eg::ExchangeGrid, csf,
-                                 temp_uv_vec, uv_basis)
-
-Gather the atmospheric near-surface state from the coupler fields (SE nodal)
-onto the exchange-grid polygons. `csf.u_int`/`csf.v_int` are converted from
-the local CT1/CT2 basis to the global UV basis before gathering, so
-per-polygon winds and stresses are basis-consistent across the nodes a
-polygon touches. `uv_basis` is the output of [`uv_basis_coefficients`](@ref).
-"""
+# Gather atmos SE nodes → polygons. Convert winds CT1/CT2 → UV first so
+# stresses stay basis-consistent across nodes that touch a polygon.
 NVTX.@annotate function gather_atmos_state_to_polys!(
     fs::ExchangeFluxState,
     eg::ExchangeGrid,
@@ -214,15 +183,31 @@ NVTX.@annotate function gather_atmos_state_to_polys!(
     contravariant_to_cartesian!(temp_uv_vec, csf.u_int, csf.v_int, uv_basis)
     u_uv = temp_uv_vec.components.data.:1
     v_uv = temp_uv_vec.components.data.:2
-    gather_nodes_to_polys!(fs.u_atmos, eg, se_nodal_vec(u_uv))
-    gather_nodes_to_polys!(fs.v_atmos, eg, se_nodal_vec(v_uv))
-    gather_nodes_to_polys!(fs.T_atmos, eg, se_nodal_vec(csf.T_atmos))
-    gather_nodes_to_polys!(fs.q_tot, eg, se_nodal_vec(csf.q_tot_atmos))
-    gather_nodes_to_polys!(fs.q_liq, eg, se_nodal_vec(csf.q_liq_atmos))
-    gather_nodes_to_polys!(fs.q_ice, eg, se_nodal_vec(csf.q_ice_atmos))
-    gather_nodes_to_polys!(fs.ρ_atmos, eg, se_nodal_vec(csf.ρ_atmos))
-    gather_nodes_to_polys!(fs.height_int, eg, se_nodal_vec(csf.height_int))
-    gather_nodes_to_polys!(fs.height_sfc, eg, se_nodal_vec(csf.height_sfc))
+    gather_nodes_to_polys!(
+        (
+            fs.u_atmos,
+            fs.v_atmos,
+            fs.T_atmos,
+            fs.q_tot,
+            fs.q_liq,
+            fs.q_ice,
+            fs.ρ_atmos,
+            fs.height_int,
+            fs.height_sfc,
+        ),
+        eg,
+        (
+            se_nodal_vec(u_uv),
+            se_nodal_vec(v_uv),
+            se_nodal_vec(csf.T_atmos),
+            se_nodal_vec(csf.q_tot_atmos),
+            se_nodal_vec(csf.q_liq_atmos),
+            se_nodal_vec(csf.q_ice_atmos),
+            se_nodal_vec(csf.ρ_atmos),
+            se_nodal_vec(csf.height_int),
+            se_nodal_vec(csf.height_sfc),
+        ),
+    )
     return nothing
 end
 
@@ -447,15 +432,8 @@ end
     )
 end
 
-@inline function _store_ice_polygon_fluxes!(vecs, k, out)
-    _store_ocean_polygon_fluxes!(vecs, k, out)
-    @inbounds vecs.T_sfc_new[k] = out.T_sfc_new
-    return nothing
-end
-
-@inline function _ice_polygon_fluxes_at(
+@kernel function _ice_polygon_fluxes_kernel!(
     vecs,
-    k,
     surface_fluxes_params,
     thermo_params,
     config,
@@ -465,6 +443,7 @@ end
     α_albedo,
     T_melt,
 )
+    k = @index(Global)
     @inbounds out = _polygon_ice_fluxes(
         surface_fluxes_params,
         thermo_params,
@@ -490,43 +469,15 @@ end
         vecs.SW_d[k],
         vecs.LW_d[k],
     )
-    _store_ice_polygon_fluxes!(vecs, k, out)
-    return nothing
-end
-
-@kernel function _ice_polygon_fluxes_kernel!(
-    vecs,
-    surface_fluxes_params,
-    thermo_params,
-    config,
-    solver_opts,
-    σ,
-    ϵ,
-    α_albedo,
-    T_melt,
-)
-    k = @index(Global)
-    _ice_polygon_fluxes_at(
-        vecs,
-        k,
-        surface_fluxes_params,
-        thermo_params,
-        config,
-        solver_opts,
-        σ,
-        ϵ,
-        α_albedo,
-        T_melt,
-    )
+    _store_ocean_polygon_fluxes!(vecs, k, out)
+    @inbounds vecs.T_sfc_new[k] = out.T_sfc_new
 end
 
 """
-    compute_ice_polygon_fluxes!(is::IceExchangeState, surface_fluxes_params,
-                                thermo_params, config, σ, ϵ, α_albedo, T_melt)
+    compute_ice_polygon_fluxes!(is, …)
 
-Run the SurfaceFluxes evaluation with skin-temperature diagnosis for every
-exchange-grid polygon with ice (`sic > 0`), storing the flux outputs, the
-diagnosed `T_sfc_new`, and adding the fluxes to the running accumulators.
+Per-polygon SurfaceFluxes + skin temperature (`sic > 0`); store fluxes / `T_sfc_new`
+and accumulate.
 """
 NVTX.@annotate function compute_ice_polygon_fluxes!(
     is::IceExchangeState,
@@ -621,21 +572,11 @@ function _dss_and_normalize!(field, cov, buffer, cutoff, z)
 end
 
 """
-    scatter_poly_fluxes_to_boundary!(remapping, eg::ExchangeGrid,
-                                     fs::ExchangeFluxState, weight;
-                                     cov_cutoff = 1e-3)
+    scatter_poly_fluxes_to_boundary!(remapping, eg, fs, weight; cov_cutoff=1e-3)
 
-Aggregate per-polygon fluxes onto the SE boundary space as a `weight`-weighted
-average, filling the `remapping.flux_scratch` fields for
-`FluxCalculator.update_flux_fields!`. `weight` selects the sub-surface the
-fluxes apply to — `1 - sic` for open ocean, `sic` for sea ice — so the nodal
-result is a per-unit-*weighted*-area flux, consistent with the area fraction
-the coupler multiplies it by: L2-scatter `weight * F` (momentum in UV) and
-`weight` itself, `weighted_dss!` each scalar, divide by the DSS'd weighted
-coverage, then convert momentum UV → CT1/CT2. Nodes with relative coverage
-below `cov_cutoff` get zero flux (they are essentially not covered by wet
-ocean; their area fraction vanishes there too, so they never contribute to
-the coupler sums). Uses `fs.scratch1` internally; `weight` must not alias it.
+Weight-average polygon fluxes onto SE boundary scratch (`weight` = `1-sic` or
+`sic`): fused L2 scatter of `weight` and `weight*F`, DSS, normalize by coverage,
+then UV → CT1/CT2 for momentum. Low-coverage nodes (`< cov_cutoff`) get zero.
 """
 NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
     remapping,
@@ -646,29 +587,28 @@ NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
 )
     fx = remapping.flux_scratch
     cov = remapping.weight_cov_scratch
-    scatter_polys_to_nodes!(se_nodal_vec(cov), eg, weight)
-
-    @. fs.scratch1 = weight * fs.F_sh
-    scatter_polys_to_nodes!(se_nodal_vec(fx.F_sh), eg, fs.scratch1)
-    @. fs.scratch1 = weight * fs.F_lh
-    scatter_polys_to_nodes!(se_nodal_vec(fx.F_lh), eg, fs.scratch1)
-    @. fs.scratch1 = weight * fs.F_moisture
-    scatter_polys_to_nodes!(se_nodal_vec(fx.F_turb_moisture), eg, fs.scratch1)
-    @. fs.scratch1 = weight * fs.F_τu
-    scatter_polys_to_nodes!(se_nodal_vec(fx.F_turb_ρτxz), eg, fs.scratch1)
-    @. fs.scratch1 = weight * fs.F_τv
-    scatter_polys_to_nodes!(se_nodal_vec(fx.F_turb_ρτyz), eg, fs.scratch1)
+    scatter_polys_to_nodes_weighted!(
+        (
+            se_nodal_vec(fx.F_sh),
+            se_nodal_vec(fx.F_lh),
+            se_nodal_vec(fx.F_turb_moisture),
+            se_nodal_vec(fx.F_turb_ρτxz),
+            se_nodal_vec(fx.F_turb_ρτyz),
+        ),
+        se_nodal_vec(cov),
+        eg,
+        (fs.F_sh, fs.F_lh, fs.F_moisture, fs.F_τu, fs.F_τv),
+        weight,
+    )
 
     FT = CC.Spaces.undertype(axes(cov))
     cutoff = FT(cov_cutoff)
     z = zero(FT)
     buf = remapping.flux_dss_buffer
     scalar_weighted_dss!(cov, buf)
-    _dss_and_normalize!(fx.F_sh, cov, buf, cutoff, z)
-    _dss_and_normalize!(fx.F_lh, cov, buf, cutoff, z)
-    _dss_and_normalize!(fx.F_turb_moisture, cov, buf, cutoff, z)
-    _dss_and_normalize!(fx.F_turb_ρτxz, cov, buf, cutoff, z)
-    _dss_and_normalize!(fx.F_turb_ρτyz, cov, buf, cutoff, z)
+    for f in (fx.F_sh, fx.F_lh, fx.F_turb_moisture, fx.F_turb_ρτxz, fx.F_turb_ρτyz)
+        _dss_and_normalize!(f, cov, buf, cutoff, z)
+    end
 
     parent(remapping.temp_uv_vec.components.data.:1) .= parent(fx.F_turb_ρτxz)
     parent(remapping.temp_uv_vec.components.data.:2) .= parent(fx.F_turb_ρτyz)

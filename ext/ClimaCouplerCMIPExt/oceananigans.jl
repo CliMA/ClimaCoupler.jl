@@ -394,12 +394,8 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
         wet_ocean_fraction = wet_ocean_fraction_field(boundary_space, exchange_grid_cpu)
         exchange_grid = on_device(arch, exchange_grid_cpu)
 
-        # Per-polygon flux scratch (ocean and ice share atmos gather buffers),
-        # boundary-space flux scratch fields (in the layout
-        # `update_flux_fields!` expects), the boundary-space nodal coverage of
-        # the current flux weight (`scatter_poly_fluxes_to_boundary!` fills it
-        # each step), a shared DSS buffer, and a per-coupling-step flag for the
-        # shared atmos gather (ice runs before ocean in `turbulent_fluxes!`).
+        # Ocean/ice polygon flux state (shared atmos buffers), boundary flux
+        # scratch, coverage scratch, DSS buffer, and per-step atmos-gather flag.
         ocean_flux_state, ice_flux_state =
             paired_exchange_flux_states(FT, arch, exchange_grid_cpu.n_poly)
         atmos_gathered = Ref(false)

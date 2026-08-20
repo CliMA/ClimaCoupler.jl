@@ -15,7 +15,8 @@ weights are consistent with where the ocean actually has wet cells
 (2) compute ocean and sea-ice turbulent fluxes per polygon, with per-polygon
 sea-ice-concentration weighting, conservative aggregation to both grids, and
 GPU-resident, allocation-free per-step application. Atmospheric state is
-gathered onto polygons once per coupling step (shared ocean/ice buffers); a
+gathered onto polygons once per coupling step (shared ocean/ice buffers); 
+boundary scatter fuses `weight * F` into one CSR pass. A
 globally ice-free step skips the ice SurfaceFluxes kernel. Controlled by the new
 `use_intersection_grid` configuration option (default `true`; automatically
 disabled for column and distributed setups).

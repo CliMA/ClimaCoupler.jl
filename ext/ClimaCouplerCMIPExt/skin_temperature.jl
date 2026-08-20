@@ -136,29 +136,10 @@ end
 """
     UpdateTSfc{FT}
 
-Callable skin-temperature updater for `SurfaceFluxes.jl` (SDP 18 functor;
-replaces a capturing closure). One Newton step of
-
-    Jᵃ(Tₛ) + (Tₛ - Tᵢ)/R = 0
-
-with
-
-    Tₛⁿ⁺¹ = (Tᵢ - R · (Jᵃ - Λ Tₛⁿ)) / (1 + R Λ),
-    Λ = 4σϵTₛⁿ³ + ∂F_turb/∂Tₛ
-
-where `∂F_turb/∂Tₛ` is the analytic bulk sensitivity from
-[`turbulent_energy_flux_and_sensitivity`](@ref) (no finite-difference second
-turbulent-flux evaluation). The step is clamped to ±5 K and capped at `T_melt`.
-
-# Fields
-- `R`: Conductive resistance of the column [m² K W⁻¹] (snow and ice in series)
-- `T_i`: Internal (ice-ocean interface) temperature [K]
-- `σ`: Stefan-Boltzmann constant [W m⁻² K⁻⁴]
-- `ϵ`: Surface emissivity [-]
-- `SW_d`: Downward shortwave radiation [W m⁻²]
-- `LW_d`: Downward longwave radiation [W m⁻²]
-- `α_albedo`: Surface albedo [-]
-- `T_melt`: Melting temperature [K]
+Skin-temperature Newton step for SurfaceFluxes (functor, not a capturing
+closure): `Jᵃ(Tₛ) + (Tₛ - Tᵢ)/R = 0` with
+`Λ = 4σϵTₛ³ + ∂F_turb/∂Tₛ` from
+[`turbulent_energy_flux_and_sensitivity`](@ref). Clamp ±5 K, cap at `T_melt`.
 """
 struct UpdateTSfc{FT}
     R::FT
@@ -171,21 +152,10 @@ struct UpdateTSfc{FT}
     T_melt::FT
 end
 
-"""
-    update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
-
-Construct an [`UpdateTSfc`](@ref) functor. Broadcast-friendly so
-`update_T_sfc.(R, T_i, σ, …)` builds a field of functors on the boundary-space
-path.
-"""
+# Broadcast-friendly constructor (`update_T_sfc.(…)` on the boundary path).
 update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt) =
     UpdateTSfc(promote(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)...)
 
-"""
-    (cb::UpdateTSfc)(ζ, param_set, thermo_params, inputs, scheme, u_star, z0m, z0s)
-
-Apply one safeguarded Newton skin-temperature update. See [`UpdateTSfc`](@ref).
-"""
 @inline function (cb::UpdateTSfc)(
     ζ,
     param_set,
@@ -229,12 +199,6 @@ Apply one safeguarded Newton skin-temperature update. See [`UpdateTSfc`](@ref).
     return T_sfc_new
 end
 
-"""
-    ice_surface_flux_solver_opts(::Type{FT})
-
-`SurfaceFluxes.SolverOptions` for the sea-ice flux path: fixed iteration count
-(`forced_fixed_iters = true`, default `maxiter`) so every polygon/column runs
-identical MOST work with no tolerance early-exit (branchless / GPU-uniform).
-"""
+# Fixed MOST iteration count (GPU-uniform; no early exit).
 @inline ice_surface_flux_solver_opts(::Type{FT}) where {FT} =
     SF.SolverOptions{FT}(forced_fixed_iters = true)

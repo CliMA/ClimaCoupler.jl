@@ -215,6 +215,22 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # spatial dimensions on a block-averaged grid instead (see coarsen_lonlat).
     vars = reduce_spatial.(vars)
 
+    # A config may define OCEAN_ONLY = true to restrict the loss to ocean
+    # points: apply_landmask NaNs any cell whose land fraction exceeds 0.5
+    # (kept coastal cells are therefore <= 50% land block means, equally
+    # contaminated on the obs and sim sides). Deliberately the LAST spatial
+    # step, on the coarse grid, so the covariance and flattening see the
+    # final mask. The simulation side needs NO matching code:
+    # GEnsembleBuilder fills G via ClimaAnalysis.flatten(sim_var, metadata),
+    # and the observation metadata's drop_mask carries this mask.
+    if @isdefined(OCEAN_ONLY) && OCEAN_ONLY
+        vars = ClimaAnalysis.apply_landmask.(vars)
+        for v in vars
+            n_ocean = count(isfinite, v.data)
+            @info "Applied landmask to $(ClimaAnalysis.short_name(v))" n_ocean n_total = length(v.data)
+        end
+    end
+
     # NOTE: Normalization is intentionally NOT applied. The SVDplusD covariance
     # below carries each variable's physical scale, and normalization is
     # unsupported with it. `preprocess_sim_vars` skips normalization when

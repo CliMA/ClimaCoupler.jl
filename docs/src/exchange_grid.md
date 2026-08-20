@@ -38,12 +38,8 @@ provide:
   systematic error of approximating strongly curved FV cells (e.g. along the
   tripolar fold) by four-corner spherical quads.
 
-On the FV side each polygon belongs to exactly one cell; gathers are direct
-reads and scatters are area-weighted averages, followed by a mirror of the
-tripolar fold's duplicated (shadow) cells. All couplings are stored in CSR
-form, so every per-step operation is a race-free segmented reduction with no
-atomics — a serial loop on CPU and a KernelAbstractions kernel on GPU, with
-zero (CPU) or bounded (GPU) per-step allocations.
+On the FV side, each polygon belongs to exactly one cell; gathers are direct
+reads and scatters are area-weighted averages.
 
 ## Surface fractions
 

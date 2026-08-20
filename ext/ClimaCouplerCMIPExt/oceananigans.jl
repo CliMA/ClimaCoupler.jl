@@ -394,12 +394,15 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
         wet_ocean_fraction = wet_ocean_fraction_field(boundary_space, exchange_grid_cpu)
         exchange_grid = on_device(arch, exchange_grid_cpu)
 
-        # Per-polygon flux scratch, boundary-space flux scratch fields (in the
-        # layout `update_flux_fields!` expects), the boundary-space nodal
-        # coverage of the current flux weight (`scatter_poly_fluxes_to_boundary!`
-        # fills it each step), and a shared DSS buffer.
-        ocean_flux_state = ExchangeFluxState{FT}(arch, exchange_grid_cpu.n_poly)
-        ice_flux_state = IceExchangeState{FT}(arch, exchange_grid_cpu.n_poly)
+        # Per-polygon flux scratch (ocean and ice share atmos gather buffers),
+        # boundary-space flux scratch fields (in the layout
+        # `update_flux_fields!` expects), the boundary-space nodal coverage of
+        # the current flux weight (`scatter_poly_fluxes_to_boundary!` fills it
+        # each step), a shared DSS buffer, and a per-coupling-step flag for the
+        # shared atmos gather (ice runs before ocean in `turbulent_fluxes!`).
+        ocean_flux_state, ice_flux_state =
+            paired_exchange_flux_states(FT, arch, exchange_grid_cpu.n_poly)
+        atmos_gathered = Ref(false)
         weight_cov_scratch = CC.Fields.zeros(boundary_space)
         flux_scratch = (;
             F_turb_ρτxz = CC.Fields.zeros(boundary_space),
@@ -414,6 +417,7 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
         wet_ocean_fraction = nothing
         ocean_flux_state = nothing
         ice_flux_state = nothing
+        atmos_gathered = nothing
         weight_cov_scratch = nothing
         flux_scratch = nothing
         flux_dss_buffer = nothing
@@ -435,6 +439,7 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
         wet_ocean_fraction,
         ocean_flux_state,
         ice_flux_state,
+        atmos_gathered,
         weight_cov_scratch,
         flux_scratch,
         flux_dss_buffer,
@@ -731,8 +736,10 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     fs = remapping.ocean_flux_state
     surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
 
-    # Gather the atmospheric and ocean-surface state onto the polygons.
-    gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec, remapping.uv_basis)
+    # Atmos state: reuse the gather from ice when ice ran first this step
+    # (shared polygon atmos buffers); otherwise gather here.
+    ensure_atmos_gathered!(remapping, csf)
+    remapping.atmos_gathered[] = false # next coupling step starts clean
     Nz = size(sim.ocean.model.grid, 3)
     gather_cells_to_polys!(
         fs.T_sfc,

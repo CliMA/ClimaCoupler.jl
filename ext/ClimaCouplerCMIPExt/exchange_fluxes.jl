@@ -28,7 +28,8 @@ one surface model (one instance for the ocean, one for sea ice): the gathered
 atmospheric and surface state (momentum in the UV basis; `T_sfc` in [K]), the
 flux outputs (`F_*`), running time accumulators for the slow-surface path
 (`acc_*`, with `n_acc` counting contributions), and two generic scratch
-vectors.
+vectors. Ocean and ice instances built by [`paired_exchange_flux_states`](@ref)
+share the nine atmospheric vectors so atmos is gathered once per coupling step.
 """
 struct ExchangeFluxState{FT, VF <: AbstractVector{FT}}
     T_atmos::VF
@@ -60,12 +61,17 @@ end
 Adapt.@adapt_structure ExchangeFluxState
 
 # CPU-resident, zero-initialized flux state. Every field is a per-polygon
-# vector except the trailing `n_acc` counter, so allocate one vector per field
-# and cap it with the counter.
-function _cpu_exchange_flux_state(FT, n_poly::Int)
-    n_vec = fieldcount(ExchangeFluxState) - 1
+# vector except the trailing `n_acc` counter. Optional `atmos` reuses an
+# existing 9-tuple of atmos vectors (`T_atmos`…`height_sfc`, so ocean and ice
+# can share one gather).
+function _cpu_exchange_flux_state(FT, n_poly::Int; atmos = nothing)
+    n_atmos = 9 # leading atmos fields through `height_sfc`
+    n_rest = fieldcount(ExchangeFluxState) - 1 - n_atmos
+    atmos_vecs = isnothing(atmos) ? ntuple(_ -> zeros(FT, n_poly), n_atmos) : atmos
+    @assert length(atmos_vecs) == n_atmos
     return ExchangeFluxState{FT, Vector{FT}}(
-        ntuple(_ -> zeros(FT, n_poly), n_vec)...,
+        atmos_vecs...,
+        ntuple(_ -> zeros(FT, n_poly), n_rest)...,
         Ref(0),
     )
 end
@@ -100,6 +106,68 @@ function IceExchangeState{FT}(arch, n_poly::Int) where {FT}
         ntuple(_ -> zeros(FT, n_poly), n_vec)...,
     )
     return on_device(arch, state)
+end
+
+"""
+    paired_exchange_flux_states(FT, arch, n_poly)
+
+Allocate the ocean [`ExchangeFluxState`](@ref) and ice [`IceExchangeState`](@ref)
+so they **share** the nine atmospheric polygon vectors. `turbulent_fluxes!`
+iterates ice before ocean, so ice gathers atmos once and ocean reuses it
+(`ensure_atmos_gathered!` / `atmos_gathered`).
+"""
+function paired_exchange_flux_states(::Type{FT}, arch, n_poly::Int) where {FT}
+    ocean = ExchangeFluxState{FT}(arch, n_poly)
+    AT = typeof(ocean.T_atmos)
+    z() = similar(ocean.T_atmos)
+    ice_fluxes = ExchangeFluxState{FT, AT}(
+        ocean.T_atmos,
+        ocean.q_tot,
+        ocean.q_liq,
+        ocean.q_ice,
+        ocean.ρ_atmos,
+        ocean.u_atmos,
+        ocean.v_atmos,
+        ocean.height_int,
+        ocean.height_sfc,
+        z(),
+        z(), # T_sfc, sic
+        z(),
+        z(),
+        z(),
+        z(),
+        z(), # F_*
+        z(),
+        z(),
+        z(),
+        z(),
+        z(), # acc_*
+        z(),
+        z(), # scratch
+        Ref(0),
+    )
+    ice = IceExchangeState{FT, AT}(ice_fluxes, z(), z(), z(), z(), z())
+    return ocean, ice
+end
+
+"""
+    ensure_atmos_gathered!(remapping, csf)
+
+Gather atmospheric coupler fields onto the exchange-grid polygons if this
+coupling step has not done so yet. Writes into the shared atmos vectors of
+`remapping.ocean_flux_state` (aliased by `ice_flux_state.fluxes`).
+"""
+NVTX.@annotate function ensure_atmos_gathered!(remapping, csf)
+    remapping.atmos_gathered[] && return nothing
+    gather_atmos_state_to_polys!(
+        remapping.ocean_flux_state,
+        remapping.exchange_grid,
+        csf,
+        remapping.temp_uv_vec,
+        remapping.uv_basis,
+    )
+    remapping.atmos_gathered[] = true
+    return nothing
 end
 
 """

@@ -532,20 +532,33 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
     C_to_K = FT(sim.ice_properties.C_to_K)
     surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
 
-    # Atmospheric state, including the downwelling radiation entering the
-    # skin-temperature balance.
-    gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec, remapping.uv_basis)
+    # Shared atmos gather (ice runs before ocean in `turbulent_fluxes!`).
+    remapping.atmos_gathered[] = false
+    ensure_atmos_gathered!(remapping, csf)
+
+    # Ice concentration first so a globally ice-free step can exit early.
+    gather_cells_to_polys!(
+        fs.sic,
+        eg,
+        vec(OC.interior(sim.ice.model.ice_concentration, :, :, 1)),
+    )
+    if !(maximum(fs.sic) > zero(FT))
+        # No ice anywhere: zero boundary flux scratch and skip the SurfaceFluxes
+        # kernel, radiation gathers, and sic-weighted scatter.
+        for f in remapping.flux_scratch
+            fill!(parent(f), zero(FT))
+        end
+        FluxCalculator.update_flux_fields!(csf, sim, remapping.flux_scratch, accumulator)
+        return nothing
+    end
+
+    # Downwelling radiation for the skin-temperature balance.
     gather_nodes_to_polys!(is.SW_d, eg, se_nodal_vec(csf.SW_d))
     gather_nodes_to_polys!(is.LW_d, eg, se_nodal_vec(csf.LW_d))
 
     # Ice state from the owning cells. Conductive resistance
     # R = h_ice/k_ice + h_snow/k_snow (series; reduces to h_ice/k_ice with no
     # snow layer).
-    gather_cells_to_polys!(
-        fs.sic,
-        eg,
-        vec(OC.interior(sim.ice.model.ice_concentration, :, :, 1)),
-    )
     gather_cells_to_polys!(is.R, eg, vec(OC.interior(sim.ice.model.ice_thickness, :, :, 1)))
     ice_heat_flux = sim.ice.model.ice_thermodynamics.internal_heat_flux
     k_ice =

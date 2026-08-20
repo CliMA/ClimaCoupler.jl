@@ -66,9 +66,10 @@ which sum to 1 identically (asserted at runtime)
 
 For the ocean and for sea ice, `FluxCalculator.compute_surface_fluxes!` runs
 one `SurfaceFluxes.surface_fluxes` evaluation per polygon (the ice version
-includes the skin-temperature diagnosis; ice-free polygons short-circuit).
-Atmospheric inputs are gathered from the SE nodes with velocities converted
-to the global UV (east/north) basis; surface inputs (SST, sea-ice
+includes the skin-temperature diagnosis; ice-free polygons short-circuit, and
+a globally ice-free step skips the ice kernel entirely). Atmospheric inputs are
+gathered from the SE nodes once per coupling step into buffers shared by ocean
+and ice (ice runs first in `turbulent_fluxes!`); surface inputs (SST, sea-ice
 concentration, ice thickness, interface temperature) are read directly from
 the owning FV cell.
 

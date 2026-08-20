@@ -1,0 +1,88 @@
+FLOAT_TYPE: "Float32"
+
+### Grid ###
+h_elem: 12
+z_max: 60000.0
+z_elem: 63
+dz_bottom: 30.0
+topo_smoothing: true
+topography: "Earth"
+
+### Time and Simulation ###
+# Placeholder only (calibration members override both via update_timespan!).
+# start_date must exist in era5_initial_condition_dir or config validation
+# fails. It is deliberately set to the date the RUN needs (2010-09-24 =
+# 2010-10-01 minus the 7-day spinup) rather than to an already-present date,
+# so a missing initial condition fails loudly at preflight instead of on a
+# worker 40 minutes into iteration 1.
+start_date: "20100924"
+initial_condition: "WeatherModel"
+t_end: "38days"
+dt: "180secs"
+dt_cpl: "180secs"
+dt_seaice: "180secs"
+checkpoint_dt: "900days"
+
+### Coupler ###
+mode_name: "subseasonal"
+binary_area_fraction: false
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
+# Production parameter set PLUS entr_param_vec (12 zeros, required by the
+# `_E#` splice) and fixed_cloud_liquid_terminal_velocity = 0. A separate file
+# from toml/amip_progedmf_1m.toml so that amip.yml, the nightly, the longrun,
+# both benchmarks and the previous micro_edmf calibration are all unaffected.
+# The member's parameters_spliced.toml is appended at runtime and wins.
+coupler_toml: ["toml/amip_progedmf_1m_pigroups.toml"]
+# Local copy of nefrathe's son_ic (18 GB, rsync'd 2026-08-19) so the run does
+# not depend on another user's purgeable scratch directory. Must contain the
+# seven processed files for 20100924.
+era5_initial_condition_dir: "/glade/derecho/scratch/kphan/son_ic"
+energy_check: false
+
+### Atmosphere ###
+# THE functional change of this calibration. Coupler keys override the atmos
+# config file (Input.jl merges atmos_config_dict then coupler_config_dict), so
+# this beats the "Generalized" in climaatmos_progedmf_1m.yml. Without it
+# entr_param_vec is never read - InvZEntrainment uses entr_coeff instead - and
+# all three priors would be silently inert.
+edmfx_entr_model: "PiGroups"
+radiation_reset_rng_seed: true
+albedo_model: "CouplerAlbedo"
+surface_setup: "PrescribedSurface"
+strict_params: false
+# Per-member simulation log, tee'd to stdout and written to output.log in the
+# member's atmos output directory with always_flush. Without it a failed
+# member's progress output dies with the worker's PBS spool (how the
+# 2026-08-14 NaN run left only driver-side stack traces).
+log_to_file: true
+
+### Land ###
+lai_source: "modis_monthly_climatology"
+land_fraction_source: "era5"
+land_model: "integrated"
+land_spun_up_ic: false
+land_temperature_anomaly: "nothing"
+
+### Diagnostics ###
+netcdf_output_at_levels: true
+output_default_diagnostics: false
+use_coupler_diagnostics: false
+use_land_diagnostics: false
+# Only rlut is graded. The rest are kept identical to the micro_edmf run so
+# side effects of the entrainment change stay inspectable (clt, lwp and the
+# clear-sky pairs give swcre/lwcre for free). If walltime becomes the binding
+# constraint, the two `compute_every: 6hours` blocks below are the expensive
+# ones and can be dropped without touching the loss.
+extra_atmos_diagnostics:
+  - short_name: [tas, pr, mslp, rsut, rsutcs, rlut, rlutcs, rsdt, lwp, clt]
+    period: monthly
+    reduction_time: average
+  - short_name: [ta, hur, pfull]
+    period: monthly
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
+  - short_name: [cl]
+    period: monthly
+    reduction_time: average
+    compute_every: 6hours

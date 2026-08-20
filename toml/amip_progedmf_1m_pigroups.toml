@@ -1,0 +1,153 @@
+# Parameter set for the Pi-groups entrainment calibration (rlut_pigroups).
+#
+# This is toml/amip_progedmf_1m.toml (the production set, used by amip.yml,
+# the nightly, the longrun and both benchmarks) with exactly two additions,
+# kept as a separate file so the production set is untouched and the earlier
+# micro_edmf calibration stays reproducible from its own config.
+#
+# ADDITION 1 - entr_param_vec, all zeros.
+#   Required by the `_E#` splice: CalibrationTools.parameter_dict reads the
+#   base vector ONLY from the coupler_toml files, so a missing entry aborts
+#   every member. Zeroing it also implements the calibration's design: only
+#   elements 2, 3 and 6 are sampled, everything else contributes nothing.
+#   ClimaParams' registry default is all-ones, which would silently switch on
+#   the Pi_1, Pi_4 and Pi_5 terms we mean to hold out.
+#
+#   Under `edmfx_entr_model: "PiGroups"` the closure is
+#
+#     entr_vel_scale = limiter * max(0, sum_i c_i |Pi_i| + c_6) / (z - z_sfc)
+#
+#   so c_6 plays exactly the role entr_coeff plays in InvZEntrainment. With
+#   c_2 = c_3 = 0 and c_6 = 0.3 (the c_6 prior mean) this reproduces the
+#   production InvZ closure IDENTICALLY, because entr_coeff below is also
+#   0.3. The prior centre is therefore the shipped model, not a new one.
+#
+#   Only elements 1-6 are read by the closure; 7-12 exist because the
+#   registry declares length 12 and the splice preserves the base length.
+#
+# ADDITION 2 - fixed_cloud_liquid_terminal_velocity = 0.0 (was 0.01).
+#   Disables cloud liquid sedimentation. `fixed_terminal_velocity_liquid`
+#   defaults to true in ClimaAtmos, so this value is live; the flag must stay
+#   true for it to take effect. This is why the file is a copy rather than an
+#   edit in place - the same change in amip_progedmf_1m.toml would silently
+#   alter production, nightly, longrun and both benchmark configurations.
+#
+# entr_coeff is retained below but is DEAD under PiGroups (read only by
+# InvZEntrainment). It is left in place so this file stays a clean, diffable
+# copy of the production set.
+
+[zd_rayleigh]
+value = 40000.0
+type = "float"
+
+[zd_viscous]
+value = 40000.0
+type = "float"
+
+[alpha_rayleigh_tracer]
+value = 0.001
+type = "float"
+
+[EDMF_max_surface_area]
+value = 0.1
+type = "float"
+
+[EDMF_min_area]
+value = 1.0e-5
+type = "float"
+
+[EDMF_max_area]
+value = 0.7
+type = "float"
+
+[entr_inv_tau]
+value = 0
+type = "float"
+
+[entr_coeff]
+value = 0.3
+type = "float"
+
+[entr_param_vec]
+value = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+type = "float"
+
+[min_area_limiter_scale]
+value = 0.001
+type = "float"
+
+[min_area_limiter_power]
+value = 1
+type = "float"
+
+[turb_entr_param_vec]
+value = [0.001, 1e5]
+type = "float"
+
+[entr_detr_limit_inv_tau]
+value = 0
+type = "float"
+
+[detr_inv_tau]
+value = 0
+type = "float"
+
+[detr_coeff]
+value = 0
+type = "float"
+
+[detr_buoy_coeff]
+value = 1
+type = "float"
+
+[detr_vertdiv_coeff]
+value = 0
+type = "float"
+
+[detr_massflux_vertdiv_coeff]
+value = 0.3
+type = "float"
+
+[max_area_limiter_scale]
+value = 0.001
+type = "float"
+
+[max_area_limiter_power]
+value = 1
+type = "float"
+
+[mixing_length_Prandtl_maximum]
+value = 100
+type = "float"
+
+[condensation_evaporation_timescale]
+value = 100
+type = "float"
+
+[sublimation_deposition_timescale]
+value = 300
+type = "float"
+
+[rain_autoconversion_timescale]
+value = 1200
+type = "float"
+
+[snow_autoconversion_timescale]
+value = 1360
+type = "float"
+
+[cloud_liquid_water_specific_humidity_autoconversion_threshold]
+value = 2e-4
+type = "float"
+
+[cloud_fraction_steepness_scale]
+value = 0.55
+type = "float"
+
+[cloud_fraction_eps_rel]
+value = 0.05
+type = "float"
+
+[fixed_cloud_liquid_terminal_velocity]
+value = 0.0
+type = "float"

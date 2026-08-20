@@ -21,6 +21,10 @@ areas define
 1. the surface area fractions, and
 2. the weights with which per-polygon fluxes are aggregated to both sides.
 
+Setting the exchange grid as a FV space also bypasses the need to define a conservative 
+SE to SE regridding; only SE to FV and FV to SE implementations of `regrid!` (which are 
+already implemented in ConservativeRegridding.jl) are needed. This allows the land and 
+atmosphere to be defined on different boundary spaces at no extra cost.
 ## Geometry and weights
 
 For a more in-depth derivation of the regridding operations, see [the 

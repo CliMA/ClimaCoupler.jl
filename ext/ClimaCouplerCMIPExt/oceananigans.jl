@@ -185,8 +185,10 @@ function OceananigansSimulation(
     OC.Oceananigans.defaults.FloatType = FT_ocean
 
     # Use ClimaParams for Oceananigans planetary constants
-    OC.Oceananigans.defaults.gravitational_acceleration = coupled_param_dict["gravitational_acceleration"]
-    OC.Oceananigans.defaults.planet_rotation_rate = coupled_param_dict["angular_velocity_planet_rotation"]
+    OC.Oceananigans.defaults.gravitational_acceleration =
+        coupled_param_dict["gravitational_acceleration"]
+    OC.Oceananigans.defaults.planet_rotation_rate =
+        coupled_param_dict["angular_velocity_planet_rotation"]
     OC.Oceananigans.defaults.planet_radius = coupled_param_dict["planet_radius"]
 
     # Create ocean simulation

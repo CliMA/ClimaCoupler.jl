@@ -29,12 +29,11 @@ SE-side weights come from the SEM basis integrals
   - scatter (node-major): `F_n = Σ_k sweight[n,k] F_k` with
     `sweight = B_{kn} / (Jw)_n` — the per-element L2 projection, to be
     followed by `weighted_dss!`;
-  - `node_cov[n] = Σ_{k wet} B_{kn} / (Jw)_n` — the wet-ocean coverage of
-    node `n`: scattering a constant yields `constant × node_cov`. It carries
-    Gibbs overshoot and systematic geometric deficits, so the quantity to use
-    as a wet fraction is `node_cov / node_cov_total` (clamped to [0, 1]),
-    where `node_cov_total` is the same sum over *all* polygons before the
-    wet-mask filter — the ratio cancels the geometric error.
+  - `node_cov[n] = Σ_{k wet} B_{kn} / (Jw)_n` — how much area near node `n`
+    lies over wet ocean (sum over wet polygons). `node_cov_total` is the
+    same sum over all polygons (wet and dry). The wet-ocean fraction is
+    `node_cov / node_cov_total` (clamped to `[0, 1]`): both coverages share
+    the same projection/geometry errors, so the ratio removes them.
 
 Flat index conventions: SE node `n = (e-1) Nq² + (j-1) Nq + i` (i fastest
 within each element, then elements — the order of

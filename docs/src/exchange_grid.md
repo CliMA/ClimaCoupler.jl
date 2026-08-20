@@ -39,10 +39,12 @@ provide:
   B_{kn}) f_n`` — rows sum to 1, constants preserved exactly;
 - a **scatter** (FV polygons → SE nodes): the per-element L2 projection
   ``F_n = \\sum_k (B_{kn}/(Jw)_n) F_k``, followed by `weighted_dss!`;
-- the **nodal wet coverage** `node_cov` (the L2 projection of the ocean wet
-  mask) and its unmasked counterpart `node_cov_total`; their ratio cancels the
-  systematic error of approximating strongly curved FV cells (e.g. along the
-  tripolar fold) by four-corner spherical quads.
+- **wet and total nodal coverage**, `node_cov` and `node_cov_total`.
+  At each SE node, `node_cov` is how much nearby area lies over wet ocean,
+  and `node_cov_total` is how much lies over any ocean cell (wet or dry).
+  The wet-ocean fraction is their ratio `node_cov / node_cov_total`
+  (clamped to ``[0, 1]``). Using the ratio rather than `node_cov` alone
+  corrects for projection and geometry errors that affect both equally.
 
 On the FV side, each polygon belongs to exactly one cell; gathers are direct
 reads and scatters are area-weighted averages.

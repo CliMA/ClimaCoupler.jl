@@ -64,7 +64,19 @@ function ClimaCalibrate.forward_model(interface::CouplerModelInterface, iter, me
         ClimaCalibrate.path_to_ensemble_member(output_dir_root, iter, member)
     config_dict["coupler_output_dir"] = member_output_dir
     config_dict["detect_restart_files"] = true
-    config_dict["checkpoint_dt"] = "10days"
+    # Month-aligned checkpoints (was 10 days): monthly-mean diagnostics - the
+    # G entries - accumulate over calendar months, and the accumulation state
+    # is NOT in the checkpoint. A member restarted from a mid-month checkpoint
+    # would silently write partial-month "means". Month boundaries make every
+    # month a restarted member simulates accumulate from scratch (and silence
+    # the model's own integer-multiple checkpoint warning). NOTE this does not
+    # make mid-run kills fully safe: a restart may write to a fresh
+    # output_NNNN segment, and the observation map reads output_active only,
+    # so months completed before the kill can go missing from the graded
+    # window. Prefer clean iteration boundaries (CALIBRATION_N_ITERATIONS
+    # sized to the worker walltime) so members are never killed mid-flight;
+    # this checkpoint alignment is the fallback for abnormal deaths.
+    config_dict["checkpoint_dt"] = "1months"
 
     ClimaCoupler.Input.update_t_start_for_restarts!(config_dict)
 

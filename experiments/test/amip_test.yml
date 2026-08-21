@@ -8,7 +8,8 @@ dz_bottom: 100.0
 energy_check: false
 h_elem: 4
 checkpoint_dt: "720hours"
-bucket_albedo_type: "map_temporal"
+# This test is used for downstream test, and we don't have the WeatherModel initial condtion in the artifacts
+initial_condition: DecayingProfile
 land_model: "integrated"
 land_spun_up_ic: false
 mode_name: "amip"

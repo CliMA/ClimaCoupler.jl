@@ -79,6 +79,15 @@ function preprocess_sim_vars(vars)
         apply_normalization!.(Ref(normalization_stats), vars)
     end
 
+    # SEASONAL_MEAN: mirror the observation side. average_season_across_time
+    # keeps the time dimension with each season stamped at its first date, so
+    # GEnsembleBuilder's _match_dates selects the SON slice by the
+    # observation metadata's date (Sep 1); partial spinup-month seasons (the
+    # lone August -> a partial JJA slice) exist but are never matched.
+    if isdefined(Main, :SEASONAL_MEAN) && Main.SEASONAL_MEAN
+        vars = map(ClimaAnalysis.average_season_across_time, vars)
+    end
+
     # Note: We also do not process the time dimension either since we can rely
     # on GEnsembleBuilder to pick out the right times for us
     return vars

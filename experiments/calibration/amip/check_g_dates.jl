@@ -87,7 +87,7 @@ slab = selectdim(template.data, ti, 1:1)
 newdata = cat(fill(Array(slab), length(months))...; dims = ti)
 newdims = copy(template.dims)
 newdims[tname] = times_s
-newattribs = Dict{Union{AbstractString, Symbol}, Any}(template.attributes...)
+newattribs = Dict{String, Any}(string(k) => v for (k, v) in template.attributes)
 newattribs["start_date"] = Dates.format(run_start, dateformat"yyyy-mm-ddTHH:MM:SS")
 synth = ClimaAnalysis.remake(
     template;

@@ -231,6 +231,23 @@ if abspath(PROGRAM_FILE) == @__FILE__
         end
     end
 
+    # A config may define SEASONAL_MEAN = true to grade SEASONAL means:
+    # ClimaAnalysis.average_season_across_time reduces each season occurrence
+    # to one time-mean slice, KEEPING the time dimension with each season
+    # stamped at its first date (SON -> Sep 1 of that year), so flattening
+    # and date selection work unchanged. The covariance/sample date ranges
+    # collapse to those dates; seasons we never request (DJF/MAM/JJA slices,
+    # possibly partial at the data edges) simply go unselected. The sim side
+    # applies the same reduction in preprocess_sim_vars.
+    if @isdefined(SEASONAL_MEAN) && SEASONAL_MEAN
+        vars = map(ClimaAnalysis.average_season_across_time, vars)
+        for v in vars
+            @info "Season-averaged $(ClimaAnalysis.short_name(v))" n_seasons =
+                length(ClimaAnalysis.times(v)) seasons =
+                join(unique(v.attributes["season"]), ",")
+        end
+    end
+
     # NOTE: Normalization is intentionally NOT applied. The SVDplusD covariance
     # below carries each variable's physical scale, and normalization is
     # unsupported with it. `preprocess_sim_vars` skips normalization when
@@ -265,8 +282,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
         )
         make_data_informed_observation_vector(
             group_vars,
-            sample_date_ranges,
-            COVARIANCE_DATE_RANGES;
+            (@isdefined(SEASONAL_MEAN) && SEASONAL_MEAN) ?
+                collapse_ranges(sample_date_ranges) : sample_date_ranges,
+            (@isdefined(SEASONAL_MEAN) && SEASONAL_MEAN) ?
+                collapse_ranges(COVARIANCE_DATE_RANGES) : COVARIANCE_DATE_RANGES;
             model_error_scale = group.model_error_scale,
             use_latitude_weights = true,
             min_cosd_lat = 0.1,

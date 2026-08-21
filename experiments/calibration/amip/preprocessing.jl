@@ -337,6 +337,12 @@ parameter can reach its spatial pattern; the full-field term otherwise
 finances degradation of pattern-reachable observables (see the
 lwp_clt_swcre_release verdict).
 """
+
+"Collapse `(t0, t1)` sample/covariance ranges to `(t0, t0)`: after
+`ClimaAnalysis.average_season_across_time` each season is one slice stamped
+at its first date (SON -> Sep 1), so the builders select by that date."
+collapse_ranges(ranges) = [(t0, t0) for (t0, _) in ranges]
+
 function reduce_spatial(var)
     zonal_names =
         isdefined(Main, :ZONAL_SHORT_NAMES) ? Main.ZONAL_SHORT_NAMES : String[]

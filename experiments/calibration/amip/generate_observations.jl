@@ -240,6 +240,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # possibly partial at the data edges) simply go unselected. The sim side
     # applies the same reduction in preprocess_sim_vars.
     if @isdefined(SEASONAL_MEAN) && SEASONAL_MEAN
+        foreach(v -> check_season_months(v, COVARIANCE_DATE_RANGES), vars)
         vars = map(ClimaAnalysis.average_season_across_time, vars)
         for v in vars
             @info "Season-averaged $(ClimaAnalysis.short_name(v))" n_seasons =

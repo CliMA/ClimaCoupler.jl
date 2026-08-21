@@ -85,6 +85,12 @@ function preprocess_sim_vars(vars)
     # observation metadata's date (Sep 1); partial spinup-month seasons (the
     # lone August -> a partial JJA slice) exist but are never matched.
     if isdefined(Main, :SEASONAL_MEAN) && Main.SEASONAL_MEAN
+        # Loud failure on truncated member output (e.g. a member killed and
+        # restarted into a fresh output segment missing earlier months).
+        foreach(
+            v -> check_season_months(v, unique(Main.CALIBRATE_CONFIG.sample_date_ranges)),
+            vars,
+        )
         vars = map(ClimaAnalysis.average_season_across_time, vars)
     end
 

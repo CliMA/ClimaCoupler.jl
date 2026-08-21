@@ -338,6 +338,31 @@ finances degradation of pattern-reachable observables (see the
 lwp_clt_swcre_release verdict).
 """
 
+"""
+    check_season_months(var, ranges)
+
+Guard for SEASONAL_MEAN, run BEFORE `average_season_across_time`: the library
+function silently averages however many months a season happens to contain,
+so a truncated simulation or a data-edge season would yield a partial
+"seasonal mean" with no error. Check that `var` contains every calendar
+month of every requested `(t0, t1)` window and error naming the missing
+months otherwise. Returns `var` for chaining.
+"""
+function check_season_months(var, ranges)
+    ClimaAnalysis.has_time(var) || return var
+    have = Set((Dates.year(d), Dates.month(d)) for d in ClimaAnalysis.dates(var))
+    for (t0, t1) in ranges
+        want = [(Dates.year(d), Dates.month(d)) for d in t0:Dates.Month(1):t1]
+        missing_months = [w for w in want if !(w in have)]
+        isempty(missing_months) || error(
+            "SEASONAL_MEAN: $(ClimaAnalysis.short_name(var)) is missing " *
+            "month(s) $missing_months for season window $t0 .. $t1 - a " *
+            "partial seasonal mean would be silently wrong",
+        )
+    end
+    return var
+end
+
 "Collapse `(t0, t1)` sample/covariance ranges to `(t0, t0)`: after
 `ClimaAnalysis.average_season_across_time` each season is one slice stamped
 at its first date (SON -> Sep 1), so the builders select by that date."

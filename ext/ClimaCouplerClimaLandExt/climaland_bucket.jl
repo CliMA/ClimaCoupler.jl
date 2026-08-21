@@ -249,6 +249,8 @@ end
 
 # extensions required by Interfacer
 Interfacer.get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
+Interfacer.update_field!(sim::BucketSimulation, ::Val{:area_fraction}, field) =
+    sim.area_fraction .= field
 Interfacer.get_field(sim::BucketSimulation, ::Val{:emissivity}) =
     CL.surface_emissivity(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:roughness_buoyancy}) =

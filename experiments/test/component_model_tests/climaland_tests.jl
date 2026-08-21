@@ -127,7 +127,7 @@ end
         nothing, # conservation_checks
         tspan,
         dt,
-        tspan[1],
+        Ref(tspan[1]),
         Ref(0), # step
         Ref(-1), # prev_checkpoint_t
         model_sims,

@@ -560,7 +560,7 @@ version = "0.1.31"
 
 [[deps.CloudMicrophysics]]
 deps = ["ClimaParams", "DocStringExtensions", "FastGaussQuadrature", "ForwardDiff", "InteractiveUtils", "LazyArtifacts", "LogExpFunctions", "RootSolvers", "SpecialFunctions", "StaticArrays", "Thermodynamics", "UnrolledUtilities"]
-path = "../../../CloudMicrophysics.jl-mod"
+git-tree-sha1 = "0632cf4bbc71ad5bfc60d3634106a640cfb95950"
 uuid = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
 version = "0.38.1"
 

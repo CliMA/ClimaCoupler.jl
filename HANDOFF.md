@@ -1,177 +1,256 @@
-# Session handoff — 2026-08-12 (evening, MDT)
+# Calibration handoff — 2026-08-21 (night, MDT)
 
-Context for resuming work on branch `kp/ne/amip-calibration` (AMIP
-calibration machinery). Written at the end of a local Derecho session;
-the next session may be a cloud session (see "Cloud-session limits").
+How to run and babysit AMIP-mode calibrations on this branch
+(`kp/ne/amip-calibration`), written for an incoming agent. Supersedes the
+2026-08-12 repro-run handoff (see git history for it). Campaign results and
+post-mortems live in the config headers and the session memory; this file is
+the OPERATIONAL knowledge.
 
-## TL;DR
+## 0. THE JOB AT HAND: rlut_son_ocean (LIVE — read this section fully)
 
-1. The branch was rebased onto `origin/main` today and ported to
-   registered **ClimaCalibrate v0.4.0** (no more branch pin). Validated:
-   observations produced by the ported pipeline are **identical** to both
-   the pre-rebase code and the original campaign run's vector.
-2. The **reproducibility calibration COMPLETED** (2026-08-12 22:15 MDT,
-   3 iterations, driver exited 0, workers released). Verdict recorded in
-   the repro config header: machinery reproduces exactly (obs and
-   iteration-1 parameters bit-identical to the original run), but the
-   trajectory diverged because main changed the model physics
-   (`cloud_ice_formation: TemperatureDependent`, commit 674ccf36, plus
-   ClimaAtmos 0.42.3→0.42.4): G changed 23-41% rel RMS at identical
-   parameters. Campaign posteriors must be treated as priors to
-   re-verify on the new physics. Comparison tool:
-   `compare_trajectory.jl` in the run dir.
-3. **Nothing is pushed.** The rebase rewrote history and several key
-   files are untracked. A cloud session sees none of this unless it is
-   committed and pushed first (`git push --force-with-lease`).
+**Identity**: AMIP-mode, ocean-only, SON-2010 seasonal-mean rlut calibration.
+Config `experiments/calibration/amip/config/rlut_son_ocean.jl` (its header
+holds the rationale and four pre-registered predictions — grade them at the
+end). 7 members, target **4 iterations** (T=0.4), n = 1696, floor 4.5 W/m²,
+expected iteration-1 whitened residual ≈ 1σ.
 
-## What is running on Derecho (local-only resources)
+**Run dir** (everything lives here):
+`/glade/derecho/scratch/kphan/amip_calibration_rlut_son_ocean_out`
+(= repo symlink `amip_calibration_rlut_son_ocean`). Members are ~122
+simulated days ≈ **4.3 h wall each**; an iteration = one member's wall time
+(7 members run concurrently on 2 GPU nodes).
 
-- tmux session **`cal_repro`** on the login node runs the calibration
-  driver. Reattach: `tmux attach -t cal_repro` (detach `Ctrl-b d`).
-  Driver script + env: `/glade/derecho/scratch/kphan/amip_calibration_release_repro_out/driver_repro.sh`.
-- PBS worker jobs **7104267, 7104270, 7104271, 7104272** (queue `gpu`,
-  account UCIT0011, 12 h walltime, 4 nodes, 13 workers packed 4/node,
-  all connected over the HSN at launch).
-- Config: `experiments/calibration/amip/config/lwp_clt_swcre_release_repro.jl`
-  — byte-identical science to `lwp_clt_swcre_release.jl` (the last
-  completed campaign run), but `n_iterations = 3` (half of 6) and output
-  to `/glade/derecho/scratch/kphan/amip_calibration_release_repro_out`
-  (symlinked from repo root as `amip_calibration_release_repro`).
-- Timeline: preflight estimated 1.2 h/iteration, ~4.6 h total → done
-  roughly 23:00 MDT 2026-08-12. Worker walltime (12 h) is ample.
-- Monitoring rules (README): judge by process liveness and member
-  file-write recency; Julia buffers driver.log for hours. `qstat` is a
-  cache and can lie for ~30 min.
-- If the driver must be killed: check for orphaned `julia-*` jobs in
-  `qstat -u kphan` and `qdel` them (guide pitfall 7). The run is
-  resumable (rerun the driver with the same CALIBRATION_CONFIG), but
-  clean partial member dirs first (preflight checks this).
-- The background watchers armed by the previous session died with it.
-  Nothing else monitors the run automatically.
+**What is running**: tmux session `cal_son_chain` executing
+`<run_dir>/chain_son.sh`, started 2026-08-21 21:10 MDT:
 
-## The reproducibility experiment (why this run exists)
+    step 1  wait for the Aug-1 atmosphere IC            DONE (21:10)
+    step 2  one-week smoke test                          verdict ~22:00 Aug 21
+    step 3  launch 1: CALIBRATION_N_ITERATIONS=2         done ~07:15 Aug 22
+    step 4  launch 2: CALIBRATION_N_ITERATIONS=4         done ~16:00 Aug 22
 
-Goal: confirm the post-rebase pipeline reproduces the original
-floor-release run (`lwp_clt_swcre_release.jl`, run 2026-08-06/07 by
-nefrathenrici) before trusting the migrated machinery.
+Any failure STOPS the chain with a diagnosis line. It never retries by
+itself — that is deliberate (see the restart hazard, §3).
 
-Predictions (also in the repro config header), status:
+### Status check (the only command you need routinely)
 
-1. **Observation vector identical to the original run's — CONFIRMED**
-   before launch (every sample, covariance block, coverage mask; the
-   three-way check original == pre-rebase == post-rebase all matched,
-   differences ≤ ~1e-13 relative, i.e. summation-order noise).
-2. **Iteration-1 member parameters byte-identical — CONFIRMED, 13/13**
-   (`diff` of every `iteration_001/member_*/parameters.toml` against the
-   original run's; same priors + seed 42 + TransformUnscented sigma
-   points are deterministic).
-3. **3-iteration trajectory tracks the original within the weather
-   floor — PENDING.** When the run finishes, compare per-iteration
-   residuals/loss/parameter means against the original's first three
-   iterations. Same-sample comparison is valid: iterations 1–3 grade
-   Sep 2006, 2010, 2008 in both runs.
+    cat /glade/derecho/scratch/kphan/amip_calibration_rlut_son_ocean_out/chain.log
+    # supporting evidence:
+    tmux ls                                  # cal_son_chain present?
+    qstat -u kphan                           # smoke job, or 2x julia-* workers
+    find <run_dir> -maxdepth 2 -name G_ensemble.jld2 | wc -l   # iterations done
 
-How to judge prediction 3:
+### Scenario playbook
 
-- This run's data: `driver.log` steering blocks and
-  `iteration_00N/eki_file.jld2` in the repro run dir.
-- Original run's data (copied to kphan scratch, member output excluded):
-  `/glade/derecho/scratch/kphan/nefrathe_calibration_runs/amip_calibration_release/`
-  — has `driver.log`, per-iteration `eki_file.jld2`/`G_ensemble.jld2`,
-  plots, and `calibration_report.md`.
-- Reference anchors from the original: iteration-1 leverage ratios
-  lwp 2.1 / clt 2.6 / swcre 2.4; residual trajectory over its 6
-  iterations lwp 0.65→0.66, clt 0.76→0.93, swcre 0.69→0.55 (its σ
-  units). Extract per-iteration values from its eki files or driver.log.
-- Expected agreement: displacement signs match; residuals within
-  ~0.1 σ per iteration. Known confound if it drifts more:
-  **ClimaAtmos 0.42.3 (original) → 0.42.4 (now)** — the campaign once
-  measured 27% ocean-lwp shift from an Atmos upgrade at identical
-  parameters, so a trajectory mismatch indicts the model bump, not the
-  calibration machinery (predictions 1–2 already isolate this).
-- Also check the iteration-1 go/no-go gate (guide §5): ensemble spread
-  of G must beat the noise floor; steering `obs RMS` etc. in driver.log.
-- End-of-run: `calibration_report.jl` as a PBS analysis job
-  (develop queue, `select=1:ncpus=4:ngpus=1:mem=40GB`), then record the
-  verdict in the repro config header (campaign practice), quoting
-  numbers, run dir, and dates.
+**A. Chain healthy** → touch nothing. Progress markers per stage: smoke →
+`SMOKE TEST PASSED` in `/glade/derecho/scratch/kphan/rlut_son_smoke/smoke.log`;
+launches → `Running member N` lines in `<run_dir>/driver.log`, member
+`output.log`s updating (they print progress + ETA), `iteration_00N/` dirs
+appearing with `G_ensemble.jld2` when an iteration closes.
 
-## Repo state (NOT pushed)
+**B. Chain stopped: "smoke test FAILED"** → read the smoke log's ERROR +
+stacktrace. Do NOT launch the calibration. Likely classes: IC file/date
+resolution (see §5 AMIP-IC fact), AMIP-mode config validation, instability
+(look for `Found NaN` / `Y.f.sgsʲs`). Fix, rerun the smoke by hand:
 
-- Worktree: `/glade/u/home/kphan/worktree/ClimaCoupler/ne/amip-calibration`,
-  branch `kp/ne/amip-calibration`, HEAD `fd733fd0` ("Add AMIP calibration
-  machinery") rebased onto `origin/main` = `765727cb`.
-- Untracked (commit if they should survive/be visible in cloud):
-  - `experiments/calibration/amip/SUMMARY.md` — campaign narrative,
-    timeline, loss≠RMSE explainer, obs/covariance changes, epilogue.
-  - `experiments/calibration/amip/campaign_reference/` — campaign-branch
-    docs (CALIBRATION_LESSONS.md, identifiability_map.md, ROADMAP.md,
-    plan docs), analysis scripts (leverage.jl, run_parameter_sweep.jl,
-    clt_regime_attribution.jl, …), and `config_with_verdicts/` (all 42
-    configs incl. final zsw/edmf/panom verdicts). Provenance:
-    nefrathe's clone, branch `ne/calibrate` @ `bfb85870`.
-  - `experiments/calibration/amip/config/lwp_clt_swcre_release_repro.jl`
-    — the running experiment's config.
-  - `HANDOFF.md` (this file).
-- The rebase resolutions, in case anything looks surprising:
-  - Manifests + Project.toml: main's exactly (ClimaCalibrate 0.4.0
-    registered; `[sources]` pin and unused PNGFiles removed).
-  - `generate_observations.jl`: OUR statistical machinery kept
-    (SVDplusD + noise groups + correlated floors + masks +
-    harmonization), ported to the v0.4 SampleBuilder API. Main's version
-    had regressed to ScalarCovariance + normalization — deliberately not
-    adopted. Port details: `SVDplusDCovariance(; kwargs)` (no date
-    positional), one `build_samples_by_times(vars, COVARIANCE_DATE_RANGES;
-    FT = Float64)` collection, targets selected by index
-    (`findfirst` into covariance dates). **FT = Float64 matters** — the
-    new API defaults to Float32.
-  - `run_calibration.jl`: merged. Kept `DefaultScheduler(0.1)` (main
-    uses DataMisfitController, which the campaign showed collapses
-    ensembles — do not "fix" this), CALIBRATION_CONFIG env selection,
-    obs vector in output_dir, worker packing 4/node, HSN-bind exename
-    hook, 11 h empty-pool timeout, priors plot. Adopted main's
-    TEST_CALIBRATION-on-CPU and `mem = "16GB"` for the test path.
+    cd <repo>; mkdir -p /glade/derecho/scratch/kphan/rlut_son_smoke
+    qsub -v REPO=$PWD,CALIBRATION_CONFIG=$PWD/experiments/calibration/amip/config/rlut_son_ocean.jl,SMOKE_DIR=/glade/derecho/scratch/kphan/rlut_son_smoke,SMOKE_SIM_SECONDS=604800 \
+         -o /glade/derecho/scratch/kphan/rlut_son_smoke/smoke.log \
+         experiments/calibration/amip/smoke_test.sh
 
-## Environment
+**C. Chain/tmux died mid-launch (login node reboot, kill)** — the one case
+needing care:
+  1. `qdel` any surviving `julia-*` worker jobs FIRST (never run two drivers
+     against one pool).
+  2. Count completed iterations (`G_ensemble.jld2` count = K).
+  3. **If an iteration is INCOMPLETE** (an `iteration_00(K+1)` exists with
+     member dirs but no `G_ensemble.jld2`): delete its member subdirectories
+     before relaunching —
+     `rm -rf <run_dir>/iteration_00(K+1)/member_*` — so members rerun from
+     scratch. Otherwise `detect_restart_files` resumes them from mid-month
+     checkpoints and their monthly means are silently wrong (§3).
+  4. Relaunch cleanly, target sized to the 12 h worker walltime
+     (2 iterations per launch MAX for this run):
 
-- Modules/Julia: `module load climacommon/2025_02_25`;
-  `JULIA=/glade/campaign/univ/ucit0011/software/julia/julia-1.11.3/bin/julia`;
-  project `--project=experiments/AMIP`.
-- Versions: ClimaCalibrate 0.4.0 (registered), EKP 2.7.1, ClimaAnalysis
-  0.5.23, ClimaAtmos 0.42.4. Freeze while the run is in flight.
-- Login nodes: 10 GiB cgroup → `--heap-size-hint=3G` and
-  `JULIA_NUM_PRECOMPILE_TASKS=8` (parallel precompile workers otherwise
-  get OOM-killed, which once left EMPTY package dirs in
-  `~/.julia/packages/<Pkg>/<slug>` — instantiate then thinks the package
-  is installed and precompile fails with "does not seem to be
-  installed"; fix is deleting the empty slug dirs and re-instantiating).
+         tmux new-session -d -s cal_son_l2 \
+           'CALIBRATION_N_ITERATIONS=<K+2 (cap 4)> bash /glade/derecho/scratch/kphan/amip_calibration_rlut_son_ocean_out/driver_rlut_son_ocean.sh'
 
-## Cloud-session limits
+     Resume skips the K completed iterations automatically. Repeat until 4.
 
-A cloud session cannot: reach Derecho scratch/tmux/PBS, monitor or
-manage the run, or see unpushed/untracked work. It CAN: work on the
-committed+pushed repo (docs, code review, analysis scripts, planning).
-Run monitoring, the trajectory comparison, the report job, and any
-future launches need a session with Derecho shell access.
+**D. A launch exited but below its target** (chain says STOP with N/target)
+→ `grep -E "Error|Found NaN|failed" <run_dir>/driver.log | tail`. Member
+NaNs: EKP absorbs ≤3/7 dead members but note WHO died (σ=0.3 priors were
+audited stable — a death is news; record it). 100% failure aborts the driver
+("Execution halted") — that is a config/physics problem, not a retry case.
 
-## Other completed work this session (context)
+**E. All 4 iterations done** → post-run sequence:
+  1. Gate + spread:
+     `GNG_MIN_SPREAD=1.5 julia --startup-file=no --project=experiments/AMIP experiments/calibration/amip/go_no_go.jl <run_dir> 1`
+  2. **Physical trajectory** (the gate misses this — lwcre lesson): per
+     iteration, load `iteration_00N/G_ensemble.jld2`, drop all-NaN member
+     columns, mean over members, compare to
+     `EKP.get_obs(JLD2.load_object("<run_dir>/observation_vec.jld2")[1])`:
+     bias and RMS per iteration on identical weather. Bias should shrink;
+     RMS flat is expected; BOTH degrading while EKP loss falls = the
+     pattern-steering pathology, stop trusting the posterior direction.
+  3. Parameters: `iteration_005/eki_file.jld2` + `iteration_001/prior.jld2`,
+     `EKP.get_ϕ(prior, ekp)` per iteration. Key questions, from the config
+     header's predictions: all 7 alive in iteration 1? whitened residual
+     ≈1σ? contraction <30x? and THE question — does c6 rise again, and if
+     so does lwcre (free in the saved rlutcs/rlut diagnostics of every
+     member) degrade in mirror (compensating error) or hold (real signal)?
+  4. Plots auto-generate per iteration (`bias_sample_dates.png`,
+     `g_vs_obs.png`, first/last strips in the run dir). The bias-map panels
+     are MEMBER 1 (= the UKI mean member), not the ensemble mean.
 
-- Fixed the broken environment that predated the rebase: Manifest
-  pinned an unfetchable tree of `ClimaCalibrate#ne/worker-packing`
-  (never-pushed or force-pushed commit) → resolved to branch head; then
-  the empty-husk depot problem (see Environment above).
-- Session artifacts (scratchpad, ephemeral — may not survive):
-  observation A/B snapshots and compare scripts under
-  `/glade/derecho/scratch/kphan/tmp/claude-48097/.../scratchpad/`
-  (`snapshot.jl`, `compare_snapshots.jl`, `obs_pre/`, `obs_post/`,
-  `snapshot_original_release.jld2`). The methodology: dump samples,
-  cov diagonals + Frobenius/sums, masks to base-type JLD2, compare
-  across environments.
-- Campaign endgame (recovered from ne/calibrate, now in SUMMARY.md
-  epilogue and campaign_reference/): zsw (2026-08-07) halved the
-  clt-for-swcre trade; edmf (2026-08-08) flat — AMIP-invisible, scalar
-  campaign converged; panom (2026-08-08) pattern residual immobile,
-  ensemble collapsed — clt pattern error is directionally orthogonal to
-  the entire parameter space; campaign closed toward model development /
-  the SCM rung. Attribution: residual concentrates in the Sc-to-Cu
-  transition (clt_regime_attribution.jl).
+### Launch anatomy (what the driver does, for debugging)
+
+`driver_rlut_son_ocean.sh` (in the run dir): loads climacommon, exports
+`CALIBRATION_CONFIG`, `CALIBRATION_WORKER_EXENAME` (HSN bind — required for
+login-node drivers), `CALIBRATION_N_ITERATIONS`; runs
+`run_calibration.jl` under `--heap-size-hint=3G`, tees to `driver.log`.
+The driver loads `observation_vec.jld2` (hard-fails if absent — regenerate
+with the prep, §2), builds the EKP object, submits 2 packed GPU worker jobs
+(12 h walltime, 4 workers/node), farms members, updates, writes
+`iteration_00N/` per iteration, exits after `CALIBRATION_N_ITERATIONS`.
+Worker PBS stdout persists in `<run_dir>/worker_logs/`.
+
+## 1. Anatomy of a calibration
+
+Selection is by environment variable: `CALIBRATION_CONFIG=<config .jl>`.
+
+| layer | example (current run) | notes |
+|---|---|---|
+| calibration config | `experiments/calibration/amip/config/rlut_son_ocean.jl` | loss variables, dates, priors, noise model, output_dir, flags (`OCEAN_ONLY`, `SEASONAL_MEAN`); headers carry run rationale + pre-registered predictions — READ THEM |
+| coupler YAML | `config/amip_configs/amip_calibration_pigroups_son.yml` | mode, grid, start_date, `coupler_toml`, `edmfx_entr_model`, `log_to_file` |
+| atmos YAML | `config/atmos_configs/climaatmos_progedmf_1m.yml` | merged FIRST; coupler YAML keys override it |
+| parameter TOML | `toml/amip_progedmf_1m_pigroups.toml` | the atmos YAML's own `toml:` is REPLACED, not layered — only `coupler_toml` + the member file reach ClimaParams |
+| member file | `iteration_N/member_M/parameters_spliced.toml` | `<base>_E<i>` prior names splice into vector params (`entr_param_vec`); base vector MUST exist in a coupler_toml |
+
+Environment: `module load climacommon/2025_02_25`, Julia
+`/glade/campaign/univ/ucit0011/software/julia/julia-1.11.3/bin/julia`,
+`--project=experiments/AMIP` (manifest pins ClimaAtmos `#main`). Ground truth
+of what a member ran: its resolved `*_parameters.toml` (341 params) and `.yml`
+in the member's `clima_atmos` output dir.
+
+Run dirs live on scratch, symlinked from the repo root
+(`amip_calibration_<name>` -> `/glade/derecho/scratch/kphan/..._out`).
+The observation vector is keyed to `output_dir` — new run = new dir, or you
+silently grade against a stale covariance.
+
+## 2. The procedure (gates in order; skip none for a new configuration)
+
+1. **Prep job** (develop queue, ~8 min; template: `<run_dir>/prep.sh`):
+   instantiate → `generate_observations.jl` → `plot_observations.jl`
+   (eyeball `observation_check.png` — reconstructs what EKP actually sees)
+   → `check_g_dates.jl` (synthetic member through the REAL preprocess +
+   GEnsembleBuilder; catches obs/sim date misalignment at zero GPU)
+   → `preflight.jl` (wiring check D is the one that matters: a prior the
+   model silently ignores must fail here, not appear as a flat posterior).
+   PASS = `0 failed`, all `wiring` PASS, and **zero `KeyError` strings in
+   the log** (the default logger swallows message-construction errors).
+2. **Sigma-point audit**: print the actual constrained values the 7 members
+   will run (see §5 stability envelope). One minute on a login node.
+3. **Smoke test** (`smoke_test.sh`): `SMOKE_SIM_SECONDS=360` = construction
+   +2 steps (~15 min); `604800` = one week; days mode via `SMOKE_DAYS`.
+   Mandatory for any new mode/physics; it has caught a fatal config error
+   or instability before every launch that needed one.
+4. **Launch** in tmux on a login node (never a compute job for the driver).
+5. **Iteration-1 go/no-go** (§4).
+
+## 3. Walltime and the restart hazard (the most important operational rule)
+
+Workers are PBS jobs capped at **12 h** (queue max). Members killed at
+walltime and rerun are DANGEROUS: `detect_restart_files=true` restarts from
+checkpoints, but monthly-diagnostic accumulation state is NOT checkpointed,
+and restarts may write to a fresh `output_NNNN` segment while the observation
+map reads `output_active` only → silently wrong or missing months in G.
+
+**Rule: never let walltime kill members. Size launches to clean iteration
+boundaries** via `CALIBRATION_N_ITERATIONS` (env-overridable in the config)
+so each driver run exits cleanly inside 12 h, then relaunch with a higher
+target (resume skips finished iterations). Throughput ≈ 30 simulated
+days/GPU-hour at h_elem 12; iteration wall time = one member (all members run
+concurrently on 2 packed GPU nodes = 8 slots).
+
+Mitigations already in place: member checkpoints are month-aligned
+(`model_interface.jl`), and `check_season_months` errors loudly on missing
+months. For unattended multi-launch there is `calibration_relay.sh
+<run_dir> <target> <driver cmd...>` + auto-started watchdog (tested), and the
+chain-script pattern (`chain_son.sh`: wait-for-file → smoke → launches).
+
+## 4. Reading results (and the trap)
+
+- `go_no_go.jl <run_dir> <iter>`: leverage ratio (≤3), physical reachable
+  spread (`GNG_MIN_SPREAD`, scale it to the run's floor), contraction (≤10x),
+  dead members. Exit 1 = stop the run.
+- **The gate is not sufficient** (lwcre lesson): EKP minimizes the
+  Σ⁻¹-weighted misfit and can "improve" while the loss variable's physical
+  bias/RMS degrade. After iterations 1→2, compute same-weather bias/RMS of
+  the loss variable from `G_ensemble.jld2` vs the observation; two
+  consecutive wrong-direction moves = stop.
+- Loss/params live in `iteration_<last>/eki_file.jld2` (cumulative: full
+  history) + `iteration_001/prior.jld2`. `EKP.get_error` across a
+  failed-member boundary is not comparable. Contraction reflects the ASSUMED
+  noise, not achieved fit — 24.8x–7000x observed under tight floors; treat
+  posterior spreads as unreliable, means as the result.
+- Logs: `driver.log` (scheduling, EKP, thrown exceptions incl. member NaNs),
+  member `output.log` (live, `log_to_file`), `worker_logs/worker-*.out`
+  (persistent PBS stdout), `relay.log`/`chain.log`. qstat lags ~30 min on
+  login nodes — judge liveness by file mtimes, never one qstat miss.
+
+## 5. Hard-won facts (violate any of these and you rediscover a post-mortem)
+
+- **model_error_scale is per-field**: floor = (scale × field mean)²; the
+  honest criterion is floor ≈ interannual spread. Measured: rlut ocean 0.02;
+  lwcre honest ≈ 0.2 (0.02 gave 7σ whitening and one-update collapse). Never
+  transplant a scale between fields. Too-small floors also steer updates
+  into near-null pattern directions (optimizer diverges from physical
+  metrics).
+- **Prior stability envelope** (PiGroups): c2/c3 sigma points at ±0.87
+  NaN'd (`Y.f.sgsʲs` updraft blow-up); ±0.52 (σ=0.3) is inside. Losing
+  members in iteration 1 corrupts the DECISIVE update via failure-handling
+  artifacts. Audit sigma points before every launch.
+- **SEASONAL_MEAN**: uses `ClimaAnalysis.average_season_across_time`
+  symmetrically; requires MONTH-ALIGNED start dates (a partial leading slab
+  would contaminate a season silently); `check_season_months` guards the
+  requested windows on both sides.
+- **AMIP vs subseasonal ICs**: `initial_condition: WeatherModel` is the
+  coupler DEFAULT even in amip mode; the atmos IC file
+  `era5_init_processed_internal_<start>_0000.nc` resolves from
+  `era5_initial_condition_dir` (atmos-only in amip mode) else the
+  `wxquest_initial_conditions` artifact, which has FIXED dates — check
+  before choosing a start_date. Subseasonal mode needs all seven processed
+  IC products; amip needs only the one atmos file.
+- **All coupler TOMLs need `type = "float"` fields** — ClimaParams' override
+  warning indexes `entry["type"]` and a missing field KeyErrors every member
+  (still unfixed upstream).
+- Login nodes: `--heap-size-hint=3G` (10 GiB cgroup), `--startup-file=no`
+  (user startup.jl is broken under this project), `JULIA_NUM_PRECOMPILE_TASKS`
+  ≤2 when instantiating on login. Artifacts resolve via
+  `~/.julia/artifacts/Overrides.toml` → symlink to
+  `ClimaArtifacts2/artifacts/Overrides.toml` (if CERES/radiation_obs "not
+  found", the symlink is missing).
+- Workers: submitted by the driver (`julia-*` job names), inherit env via
+  `qsub -V`, must bind the HSN via `CALIBRATION_WORKER_EXENAME=
+  experiments/calibration/amip/julia_worker_hsn_bind.sh` when the driver is
+  on a login node. `DefaultScheduler(0.1)`: T = 0.1 × iterations; 4
+  iterations = a deliberate 40% posterior.
+
+## 6. Campaign state (details in config headers + session memory)
+
+- micro_edmf (8 params, lwp/swcre/lwcre): null; EDMF params flat.
+- rlut_pigroups (land+ocean, scale 0.05): null — floor = total error
+  declared the residual irreducible; ≤4% of it was reachable anyway.
+- rlut_pigroups_ocean (scale 0.02): bias 93% removed, c6 0.30→0.34, BUT
+  shown to be a compensating-error fit (clear-sky Δrlutcs ≈ −6.5 W/m²;
+  lwcre degraded monotonically as c6 rose).
+- lwcre_pigroups_ocean (scale 0.02 = mispriced): one-update collapse
+  (7000x), c6 up again via pattern-steering while lwcre's own bias/RMS
+  degraded. Killed at iteration 4 by choice.
+- **rlut_son_ocean (running)**: AMIP mode, SON-2010 seasonal mean, ocean,
+  σ=0.3 priors, scale 0.02 (floor/interannual ≈ 1.2 — in band). Predictions
+  pre-registered in the config header; grade them.
+- Queued ideas: JOINT rlut+lwcre (+rlutcs) loss with per-variable scales;
+  one-at-a-time perturbation gate before any new parameter set; upstream
+  PRs (ClimaParams `get(entry,"type",…)`; type fields on main's TOML;
+  worker exceptions logged member-side; singleton-dim squeeze in plotters).

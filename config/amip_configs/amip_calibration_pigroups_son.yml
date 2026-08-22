@@ -26,6 +26,12 @@ checkpoint_dt: "900days"
 # graded window legitimate (subseasonal persistence forcing would run
 # November on an August ocean snapshot).
 mode_name: "amip"
+# In AMIP mode this feeds ONLY the atmosphere's WeatherModel initial
+# condition (weather_model.jl looks up era5_init_processed_internal_
+# <start_date>_0000.nc here before the wxquest artifact); the coupler-side
+# SST/SIC/land IC machinery ignores it. The 20100801 file was generated
+# 2026-08-21 into the local son_ic copy.
+era5_initial_condition_dir: "/glade/derecho/scratch/kphan/son_ic"
 binary_area_fraction: false
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
 # Production parameter set PLUS entr_param_vec (12 zeros, required by the

@@ -129,7 +129,17 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # them when the driver exits - which is how the rlut_pigroups member-2 NaN
     # left no worker-side record. `o` is a filename PREFIX: workers write
     # <prefix>-<job>-<slot>.out next to driver.log.
-    worker_log_prefix = joinpath(output_dir, "worker_logs", "worker")
+    # UNIQUE PER LAUNCH. ClimaCalibrate polls these files for each worker's
+    # "julia_worker:<port>#<host>" handshake line; a fixed prefix reused
+    # across launches makes a relaunch read the PREVIOUS launch's lines,
+    # report "Worker ready after 0s" for dead hosts, and hang on
+    # ECONNREFUSED while the real workers time out waiting for the master.
+    worker_log_prefix = joinpath(
+        output_dir,
+        "worker_logs",
+        Dates.format(Dates.now(), "yyyymmdd-HHMMSS"),
+        "worker",
+    )
     mkpath(dirname(worker_log_prefix))
     if TEST_CALIBRATION
         # CPU workers inside the current allocation; no packing (local

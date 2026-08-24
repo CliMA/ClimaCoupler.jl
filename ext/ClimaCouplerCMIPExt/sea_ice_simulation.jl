@@ -5,7 +5,6 @@ import Oceananigans.BoundaryConditions: Zipper
 
 ocean_reference_density(ocean::OC.Simulation, FT) =
     convert(FT, ocean.model.buoyancy.formulation.equation_of_state.reference_density)
-ocean_reference_density(::Nothing, FT) = convert(FT, 1026.0)
 
 @inline u_immersed_side_drag(i, j, k, grid, clock, Φ, μ) =
     @inbounds -μ * Φ.u[i, j, k] * spᶠᶜᶜ(i, j, k, grid, Φ)

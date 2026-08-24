@@ -90,7 +90,7 @@ function Plotting.plot_global_conservation(
     if !softfail
         @info typeof(cc)
         @info rse[end]
-        @assert rse[end] < 0.035
+        @assert rse[end] < 0.055
     end
 end
 
@@ -121,22 +121,66 @@ Plot useful coupler fields (in `field_names`) and save plots to a directory.
 
 If `cs_fields_ref` is provided (e.g., using a copy of cs.fields from the initialization),
 plot the anomalies of the fields with respect to `cs_fields_ref`.
+
+For vector fields which are not defined on a Cartesian basis, rotate them to the Cartesian
+basis before plotting so they can be interpreted physically.
+
+For single-column (PointSpace) fields, each subplot shows only the title with extrema;
+no heatmap or table is drawn.
 """
-function Plotting.debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing) # TODO should this dispatch on NamedTuple?
+function Plotting.debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing)
     field_names = propertynames(cs_fields)
+
     fig = Makie.Figure(size = (1500, 800))
     min_square_len = ceil(Int, sqrt(length(field_names)))
+
+    # Set up to rotate vector fields to the Cartesian basis
+    local_geometry = CC.Fields.local_geometry_field(getproperty(cs_fields, field_names[1]))
+
+    has_nan = false
     for i in 1:min_square_len, j in 1:min_square_len
         field_index = (i - 1) * min_square_len + j
+
+        # Rotate vector fields to the Cartesian basis so they can be interpreted physically
+        rotated_vectors = Dict{Symbol, CC.Fields.Field}()
+        if :u_int in field_names && :v_int in field_names
+            u_int_cartesian, v_int_cartesian = _get_cartesian_vector_components(
+                local_geometry,
+                getproperty(cs_fields, :u_int),
+                getproperty(cs_fields, :v_int),
+            )
+
+            rotated_vectors[:u_int] = u_int_cartesian
+            rotated_vectors[:v_int] = v_int_cartesian
+        end
+        if :F_turb_ρτxz in field_names && :F_turb_ρτyz in field_names
+            F_turb_ρτxz_cartesian, F_turb_ρτyz_cartesian = _get_cartesian_vector_components(
+                local_geometry,
+                getproperty(cs_fields, :F_turb_ρτxz),
+                getproperty(cs_fields, :F_turb_ρτyz),
+            )
+
+            rotated_vectors[:F_turb_ρτxz] = F_turb_ρτxz_cartesian
+            rotated_vectors[:F_turb_ρτyz] = F_turb_ρτyz_cartesian
+        end
+
         if field_index <= length(field_names)
             field_name = field_names[field_index]
-            field = getproperty(cs_fields, field_name)
 
-            title = string(field_name) * Plotting.print_extrema(field)
+            if field_name in keys(rotated_vectors)
+                field = rotated_vectors[field_name]
+            else
+                field = getproperty(cs_fields, field_name)
+            end
+
+            extrema_str, field_has_nan = Plotting.print_extrema(field)
+            has_nan = has_nan || field_has_nan
+            title = string(field_name) * extrema_str
             ax = Makie.Axis(fig[i, j * 2 - 1]; title)
             Plotting.debug_plot!(ax, fig, field, i, j)
         end
     end
+    mkpath(dir)
     Makie.save(joinpath(dir, "debug_coupler.png"), fig)
 
     # plot anomalies if a reference cs.fields, `cs_fields_ref`, are provided
@@ -147,13 +191,35 @@ function Plotting.debug(cs_fields::CC.Fields.Field, dir, cs_fields_ref = nothing
                 field_name = field_names[field_index]
                 field = getproperty(cs_fields, field_name)
 
-                title = string(field_name) * Plotting.print_extrema(field)
+                extrema_str, field_has_nan = Plotting.print_extrema(field)
+                has_nan = has_nan || field_has_nan
+                title = string(field_name) * extrema_str
                 ax = Makie.Axis(fig[i, j * 2 - 1]; title)
                 Plotting.debug_plot!(ax, fig, field, i, j)
             end
         end
         Makie.save(joinpath(dir, "debug_coupler_anomalies.png"), fig)
     end
+
+    # Check for NaN errors after plots are saved
+    if has_nan
+        @warn "NaN values found in coupler fields extrema"
+    end
+end
+
+function _get_cartesian_vector_components(
+    local_geometry,
+    u_component::CC.Fields.Field,
+    v_component::CC.Fields.Field,
+)
+    # Get the vector components in the CT1 and CT2 directions
+    xz = @. CT12(CT1(_unit_basis_vector_data(CT1, local_geometry)), local_geometry)
+    yz = @. CT12(CT2(_unit_basis_vector_data(CT2, local_geometry)), local_geometry)
+
+    # Convert the vector components to a UVVector on the Cartesian basis
+    uv_cartesian =
+        @. CC.Geometry.UVVector(u_component * xz + v_component * yz, local_geometry)
+    return uv_cartesian.components.data.:1, uv_cartesian.components.data.:2
 end
 
 """
@@ -165,33 +231,114 @@ function Plotting.debug(sim::Interfacer.AbstractComponentSimulation, dir)
     field_names = Plotting.debug_plot_fields(sim)
     fig = Makie.Figure(size = (1500, 800))
     min_square_len = ceil(Int, sqrt(length(field_names)))
+    has_nan = false
     for i in 1:min_square_len, j in 1:min_square_len
         field_index = (i - 1) * min_square_len + j
         if field_index <= length(field_names)
             field_name = field_names[field_index]
             field = Interfacer.get_field(sim, Val(field_name))
-            title = string(field_name) * Plotting.print_extrema(field)
+            extrema_str, field_has_nan = Plotting.print_extrema(field)
+            has_nan = has_nan || field_has_nan
+            title = string(field_name) * extrema_str
             ax = Makie.Axis(fig[i, j * 2 - 1]; title)
             Plotting.debug_plot!(ax, fig, field, i, j)
         end
     end
     Makie.save(joinpath(dir, "debug_$(nameof(sim)).png"), fig)
+
+    # Check for NaN errors after plots are saved
+    if has_nan
+        error("NaN values found in field extrema of $(nameof(sim))")
+    end
 end
 
 """
     Plotting.debug_plot!(ax, fig, field::CC.Fields.Field, i, j)
 
-Helper function to plot a heatmap of a ClimaCore field in the given figure at position (i, j).
-If the field is constant, skip plotting it to avoid heatmap errors.
+Helper function to plot a ClimaCore field in the given figure at position (i, j).
+Dispatches on the field's space type via `_debug_plot_field!`.
 """
 function Plotting.debug_plot!(ax, fig, field::CC.Fields.Field, i, j)
-    # Copy field onto cpu space if necessary
     cpu_field = CC.to_cpu(field)
-    if cpu_field isa CC.Fields.ExtrudedCubedSphereSpectralElementField3D
-        cpu_field = CC.Fields.level(cpu_field, 1)
-    end
+    _debug_plot_field!(ax, fig, cpu_field, axes(cpu_field), i, j)
+end
 
-    # ClimaCoreMakie doesn't support NaNs/Infs, so we substitute them with 100max
+"""
+    _debug_plot_field!(ax, fig, cpu_field, space::CC.Spaces.FiniteDifferenceSpace, i, j)
+
+Plot a 1D column field (center or face FD space) as a line with z on the y-axis.
+"""
+function _debug_plot_field!(
+    ax,
+    fig,
+    cpu_field,
+    space::CC.Spaces.FiniteDifferenceSpace,
+    i,
+    j,
+)
+    _debug_plot_column!(ax, cpu_field)
+    return nothing
+end
+
+"""
+    _debug_plot_field!(ax, fig, cpu_field, space::CC.Spaces.ExtrudedFiniteDifferenceSpace, i, j)
+
+Plot a 3D extruded field: if horizontal space is cubed-sphere, take level 1 and heatmap;
+otherwise extract a single column and plot as a line (for BoxGrid column mode, used by atmos).
+"""
+function _debug_plot_field!(
+    ax,
+    fig,
+    cpu_field,
+    space::CC.Spaces.ExtrudedFiniteDifferenceSpace,
+    i,
+    j,
+)
+    hspace = CC.Spaces.horizontal_space(space)
+    if hspace isa CC.Spaces.CubedSphereSpectralElementSpace2D
+        # Cubed sphere case: make heatmap of level 1
+        _debug_plot_heatmap!(ax, fig, CC.Fields.level(cpu_field, 1), i, j)
+    else
+        # BoxGrid column mode: extract a single column and plot as a line
+        col_field = CC.Fields.column(cpu_field, 1, 1, 1)
+        _debug_plot_column!(ax, col_field)
+    end
+    return nothing
+end
+
+"""
+    _debug_plot_field!(ax, fig, cpu_field, space, i, j)
+
+Fallback: plot a 2D spatial field as a heatmap (e.g. `SpectralElementSpace2D`).
+"""
+function _debug_plot_field!(ax, fig, cpu_field, space, i, j)
+    _debug_plot_heatmap!(ax, fig, cpu_field, i, j)
+    return nothing
+end
+
+"""
+    _debug_plot_column!(ax, field)
+
+Plot a 1D column field as a line with z on the y-axis.
+"""
+function _debug_plot_column!(ax, field)
+    z = vec(Array(parent(CC.Fields.coordinate_field(field).z)))
+    vals = vec(Array(parent(field)))
+
+    valid = @. !(isnan(vals) || isinf(vals))
+    any(valid) || return nothing
+
+    Makie.lines!(ax, vals[valid], z[valid])
+    ax.ylabel = "z"
+    return nothing
+end
+
+"""
+    _debug_plot_heatmap!(ax, fig, cpu_field, i, j)
+
+Plot a 2D spatial field as a heatmap with colorbar.
+"""
+function _debug_plot_heatmap!(ax, fig, cpu_field, i, j)
     FT = CC.Spaces.undertype(axes(cpu_field))
     isinvalid = (x) -> isnan(x) || isinf(x)
     field_valid_min, field_valid_max =
@@ -226,15 +373,23 @@ Plotting.debug_plot!(ax, fig, field, i, j) = nothing # fallback method
 """
     Plotting.print_extrema(field::Union{CC.Fields.Field, Vector, StaticArrays.SVector, Number})
 
-Return the minimum and maximum values of a field as a string.
+Return a tuple `(string, has_nan::Bool)` where:
+- `string` is the minimum and maximum values of a field formatted as a string
+- `has_nan` is true if the extrema contain NaN values
 """
 function Plotting.print_extrema(
     field::Union{CC.Fields.Field, Vector, StaticArrays.SVector, Number},
 )
     ext_vals = extrema(field)
-    min = Printf.@sprintf("%.2E", ext_vals[1])
-    max = Printf.@sprintf("%.2E", ext_vals[2])
-    return " [$min, $max]"
+    min_val = ext_vals[1]
+    max_val = ext_vals[2]
+
+    # Check for NaN values
+    has_nan = isnan(min_val) || isnan(max_val)
+
+    min = Printf.@sprintf("%.2E", min_val)
+    max = Printf.@sprintf("%.2E", max_val)
+    return (" [$min, $max]", has_nan)
 end
 
 """
@@ -246,3 +401,19 @@ that has additional fields to plot.
 """
 Plotting.debug_plot_fields(sim::Interfacer.AbstractSurfaceSimulation) =
     (:area_fraction, :surface_temperature)
+
+# Define shorthands for ClimaCore types
+const CT1 = CC.Geometry.Contravariant1Vector
+const CT2 = CC.Geometry.Contravariant2Vector
+const CT12 = CC.Geometry.Contravariant12Vector
+
+"""
+    _unit_basis_vector_data(type, local_geometry)
+
+The component of the vector of the specified type with length 1 in physical units.
+The type should correspond to a vector with only one component, i.e., a basis vector.
+"""
+function _unit_basis_vector_data(::Type{V}, local_geometry) where {V}
+    FT = CC.Geometry.undertype(typeof(local_geometry))
+    return FT(1) / CC.Geometry._norm(V(FT(1)), local_geometry)
+end

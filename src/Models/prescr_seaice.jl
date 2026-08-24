@@ -1,12 +1,14 @@
-import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
+import ClimaUtilities.TimeManager: ITime
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Interpolations # triggers InterpolationsExt in ClimaUtilities
 import Thermodynamics as TD
-import ..Checkpointer, ..FluxCalculator, ..Interfacer, ..Utilities
+import ..Checkpointer, ..FluxCalculator, ..Interfacer, ..Utilities, ..TimeManager
 import ClimaComms
+import NCDatasets
+import ClimaDiagnostics as CD
 
 """
     PrescribedIceSimulation{P, I}
@@ -44,12 +46,14 @@ Base.@kwdef struct IceSlabParameters{FT <: AbstractFloat}
     α::FT                   # albedo of sea ice, roughly tuned to match observations
     ϵ::FT                   # emissivity of sea ice
     σ::FT                   # Stefan-Boltzmann constant [W / m2 / K4]
+    T_sfc_min::FT           # minimum allowed surface temperature [K]
 end
 
 """
     IceSlabParameters{FT}(coupled_param_dict; h = FT(2), ρ = FT(900), c = FT(2100),
                           T_base = FT(271.2), z0m = FT(1e-4), z0b = FT(1e-4),
-                          T_freeze = FT(271.2), k_ice = FT(2), α = FT(0.65), ϵ = FT(1))
+                          T_freeze = FT(271.2), k_ice = FT(2), α = FT(0.65), ϵ = FT(1),
+                          T_sfc_min = FT(200))
 
 Initialize the `IceSlabParameters` object with the coupled parameters.
 
@@ -65,6 +69,7 @@ Initialize the `IceSlabParameters` object with the coupled parameters.
 - `k_ice`: thermal conductivity of sea ice [W / m / K] (default: 2)
 - `α`: albedo of sea ice (default: 0.65)
 - `ϵ`: emissivity of sea ice (default: 1)
+- `T_sfc_min`: minimum allowed surface temperature [K] (default: 200)
 
 # Returns
 - `IceSlabParameters{FT}`: an `IceSlabParameters` object
@@ -81,6 +86,7 @@ function IceSlabParameters{FT}(
     k_ice = FT(2),
     α = FT(0.65),
     ϵ = FT(1),
+    T_sfc_min = FT(200),
 ) where {FT}
     return IceSlabParameters{FT}(;
         h,
@@ -94,11 +100,76 @@ function IceSlabParameters{FT}(
         α,
         ϵ,
         σ = coupled_param_dict["stefan_boltzmann_constant"],
+        T_sfc_min,
     )
 end
 
-# init simulation
-function slab_ice_space_init(::Type{FT}, space, params) where {FT}
+"""
+    slab_ice_space_init(::Type{FT}, space, params, sic_data, start_date, t_start, ice_fraction)
+
+Initialize ice bulk temperature from the ISTL1 variable in `sic_data` if available.
+ISTL1 from ERA5 (ice surface temperature layer 1, 0-7cm) is used as a proxy for surface temperature,
+then back-calculates T_bulk assuming a linear temperature profile: T_bulk = (T_sfc + T_base) / 2.
+
+Only uses ISTL1 temperatures where there is ice (ice_fraction > 0). In ice-free regions,
+uses the fallback temperature to avoid initializing with values at/above freezing which
+can cause numerical issues.
+
+Falls back to constant initialization (T_freeze - 5K) if ISTL1 is not present or data is not finite.
+"""
+function slab_ice_space_init(
+    ::Type{FT},
+    space,
+    params,
+    sic_data,
+    start_date,
+    t_start,
+    ice_fraction,
+) where {FT}
+    (; T_base, T_freeze) = params
+    T_fallback = T_freeze - FT(5.0)
+
+    # Initialize ice temperature if available
+    has_ISTL1 = NCDatasets.NCDataset(sic_data, "r") do ds
+        haskey(ds, "ISTL1")
+    end
+
+    if has_ISTL1
+        # Use ERA5 ISTL1 (0-7cm, near-surface layer) as a proxy for surface temperature
+        ISTL1_input = TimeVaryingInput(sic_data, "ISTL1", space; start_date)
+        T_sfc_data = CC.Fields.zeros(space)
+        evaluate!(T_sfc_data, ISTL1_input, t_start)
+
+        # Back-calculate T_bulk from T_sfc assuming linear temperature profile
+        T_bulk = @. (T_sfc_data + T_base) / FT(2)
+
+        # Only use ISTL1 temperatures where there is ice; use fallback elsewhere
+        @. T_bulk = ifelse(ice_fraction > 0, T_bulk, T_fallback)
+
+        # Fall back to constant where data is not finite
+        @. T_bulk = ifelse(isfinite(T_bulk), T_bulk, T_fallback)
+
+        @info "PrescribedIce: initialized T_bulk from ISTL1"
+        T_bulk_init = T_bulk
+    else
+        @info "PrescribedIce: ISTL1 not in file, using constant initialization" file =
+            sic_data
+        T_bulk_init = ones(space) .* T_fallback
+    end
+
+    @. T_bulk_init = ifelse(isnan(T_bulk_init), T_fallback, T_bulk_init)
+
+    Y = CC.Fields.FieldVector(T_bulk = T_bulk_init)
+    return Y
+end
+
+"""
+    slab_ice_space_init(::Type{FT}, space, params, ::Nothing, args...)
+
+Fallback initialization when no SIC data file is provided.
+Initializes bulk temperature to 5K below freezing.
+"""
+function slab_ice_space_init(::Type{FT}, space, params, ::Nothing, args...) where {FT}
     # bulk temperatures commonly 10-20 K below freezing for sea ice 2m thick in winter,
     # and closer to freezing in summer and when melting.
     Y = CC.Fields.FieldVector(T_bulk = ones(space) .* params.T_freeze .- FT(5.0))
@@ -156,6 +227,7 @@ function PrescribedIceSimulation(
     stepper = CTS.RK4(),
     sic_path::Union{Nothing, String} = nothing,
     binary_area_fraction::Bool = true,
+    domain_type::String = "global",
     extra_kwargs...,
 ) where {FT}
     # Set up prescribed sea ice concentration object
@@ -178,27 +250,41 @@ function PrescribedIceSimulation(
     SIC_timevaryinginput = TimeVaryingInput(
         sic_data,
         "SEAICE",
-        boundary_space,
-        reference_date = start_date,
+        boundary_space;
+        start_date,
         file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
     )
 
     # Get initial SIC values and use them to calculate ice fraction
     ice_fraction = CC.Fields.zeros(boundary_space)
-    evaluate!(ice_fraction, SIC_timevaryinginput, tspan[1])
+    if domain_type == "column"
+        ice_fraction .= FT(1)
+    else
+        evaluate!(ice_fraction, SIC_timevaryinginput, tspan[1])
 
-    # Ensure ice fraction is finite and not NaN
-    @. ice_fraction = ifelse(isfinite(ice_fraction), ice_fraction, FT(0))
-    # binary ice fraction (threshold at 0.5)
-    if binary_area_fraction
-        @. ice_fraction = ifelse(ice_fraction > FT(0.5), FT(1), FT(0))
+        # Ensure ice fraction is finite and not NaN
+        @. ice_fraction = ifelse(isfinite(ice_fraction), ice_fraction, FT(0))
+        # binary ice fraction (threshold at 0.5)
+        if binary_area_fraction
+            @. ice_fraction = ifelse(ice_fraction > FT(0.5), FT(1), FT(0))
+        end
+        # max/min needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
+        @. ice_fraction = max(min(ice_fraction, FT(1) - land_fraction), FT(0))
     end
-    # max/min needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-    @. ice_fraction = max(min(ice_fraction, FT(1) - land_fraction), FT(0))
 
     params = IceSlabParameters{FT}(coupled_param_dict)
 
-    Y = slab_ice_space_init(FT, boundary_space, params)
+    # Initialize ice temperature: use ERA5 ice layer data if available, otherwise constant
+    Y = slab_ice_space_init(
+        FT,
+        boundary_space,
+        params,
+        sic_data,
+        start_date,
+        tspan[1],
+        ice_fraction,
+    )
+
     cache = (;
         F_turb_energy = CC.Fields.zeros(boundary_space),
         SW_d = CC.Fields.zeros(boundary_space),
@@ -207,31 +293,58 @@ function PrescribedIceSimulation(
         SIC_timevaryinginput = SIC_timevaryinginput,
         land_fraction = land_fraction,
         binary_area_fraction = binary_area_fraction,
+        domain_type = domain_type,
         dt = dt,
         thermo_params = thermo_params,
         # add dss_buffer to cache to avoid runtime dss allocation
-        dss_buffer = CC.Spaces.create_dss_buffer(Y),
+        dss_buffer = Utilities.init_dss_buffer(Y),
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     ode_function = CTS.ClimaODEFunction(
         T_exp! = ice_rhs!,
-        dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer),
+        dss! = (Y, p, t) -> Utilities.apply_dss!(Y, p.dss_buffer),
     )
-    if typeof(dt) isa Number
+    if dt isa Number
         dt = Float64(dt)
         tspan = Float64.(tspan)
         saveat = Float64.(saveat)
     end
-    problem = SciMLBase.ODEProblem(ode_function, Y, tspan, (; cache..., params = params))
-    integrator =
-        SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
+
+    # Create a schedule to update the SIC daily. The data provides monthly
+    # averages, so it doesn't make sense to update the SIC more frequently than daily.
+    SIC_schedule = CD.Schedules.EveryCalendarDtSchedule(
+        TimeManager.time_to_period("1days");
+        start_date,
+    )
+    SIC_update_cb =
+        CTS.DiscreteCallback((_, _, integrator) -> SIC_schedule(integrator), read_sic_data!)
+
+    problem = CTS.ODEProblem(ode_function, Y, tspan, (; cache..., params = params))
+    integrator = CTS.init(
+        problem,
+        ode_algo,
+        dt = dt,
+        saveat = saveat,
+        adaptive = false,
+        callback = CTS.CallbackSet(SIC_update_cb),
+    )
 
     sim = PrescribedIceSimulation(params, integrator)
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)
     return sim
+end
+
+"""
+    read_sic_data!(integrator)
+
+Read in the sea ice concentration data at the current time.
+This function is intended to be used within a callback.
+"""
+function read_sic_data!(integrator)
+    evaluate!(integrator.p.area_fraction, integrator.p.SIC_timevaryinginput, integrator.t)
 end
 
 # extensions required by Interfacer
@@ -251,11 +364,22 @@ Interfacer.get_field(
 ) = sim.integrator.p.params.α
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_model}) = :constant
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) =
-    ice_surface_temperature.(sim.integrator.u.T_bulk, sim.integrator.p.params.T_base)
+    ice_surface_temperature.(
+        sim.integrator.u.T_bulk,
+        sim.integrator.p.params.T_base,
+        sim.integrator.p.params.T_sfc_min,
+        sim.integrator.p.params.T_freeze,
+    )
 
-# Approximates the surface temperature of the sea ice assuming
-# the ice temperature varies linearly between the ice surface and the base
-ice_surface_temperature(T_bulk, T_base) = 2 * T_bulk - T_base
+"""
+    ice_surface_temperature(T_bulk, T_base, T_sfc_min, T_freeze)
+
+Approximates the surface temperature of the sea ice assuming
+the ice temperature varies linearly between the ice surface and the base.
+Clamps the result to be between `T_sfc_min` and `T_freeze`.
+"""
+ice_surface_temperature(T_bulk, T_base, T_sfc_min, T_freeze) =
+    clamp(2 * T_bulk - T_base, T_sfc_min, T_freeze)
 
 """
     Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:energy})
@@ -294,9 +418,6 @@ Interfacer.update_field!(
     field,
 ) = nothing
 
-# extensions required by FieldExchanger
-Interfacer.step!(sim::PrescribedIceSimulation, t) =
-    Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 
 function FluxCalculator.update_turbulent_fluxes!(
     sim::PrescribedIceSimulation,
@@ -334,23 +455,32 @@ function ice_rhs!(dY, Y, p, t)
     (; k_ice, h, T_base, ρ, c, ϵ, α, T_freeze, σ) = p.params
 
     # Update the cached area fraction with the current SIC
-    evaluate!(p.area_fraction, p.SIC_timevaryinginput, t)
-    @. p.area_fraction = ifelse(isfinite(p.area_fraction), p.area_fraction, FT(0))
-    # binary ice fraction (threshold at 0.5)
-    if p.binary_area_fraction
-        @. p.area_fraction = ifelse(p.area_fraction > FT(0.5), FT(1), FT(0))
+    if p.domain_type == "column"
+        @. p.area_fraction = FT(1)
+    else
+        @. p.area_fraction = ifelse(isfinite(p.area_fraction), p.area_fraction, FT(0))
+        # binary ice fraction (threshold at 0.5)
+        if p.binary_area_fraction
+            @. p.area_fraction = ifelse(p.area_fraction > FT(0.5), FT(1), FT(0))
+        end
+
+        # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
+        #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
+        @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_fraction), FT(0))
     end
 
-    # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
-    #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-    @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_fraction), FT(0))
+    # Calculate the conductive flux (positive when upward)
+    (; T_sfc_min) = p.params
+    F_conductive = @. k_ice / h *
+       (T_base - ice_surface_temperature(Y.T_bulk, T_base, T_sfc_min, T_freeze))
 
-    # Calculate the conductive flux, and set it to zero if the area fraction is zero
-    F_conductive = @. k_ice / (h) * (T_base - ice_surface_temperature(Y.T_bulk, T_base)) # fluxes are defined to be positive when upward
+    # Compute the energy balance RHS
     rhs = @. (
         -p.F_turb_energy +
         (1 - α) * p.SW_d +
-        ϵ * (p.LW_d - σ * ice_surface_temperature(Y.T_bulk, T_base)^4) +
+        ϵ * (
+            p.LW_d - σ * ice_surface_temperature(Y.T_bulk, T_base, T_sfc_min, T_freeze)^4
+        ) +
         F_conductive
     ) / (h * ρ * c)
     # Zero out tendencies where there is no ice, so that ice temperature remains constant there
@@ -367,7 +497,7 @@ Perform DSS on the state of a component simulation, intended to be used
 before the initial step of a run. This method acts on prescribed ice simulations.
 """
 dss_state!(sim::PrescribedIceSimulation) =
-    CC.Spaces.weighted_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)
+    Utilities.apply_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)
 
 function Checkpointer.get_model_cache(sim::PrescribedIceSimulation)
     return sim.integrator.p

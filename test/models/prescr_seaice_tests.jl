@@ -4,10 +4,9 @@ import NCDatasets
 import ClimaCore as CC
 import Thermodynamics.Parameters as TDP
 import ClimaParams as CP # required for TDP
-import ClimaCoupler
+import ClimaCoupler: Models, Utilities
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
-import ClimaCoupler.Models
 
 for FT in (Float32, Float64)
     @testset "test sea-ice energy slab for FT=$FT" begin
@@ -31,8 +30,8 @@ for FT in (Float32, Float64)
         )
             params = Models.IceSlabParameters{FT}(coupled_param_dict; T_base)
 
-            Y = Models.slab_ice_space_init(FT, space, params)
-            dY = Models.slab_ice_space_init(FT, space, params) .* FT(0.0)
+            Y = Models.slab_ice_space_init(FT, space, params, nothing)
+            dY = Models.slab_ice_space_init(FT, space, params, nothing) .* FT(0.0)
 
             dt = FT(1.0)
             t_start = 0.0
@@ -54,7 +53,7 @@ for FT in (Float32, Float64)
                 sic_data,
                 "SEAICE",
                 space,
-                reference_date = Dates.DateTime("20100101", Dates.dateformat"yyyymmdd"),
+                start_date = Dates.DateTime("20100101", Dates.dateformat"yyyymmdd"),
                 file_reader_kwargs = (; preprocess_func = (data) -> data / 100,), ## convert to fraction
             )
             # Get initial SIC values and use them to calculate ice fraction
@@ -71,6 +70,7 @@ for FT in (Float32, Float64)
                 thermo_params = thermo_params,
                 dt = dt,
                 binary_area_fraction = true,
+                domain_type = "global",
             )
 
             p = (; cache..., params = params)
@@ -142,11 +142,10 @@ for FT in (Float32, Float64)
             T_base = T_base,
         )
         T_bulk = minimum(Y.T_bulk) # get the non-zero temperature value
-        (; k_ice, h, ρ, c, T_base, ϵ) = p.params
+        (; k_ice, h, ρ, c, T_base, ϵ, T_sfc_min, T_freeze) = p.params
+        T_sfc = Models.ice_surface_temperature(T_bulk, T_base, T_sfc_min, T_freeze)
         dT_expected =
-            (k_ice / (h * h * ρ * c)) *
-            (T_base - Models.ice_surface_temperature(T_bulk, T_base)) -
-            (ϵ * σ * Models.ice_surface_temperature(T_bulk, T_base)^4) / (h * ρ * c)
+            (k_ice / (h * h * ρ * c)) * (T_base - T_sfc) - (ϵ * σ * T_sfc^4) / (h * ρ * c)
         @test minimum(dY) ≈ FT(dT_expected)
         @test maximum(dY) ≈ FT(0)
     end
@@ -160,9 +159,6 @@ for FT in (Float32, Float64)
             h_elem = 4,
         )
 
-        # construct dss buffer to put in cache
-        dss_buffer = CC.Spaces.create_dss_buffer(CC.Fields.zeros(boundary_space))
-
         # set up objects for test
         u = CC.Fields.FieldVector(;
             state_field1 = CC.Fields.ones(boundary_space),
@@ -170,7 +166,8 @@ for FT in (Float32, Float64)
         )
         p = (;
             cache_field = CC.Fields.zeros(boundary_space),
-            dss_buffer = CC.Spaces.create_dss_buffer(u),
+            dss_buffer = Utilities.init_dss_buffer(u),
+            domain_type = "global",
         )
         integrator = (; u, p)
         sim = Models.PrescribedIceSimulation(nothing, integrator)

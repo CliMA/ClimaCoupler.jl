@@ -27,8 +27,7 @@ information needed to run that simulation.
 
 Each `AbstractComponentSimulation` must extend the following functions to be able
 to use our coupler. For some existing models, these are defined within
-ClimaCoupler.jl in that model’s file in `experiments/ClimaEarth/components/`, but it is preferable
-for these to be defined in a model’s own repository. Note that the dispatch
+ClimaCoupler.jl `Models` module, or within package extensions. Note that the dispatch
 `::AbstractComponentSimulation` in the function definitions given below should
 be replaced with the particular component model extending these functions.
 - constructor: construct and return an instance of the `AbstractComponentSimulation`,
@@ -39,7 +38,7 @@ function varies across component models.
 - `step!(::AbstractComponentSimulation, t)`: A function to update the
 simulation in-place with values calculate for time `t`. For the
 models we currently have implemented, this is a simple wrapper around
-the `step!` function implemented in SciMLBase.jl.
+the `step!` function implemented in ClimaTimeSteppers.jl.
 
 ### AbstractComponentSimulation - optional functions
 - `Checkpointer.get_model_prog_state(::AbstractComponentSimulation)`:
@@ -83,30 +82,33 @@ to update the coupler fields from the component model that computes the field.
 The default coupler exchange fields are the following, defined in
 `default_coupler_fields()` in the Interfacer module:
 
-| Coupler name      | Description                                                 | Units      |
-|-------------------|-------------------------------------------------------------|------------|
-| `T_atmos`         | atmosphere temperature at the bottom layer                  | K          |
-| `q_tot_atmos`     | atmosphere total humidity at the bottom layer               | kg kg⁻¹    |
-| `q_liq_atmos`     | atmosphere liquid humidity at the bottom layer              | kg kg⁻¹    |
-| `q_ice_atmos`     | atmosphere ice humidity at the bottom layer                 | kg kg⁻¹    |
-| `ρ_atmos`         | atmosphere air density at the bottom layer                  | kg m⁻³     |
-| `height_int`      | height at the bottom cell center of the atmosphere space    | m          |
-| `height_sfc`      | height at the bottom face of the atmosphere space           | m          |
-| `F_lh`            | latent heat flux                                            | W m⁻²      |
-| `F_sh`            | sensible heat flux                                          | W m⁻²      |
-| `F_turb_moisture` | turbulent moisture flux                                     | kg m⁻² s⁻¹ |
-| `F_turb_ρτxz`     | turbulent momentum flux in the zonal direction              | kg m⁻¹ s⁻² |
-| `F_turb_ρτyz`     | turbulent momentum flux in the meridional direction         | kg m⁻¹ s⁻² |
-| `SW_d`            | downward SW flux at the surface                             | W m⁻²      |
-| `LW_d`            | downward LW flux at the surface                             | W m⁻²      |
-| `emissivity`      | surface emissivity                                          | -          |
-| `T_sfc`           | surface temperature, averaged across components             | K          |
-| `P_liq`           | liquid precipitation                                        | kg m⁻² s⁻¹ |
-| `P_snow`          | snow precipitation                                          | kg m⁻² s⁻¹ |
-| `scalar_temp1`    | a surface scalar field used for intermediate calculations   | -          |
-| `scalar_temp2`    | a surface scalar field used for intermediate calculations   | -          |
-| `scalar_temp3`    | a surface scalar field used for intermediate calculations   | -          |
-| `scalar_temp4`    | a surface scalar field used for intermediate calculations   | -          |
+| Coupler name          | Description                                                 | Units      |
+|-----------------------|-------------------------------------------------------------|------------|
+| `land_area_fraction`  | area fraction of the land model                             | -          |
+| `ocean_area_fraction` | area fraction of the ocean model                            | -          |
+| `ice_area_fraction`   | area fraction of the sea-ice model                          | -          |
+| `T_atmos`             | atmosphere temperature at the bottom layer                  | K          |
+| `q_tot_atmos`         | atmosphere total humidity at the bottom layer               | kg kg⁻¹    |
+| `q_liq_atmos`         | atmosphere liquid humidity at the bottom layer              | kg kg⁻¹    |
+| `q_ice_atmos`         | atmosphere ice humidity at the bottom layer                 | kg kg⁻¹    |
+| `ρ_atmos`             | atmosphere air density at the bottom layer                  | kg m⁻³     |
+| `height_int`          | height at the bottom cell center of the atmosphere space    | m          |
+| `height_sfc`          | height at the bottom face of the atmosphere space           | m          |
+| `F_lh`                | latent heat flux                                            | W m⁻²      |
+| `F_sh`                | sensible heat flux                                          | W m⁻²      |
+| `F_turb_moisture`     | turbulent moisture flux                                     | kg m⁻² s⁻¹ |
+| `F_turb_ρτxz`         | turbulent momentum flux in the zonal direction              | kg m⁻¹ s⁻² |
+| `F_turb_ρτyz`         | turbulent momentum flux in the meridional direction         | kg m⁻¹ s⁻² |
+| `SW_d`                | downward SW flux at the surface                             | W m⁻²      |
+| `LW_d`                | downward LW flux at the surface                             | W m⁻²      |
+| `emissivity`          | surface emissivity                                          | -          |
+| `T_sfc`               | surface temperature, averaged across components             | K          |
+| `P_liq`               | liquid precipitation                                        | kg m⁻² s⁻¹ |
+| `P_snow`              | snow precipitation                                          | kg m⁻² s⁻¹ |
+| `scalar_temp1`        | a surface scalar field used for intermediate calculations   | -          |
+| `scalar_temp2`        | a surface scalar field used for intermediate calculations   | -          |
+| `scalar_temp3`        | a surface scalar field used for intermediate calculations   | -          |
+| `scalar_temp4`        | a surface scalar field used for intermediate calculations   | -          |
 
 !!! note "What should be stored in the coupler exchange fields?"
     In general, the coupler fields should contain exchange fields for fluxes, including
@@ -136,6 +138,28 @@ simulation initialization, and that must be done after the initial exchange.
 This is necessary, for example, when component models have cache
 interdependencies that must be handled in a specific order.
 Cache variables that are computed as part of the tendencies do not need to be set here.
+
+- `sim_dt(sim::AbstractComponentSimulation)`: Returns the component model's own
+timestep in seconds as a `Float64`. Used by the coupler to detect slow surfaces
+(those with `sim_dt > Δt_cpl`) and allocate `FluxCalculator.FluxAccumulator`s
+for them. The default implementation returns `Float64(float(sim.integrator.dt))`,
+which is correct for ClimaTimeSteppers-style integrators. Components that
+store their timestep elsewhere (e.g. `OceananigansSimulation`,
+`ClimaSeaIceSimulation`) extend this method.
+
+- `will_step(sim::AbstractComponentSimulation, t)`: Returns `true` when calling
+`Interfacer.step!(sim, t)` would advance the component by at least one of its
+own steps. The default implementation compares `t` against
+`sim.integrator.t` using `sim_dt`. Used by
+[`FluxCalculator.push_ready_accumulators!`](@ref) to write the time-averaged
+flux to a slow surface before it steps. Component models that need different
+step-boundary detection logic can override this method.
+
+- `progress(sim::AbstractComponentSimulation, cs)`: Print progress statistics
+from the component model simulation. This is called by a coupler callback with
+a frequency controlled by the `<component>_progress_interval` config options.
+If this function is not extended for a component model, a warning is raised
+once and no progress is printed.
 
 ### AbstractAtmosSimulation - required functions
 In addition to the functions required for a general
@@ -182,13 +206,11 @@ properties needed by a component model.
 | `surface_temperature`    | temperature over the combined surface space              | K     |
 | `turbulent_fluxes`       | turbulent fluxes                                         | W m⁻² |
 
-ClimaAtmos should also add the following coupler fields for Monin-Obukhov similarity theory:
-| Coupler name    | Description       | Units  |
-|-----------------|-------------------|--------|
-| `ustar`         | friction velocity | m s⁻¹  |
-| `L_MO`          | Obukhov length    | m      |
-| `buoyancy_flux` | flux of buoyancy  | m⁻²s⁻³ |
-
+- `atmos_default_config_dict()`:
+Return a dictionary of default configuration options for the atmosphere mode. The default
+method is only defined when the ClimaCouplerClimaAtmosExt extension is loaded, and returns
+the default configuration dictionary for ClimaAtmos. If `ClimaAtmos.jl` is not loaded, users
+must define this function themselves.
 
 ### AbstractAtmosSimulation - required functions to run with the ClimaLandSimulation
 
@@ -331,6 +353,8 @@ end
 ## Interfacer API
 ```@docs
     Interfacer.CoupledSimulation
+    Interfacer.current_date
+    Interfacer.default_coupler_fields
     Interfacer.AbstractAtmosSimulation
     Interfacer.AbstractSurfaceSimulation
     Interfacer.AbstractComponentSimulation

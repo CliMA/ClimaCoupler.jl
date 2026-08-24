@@ -9,12 +9,20 @@ dt_cloud_fraction: "1hours"
 dt_cpl: "120secs"
 dt_rad: "1hours"
 energy_check: false
-insolation: "timevarying"
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: 1months
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
+initial_condition: "AMIPFromERA5"
 mode_name: "amip"
 netcdf_interpolate_z_over_msl: true
+output_default_diagnostics: true
 rmse_check: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
+walltime_debug: true

@@ -1,8 +1,7 @@
-import SciMLBase
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
 import ClimaUtilities
-import ClimaUtilities.TimeManager: date
+import ClimaUtilities.TimeManager: ITime, date
 import SurfaceFluxes as SF
 import ..Checkpointer, ..FluxCalculator, ..Interfacer, ..Utilities, ..FieldExchanger
 
@@ -39,8 +38,9 @@ end
 """
     OceanSlabParameters{FT}(coupled_param_dict; h = FT(20), ρ = FT(1500),
                             c = FT(800), T_init = FT(271), z0m = FT(5e-4),
-                            z0b = FT(5e-4), α = FT(0.38), ϵ = FT(1),
-                            evolving_switch = FT(1))
+                            z0b = FT(5e-4),
+                            α = FT(coupled_param_dict["idealized_ocean_albedo"]),
+                            ϵ = FT(1), evolving_switch = FT(1))
 
 Initialize the `OceanSlabParameters` object with the coupled parameters.
 
@@ -52,7 +52,7 @@ Initialize the `OceanSlabParameters` object with the coupled parameters.
 - `T_init`: initial temperature of the ocean [K] (default: 271)
 - `z0m`: roughness length for momentum [m] (default: 5e-4)
 - `z0b`: roughness length for heat [m] (default: 5e-4)
-- `α`: albedo of the ocean [0, 1] (default: 0.38)
+- `α`: albedo of the ocean [0, 1] (default: `idealized_ocean_albedo` from the param dict)
 - `ϵ`: emissivity of the ocean (default: 1)
 - `evolving_switch`: switch to turn off the evolution of the ocean temperature [0 or 1] (default: 1)
 
@@ -67,7 +67,7 @@ function OceanSlabParameters{FT}(
     T_init = FT(271),
     z0m = FT(5e-4),
     z0b = FT(5e-4),
-    α = FT(0.38),
+    α = FT(coupled_param_dict["idealized_ocean_albedo"]),
     ϵ = FT(1),
     evolving_switch = FT(1),
 ) where {FT}
@@ -162,23 +162,22 @@ function SlabOceanSimulation(
         u_atmos = CC.Fields.zeros(boundary_space),
         v_atmos = CC.Fields.zeros(boundary_space),
         # add dss_buffer to cache to avoid runtime dss allocation
-        dss_buffer = CC.Spaces.create_dss_buffer(Y),
+        dss_buffer = Utilities.init_dss_buffer(Y),
         coare3_roughness_params,
     )
 
     ode_algo = CTS.ExplicitAlgorithm(stepper)
     ode_function = CTS.ClimaODEFunction(;
         T_exp! = slab_ocean_rhs!,
-        dss! = (Y, p, t) -> CC.Spaces.weighted_dss!(Y, p.dss_buffer),
+        dss! = (Y, p, t) -> Utilities.apply_dss!(Y, p.dss_buffer),
     )
     if typeof(dt) isa Number
         dt = Float64(dt)
         tspan = Float64.(tspan)
         saveat = Float64.(saveat)
     end
-    problem = SciMLBase.ODEProblem(ode_function, Y, tspan, cache)
-    integrator =
-        SciMLBase.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
+    problem = CTS.ODEProblem(ode_function, Y, tspan, cache)
+    integrator = CTS.init(problem, ode_algo, dt = dt, saveat = saveat, adaptive = false)
 
     sim = SlabOceanSimulation(params, integrator)
 
@@ -250,9 +249,6 @@ function Interfacer.update_field!(
     Interfacer.remap!(sim.integrator.p.α_diffuse, field)
 end
 
-# extensions required by FieldExchanger
-Interfacer.step!(sim::SlabOceanSimulation, t) =
-    Interfacer.step!(sim.integrator, t - sim.integrator.t, true)
 
 function FluxCalculator.update_turbulent_fluxes!(
     sim::SlabOceanSimulation,
@@ -308,4 +304,4 @@ Perform DSS on the state of a component simulation, intended to be used
 before the initial step of a run. This method acts on slab ocean model sims.
 """
 dss_state!(sim::SlabOceanSimulation) =
-    CC.Spaces.weighted_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)
+    Utilities.apply_dss!(sim.integrator.u, sim.integrator.p.dss_buffer)

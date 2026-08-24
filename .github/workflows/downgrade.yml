@@ -20,15 +20,16 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ['1.10', '1.11']
+        version: ['1.10', '1.12']
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@latest
         with:
           version: ${{ matrix.version }}
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-downgrade-compat@v2
         with:
           skip: Artifacts, Dates, Download, Logging, Pkg, Statistics, Test
+          julia_version: ${{ matrix.version }}
       - uses: julia-actions/julia-buildpkg@latest
       - uses: julia-actions/julia-runtest@latest

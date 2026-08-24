@@ -1,14 +1,14 @@
-[alpha_rayleigh_w]
-value = 10.0
-
 [zd_rayleigh]
 value = 40000.0
+type = "float"
 
 [zd_viscous]
 value = 40000.0
+type = "float"
 
 [precipitation_timescale]
-value = 600
+value = 1200
+type = "float"
 
-[mixing_length_Prandtl_maximum]
-value = 4.2
+[cloud_fraction_steepness_scale]
+value = 0.5

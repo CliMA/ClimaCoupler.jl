@@ -9,10 +9,10 @@ dz_bottom: 30.0
 edmfx_sgs_diffusive_flux: true
 h_elem: 16
 implicit_diffusion: true
+initial_condition: "WeatherModel"
 insolation: "timevarying"
-moist: "equil"
 netcdf_output_at_levels: true
-precip_model: "0M"
+ode_algo: ARS343
 prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05", "OC1", "OC2", "SO4", "SSLT01", "SSLT02", "SSLT03", "SSLT04", "SSLT05"]
 rad: "allskywithclear"
 rayleigh_sponge: true
@@ -24,3 +24,6 @@ turbconv: "edonly_edmfx"
 viscous_sponge: true
 z_elem: 63
 z_max: 60000.0
+microphysics_model: "0M"
+non_orographic_gravity_wave: true
+orographic_gravity_wave: "raw_topo"

@@ -1,4 +1,4 @@
-# Conservation Checks
+# ConservationChecker
 
 If the model is a physically closed system (e.g., in the `slabplanet` configuration with free slip conditions),
 it should conserve mass (including water), energy and momentum. The conservation checker logs global conservation.

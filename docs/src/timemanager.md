@@ -8,14 +8,15 @@ functions from Julia's [Dates](https://docs.julialang.org/en/v1/stdlib/Dates/) m
 
 ```@docs
 TimeManager.maybe_trigger_callback
+TimeManager.WalltimeReporter
 ```
 
 ## ITime
 
 `ITime`, or _integer time_, is a time type used by CliMA simulations to keep
 track of simulation time. For more information, refer to the
-[TimeManager section](https://clima.github.io/ClimaUtilities.jl/dev/timemanager/)
-in ClimaUtilities and the [ITime section](https://clima.github.io/ClimaAtmos.jl/dev/itime/)
+[TimeManager section](https://clima.github.io/ClimaUtilities.jl/stable/timemanager/)
+in ClimaUtilities and the [ITime section](https://clima.github.io/ClimaAtmos.jl/stable/itime/)
 in ClimaAtmos.
 
 ### How do I use ITime?

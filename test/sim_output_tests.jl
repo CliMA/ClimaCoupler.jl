@@ -2,6 +2,14 @@ using Test
 import ClimaCoupler: SimOutput
 import ArgParse
 
+@testset "get_reduction" begin
+    @test isnothing(SimOutput.get_reduction(Val(:instantaneous)))
+    @test SimOutput.get_reduction(Val(:average)) == (+)
+    @test SimOutput.get_reduction(Val(:max)) == max
+    @test SimOutput.get_reduction(Val(:min)) == min
+    @test_throws ErrorException SimOutput.get_reduction(Val(:not_a_reduction))
+end
+
 @testset "get_benchmark_args" begin
     # Test with empty ARGS (should use defaults)
     # We need to temporarily set ARGS
@@ -12,7 +20,7 @@ import ArgParse
         args = SimOutput.get_benchmark_args()
         @test args["job_id_coupled"] == "test_coupled"
         @test isnothing(args["job_id_atmos"])
-        @test args["coupler_output_dir"] == "experiments/ClimaEarth/output"
+        @test args["coupler_output_dir"] == "output"
     finally
         empty!(ARGS)
         append!(ARGS, old_args)
@@ -25,7 +33,7 @@ end
         "job_id_coupled" => "test_coupled",
         "job_id_atmos" => "test_atmos",
         "job_id_coupled_io" => "test_coupled_io",
-        "job_id_atmos_diagedmf" => "test_atmos_diagedmf",
+        "job_id_atmos_progedmf" => "test_atmos_progedmf",
         "job_id_coupled_progedmf_coarse" => "test_coarse",
         "job_id_coupled_progedmf_fine" => "test_fine",
         "coupler_output_dir" => test_output_dir,
@@ -36,7 +44,7 @@ end
         ("coupled", "test_coupled"),
         ("atmos", "test_atmos"),
         ("coupled_io", "test_coupled_io"),
-        ("atmos_diagedmf", "test_atmos_diagedmf"),
+        ("atmos_progedmf", "test_atmos_progedmf"),
         ("coupled_progedmf_coarse", "test_coarse"),
         ("coupled_progedmf_fine", "test_fine"),
     ]

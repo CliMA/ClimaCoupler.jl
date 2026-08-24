@@ -4,7 +4,7 @@
 using Test
 import ArgParse
 import Dates
-import ClimaCoupler: Input, Utilities
+import ClimaCoupler: Input, Utilities, Interfacer
 import ClimaCoupler
 import YAML
 
@@ -68,14 +68,24 @@ end
         "dt_cpl" => "400secs",
         "dt" => "400secs",
         "share_surface_space" => true,
+        "nh_poly" => 2,
+        "h_elem" => 8,
+        "h_elem_coupler" => 16,
+        "nh_poly_coupler" => 2,
         "checkpoint_dt" => "90days",
+        "atmos_progress_interval" => "1days",
         "detect_restart_files" => false,
         "restart_dir" => nothing,
         "restart_t" => nothing,
         "restart_cache" => true,
         "save_cache" => true,
         "use_coupler_diagnostics" => true,
+        "coupler_diagnostics_period" => nothing,
+        "coupler_diagnostics_reduction" => "average",
         "use_land_diagnostics" => true,
+        "land_diagnostics_period" => "1months",
+        "land_diagnostics_reduction" => "average",
+        "land_progress_interval" => "never",
         "evolving_ocean" => true,
         "energy_check" => false,
         "conservation_softfail" => false,
@@ -83,15 +93,29 @@ end
         "coupler_output_dir" => "test_output",
         "land_model" => "bucket",
         "land_temperature_anomaly" => "aquaplanet",
-        "land_spun_up_ic" => true,
+        "land_spun_up_ic" => false,
+        "lai_source" => "modis_monthly",
         "bucket_albedo_type" => "map_static",
         "bucket_initial_condition" => "",
         "coupler_toml" => [],
         "era5_initial_condition_dir" => nothing,
         "ocean_model" => "prescribed",
+        "ocean_diagnostic_interval" => "1days",
+        "ocean_diagnostic_mode" => "average",
+        "seaice_diagnostic_interval" => "1days",
+        "seaice_diagnostic_mode" => "average",
+        "seaice_progress_interval" => "never",
+        "simple_ocean" => false,
+        "use_intersection_grid" => true,
+        "ocean_grid" => "one_deg_tripolar",
+        "sst_adjustment" => 2.0,
         "ice_model" => "prescribed",
+        "ocean_progress_interval" => "1days",
         "land_fraction_source" => "etopo",
         "binary_area_fraction" => true,
+        "domain_type" => "global",
+        "column_latlon" => [0.0, 0.0],
+        "scm_surface_type" => nothing,
         "component_dt_dict" => Dict(
             "dt_atmos" => 400.0,
             "dt_land" => 400.0,
@@ -119,11 +143,38 @@ end
     @test args.ocean_model == Val(:prescribed)
     @test args.ice_model == Val(:prescribed)
     @test args.land_fraction_source == "etopo"
+    @test args.sst_adjustment == 2.0
+    @test args.ocean_grid == :one_deg_tripolar
+    @test args.domain_type == "global"
+    @test args.column_latlon == (0.0, 0.0)
+    @test args.scm_surface_type === nothing
 
     # Test that component_dt_dict is preserved
     @test args.component_dt_dict isa Dict
     @test haskey(args.component_dt_dict, "dt_atmos")
     @test !haskey(args.component_dt_dict, "dt")
+
+    # If unspecified, walltime_dt defaults to a tenth of the simulation length, but
+    # never shorter than one coupling step. Here a tenth of 800secs is 80secs, which is
+    # below dt_cpl (400secs), so it is set to dt_cpl.
+    @test args.walltime_dt == "400.0secs"
+    # ... for a longer simulation, the tenth-of-length rule applies (8000secs / 10)
+    config_dict["t_end"] = "8000secs"
+    @test Input.get_coupler_args(config_dict).walltime_dt == "800.0secs"
+    # ... capped at 30 days
+    config_dict["t_end"] = "3650days"
+    @test Input.get_coupler_args(config_dict).walltime_dt == "2.592e6secs"
+    config_dict["t_end"] = "800secs" # undo
+    # If specified, walltime_dt is passed through unchanged
+    config_dict["walltime_dt"] = "never"
+    @test Input.get_coupler_args(config_dict).walltime_dt == "never"
+    delete!(config_dict, "walltime_dt") # undo
+
+    # walltime_debug is off by default and passed through when set
+    @test args.walltime_debug == false
+    config_dict["walltime_debug"] = true
+    @test Input.get_coupler_args(config_dict).walltime_debug == true
+    delete!(config_dict, "walltime_debug") # undo
 end
 
 @testset "get_diag_period" begin
@@ -169,6 +220,16 @@ end
     t_end = 1.0 * secs_per_day
     period, diagnostics_dt = Input.get_diag_period(t_start, t_end)
     @test period == "1days"
+end
+
+@testset "land_diagnostics_period_to_symbol" begin
+    @test Input.land_diagnostics_period_to_symbol("30mins") == :halfhourly
+    @test Input.land_diagnostics_period_to_symbol("1hours") == :hourly
+    @test Input.land_diagnostics_period_to_symbol("1days") == :daily
+    @test Input.land_diagnostics_period_to_symbol("10days") == :tendaily
+    @test Input.land_diagnostics_period_to_symbol("1months") == :monthly
+    @test_throws ErrorException Input.land_diagnostics_period_to_symbol("2hours")
+    @test_throws ErrorException Input.land_diagnostics_period_to_symbol("hourly")
 end
 
 @testset "parse_component_dts!" begin
@@ -244,7 +305,7 @@ end
         "dt_ocean" => "200secs",
         "dt_seaice" => "200secs",
     )
-    @test_throws "Coupler dt must be divisible by all component dt's" Input.parse_component_dts!(
+    @test_throws "Coupler's and each model's time steps must be integer multiples of each other" Input.parse_component_dts!(
         config_dict,
     )
 
@@ -261,4 +322,145 @@ end
         config_dict,
     )
     @test !haskey(config_dict, "dt")
+end
+
+@testset "validate_model_types_for_mode" begin
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.AMIPMode, # sim_mode
+        Val(:slab), # ocean_model
+        Val(:nothing), # ice_model
+        Val(:bucket), # land_model
+    )
+    @test ocean == Val(:prescribed)
+    @test ice == Val(:prescribed)
+    @test land == Val(:bucket)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.SlabplanetAquaMode,
+        Val(:slab),
+        Val(:nothing),
+        Val(:bucket),
+    )
+    @test ocean == Val(:slab)
+    @test ice == Val(:nothing)
+    @test land == Val(:nothing)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.SlabplanetTerraMode,
+        Val(:slab),
+        Val(:prescribed),
+        Val(:integrated),
+    )
+    @test ocean == Val(:nothing)
+    @test ice == Val(:nothing)
+    @test land == Val(:integrated)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.CMIPMode,
+        Val(:prescribed),
+        Val(:prescribed),
+        Val(:bucket),
+    )
+    @test ocean == Val(:oceananigans)
+    @test ice == Val(:clima_seaice)
+    @test land == Val(:bucket)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.SlabplanetTerraMode,
+        Val(:nothing),
+        Val(:nothing),
+        Val(:integrated);
+        domain_type = "column",
+        scm_surface_type = "land",
+    )
+    @test ocean == Val(:nothing)
+    @test ice == Val(:nothing)
+    @test land == Val(:integrated)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.SlabplanetAquaMode,
+        Val(:slab),
+        Val(:nothing),
+        Val(:nothing);
+        domain_type = "column",
+        scm_surface_type = "ocean",
+    )
+    @test ocean == Val(:slab)
+    @test ice == Val(:nothing)
+    @test land == Val(:nothing)
+
+    # Test default scm_surface_type is "ocean"
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.AMIPMode,
+        Val(:prescribed),
+        Val(:prescribed),
+        Val(:bucket);
+        domain_type = "column",
+    )
+    @test ocean == Val(:prescribed)
+    @test ice == Val(:nothing)
+    @test land == Val(:nothing)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.AMIPMode,
+        Val(:prescribed),
+        Val(:prescribed),
+        Val(:bucket);
+        domain_type = "column",
+        scm_surface_type = "land",
+    )
+    @test ocean == Val(:nothing)
+    @test ice == Val(:nothing)
+    @test land == Val(:bucket)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.AMIPMode,
+        Val(:prescribed),
+        Val(:prescribed),
+        Val(:bucket);
+        domain_type = "column",
+        scm_surface_type = "ocean",
+    )
+    @test ocean == Val(:prescribed)
+    @test ice == Val(:nothing)
+    @test land == Val(:nothing)
+
+    ocean, ice, land = Input.validate_model_types_for_mode(
+        Interfacer.AMIPMode,
+        Val(:prescribed),
+        Val(:prescribed),
+        Val(:bucket);
+        domain_type = "column",
+        scm_surface_type = "sea_ice",
+    )
+    @test ocean == Val(:nothing)
+    @test ice == Val(:prescribed)
+    @test land == Val(:nothing)
+
+    @test_throws "Oceananigans ocean model is not supported" Input.validate_model_types_for_mode(
+        Interfacer.CMIPMode,
+        Val(:oceananigans),
+        Val(:prescribed),
+        Val(:bucket);
+        domain_type = "column",
+        scm_surface_type = "ocean",
+    )
+
+    @test_throws "ClimaSeaIce model is not supported" Input.validate_model_types_for_mode(
+        Interfacer.CMIPMode,
+        Val(:prescribed),
+        Val(:clima_seaice),
+        Val(:bucket);
+        domain_type = "column",
+        scm_surface_type = "sea_ice",
+    )
+
+    @test_throws "Unknown scm_surface_type" Input.validate_model_types_for_mode(
+        Interfacer.SlabplanetAquaMode,
+        Val(:slab),
+        Val(:nothing),
+        Val(:nothing);
+        domain_type = "column",
+        scm_surface_type = "invalid_surface",
+    )
 end

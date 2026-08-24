@@ -18,7 +18,7 @@ function `get_sim_var_dict`, `get_obs_var_dict`, `get_compare_vars_biases_groups
 `get_compare_vars_biases_plot_extrema` respectively.
 
 The dictionaries `sim_var_dict` and `obs_var_dict` map short names to an anonymous function
-that returns a [`OutputVar`](https://clima.github.io/ClimaAnalysis.jl/dev/var/). Both
+that returns a [`OutputVar`](https://clima.github.io/ClimaAnalysis.jl/stable/var/). Both
 dictionaries must use the same short names as the keys so that the right simulation and
 observational data are compared.
 
@@ -43,7 +43,7 @@ The dictionary sets the lower and upper bounds of the bias plots.
 If you want to add a new variable to the leaderboard, you add the variable to
 `rmse_var_names` and `rmse_var_dict`. The array `rmse_var_names` is a list of short names.
 The dictionary `rmse_var_dict` maps short name to
-[`RMSEVariable`](https://clima.github.io/ClimaAnalysis.jl/dev/rmse_var/). A `RMSEVariable`
+[`RMSEVariable`](https://clima.github.io/ClimaAnalysis.jl/stable/rmse_var/). A `RMSEVariable`
 must be initialized for each variable of interest. The CliMA model is added with units to
 the `RMSEVariable`. It is assumed that the `RMSEVariable` contains only the columns "DJF",
 "MAM", "JJA", "SON", and "ANN" in that order. The file `leaderboard.jl` will load the

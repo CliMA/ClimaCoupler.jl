@@ -17,7 +17,8 @@ export update_sim!,
     exchange!,
     set_caches!,
     update_surface_fractions!,
-    resolve_area_fractions!
+    resolve_area_fractions!,
+    align_surface_fractions!
 
 """
     update_surface_fractions!(cs::Interfacer.CoupledSimulation)
@@ -33,6 +34,36 @@ If a surface model is not present, the area fraction is set to 0.
 - `cs`: [Interfacer.CoupledSimulation] containing area fraction information.
 """
 function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
+    # An ocean model may provide its own authoritative surface fractions
+    # (e.g. derived from its bathymetric wet mask); if it does, skip the
+    # land-fraction-based derivation below.
+    if haskey(cs.model_sims, :ocean_sim) &&
+       align_surface_fractions!(cs.model_sims.ocean_sim, cs)
+        return nothing
+    end
+    _update_surface_fractions_from_land_fraction!(cs)
+    return nothing
+end
+
+"""
+    align_surface_fractions!(ocean_sim, cs::Interfacer.CoupledSimulation) -> Bool
+
+Give the ocean model the opportunity to set all surface area fractions from its
+own representation of the land/sea distribution (e.g. a fraction derived from
+the ocean bathymetry via an exchange grid).
+
+Return `true` if the fractions were updated (in which case the land-fraction-based update in
+[`update_surface_fractions!`](@ref) is skipped), `false` otherwise. The default
+implementation returns `false`; ocean models can extend this method.
+
+Implementations must maintain the invariant that the land, ice, and ocean area
+fractions sum to 1 at every point of the boundary space.
+"""
+function align_surface_fractions!(ocean_sim, cs::Interfacer.CoupledSimulation)
+    return false
+end
+
+function _update_surface_fractions_from_land_fraction!(cs::Interfacer.CoupledSimulation)
     FT = CC.Spaces.undertype(Interfacer.boundary_space(cs))
 
     # land fraction is static
@@ -46,8 +77,8 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
     # ice and ocean fractions are dynamic
     if haskey(cs.model_sims, :ice_sim)
         ice_sim = cs.model_sims.ice_sim
-        Interfacer.get_field!(cs.fields.scalar_temp1, ice_sim, Val(:ice_concentration))
-        ice_concentration = cs.fields.scalar_temp1
+        Interfacer.get_field!(cs.fields.scalar_temp2, ice_sim, Val(:ice_concentration))
+        ice_concentration = cs.fields.scalar_temp2
 
         # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
         Interfacer.update_field!(
@@ -57,8 +88,8 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
         )
         ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
     else
-        cs.fields.scalar_temp1 .= 0
-        ice_fraction = cs.fields.scalar_temp1
+        cs.fields.scalar_temp2 .= 0
+        ice_fraction = cs.fields.scalar_temp2
     end
 
     if haskey(cs.model_sims, :ocean_sim)
@@ -75,9 +106,13 @@ function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
             resolve_area_fractions!(ocean_sim, cs.model_sims.ice_sim, land_fraction)
         end
     else
-        cs.fields.scalar_temp1 .= 0
-        ocean_fraction = cs.fields.scalar_temp1
+        cs.fields.scalar_temp3 .= 0
+        ocean_fraction = cs.fields.scalar_temp3
     end
+
+    # update the ice and ocean area fraction coupler fields (land is static)
+    cs.fields.ice_area_fraction .= ice_fraction
+    cs.fields.ocean_area_fraction .= ocean_fraction
 
     # check that the sum of area fractions is 1
     @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
@@ -312,6 +347,8 @@ Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 # Arguments
 - `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
 - `t`: [AbstractFloat or ITime] denoting the simulation time.
+- `coupler_fields`: [Field of NamedTuple] containing the coupler exchange fields.
+- `thermo_params`: thermodynamic parameters.
 """
 function step_model_sims!(model_sims, t, coupler_fields, thermo_params, step_concurrently)
     if step_concurrently && (haskey(model_sims, :ocean_sim) || haskey(model_sims, :seaice_sim))

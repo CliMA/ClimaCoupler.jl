@@ -1,45 +1,5 @@
-"""
-    to_node(pt::CC.Geometry.LatLongPoint)
-
-Transform `LatLongPoint` into a tuple (long, lat, 0), where the 0 is needed because we only
-care about the surface.
-"""
-@inline to_node(pt::CC.Geometry.LatLongPoint) = pt.long, pt.lat, zero(pt.lat)
-# This next one is needed if we have "LevelGrid"
-@inline to_node(pt::CC.Geometry.LatLongZPoint) = pt.long, pt.lat, zero(pt.lat)
-
-"""
-    map_interpolate!(target_field::CC.Fields.Field, source_field::OC.Field)
-
-Interpolate the given 3D field onto the target field, modifying the target field in place.
-
-If the underlying grid does not contain a given point, writes 0 instead.
-
-Note: `map_interpolate!` does not support interpolation from `Field`s defined on
-`OrthogononalSphericalShellGrids` such as the `TripolarGrid`.
-"""
-function map_interpolate!(target_field::CC.Fields.Field, source_field::OC.Field)
-    points = CC.Fields.coordinate_field(axes(target_field))
-    loc = map(L -> L(), OC.Fields.location(source_field))
-    grid = source_field.grid
-    data = source_field.data
-
-    # TODO: There has to be a better way
-    min_lat, max_lat = extrema(OC.φnodes(grid, OC.Center(), OC.Center(), OC.Center()))
-
-    # Use map! on the field directly, which handles complex data layouts correctly
-    map!(target_field, points) do pt
-        FT = eltype(pt)
-
-        # The oceananigans grid does not cover the entire globe, so we should not
-        # interpolate outside of its latitude bounds. Instead we return 0
-        min_lat < pt.lat < max_lat || return FT(0)
-
-        fᵢ = OC.Fields.interpolate(to_node(pt), data, loc, grid)
-        return convert(FT, fᵢ)::FT
-    end
-    return nothing
-end
+import Dates
+import ClimaUtilities.TimeManager: ITime, date, counter, period
 
 """
     surface_flux(f::OC.AbstractField)
@@ -48,40 +8,71 @@ Extract the top boundary conditions for the given field.
 """
 function surface_flux(f::OC.AbstractField)
     top_bc = f.boundary_conditions.top
-    if top_bc isa OC.BoundaryCondition{<:OC.BoundaryConditions.Flux}
-        return top_bc.condition
-    else
+    if !(top_bc isa OC.BoundaryCondition{<:OC.BoundaryConditions.Flux})
         return nothing
     end
+    return flux_field(top_bc.condition)
 end
 
-function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field)
-    map_interpolate!(target_field, source_field)
-    return nothing
-end
+flux_field(condition) = condition
+flux_field(bc::OC.BoundaryConditions.DiscreteBoundaryFunction) = flux_field(bc.func)
 
-function Interfacer.remap!(
-    target_field::CC.Fields.Field,
-    operation::OC.AbstractOperations.AbstractOperation,
-)
-    evaluated_field = OC.Field(operation)
-    OC.compute!(evaluated_field)
-    Interfacer.remap!(target_field, evaluated_field)
-    return nothing
-end
+# `MultipleFluxes` is internal to NumericalEarth, once we detach completely and restore 
+# real salinity fluxes, we will add `MultipleFluxes` that follows this path
+flux_field(func::Function) = func.flux_field
 
-function Interfacer.remap(target_space, field::OC.Field)
-    # Allocate target field and call remap!
-    target_field = CC.Fields.zeros(target_space)
-    Interfacer.remap!(target_field, field)
-    return target_field
-end
+# Flat nodal vector of a 2-D ClimaCore field (Nv = 1). Same ordering as
+# ConservativeRegridding's `se_field_to_vec`, but a local call so the hot path
+# does not go through `Base.get_extension` (which is type-unstable).
+@inline se_nodal_vec(field::CC.Fields.Field) = vec(parent(CC.Fields.field_values(field)))
 
-function Interfacer.remap(target_space, operation::OC.AbstractOperations.AbstractOperation)
-    # Allocate target field and call remap!
-    target_field = CC.Fields.zeros(target_space)
-    Interfacer.remap!(target_field, operation)
-    return target_field
+const CT1 = CC.Geometry.Contravariant1Vector
+const CT2 = CC.Geometry.Contravariant2Vector
+const CT12 = CC.Geometry.Contravariant12Vector
+
+"""
+    uv_basis_coefficients(boundary_space)
+
+Precompute the linear maps between unit-contravariant (CT1/CT2) components and
+the global UV (east/north) basis at each SE node. Built once at setup; the
+per-step conversions are then parent-array saxpys that do not load
+`LocalGeometry` (which boxes a 22-float struct per node at `-O0`).
+"""
+function uv_basis_coefficients(boundary_space)
+    FT = CC.Spaces.undertype(boundary_space)
+    lg = CC.Fields.local_geometry_field(boundary_space)
+    onef = CC.Fields.ones(boundary_space)
+    zerof = CC.Fields.zeros(boundary_space)
+    uv_from_ct1 = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
+    uv_from_ct2 = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
+    @. uv_from_ct1 = CC.Geometry.UVVector(
+        CT12(
+            onef * CA.unit_basis_vector_data(CT1, lg),
+            zerof * CA.unit_basis_vector_data(CT2, lg),
+        ),
+        lg,
+    )
+    @. uv_from_ct2 = CC.Geometry.UVVector(
+        CT12(
+            zerof * CA.unit_basis_vector_data(CT1, lg),
+            onef * CA.unit_basis_vector_data(CT2, lg),
+        ),
+        lg,
+    )
+    uv_i = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
+    uv_j = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
+    @. uv_i = CC.Geometry.UVVector(one(FT), zero(FT))
+    @. uv_j = CC.Geometry.UVVector(zero(FT), one(FT))
+    return (;
+        ct1_to_u = uv_from_ct1.components.data.:1,
+        ct1_to_v = uv_from_ct1.components.data.:2,
+        ct2_to_u = uv_from_ct2.components.data.:1,
+        ct2_to_v = uv_from_ct2.components.data.:2,
+        u_to_ct1 = (@. CA.projected_vector_data(CT1, uv_i, lg)),
+        v_to_ct1 = (@. CA.projected_vector_data(CT1, uv_j, lg)),
+        u_to_ct2 = (@. CA.projected_vector_data(CT2, uv_i, lg)),
+        v_to_ct2 = (@. CA.projected_vector_data(CT2, uv_j, lg)),
+    )
 end
 
 """
@@ -149,40 +140,223 @@ Fields to Face/Center and Center/Face coordinates, respectively.
 end
 
 """
+    contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz, uv_basis)
     contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz)
 
-Convert the covariant vector components `ρτxz` and `ρτyz` from the
-contravariant basis (as they are output by the surface flux calculation)
-to the Cartesian basis. These are now in an extrinsic coordinate system
-that can be rotated onto the ocean/sea ice grid by `_rotate_vector!`.
+Convert the vector components `ρτxz` and `ρτyz` on the unit contravariant
+basis (as they are output by the surface flux calculation) to the Cartesian
+UV (east/north) basis. Exact inverse of [`cartesian_to_contravariant!`](@ref).
+
+The 4-argument form applies precomputed [`uv_basis_coefficients`](@ref) as
+parent-array saxpys so the hot path does not load `LocalGeometry`. The
+3-argument form builds those coefficients on the fly (setup / tests).
 """
-function contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz)
-    # Get the local geometry of the boundary space
-    local_geometry = CC.Fields.local_geometry_field(ρτxz)
+contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz) =
+    contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz, uv_basis_coefficients(axes(ρτxz)))
 
-    # Get the vector components in the CT1 and CT2 directions
-    xz = @. CT12(CT1(unit_basis_vector_data(CT1, local_geometry)), local_geometry)
-    yz = @. CT12(CT2(unit_basis_vector_data(CT2, local_geometry)), local_geometry)
-
-    # Convert the vector components to a UVVector on the Cartesian basis
-    @. ρτ_flux_uv = @. CC.Geometry.UVVector(ρτxz * xz + ρτyz * yz, local_geometry)
+function contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz, uv_basis)
+    u = parent(ρτ_flux_uv.components.data.:1)
+    v = parent(ρτ_flux_uv.components.data.:2)
+    a = parent(ρτxz)
+    b = parent(ρτyz)
+    p11 = parent(uv_basis.ct1_to_u)
+    p12 = parent(uv_basis.ct2_to_u)
+    p21 = parent(uv_basis.ct1_to_v)
+    p22 = parent(uv_basis.ct2_to_v)
+    @. u = p11 * a + p12 * b
+    @. v = p21 * a + p22 * b
     return nothing
 end
 
-# Define shorthands for ClimaCore types
-const CT1 = CC.Geometry.Contravariant1Vector
-const CT2 = CC.Geometry.Contravariant2Vector
-const CT12 = CC.Geometry.Contravariant12Vector
+# Non-allocating ClimaCore -> Oceananigans remap.
+function Interfacer.remap!(target_field::OC.Field, source_field::CC.Fields.Field, remapping)
+    # Get the index of the top level (surface); Nz=1 for 2D fields
+    Nz = size(target_field, 3)
+    dst = vec(OC.interior(target_field, :, :, Nz))
+
+    CR.regrid!(dst, remapping.remapper_cc_to_oc, source_field)
+    return nothing
+end
+
+# Allocating ClimaCore -> Oceananigans remap
+function Interfacer.remap(
+    target_space::Union{
+        OC.OrthogonalSphericalShellGrid,
+        OC.ImmersedBoundaryGrid,
+        OC.LatitudeLongitudeGrid,
+    },
+    source_field::CC.Fields.Field,
+    remapping,
+)
+    target_field = OC.Field{OC.Center, OC.Center, Nothing}(target_space)
+    Interfacer.remap!(target_field, source_field, remapping)
+    return target_field
+end
+
+# Non-allocating Oceananigans Field -> ClimaCore remap.
+function Interfacer.remap!(target_field::CC.Fields.Field, source_field::OC.Field, remapping)
+    # Get the index of the top level (surface); Nz=1 for 2D fields
+    Nz = size(source_field, 3)
+    src = vec(OC.interior(source_field, :, :, Nz))
+
+    CR.regrid!(target_field, remapping.remapper_oc_to_cc, src)
+    return nothing
+end
+
+# Allocating Oceananigans Field -> ClimaCore remap
+function Interfacer.remap(
+    target_space::CC.Spaces.AbstractSpace,
+    source_field::OC.Field,
+    remapping,
+)
+    target_field = CC.Fields.zeros(target_space)
+    Interfacer.remap!(target_field, source_field, remapping)
+    return target_field
+end
+
+# Non-allocating Oceananigans operation -> ClimaCore remap
+function Interfacer.remap!(
+    target_field::CC.Fields.Field,
+    operation::OC.AbstractOperations.AbstractOperation,
+    remapping,
+)
+    evaluated_field = OC.Field(operation)
+    OC.compute!(evaluated_field)
+    Interfacer.remap!(target_field, evaluated_field, remapping)
+    return nothing
+end
+
+# Allocating Oceananigans operation -> ClimaCore remap
+function Interfacer.remap(
+    target_space::CC.Spaces.AbstractSpace,
+    operation::OC.AbstractOperations.AbstractOperation,
+    remapping,
+)
+    target_field = CC.Fields.zeros(target_space)
+    Interfacer.remap!(target_field, operation, remapping)
+    return target_field
+end
+
+# Extend Interfacer.get_field to allow automatic remapping to the target space
+function Interfacer.get_field!(
+    target_field,
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    quantity,
+)
+    Interfacer.remap!(target_field, Interfacer.get_field(sim, quantity), sim.remapping)
+    return nothing
+end
+# TODO see if we can remove this allocating version
+function Interfacer.get_field(
+    target_space::CC.Spaces.AbstractSpace,
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    quantity,
+)
+    return Interfacer.remap(
+        target_space,
+        Interfacer.get_field(sim, quantity),
+        sim.remapping,
+    )
+end
 
 """
-    unit_basis_vector_data(type, local_geometry)
+    get_oc_sim(sim)
 
-The component of the vector of the specified type with length 1 in physical units.
-The type should correspond to a vector with only one component, i.e., a basis vector.
-
-Helper function used only in `contravariant_to_cartesian!`.
+Return the underlying `Oceananigans.Simulation` object for component models
+that use Oceananigans under the hood.
 """
-function unit_basis_vector_data(::Type{V}, local_geometry) where {V}
-    FT = CC.Geometry.undertype(typeof(local_geometry))
-    return FT(1) / CC.Geometry._norm(V(FT(1)), local_geometry)
+get_oc_sim(sim::OceananigansSimulation) = sim.ocean
+get_oc_sim(sim::ClimaSeaIceSimulation) = sim.ice
+
+"""
+    Interfacer.sim_dt(sim::Union{OceananigansSimulation, ClimaSeaIceSimulation})
+
+Return the simulation's timestep in seconds as a `Float64`.
+"""
+Interfacer.sim_dt(sim::Union{OceananigansSimulation, ClimaSeaIceSimulation}) =
+    Float64(float(sim.model_Δt))
+
+"""
+    Interfacer.will_step(sim::Union{OceananigansSimulation, ClimaSeaIceSimulation}, t)
+
+Return `true` if `Interfacer.step!(sim, t)` would take at least one step.
+"""
+function Interfacer.will_step(
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    t::Float64,
+)
+    oc_sim = get_oc_sim(sim)
+    return (t - oc_sim.model.clock.time) >= Float64(sim.model_Δt)
+end
+
+function Interfacer.will_step(
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    t::ITime,
+)
+    oc_sim = get_oc_sim(sim)
+    Δt_msec = date(t) - oc_sim.model.clock.time
+    model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
+    return Δt_msec >= model_Δt_msec
+end
+
+"""
+    Checkpointer.checkpoint_model_state(sim, comms_ctx, t, prev_checkpoint_t; output_dir)
+
+Save the state of an Oceananigans-backed simulation to a JLD2 file at time `t`
+(in seconds) using `Oceananigans.checkpoint`.
+
+If a previous checkpoint exists, it is removed to avoid accumulating files.
+A value of -1 for `prev_checkpoint_t` indicates there is no previous checkpoint.
+"""
+function Checkpointer.checkpoint_model_state(
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    comms_ctx::ClimaComms.AbstractCommsContext,
+    t::Int,
+    prev_checkpoint_t::Int;
+    output_dir = "output",
+)
+    day = floor(Int, t / (60 * 60 * 24))
+    sec = floor(Int, t % (60 * 60 * 24))
+    @info "Saving checkpoint $(nameof(sim)) model state to JLD2 on day $day second $sec"
+    output_file = joinpath(output_dir, "checkpoint_$(nameof(sim))_$t.jld2")
+    prev_checkpoint_file =
+        joinpath(output_dir, "checkpoint_$(nameof(sim))_$(prev_checkpoint_t).jld2")
+    Checkpointer.remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
+    OC.checkpoint(get_oc_sim(sim); filepath = output_file)
+    return nothing
+end
+
+"""
+    Checkpointer.restart_model_state!(sim, input_file, comms_ctx)
+
+Restore the state of an Oceananigans-backed simulation from a JLD2 checkpoint
+file using `Oceananigans.set!`.
+
+The coupler constructs `input_file` with a `.hdf5` extension; this method
+replaces it with `.jld2` to match the format written by `checkpoint_model_state`.
+"""
+function Checkpointer.restart_model_state!(
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    input_file,
+    comms_ctx,
+)
+    jld2_file = replace(input_file, ".hdf5" => ".jld2")
+    ispath(jld2_file) || error("Oceananigans checkpoint file not found: $jld2_file")
+    OC.set!(get_oc_sim(sim); checkpoint = jld2_file)
+    return nothing
+end
+
+"""
+    Checkpointer.restart_model_cache!(sim, input_file)
+
+No-op for Oceananigans-backed simulations. All necessary state is restored via
+`restart_model_state!`; there is no separate cache to restore.
+"""
+function Checkpointer.restart_model_cache!(
+    sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
+    input_file,
+)
+    @warn "$(nameof(sim)) does not support restoring the model cache from a checkpoint. " *
+          "The simulation cache will not be restored."
+    return nothing
 end

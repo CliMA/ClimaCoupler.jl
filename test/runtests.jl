@@ -15,6 +15,11 @@ end
 @safetestset "Aqua tests" begin
     include("aqua.jl")
 end
+
+@safetestset "Default methods extended in ClimaCouplerClimaAtmosExt tests" begin
+    include("defaults_from_ext.jl")
+end
+
 @safetestset "Interfacer tests" begin
     include("interfacer_tests.jl")
 end
@@ -24,6 +29,9 @@ end
 end
 @safetestset "Utilities tests" begin
     include("utilities_tests.jl")
+end
+@safetestset "TimeManager tests" begin
+    include("timemanager_tests.jl")
 end
 @safetestset "FieldExchanger tests" begin
     include("field_exchanger_tests.jl")
@@ -45,4 +53,7 @@ end
 end
 @safetestset "Prescribed sea ice model tests" begin
     include("models/prescr_seaice_tests.jl")
+end
+@safetestset "Calibration tools" begin
+    include("calibration_tools_tests.jl")
 end

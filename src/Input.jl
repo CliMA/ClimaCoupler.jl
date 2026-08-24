@@ -8,17 +8,23 @@ module Input
 import ArgParse
 import YAML
 import Dates
-import ClimaAtmos as CA
 import ClimaUtilities.TimeManager: ITime
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaCore as CC
 import ClimaCoupler
+import ..Checkpointer
 import ..Interfacer
+import ..TimeManager
 import ..Utilities
 
 export argparse_settings,
-    parse_commandline, get_coupler_config_dict, get_coupler_args, get_land_fraction
+    parse_commandline,
+    get_coupler_config_dict,
+    atmos_default_config_dict,
+    get_coupler_args,
+    get_land_fraction,
+    get_era5_filepaths
 
 const MODE_NAME_DICT = Dict(
     "amip" => Interfacer.AMIPMode,
@@ -60,7 +66,7 @@ function argparse_settings()
         "--coupler_toml"
         help = "An optional list of paths to toml files used to overwrite the default model parameters."
         arg_type = Vector{String}
-        default = []
+        default = String[]
         # Computational simulation setup information
         "--unique_seed"
         help = "Boolean flag indicating whether to set the random number seed to a unique value [`false` (default), `true`]"
@@ -119,11 +125,31 @@ function argparse_settings()
         help = "Time interval for checkpointing [\"90days\" (default)]"
         arg_type = String
         default = "90days"
+        "--walltime_dt"
+        help = "Time interval for walltime reporting [nothing (default): a tenth of the simulation length, at most 1 day and at least one coupling step; allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
+        arg_type = String
+        default = nothing
+        "--walltime_debug"
+        help = "Boolean flag indicating whether to also report the walltime on every coupling step whose number is a power of two (1, 2, 4, 8, ...), in addition to the `walltime_dt` interval [`false` (default), `true`]"
+        arg_type = Bool
+        default = false
         # Space information
         "--h_elem"
-        help = "Number of horizontal elements to use for the boundary space [16 (default)]"
+        help = "Number of horizontal elements to use for the atmosphere horizontal space [16 (default)]"
         arg_type = Int
         default = 16
+        "--h_elem_coupler"
+        help = "Number of horizontal elements to use for the boundary space when `share_surface_space` is false [32 (default)]"
+        arg_type = Int
+        default = 32
+        "--nh_poly"
+        help = "Polynomial order to use for the atmosphere horizontal space [3 (default)]"
+        arg_type = Int
+        default = 3
+        "--nh_poly_coupler"
+        help = "Polynomial order to use for the boundary space when `share_surface_space` is false [2 (default)]"
+        arg_type = Int
+        default = 2
         "--share_surface_space"
         help = "Boolean flag indicating whether to share the surface space between the surface models, atmosphere, and boundary [`true` (default), `false`]"
         arg_type = Bool
@@ -154,6 +180,14 @@ function argparse_settings()
         help = "Boolean flag indicating whether to compute and output coupler diagnostics [`true` (default), `false`]"
         arg_type = Bool
         default = true
+        "--coupler_diagnostics_period"
+        help = "Time interval between coupler diagnostic outputs. If not set, the period is derived from the simulation duration. [allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\"]"
+        arg_type = String
+        default = nothing
+        "--coupler_diagnostics_reduction"
+        help = "Reduction mode for coupler diagnostic outputs. [`average` (default), `instantaneous`, `max`, `min`]"
+        arg_type = String
+        default = "average"
         # Physical simulation information
         "--evolving_ocean"
         help = "Boolean flag indicating whether to use a dynamic slab ocean model, as opposed to constant surface temperatures [`true` (default), `false`]"
@@ -186,10 +220,10 @@ function argparse_settings()
         help = "An optional YAML file used to overwrite the default model parameters."
         arg_type = String
         default = nothing
-        "--atmos_log_progress"
-        help = "Use the ClimaAtmos walltime logging callback instead of the default ClimaCoupler one [`false` (default), `true`]"
-        arg_type = Bool
-        default = false
+        "--atmos_progress_interval"
+        help = "Time interval for printing atmosphere progress information [\"never\" (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
+        arg_type = String
+        default = "never"
         "--albedo_model"
         help = "Type of albedo model. [`ConstantAlbedo`, `RegressionFunctionAlbedo`, `CouplerAlbedo` (default)]"
         arg_type = String
@@ -197,8 +231,8 @@ function argparse_settings()
         "--extra_atmos_diagnostics"
         help = "List of dictionaries containing information about additional atmosphere diagnostics to output [nothing (default)]"
         arg_type = Vector{Dict{Any, Any}}
-        default = []
-        ### ClimaLand specific
+        default = Dict{Any, Any}[]
+        # ClimaLand specific
         "--land_model"
         help = "Land model to use. [`bucket` (default), `integrated`, `nothing`]"
         arg_type = String
@@ -211,13 +245,29 @@ function argparse_settings()
         help = "Boolean flag indicating whether to compute and output land model diagnostics [`true` (default), `false`]"
         arg_type = Bool
         default = true
+        "--land_progress_interval"
+        help = "Time interval for printing land progress information [\"never\" (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
+        arg_type = String
+        default = "never"
+        "--land_diagnostics_period"
+        help = "Time interval between land diagnostic outputs. ClimaLand only supports a fixed set of periods: [`1months` (default), `10days`, `1days`, `1hours`, `30mins`]"
+        arg_type = String
+        default = "1months"
+        "--land_diagnostics_reduction"
+        help = "Reduction type for land diagnostic outputs. [`average` (default), `instantaneous`, `max`, `min`]"
+        arg_type = String
+        default = "average"
         "--land_spun_up_ic"
         help = "Boolean flag to indicate whether to use integrated land initial conditions from spun up state [`true` (default), `false`]"
         arg_type = Bool
-        default = true
+        default = false
+        "--lai_source"
+        help = "Source for leaf area index data. [`modis_monthly` (default), `modis_monthly_climatology`]"
+        arg_type = String
+        default = "modis_monthly"
         # BucketModel specific
         "--bucket_albedo_type"
-        help = "Access bucket surface albedo information from data file. [`map_static` (default), `function`, `map_temporal`]"
+        help = "Access bucket surface albedo information from data file. [`map_static` (default), `function`, `map_temporal`, `era5`]"
         arg_type = String
         default = "map_static" # to be replaced by land config file, when available
         "--bucket_initial_condition"
@@ -233,11 +283,51 @@ function argparse_settings()
         help = "Ocean model to use. [`prescribed` (default), `oceananigans`, `slab`, `nothing`]"
         arg_type = String
         default = "prescribed"
+        "--simple_ocean"
+        help = "Boolean flag indicating whether to use a simpler ocean model setup with Oceananigans [`false` (default), `true`]"
+        arg_type = Bool
+        default = false
+        "--ocean_grid"
+        help = "Horizontal grid for Oceananigans ocean model. [`one_deg_tripolar` (default), `orca`]"
+        arg_type = String
+        default = "one_deg_tripolar"
+        "--use_intersection_grid"
+        help = "Boolean flag indicating whether to use the atmosphere-ocean intersection (exchange) grid for surface fractions and ocean/sea-ice fluxes with Oceananigans. Automatically disabled for unsupported setups (column mode, distributed runs). [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
+        "--sst_adjustment"
+        help = "Adjustment to add to prescribed SST after conversion to Kelvin (default: 0.0)"
+        arg_type = Float64
+        default = 0.0
+        "--ocean_progress_interval"
+        help = "Time interval for printing ocean progress information [\"never\" (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
+        arg_type = String
+        default = "never"
+        "--ocean_diagnostic_interval"
+        help = "Time interval between ocean diagnostic outputs [\"1days\" (default), allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\"]"
+        arg_type = String
+        default = "1days"
+        "--ocean_diagnostic_mode"
+        help = "Reduction mode for ocean diagnostic outputs. [`average` (default) uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval`]"
+        arg_type = String
+        default = "average"
         # Ice model specific
         "--ice_model"
         help = "Sea ice model to use. [`prescribed` (default), `clima_seaice`, `nothing`]"
         arg_type = String
         default = "prescribed"
+        "--seaice_diagnostic_interval"
+        help = "Time interval between sea-ice diagnostic outputs [\"1days\" (default), allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\"]"
+        arg_type = String
+        default = "1days"
+        "--seaice_diagnostic_mode"
+        help = "Reduction mode for sea-ice diagnostic outputs. [`average` (default) uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval`]"
+        arg_type = String
+        default = "average"
+        "--seaice_progress_interval"
+        help = "Time interval for printing sea-ice progress information [\"never\" (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
+        arg_type = String
+        default = "never"
         "--land_fraction_source"
         help = "Source for land fraction data. [`etopo` (default) uses ETOPO-derived landsea_mask artifact, `era5` uses ERA5 land fraction artifact]"
         arg_type = String
@@ -246,6 +336,19 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use binary (thresholded) area fractions for land and ice [`true` (default), `false`]. When true, land fraction > eps becomes 1, and ice fraction > 0.5 becomes 1."
         arg_type = Bool
         default = true
+        # Single-column model (SCM) settings
+        "--domain_type"
+        help = "Domain type for the simulation. [`global` (default), `column`]"
+        arg_type = String
+        default = "global"
+        "--column_latlon"
+        help = "Latitude and longitude (degrees) for SCM column as [lat, lon]. Latitude should be in the range [-90, 90] and longitude should be in [-180, 180]. [[0.0, 0.0] (default)]"
+        arg_type = Vector{Float64}
+        default = [0.0, 0.0]
+        "--scm_surface_type"
+        help = "Select the surface type for SCM runs. [`ocean` (default), `land`, `sea_ice`]."
+        arg_type = String
+        default = "ocean"
     end
     return s
 end
@@ -296,8 +399,10 @@ function get_coupler_config_dict(config_file)
     # Load the coupler config file into a dictionary
     coupler_config_dict = YAML.load_file(config_file)
 
-    # Get ClimaAtmos default configuration dictionary
-    atmos_default = CA.default_config_dict()
+    # Get ClimaAtmos default configuration dictionary. If ClimaCouplerClimaAtmosExt is
+    # not loaded or and the user has not defined `atmos_default_config_dict()`, an empty
+    # dictionary will be returned and a warning will be issued.
+    atmos_default = atmos_default_config_dict()
     atmos_config_file = merge(coupler_default_cli, coupler_config_dict)["atmos_config_file"]
     if isnothing(atmos_config_file)
         @info "Using Atmos default configuration"
@@ -322,8 +427,59 @@ function get_coupler_config_dict(config_file)
 
     # Select the correct timestep for each component model based on which are available
     parse_component_dts!(config_dict)
+    update_t_start_for_restarts!(config_dict)
 
     return config_dict
+end
+
+"""
+    atmos_default_config_dict(...)
+
+Return a dictionary of default configuration options for the atmosphere model. The default
+method is only defined when the ClimaCouplerClimaAtmosExt extension is loaded. If the extension
+is not loaded, this fallback method throws a warning and returns an empty dictionary.
+"""
+function atmos_default_config_dict(_...)
+    # this method uses varagrs so when ClimaCouplerClimaAtmosExt is loaded,
+    # it will add a method that has no args, which is more specific that this method.
+    @warn "Using an empty default atmos config dict. ClimaAtmos.jl is required to be loaded
+    to use the default `atmos_default_config_dict()` method. Please make sure the extension
+    is correctly loaded, or define `atmos_default_config_dict()`."
+    return Dict()
+end
+
+"""
+    update_t_start_for_restarts!(config_dict)
+
+Update `t_start` in `config_dict` for restarts.
+
+If the user specifies to restart via `detect_restart_files` but a restart time
+`restart_t` isn't specified, the restart time is inferred from the checkpointed
+files. Otherwise, the provided `restart_t` is used.
+
+If the simulation is not restarting, the input `config_dict` is unchanged.
+"""
+function update_t_start_for_restarts!(config_dict)
+    # Update t_start for restarts
+    (; detect_restart_files, output_dir_root, restart_dir, restart_t) =
+        get_coupler_args(config_dict)
+    # Checkpoint directory is hardcoded and can be wrong if
+    # Utilities.setup_output_dirs is updated
+    checkpoints_dir = joinpath(output_dir_root, "checkpoints")
+    if detect_restart_files
+        isnothing(restart_t) &&
+            (restart_t = Checkpointer.t_start_from_checkpoint(checkpoints_dir))
+        isnothing(restart_dir) && (restart_dir = checkpoints_dir)
+    end
+    should_restart = !isnothing(restart_t) && !isnothing(restart_dir)
+    if should_restart
+        # We only support a round number of seconds
+        isinteger(float(restart_t)) ||
+            error("Cannot restart from a non integer number of seconds")
+        restart_t_int = Int(float(restart_t))
+        config_dict["t_start"] = "$(restart_t_int)secs"
+    end
+    return nothing
 end
 
 """
@@ -368,7 +524,12 @@ function get_coupler_args(config_dict::Dict)
     if use_itime
         t_end = ITime(t_end, epoch = start_date)
         t_start = ITime(t_start, epoch = start_date)
-        Δt_cpl = ITime(Δt_cpl, epoch = start_date)
+        # A period of Dates.Second(1) is passed when initializing Δt_cpl to
+        # ensure consistent Δt_cpl for when restarting a simulation. ITime
+        # automatically choose the appropriate period based on time value. For
+        # example, the result ITime(0) gives a period of 1 second, but
+        # ITime(120) gives a period of 1 minute.
+        Δt_cpl = ITime(Int64(Δt_cpl), period = Dates.Second(1), epoch = start_date)
         times = promote(
             t_end,
             t_start,
@@ -391,9 +552,24 @@ function get_coupler_args(config_dict::Dict)
 
     # Space information
     share_surface_space = config_dict["share_surface_space"]
+    nh_poly_coupler = config_dict["nh_poly_coupler"]
+    h_elem_coupler = config_dict["h_elem_coupler"]
 
     # Checkpointing information
     checkpoint_dt = config_dict["checkpoint_dt"]
+
+    # Walltime reporting information
+    walltime_dt = get(config_dict, "walltime_dt", nothing)
+    if isnothing(walltime_dt)
+        # default to a tenth of the simulation length (capped at 30 days, but never
+        # shorter than one coupling step)
+        walltime_dt_secs = max(min(float(t_end - t_start) / 10, 2592000.0), float(Δt_cpl))
+        walltime_dt = "$(walltime_dt_secs)secs"
+    end
+    walltime_debug = get(config_dict, "walltime_debug", false)
+
+    # Atmos progress reporting information
+    atmos_progress_interval = config_dict["atmos_progress_interval"]
 
     # Restart information
     detect_restart_files = config_dict["detect_restart_files"]
@@ -404,8 +580,14 @@ function get_coupler_args(config_dict::Dict)
 
     # Diagnostics information
     use_coupler_diagnostics = config_dict["use_coupler_diagnostics"]
-    use_land_diagnostics = config_dict["use_land_diagnostics"]
-    (_, diagnostics_dt) = get_diag_period(t_start, t_end)
+    coupler_diagnostics_reduction = Symbol(config_dict["coupler_diagnostics_reduction"])
+    # If no coupler diagnostics period is specified, auto-derive from the simulation duration
+    coupler_diagnostics_period = config_dict["coupler_diagnostics_period"]
+    if isnothing(coupler_diagnostics_period)
+        (_, coupler_diagnostics_period) = get_diag_period(t_start, t_end)
+    else
+        coupler_diagnostics_period = TimeManager.time_to_period(coupler_diagnostics_period)
+    end
 
     # Physical simulation information
     evolving_ocean = config_dict["evolving_ocean"]
@@ -423,21 +605,70 @@ function get_coupler_args(config_dict::Dict)
     land_temperature_anomaly = lowercase(config_dict["land_temperature_anomaly"])
     use_land_diagnostics = config_dict["use_land_diagnostics"]
     land_spun_up_ic = config_dict["land_spun_up_ic"]
+    lai_source = config_dict["lai_source"]
     bucket_albedo_type = config_dict["bucket_albedo_type"]
     bucket_initial_condition = config_dict["bucket_initial_condition"]
+    land_diagnostics_period =
+        land_diagnostics_period_to_symbol(config_dict["land_diagnostics_period"])
+    land_diagnostics_reduction = Symbol(config_dict["land_diagnostics_reduction"])
+    land_progress_interval = config_dict["land_progress_interval"]
 
     # Initial condition setting
     era5_initial_condition_dir = config_dict["era5_initial_condition_dir"]
 
+    # Build ERA5-based file paths (only populated for subseasonal mode)
+    era5_filepaths = get_era5_filepaths(
+        sim_mode,
+        era5_initial_condition_dir,
+        start_date,
+        bucket_initial_condition,
+    )
+
     # Ocean model-specific information
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
+    simple_ocean = config_dict["simple_ocean"]
+    ocean_grid = Symbol(lowercase(config_dict["ocean_grid"]))
+    use_intersection_grid = config_dict["use_intersection_grid"]
+    sst_adjustment = FT(config_dict["sst_adjustment"])
+    ocean_progress_interval = config_dict["ocean_progress_interval"]
+    ocean_diagnostic_interval = config_dict["ocean_diagnostic_interval"]
+    ocean_diagnostic_mode = Symbol(config_dict["ocean_diagnostic_mode"])
 
     # Ice model-specific information
     ice_model = Val(Symbol(config_dict["ice_model"]))
+    seaice_diagnostic_interval = config_dict["seaice_diagnostic_interval"]
+    seaice_diagnostic_mode = Symbol(config_dict["seaice_diagnostic_mode"])
+    seaice_progress_interval = config_dict["seaice_progress_interval"]
 
-    # Validate and correct model types based on simulation mode
-    ocean_model, ice_model, land_model =
-        validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_model)
+    # SCM settings
+    domain_type = config_dict["domain_type"]
+    column_latlon = Tuple(config_dict["column_latlon"])
+    scm_surface_type = config_dict["scm_surface_type"]
+
+    # Validate column lat/lon values
+    if domain_type == "column"
+        lat = first(column_latlon)
+        lon = last(column_latlon)
+        @assert lat >= -90 && lat <= 90 "Latitude must be between -90 and 90 degrees"
+        @assert lon >= -180 && lon <= 180 "Longitude must be between -180 and 180 degrees"
+    end
+
+    # SCM mode: no file-based land ICs available; use programmatic defaults
+    if domain_type == "column" && isempty(scm_surface_type)
+        error(
+            "domain_type=\"column\" requires `scm_surface_type` to be set to \"land\", " *
+            "\"ocean\", or \"sea_ice\". This selects the active surface type for the column.",
+        )
+    end
+
+    ocean_model, ice_model, land_model = validate_model_types_for_mode(
+        sim_mode,
+        ocean_model,
+        ice_model,
+        land_model;
+        domain_type,
+        scm_surface_type,
+    )
 
     # Land fraction source
     land_fraction_source = config_dict["land_fraction_source"]
@@ -457,15 +688,21 @@ function get_coupler_args(config_dict::Dict)
         component_dt_dict,
         step_concurrently,
         share_surface_space,
+        nh_poly_coupler,
+        h_elem_coupler,
         saveat,
         checkpoint_dt,
+        walltime_dt,
+        walltime_debug,
+        atmos_progress_interval,
         detect_restart_files,
         restart_dir,
         restart_t,
         restart_cache,
         save_cache,
         use_coupler_diagnostics,
-        diagnostics_dt,
+        coupler_diagnostics_period,
+        coupler_diagnostics_reduction,
         evolving_ocean,
         energy_check,
         conservation_softfail,
@@ -474,15 +711,31 @@ function get_coupler_args(config_dict::Dict)
         land_model,
         land_temperature_anomaly,
         land_spun_up_ic,
+        lai_source,
         use_land_diagnostics,
+        land_diagnostics_period,
+        land_diagnostics_reduction,
+        land_progress_interval,
         bucket_albedo_type,
-        bucket_initial_condition,
         parameter_files,
-        era5_initial_condition_dir,
+        era5_filepaths,
         ocean_model,
+        simple_ocean,
+        ocean_grid,
+        use_intersection_grid,
+        sst_adjustment,
+        ocean_progress_interval,
+        ocean_diagnostic_interval,
+        ocean_diagnostic_mode,
         ice_model,
+        seaice_diagnostic_interval,
+        seaice_diagnostic_mode,
+        seaice_progress_interval,
         land_fraction_source,
         binary_area_fraction,
+        domain_type,
+        column_latlon,
+        scm_surface_type,
     )
 end
 
@@ -532,6 +785,32 @@ function get_diag_period(t_start, t_end)
 end
 
 """
+    land_diagnostics_period_to_symbol(period_str)
+
+Translate the user-facing `land_diagnostics_period` time-string (e.g. `"1hours"`)
+to the corresponding ClimaLand `reduction_period` symbol expected by
+`ClimaLand.default_diagnostics` (e.g. `:hourly`).
+
+ClimaLand's diagnostics API only accepts a fixed set of period symbols
+(see `ClimaLand.Diagnostics.get_period`), but the rest of the coupler uses
+human-readable time strings, so this helper bridges the two.
+"""
+const _LAND_DIAGNOSTICS_PERIOD_SYMBOLS = Dict(
+    "30mins" => :halfhourly,
+    "1hours" => :hourly,
+    "1days" => :daily,
+    "10days" => :tendaily,
+    "1months" => :monthly,
+)
+function land_diagnostics_period_to_symbol(period_str::AbstractString)
+    haskey(_LAND_DIAGNOSTICS_PERIOD_SYMBOLS, period_str) || error(
+        "Unsupported land_diagnostics_period: \"$period_str\". " *
+        "ClimaLand only supports: $(join(sort(collect(keys(_LAND_DIAGNOSTICS_PERIOD_SYMBOLS))), ", ")).",
+    )
+    return _LAND_DIAGNOSTICS_PERIOD_SYMBOLS[period_str]
+end
+
+"""
     parse_component_dts!(config_dict)
 
 Check which timesteps are specified in the config file, and use them to choose
@@ -566,7 +845,12 @@ function parse_component_dts!(config_dict)
         end
         for key in component_dt_names
             component_dt = Float64(Utilities.time_to_seconds(config_dict[key]))
-            @assert isapprox(Δt_cpl % component_dt, 0.0) "Coupler dt must be divisible by all component dt's\n dt_cpl = $Δt_cpl\n $key = $component_dt"
+            # ensure either that the coupler dt is an integer multiple of the atmos dt
+            # or that the atmos dt is an integer multiple of the coupler dt,
+            # to ensure consistent coupling time steps and compability with legacy configs
+            assertion =
+                isapprox(Δt_cpl % component_dt, 0.0) || isapprox(component_dt % Δt_cpl, 0.0)
+            @assert assertion "Coupler's and each model's time steps must be integer multiples of each other\n dt_cpl = $Δt_cpl\n $key = $component_dt"
             component_dt_dict[key] = component_dt
         end
     else
@@ -587,7 +871,7 @@ end
 
 
 """
-    get_land_fraction(boundary_space, comms_ctx; land_fraction_source = "etopo", binary_area_fraction = true)
+    get_land_fraction(boundary_space, comms_ctx; land_fraction_source = "etopo", binary_area_fraction = true, domain_type = "global", scm_surface_type = "ocean")
 
 Read and remap the land-sea fraction field onto the coupler boundary grid.
 
@@ -597,6 +881,8 @@ Read and remap the land-sea fraction field onto the coupler boundary grid.
 - `land_fraction_source`: Source of land fraction data. Either "etopo" (default) or "era5".
 - `binary_area_fraction`: If true (default), threshold land fraction to binary (0 or 1).
 - `mode_name`: The name of the simulation mode.
+- `domain_type`: The type of domain. Either "global" or "column".
+- `scm_surface_type`: The surface type for SCM runs. Either "land", "ocean", or "sea_ice".
 
 # Returns
 - A field containing land fraction values (0 to 1) on the boundary space.
@@ -619,10 +905,19 @@ function get_land_fraction(
     land_fraction_source::String = "etopo",
     binary_area_fraction::Bool = true,
     sim_mode = Interfacer.AMIPMode,
+    domain_type = "global",
+    scm_surface_type = "ocean",
 )
-    sim_mode <: Interfacer.SlabplanetTerraMode && return ones(boundary_space)
+    # SCM column: land vs sea fraction follows `scm_surface_type`
+    if domain_type == "column"
+        if scm_surface_type == "land"
+            return ones(boundary_space)
+        else
+            return zeros(boundary_space)
+        end
+    end
 
-    FT = CC.Spaces.undertype(boundary_space)
+    sim_mode <: Interfacer.SlabplanetTerraMode && return ones(boundary_space)
     if land_fraction_source == "era5"
         land_fraction_data = joinpath(
             @clima_artifact("era5_land_fraction", comms_ctx),
@@ -641,6 +936,7 @@ function get_land_fraction(
         )
     end
 
+    FT = CC.Spaces.undertype(boundary_space)
     # Ensure land fraction is finite/not NaN and clamp to [0, 1]
     land_fraction = ifelse.(isfinite.(land_fraction), land_fraction, FT(0))
     land_fraction = max.(min.(land_fraction, FT(1)), FT(0))
@@ -655,15 +951,31 @@ function get_land_fraction(
 end
 
 """
-    validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_model)
+    validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_model;
+        domain_type = "global", scm_surface_type = nothing)
 
-Validate and correct model types based on simulation mode requirements.
+Validate and correct model types based on simulation mode requirements and
+domain type. For SCM (`domain_type == "column"`), applies `scm_surface_type`
+surface selection and rejects unsupported component models.
 Issues warnings and returns updated model types if they don't match the expected values.
 
 # Returns
 - `(ocean_model, ice_model, land_model)`: Tuple of validated model types
 """
-function validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_model)
+function validate_model_types_for_mode(
+    sim_mode,
+    ocean_model,
+    ice_model,
+    land_model;
+    domain_type = "global",
+    scm_surface_type = "ocean",
+)
+    # SCM case: choose surface type based on `scm_surface_type`
+    if domain_type == "column"
+        return _apply_scm_surface_type(scm_surface_type, ocean_model, ice_model, land_model)
+    end
+
+    # Global case: validate surface model types based on simulation mode
     expected_ocean = ocean_model
     expected_ice = ice_model
     expected_land = land_model
@@ -724,5 +1036,150 @@ function validate_model_types_for_mode(sim_mode, ocean_model, ice_model, land_mo
     return ocean_model, ice_model, land_model
 end
 
+
+"""
+    _apply_scm_surface_type(scm_surface_type, ocean_model, ice_model, land_model)
+
+Override component model selections based on `scm_surface_type`.
+When running an SCM with a specified surface type, only the corresponding
+component model is active; the others are set to `:nothing`.
+"""
+function _apply_scm_surface_type(scm_surface_type, ocean_model, ice_model, land_model)
+    if scm_surface_type == "land"
+        ocean_model = Val(:nothing)
+        ice_model = Val(:nothing)
+    elseif scm_surface_type == "ocean"
+        land_model = Val(:nothing)
+        ice_model = Val(:nothing)
+    elseif scm_surface_type == "sea_ice"
+        land_model = Val(:nothing)
+        ocean_model = Val(:nothing)
+    else
+        error(
+            "Unknown scm_surface_type: \"$scm_surface_type\". " *
+            "Must be \"land\", \"ocean\", or \"sea_ice\".",
+        )
+    end
+    @info "SCM surface type: scm_surface_type=$scm_surface_type → " *
+          "land_model=$land_model, ocean_model=$ocean_model, ice_model=$ice_model"
+
+
+    # Reject unsupported component models in column mode
+    if ocean_model == Val(:oceananigans)
+        error(
+            "Oceananigans ocean model is not supported with domain_type=\"column\". " *
+            "Use ocean_model=\"slab\" or ocean_model=\"prescribed\", or a different surface type instead.",
+        )
+    end
+    if ice_model == Val(:clima_seaice)
+        error(
+            "ClimaSeaIce model is not supported with domain_type=\"column\". " *
+            "Use ice_model=\"prescribed\", or a different surface type instead.",
+        )
+    end
+    return ocean_model, ice_model, land_model
+end
+
+"""
+    resolve_era5_dir(era5_initial_condition_dir)
+
+Return `era5_initial_condition_dir` if it is not `nothing`, otherwise attempt to
+use the `wxquest_initial_conditions` ClimaArtifact as a fallback.  Errors if
+neither source is available.
+"""
+function resolve_era5_dir(era5_initial_condition_dir)
+    isnothing(era5_initial_condition_dir) || return era5_initial_condition_dir
+    try
+        return @clima_artifact("wxquest_initial_conditions")
+    catch
+        error(
+            "subseasonal mode requires --era5_initial_condition_dir or the " *
+            "wxquest_initial_conditions ClimaArtifact",
+        )
+    end
+end
+
+"""
+    get_era5_filepaths(::Type{<:Interfacer.SubseasonalMode}, era5_initial_condition_dir, start_date, bucket_initial_condition)
+
+Build ERA5-based file paths for subseasonal mode simulations.
+Filenames are inferred from the start_date.
+
+If `era5_initial_condition_dir` is `nothing`, the `wxquest_initial_conditions`
+ClimaArtifact is used as a fallback.
+
+# Arguments
+- `sim_mode`: The simulation mode type (must be SubseasonalMode)
+- `era5_initial_condition_dir`: Directory containing ERA5 initial condition files
+- `start_date`: The start date of the simulation (DateTime)
+- `bucket_initial_condition`: User-specified bucket IC path (empty string if not specified)
+
+# Returns
+A NamedTuple with fields:
+- `sst_path`: Path to SST file
+- `sic_path`: Path to sea ice concentration file
+- `land_ic_path`: Path to land initial condition file
+- `albedo_path`: Path to albedo file
+- `bucket_initial_condition`: Path to bucket IC (user-specified if provided, otherwise ERA5-derived)
+"""
+function get_era5_filepaths(
+    ::Type{<:Interfacer.SubseasonalMode},
+    era5_initial_condition_dir,
+    start_date,
+    bucket_initial_condition,
+)
+    era5_initial_condition_dir = resolve_era5_dir(era5_initial_condition_dir)
+    datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
+
+    # Verify that the required files exist for this date
+    sst_path = joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc")
+    isfile(sst_path) || error(
+        "ERA5 initial condition files for date $datestr not found in " *
+        "$era5_initial_condition_dir. Check that start_date matches an " *
+        "available date in the initial condition directory.",
+    )
+
+    # Use ERA5-derived bucket IC if user didn't specify one
+    isempty(bucket_initial_condition) && (
+        bucket_initial_condition = joinpath(
+            era5_initial_condition_dir,
+            "era5_bucket_processed_$(datestr)_0000.nc",
+        )
+    )
+
+    return (;
+        sst_path,
+        sic_path = joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc"),
+        land_ic_path = joinpath(
+            era5_initial_condition_dir,
+            "era5_land_processed_$(datestr)_0000.nc",
+        ),
+        albedo_path = joinpath(
+            era5_initial_condition_dir,
+            "albedo_processed_$(datestr)_0000.nc",
+        ),
+        bucket_initial_condition,
+    )
+end
+
+"""
+    get_era5_filepaths(::Type{<:Interfacer.AbstractSimulationMode}, era5_initial_condition_dir, start_date, bucket_initial_condition)
+
+Fallback for non-subseasonal modes. Returns nothing for file paths, passes through bucket_initial_condition.
+"""
+function get_era5_filepaths(
+    ::Type{<:Interfacer.AbstractSimulationMode},
+    era5_initial_condition_dir,
+    start_date,
+    bucket_initial_condition,
+)
+    return (
+        sst_path = nothing,
+        sic_path = nothing,
+        land_ic_path = nothing,
+        albedo_path = nothing,
+        bucket_initial_condition = bucket_initial_condition,
+    )
+end
 
 end # module Input

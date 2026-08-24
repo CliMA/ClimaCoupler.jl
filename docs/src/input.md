@@ -28,6 +28,11 @@ multiple configuration files can be used together:
 - **Atmos config file** (`--atmos_config_file`): Optional ClimaAtmos-specific configuration
 - **TOML parameter files** (`--coupler_toml`): One or more TOML files containing model parameters
 
+Sometimes, the coupler config file includes options that are not defined in ClimaCoupler.jl,
+but affect only the atmosphere model. For example `output_default_diagnostics` controls
+only the atmosphere diagnostics, despite its generic name. The full set of options used by
+the atmosphere model can be found in the [ClimaAtmos.jl docs](https://clima.github.io/ClimaAtmos.jl/stable/config/).
+
 When multiple config files are specified, values in the coupler config file will take
 precedence over those in the atmosphere config file. This is explained in more detail
 in the [Precendence of Config Files and CLI Arguments](#precendence-of-config-files-and-cli-arguments)
@@ -51,7 +56,7 @@ TOML be used.
 Command-line arguments can be provided when running a simulation:
 
 ```bash
-julia run_amip.jl --config_file="path/to/config.yml" --job_id="amip_default"
+julia run_simulation.jl --config_file="path/to/config.yml" --job_id="amip_default"
 ```
 
 Typically, we rely mostly on configuration files, and provide only the `config_file`
@@ -84,6 +89,8 @@ The following table lists all available command-line arguments organized by cate
 | `--mode_name` | String | `"amip"` | `cmip`, `amip`, `subseasonal`, `slabplanet`, `slabplanet_aqua`, `slabplanet_terra` | Mode of coupled simulation |
 | `--coupler_toml` | Vector{String} | `[]` | Any list of valid TOML file paths | Optional list of paths to TOML files used to overwrite default model parameters |
 
+Note: the `mode_name` determines which Julia environment to use. Use `experiments/AMIP` for all modes except `cmip`, which requires `experiments/CMIP`. See the [Julia Environments](@ref) section in Models for details.
+
 #### Computational simulation setup
 
 | Argument | Type | Default | Valid Options | Description |
@@ -107,6 +114,8 @@ The following table lists all available command-line arguments organized by cate
 | `--dt_ocean` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Ocean simulation time step (alternative to `dt`) |
 | `--dt_seaice` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Sea ice simulation time step (alternative to `dt`) |
 | `--checkpoint_dt` | String | `"90days"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Time interval for checkpointing |
+| `--walltime_dt` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for walltime reporting. Defaults to a tenth of the simulation length, at most 30 days. Set to `"never"` to disable. |
+| `--walltime_debug` | Bool | `false` | `true`, `false` | Also report the walltime on every coupling step whose number is a power of two (1, 2, 4, 8, ...), in addition to the `walltime_dt` interval. If `walltime_dt` is `"never"`, this is the only reporting. |
 
 Note: If any component model-specific timestep is specified, _all_ component-model
 specific timesteps should be specified, rather than only `dt`.
@@ -133,7 +142,9 @@ specific timesteps should be specified, rather than only `dt`.
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
 | `--use_coupler_diagnostics` | Bool | `true` | `true`, `false` | Whether to compute and output coupler diagnostics |
-| `--coupler_output_dir` | String | `"experiments/ClimaEarth/output"` | Any valid directory path | Directory to save output files |
+| `--coupler_diagnostics_period` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"` | Time interval between coupler diagnostic outputs. If unset, the period is auto-derived from the simulation duration. |
+| `--coupler_diagnostics_reduction` | String | `"average"` | `average`, `instantaneous`, `max`, `min` | Reduction mode for coupler diagnostic outputs |
+| `--coupler_output_dir` | String | `"output"` | Any valid directory path | Directory to save output files |
 
 
 
@@ -151,7 +162,7 @@ specific timesteps should be specified, rather than only `dt`.
 |----------|------|---------|---------------|-------------|
 | `--surface_setup` | String | `"PrescribedSurface"` | `PrescribedSurface`, `DefaultMoninObukhov` | Triggers ClimaAtmos into coupled mode |
 | `--atmos_config_file` | String | `nothing` | Any valid file path | Optional YAML file used to overwrite default model parameters |
-| `--atmos_log_progress` | Bool | `false` | `true`, `false` | Use ClimaAtmos walltime logging callback instead of default ClimaCoupler one |
+| `--atmos_progress_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for printing atmosphere progress information. Set to `"never"` to disable. |
 | `--albedo_model` | String | `"CouplerAlbedo"` | `ConstantAlbedo`, `RegressionFunctionAlbedo`, `CouplerAlbedo` | Type of albedo model |
 | `--extra_atmos_diagnostics` | Vector{Dict{Any, Any}} | `[]` | List of dictionaries | List of dictionaries containing information about additional atmosphere diagnostics to output |
 
@@ -162,9 +173,13 @@ specific timesteps should be specified, rather than only `dt`.
 | `--land_model` | String | `"bucket"` | `bucket`, `integrated` | Land model to use |
 | `--land_temperature_anomaly` | String | `"aquaplanet"` | `amip`, `aquaplanet`, `nothing` | Type of temperature anomaly for land model |
 | `--use_land_diagnostics` | Bool | `true` | `true`, `false` | Whether to compute and output land model diagnostics |
-| `--land_spun_up_ic` | Bool | `true` | `true`, `false` | Whether to use integrated land initial conditions from spun up state |
-| `--bucket_albedo_type` | String | `"map_static"` | `map_static`, `function`, `map_temporal` | Access bucket surface albedo information from data file |
-| `--bucket_initial_condition` | String | `""` | Any valid file path | File path for a NetCDF file (read documentation about requirements) |
+| `--land_progress_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for printing land progress information. Set to `"never"` to disable. |
+| `--land_diagnostics_period` | String | `"1months"` | `"30mins"`, `"1hours"`, `"1days"`, `"10days"`, `"1months"` | Time interval between land diagnostic outputs. ClimaLand's diagnostics API only accepts a fixed set of periods, so the values listed here are the only supported options. |
+| `--land_diagnostics_reduction` | String | `"average"` | `average`, `instantaneous`, `max`, `min` | Reduction type for land diagnostic outputs |
+| `--land_spun_up_ic` | Bool | `false` | `true`, `false` | Whether to use integrated land initial conditions from spun up state |
+| `--lai_source` | String | `"modis_monthly"` | `modis_monthly`, `modis_monthly_climatology` | Source for leaf area index data. `modis_monthly` uses full MODIS monthly data, `modis_monthly_climatology` uses MODIS monthly climatology with periodic calendar |
+| `--bucket_albedo_type` | String | `"map_static"` | `map_static`, `function`, `map_temporal`, `era5` | Access bucket surface albedo information from data file. Use `era5` for ERA5-derived processed albedo files (requires `era5_initial_condition_dir`) |
+| `--bucket_initial_condition` | String | `""` | Any valid file path | File path for a NetCDF file (read documentation about requirements). In subseasonal mode, automatically inferred from `era5_initial_condition_dir` if not specified |
 | `--era5_initial_condition_dir` | String | `nothing` | Any valid directory path | Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from `start_date`. Generated with `https://github.com/CliMA/WeatherQuest` |
 | `--land_fraction_source` | String | `"etopo"` | `etopo`, `era5` | Source for land fraction data. `etopo` uses ETOPO-derived landsea_mask artifact (binary), `era5` uses ERA5/IFS land fraction artifact (0.0 - 1.0), which includes large inland seas and lakes. |
 | `--binary_area_fraction` | Bool | `true` | `true`, `false` | Whether to use binary (thresholded) area fractions for land and ice. When true, land fraction > eps becomes 1, and ice fraction > 0.5 becomes 1 |
@@ -174,6 +189,7 @@ specific timesteps should be specified, rather than only `dt`.
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
 | `--ice_model` | String | `"prescribed"` | `prescribed`, `clima_seaice` | Sea ice model to use |
+| `--seaice_progress_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for printing sea-ice progress information (ClimaSeaIce only). Set to `"never"` to disable. |
 
 
 #### Ocean model specific
@@ -181,6 +197,15 @@ specific timesteps should be specified, rather than only `dt`.
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
 | `--evolving_ocean` | Bool | `true` | `true`, `false` | Whether to use a dynamic slab ocean model, as opposed to constant surface temperatures |
+| `--ocean_progress_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for printing ocean progress information. Set to `"never"` to disable. |
+
+#### Single-column model (SCM) settings
+
+| Argument | Type | Default | Valid Options | Description |
+|----------|------|---------|---------------|-------------|
+| `--domain_type` | String | `"global"` | `global`, `column` | Domain type for the simulation. Use `column` for single-column model runs |
+| `--column_latlon` | Vector{Float64} | `[0.0, 0.0]` | `[lat, lon]` in degrees | Latitude within [-90, 90] and longitude within [-180, 180] for the SCM column location |
+| `--scm_surface_type` | String | `nothing` | `land`, `ocean`, `sea_ice` (required for `column`) | Select SCM surface model: enables exactly one of land, ocean, or sea ice. Ignored for global runs. |
 
 ## Input API
 

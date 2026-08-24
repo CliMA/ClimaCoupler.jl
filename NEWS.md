@@ -4,7 +4,145 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
-### ClimaCoupler features
+#### Exchange (intersection) grid for CMIP surface fractions and fluxes. PR [#2051](https://github.com/CliMA/ClimaCoupler.jl/pull/2051)
+When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange
+grid — the polygons where the cubed-sphere spectral elements intersect the
+ocean's `TripolarGrid` cells (via ConservativeRegridding's operator API) —
+and uses it to 
+(1) derive land/ocean/ice area fractions from the ocean's
+bathymetric wet mask (DSS'd nodal coverage ratio), so fractions and flux
+weights are consistent with where the ocean actually has wet cells 
+(2) compute ocean and sea-ice turbulent fluxes per polygon, with per-polygon
+sea-ice-concentration weighting, conservative aggregation to both grids, and
+GPU-resident, allocation-free per-step application. Controlled by the new
+`use_intersection_grid` configuration option (default `true`; automatically
+disabled for column and distributed setups).
+
+The ice skin-temperature Newton solve now linearizes turbulent fluxes as well
+as longwave emission, limits each iteration to a ±5 K update, and falls back
+to the previous guess if the update is NaN.
+
+This PR also addresses a boundary condition bug in the
+sea-ice component, using the diagnosed skin temperature to compute the radiative emission term.(Previously the incorrect energy balance would result in rapid ice melt).
+
+v0.2.3
+-------
+
+#### Add `OrSchedule`, `PowerOfTwoSchedule`, `cs.step`, and a `walltime_debug` flag.
+Callback schedules now receive `(; t, step)` instead of just `(; t)`, so any
+`ClimaDiagnostics` schedule can be used as a coupler callback. `step` is a new
+`CoupledSimulation` field that counts the coupling steps of the current run, 
+restarting from 1 after a restart. The new `walltime_debug` config flag (default 
+`false`) also reports the walltime on the steps that are a power of two, in 
+addition to every `walltime_dt`.
+
+#### Remove ClimaOcean dependency PR[#2039](https://github.com/CliMA/ClimaCoupler.jl/pull/2039), PR[#2059](https://github.com/CliMA/ClimaCoupler.jl/pull/2059)
+The ocean and sea-ice setup previously provided by ClimaOcean (ocean/sea-ice
+simulation construction, closures, sea-ice/ocean flux computations, ORCA grid
+support, and ocean initial-condition data handling) now lives directly in
+ClimaCoupler's CMIP extension. `ClimaOcean` has been dropped from the
+dependencies and extension list of both `ClimaCoupler` and the CMIP experiment
+environment; CMIP runs now depend only on `Oceananigans` and `ClimaSeaIce`.
+Ocean initial-condition data are loaded from ClimaCoupler artifacts, and the
+simulation start date is more flexible.
+
+#### Adapt to the redesigned RRTMGP 0.22 / ClimaAtmos 0.42 radiation API.
+The atmosphere radiation cache now holds an `RRTMGP.RRTMGPSolver`; coupler flux and albedo
+accesses go through `RRTMGP` getters (e.g. `RRTMGP.sw_flux_dn`, `RRTMGP.surface_emissivity`),
+and the radiation method is queried via `RRTMGP.radiation_method`.
+
+#### Use artifacts for EN4 temperature/salinity initial conditions PR[#2034](https://github.com/CliMA/ClimaCoupler.jl/pull/2034)
+The EN4 initial-condition data used by the ocean and sea-ice models are now
+provided as an artifact instead of being downloaded at run time.
+
+#### Add per-component progress callbacks PR[#2021](https://github.com/CliMA/ClimaCoupler.jl/pull/2021)
+New config arguments `--atmos_progress_interval`, `--land_progress_interval`,
+`--seaice_progress_interval`, and `--ocean_progress_interval` control how often
+each component prints progress information. All default to `"never"`.
+This is a breaking config change for `ocean_progress_interval`, which used to be
+an integer iteration count and is now a time-interval string (e.g. `"10days"`).
+
+#### Add `--ocean_grid` config argument PR[#2001](https://github.com/CliMA/ClimaCoupler.jl/pull/2001)
+Selects the horizontal grid of the Oceananigans ocean model, either
+`one_deg_tripolar` (default) or the higher-resolution `orca` grid, which is now
+used in the CMIP longrun configurations.
+
+#### Add a snow model to the sea-ice model PR[#1998](https://github.com/CliMA/ClimaCoupler.jl/pull/1998)
+
+#### Walltime reporter revamped PR[#2026](https://github.com/CliMA/ClimaCoupler.jl/pull/2026)
+
+v0.2.2
+-------
+
+#### Add model run number and commit hash as global NetCDF attributes PR[#1985](https://github.com/CliMA/ClimaCoupler.jl/pull/1985)
+Diagnostic NetCDF files now carry `start_date`, and, when available,
+`buildkite_build_number` and `commit_hash` as global (file-level) attributes,
+making it easier to trace output back to the run and code version that
+produced it.
+
+#### Update to use ClimaOcean#0.10.0. [#1971](https://github.com/CliMA/ClimaCoupler.jl/pull/1971)
+Enables the 1 deg. TripolarGrid configuration as the default, with the updated spectral element <-> finite-volume regridding method (ConservativeRegridding0.2.5).
+
+#### Remove all diagnostic EDMF jobs PR[#1988](https://github.com/CliMA/ClimaCoupler.jl/pull/1988)
+ClimaAtmos.jl v0.39.5 is the last one to support `turbconv_model: diagnostic_edmfx`.
+
+v0.2.0
+-------
+
+#### Turbulent flux time-averaging for slow surface models PR[#1945](https://github.com/CliMA/ClimaCoupler.jl/pull/1945)
+For surface simulations whose own timestep is larger than the coupling
+timestep (e.g. `dt_ocean > Δt_cpl` or `dt_seaice > Δt_cpl`), the coupler now
+accumulates the per-surface turbulent fluxes (`F_lh`, `F_sh`,
+`F_turb_moisture`, `F_turb_ρτxz`, `F_turb_ρτyz`) every coupling step and
+pushes the time-average to the surface only immediately before it steps.
+This replaces the previous behavior of pushing an instantaneous flux every
+coupling step, only one of which (the last one before each component step)
+was actually used by the surface. The area-weighted combined `cs.fields.F_*`
+fields read by the atmosphere are unchanged (still instantaneous per
+coupling step). The new `FluxCalculator.FluxAccumulator`s are checkpointed
+alongside the rest of the coupled simulation state.
+
+This is a behavior change for CMIP configs that already have `dt_ocean` or
+`dt_seaice > dt_cpl`
+(`config/ci_configs/cmip_oceananigans_climaseaice*.yml`,
+`config/longrun_configs/`); their CI outputs will differ from prior
+baselines. Integrated land at `dt_land > Δt_cpl` is out of scope for this change
+and continues to use the previous behavior (it is an `AbstractImplicitFluxSimulation`
+and computes its own fluxes inside its `step!`).
+
+#### Conservative regridding used with lat-long grids PR[#1919](https://github.com/CliMA/ClimaCoupler.jl/pull/1919)
+Enables conservative regridding in CMIP runs with lat-long grids.
+This uses the FV `value-per-element` approximation, and is a precursor
+to more consistent regridding methods to be introduced in future versions
+of ConservativeRegridding.jl[PR#99](https://github.com/JuliaGeo/ConservativeRegridding.jl/pull/99)
+
+#### Configurable land and coupler diagnostics output frequency and reduction PR[#1991](https://github.com/CliMA/ClimaCoupler.jl/pull/1939)
+Adds new config options to control the period and reduction type of land and
+coupler diagnostics, matching the existing options for ocean and sea-ice:
+- `land_diagnostics_period` (default `"monthly"`) and
+  `land_diagnostics_reduction` (default `"average"`)
+- `coupler_diagnostics_period` (default `nothing`, falls back to the
+  auto-derived `get_diag_period`) and `coupler_diagnostics_reduction`
+  (default `"average"`)
+
+Also fixes the calls to `ClimaLand.default_diagnostics` in the ClimaLand
+extension to pass `outdir` positionally, so the dispatched method actually
+produces land diagnostics instead of falling through to the no-op fallback.
+
+#### Update SST, SIC at monthly frequency PR[#1926](https://github.com/CliMA/ClimaCoupler.jl/pull/1926)
+For prescribed ocean and sea ice models, read in SST and SIC
+data monthly instead of at the model timestep. These data have
+monthly averages, so it doesn't make sense to interpolate them
+to more than daily.
+
+#### Remove perfect model calibration experiment PR[#1835](https://github.com/CliMA/ClimaCoupler.jl/pull/1835)
+Remove some GPU jobs from CI to reduce impact of long wait times.
+Also deletes the perfect model calibration altogether, which is
+not planned to be developed further.
+
+#### Remove `experiments/ClimaCore` PR[#1704](https://github.com/CliMA/ClimaCoupler.jl/pull/1809)
+The `experiments/ClimaCore/` directory and its coupling examples
+(heat diffusion and sea breeze) have been removed.
 
 #### Add an extension for CMIP models PR[#1704](https://github.com/CliMA/ClimaCoupler.jl/pull/1704)
 This extension contains the methods that extend the ClimaCoupler.jl interface

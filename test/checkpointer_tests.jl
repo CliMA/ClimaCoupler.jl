@@ -2,7 +2,8 @@ using Test
 import ClimaComms
 ClimaComms.@import_required_backends
 import ClimaCore as CC
-import ClimaCoupler: Checkpointer, Interfacer
+import ClimaCoupler: Checkpointer, FluxCalculator, Interfacer
+import JLD2
 import StaticArrays
 import Dates
 
@@ -226,4 +227,86 @@ end
     )
     cache_vec = collect(itr)
     @test isempty(cache_vec)
+end
+
+# Minimal stub that exposes only what `restart_flux_accumulators!` needs from a
+# `CoupledSimulation`: a `flux_accumulators` field and a `ClimaComms.device`.
+struct StubCSForFluxAcc{T, D}
+    flux_accumulators::T
+    device::D
+end
+ClimaComms.device(s::StubCSForFluxAcc) = s.device
+
+@testset "FluxAccumulator checkpoint round-trip" begin
+    boundary_space = space_checkpointer
+    device = ClimaComms.device(boundary_space)
+
+    # Build "original" accumulators with known nonzero data for two surfaces.
+    acc_a = FluxCalculator.FluxAccumulator(boundary_space)
+    acc_a.F_lh .= FT(1)
+    acc_a.F_sh .= FT(2)
+    acc_a.F_turb_moisture .= FT(3)
+    acc_a.F_turb_ρτxz .= FT(4)
+    acc_a.F_turb_ρτyz .= FT(5)
+    acc_a.n_steps[] = 7
+
+    acc_b = FluxCalculator.FluxAccumulator(boundary_space)
+    acc_b.F_lh .= FT(10)
+    acc_b.F_sh .= FT(20)
+    acc_b.F_turb_moisture .= FT(30)
+    acc_b.F_turb_ρτxz .= FT(40)
+    acc_b.F_turb_ρτyz .= FT(50)
+    acc_b.n_steps[] = 3
+
+    original = (; ocean_sim = acc_a, ice_sim = acc_b)
+
+    # Serialize via the same path used in `checkpoint_sims`.
+    dir = mktempdir(; prefix = "test_flux_accumulator_")
+    output_file = joinpath(dir, "checkpoint_flux_accumulators_1_100.jld2")
+    accs_cpu = NamedTuple{keys(original)}(
+        map(Checkpointer._accumulator_to_cpu_nt, values(original)),
+    )
+    JLD2.jldsave(output_file, flux_accumulators = accs_cpu)
+
+    # Restore into fresh zero-initialized accumulators using the production
+    # restore path with the same NamedTuple keys.
+    fresh = (;
+        ocean_sim = FluxCalculator.FluxAccumulator(boundary_space),
+        ice_sim = FluxCalculator.FluxAccumulator(boundary_space),
+    )
+    cs = StubCSForFluxAcc(fresh, device)
+    Checkpointer.restart_flux_accumulators!(cs, output_file)
+
+    # Each restored accumulator must match the original field-by-field and
+    # carry the same `n_steps` count.
+    for name in keys(original)
+        orig = original[name]
+        restored = cs.flux_accumulators[name]
+        @test parent(restored.F_lh) == parent(orig.F_lh)
+        @test parent(restored.F_sh) == parent(orig.F_sh)
+        @test parent(restored.F_turb_moisture) == parent(orig.F_turb_moisture)
+        @test parent(restored.F_turb_ρτxz) == parent(orig.F_turb_ρτxz)
+        @test parent(restored.F_turb_ρτyz) == parent(orig.F_turb_ρτyz)
+        @test restored.n_steps[] == orig.n_steps[]
+    end
+
+    # Missing accumulators in the file should raise an error.
+    bad_file = joinpath(dir, "missing_accumulators.jld2")
+    JLD2.jldsave(bad_file, flux_accumulators = (; only_ocean = accs_cpu.ocean_sim))
+    cs_two = StubCSForFluxAcc(
+        (;
+            ocean_sim = FluxCalculator.FluxAccumulator(boundary_space),
+            ice_sim = FluxCalculator.FluxAccumulator(boundary_space),
+        ),
+        device,
+    )
+    @test_throws ErrorException Checkpointer.restart_flux_accumulators!(cs_two, bad_file)
+
+    # Missing file path should raise.
+    @test_throws ErrorException Checkpointer.restart_flux_accumulators!(
+        cs,
+        joinpath(dir, "does_not_exist.jld2"),
+    )
+
+    rm(dir, force = true, recursive = true)
 end

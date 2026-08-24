@@ -52,9 +52,9 @@ function Plotting.compute_leaderboard(
         obs_var = obs_var_dict[short_name](sim_var.attributes["start_date"])
 
         # Remove first spin_up_months from simulation
-        spinup_cutoff = spinup * 31 * 86400.0
-        ClimaAnalysis.times(sim_var)[end] >= spinup_cutoff &&
-            (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff))
+        spinup_cutoff_date = first(ClimaAnalysis.dates(sim_var)) + spinup * Dates.Month(1)
+        ClimaAnalysis.dates(sim_var)[end] >= spinup_cutoff_date &&
+            (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff_date))
 
         obs_var = ClimaAnalysis.resampled_as(obs_var, sim_var)
         obs_var_seasons = ClimaAnalysis.split_by_season(obs_var)
@@ -79,6 +79,12 @@ function Plotting.compute_leaderboard(
         )
     end
 
+    # If there is no monthly data available, skip the leaderboard
+    if isempty(sim_obs_comparsion_dict)
+        @warn "No monthly data available. Leaderboard will not be made."
+        return nothing
+    end
+
     # Filter seasons to remove seasons with no dates
     _, var = first(sim_obs_comparsion_dict)
     filter!(season -> !ClimaAnalysis.isempty(var[season][1]), seasons)
@@ -99,9 +105,7 @@ function Plotting.compute_leaderboard(
                 sim_var.attributes["short_name"] = "mean $(ClimaAnalysis.short_name(sim_var))"
                 cmap_extrema = get(compare_vars_biases_plot_extrema, short_name) do
                     extrema(
-                        ClimaAnalysis.bias(
-                            sim_obs_comparsion_dict[short_name]["ANN"]...,
-                        ).data,
+                        ClimaAnalysis.bias(sim_obs_comparsion_dict[short_name]["ANN"]...).data,
                     )
                 end
                 ClimaAnalysis.Visualize.plot_bias_on_globe!(
@@ -227,6 +231,10 @@ function Plotting.compute_pfull_leaderboard(
     @info "Error against observations for variables in pressure coordinates"
 
     sim_var_pfull_dict = get_sim_var_in_pfull_dict(diagnostics_folder_path)
+    if isempty(sim_var_pfull_dict)
+        @warn "No diagnostics in pressure coordinates found. Leaderboard for diagnostics in pressure coordinates will not be made."
+        return nothing
+    end
     obs_var_pfull_dict = get_obs_var_in_pfull_dict()
 
     # Print dates for debugging
@@ -249,9 +257,9 @@ function Plotting.compute_pfull_leaderboard(
             error("Units of pressure should be hPa for $short_name simulation data")
 
         # Remove first spin_up_months from simulation
-        spinup_cutoff = spinup * 31 * 86400.0
-        ClimaAnalysis.times(sim_var)[end] >= spinup_cutoff &&
-            (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff))
+        spinup_cutoff_date = first(ClimaAnalysis.dates(sim_var)) + spinup * Dates.Month(1)
+        ClimaAnalysis.dates(sim_var)[end] >= spinup_cutoff_date &&
+            (sim_var = ClimaAnalysis.window(sim_var, "time", left = spinup_cutoff_date))
 
         # Restrain the pressure levels so we can resample
         min_pfull = ClimaAnalysis.pressures(obs_var)[1]
@@ -302,11 +310,11 @@ function Plotting.compute_pfull_leaderboard(
             obs_var = sim_obs_comparsion_dict[short_name].obs
 
             # Slice at pressure level using nearest value rather interpolating
-            sim_var = ClimaAnalysis.slice(sim_var, pfull = p_lvl)
+            sim_var = ClimaAnalysis.slice(sim_var, pressure_level = p_lvl)
             obs_var = ClimaAnalysis.slice(obs_var, pressure_level = p_lvl)
 
             # Get the actual pressure level that we slice at
-            push!(real_p_lvls, parse(Float64, sim_var.attributes["slice_pfull"]))
+            push!(real_p_lvls, parse(Float64, sim_var.attributes["slice_pressure_level"]))
 
             # Add so that it show up on in the title
             sim_var.attributes["short_name"] = "mean $(ClimaAnalysis.short_name(sim_var))"

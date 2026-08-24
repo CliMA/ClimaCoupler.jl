@@ -1,0 +1,104 @@
+using Dates
+import Random
+import ClimaCalibrate
+import ClimaAnalysis
+import ClimaCoupler
+import ClimaCoupler: CalibrationTools
+import EnsembleKalmanProcesses as EKP
+import EnsembleKalmanProcesses.ParameterDistributions as PD
+import JLD2
+
+model_interface_filepath = joinpath(
+    pkgdir(ClimaCoupler),
+    "experiments",
+    "calibration",
+    "amip",
+    "model_interface.jl",
+)
+include(model_interface_filepath)
+
+# Choose which calibration config to use
+config_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "amip", "config")
+default_config_path = joinpath(config_dir, "pressure_levels.jl")
+
+test_calibration_config_path = joinpath(config_dir, "pipeline_test.jl")
+const TEST_CALIBRATION = haskey(ENV, "TEST_CALIBRATION")
+
+config_path = TEST_CALIBRATION ? test_calibration_config_path : default_config_path
+
+@info "Using calibration configuration in: $config_path"
+include(config_path)
+
+(; output_dir) = CALIBRATE_CONFIG
+isdir(output_dir) || mkdir(output_dir)
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    observation_vector_filepath = joinpath(
+        pkgdir(ClimaCoupler),
+        "experiments",
+        "calibration",
+        "amip",
+        "observation_vec.jld2",
+    )
+    isfile(observation_vector_filepath) || error(
+        "Filepath to observation vector is not valid. Update the filepath or generate the observations using generate_observations.jl",
+    )
+    observation_vector = JLD2.load_object(observation_vector_filepath)
+
+    (; sample_date_ranges, minibatch_size) = CALIBRATE_CONFIG
+    obs_series = EKP.ObservationSeries(
+        Dict(
+            "observations" => observation_vector,
+            "names" => [
+                string(Dates.year(start_date)) for
+                (start_date, stop_date) in sample_date_ranges
+            ],
+            "minibatcher" => ClimaCalibrate.minibatcher_over_samples(
+                length(observation_vector),
+                minibatch_size,
+            ),
+        ),
+    )
+
+    (; rng_seed) = CALIBRATE_CONFIG
+    rng = Random.MersenneTwister(rng_seed)
+
+    ekp = EKP.EnsembleKalmanProcess(
+        obs_series,
+        EKP.TransformUnscented(PRIORS, impose_prior = true);
+        verbose = true,
+        rng,
+        scheduler = EKP.DataMisfitController(terminate_at = 1000000),
+    )
+
+    coupler_model_interface = CouplerModelInterface(CALIBRATE_CONFIG)
+
+    (; n_iterations) = CALIBRATE_CONFIG
+
+    # The smoke test runs on CPU within an existing allocation, while a full
+    # calibration puts one ensemble member on each GPU.
+    device = TEST_CALIBRATION ? :cpu : :gpu
+    walltime = @isdefined(WORKER_WALLTIME) ? WORKER_WALLTIME : TEST_CALIBRATION ? 60 : 720
+    env_vars = [
+        "CLIMACOMMS_CONTEXT" => "SINGLETON",
+        "CLIMACOMMS_DEVICE" => TEST_CALIBRATION ? "CPU" : "CUDA",
+    ]
+
+    ClimaCalibrate.add_workers(
+        EKP.get_N_ens(ekp);
+        device,
+        time = walltime,
+        env = env_vars,
+        mem = TEST_CALIBRATION ? "16GB" : "32GB",
+    )
+    ClimaCalibrate.@worker_setup include($model_interface_filepath)
+
+    eki = ClimaCalibrate.calibrate(
+        ClimaCalibrate.WorkerBackend(),
+        ekp,
+        coupler_model_interface,
+        n_iterations,
+        PRIORS,
+        output_dir,
+    )
+end

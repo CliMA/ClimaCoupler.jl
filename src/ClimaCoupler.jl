@@ -17,14 +17,16 @@ include("SimOutput/SimOutput.jl")
 include("Plotting.jl")
 include("SimCoordinator.jl")
 include("Models.jl")
+include("CalibrationTools.jl")
 
-# Import run! and step! from SimCoordinator to re-export at top level
-import ..SimCoordinator: run!, step!
-# Import postprocess from Plotting to re-export at top level
+# Import key functions from submodules to re-export at top level
+import ..Interfacer: CoupledSimulation
+import ..SimCoordinator: run!, step!, setup_and_run
 import ..Plotting: postprocess
 
 # Export all modules and key functions
-export ConservationChecker,
+export CalibrationTools,
+    ConservationChecker,
     Checkpointer,
     FieldExchanger,
     FluxCalculator,
@@ -36,8 +38,10 @@ export ConservationChecker,
     SimOutput,
     TimeManager,
     Utilities,
+    CoupledSimulation,
     run!,
     step!,
+    setup_and_run,
     postprocess
 
 end

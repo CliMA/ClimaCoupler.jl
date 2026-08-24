@@ -1,12 +1,14 @@
 apply_limiter: false
+atmos_progress_interval: "200secs"
 dt: "200secs"
 dt_cpl: "200secs"
 energy_check: true
 h_elem: 4
 mode_name: "slabplanet"
-moist: "equil"
 output_default_diagnostics: false
-precip_model: "0M"
 rad: "gray"
+microphysics_model: "0M"
 t_end: "1days"
-vert_diff: "true"
+vert_diff: VerticalDiffusion
+walltime_debug: true
+check_nan_every: 1

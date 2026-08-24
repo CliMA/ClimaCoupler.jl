@@ -285,10 +285,10 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     )
 
     surface_elevation = Interfacer.get_field(boundary_space, atmos_sim, Val(:height_sfc))
-    atmos_h = Interfacer.get_atmos_height_delta(
-        Interfacer.get_field(atmos_sim, Val(:height_int)),
-        surface_elevation,
-    )
+    atmos_bottom_center_height =
+        Interfacer.get_field(boundary_space, atmos_sim, Val(:height_int))
+    atmos_h =
+        Interfacer.get_atmos_height_delta(atmos_bottom_center_height, surface_elevation)
     initial_T = CC.Fields.zeros(boundary_space)
     initial_T .= Interfacer.get_field(boundary_space, atmos_sim, Val(:air_temperature))
 

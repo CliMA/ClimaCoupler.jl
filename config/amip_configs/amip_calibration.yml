@@ -37,7 +37,6 @@ land_model: "integrated"
 land_spun_up_ic: false
 
 ### Diagnostics ###
-mode_name: "subseasonal"
 netcdf_output_at_levels: true
 output_default_diagnostics: false
 use_coupler_diagnostics: false

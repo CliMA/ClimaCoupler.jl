@@ -42,7 +42,7 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
 ArgParse = "1"
-CUDA = "=5.11.0"
+CUDA = "5"
 CairoMakie = "0.15"
 ClimaAnalysis = "0.5.21"
 ClimaAtmos = "0.42"

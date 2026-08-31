@@ -5,6 +5,40 @@ import Dates
 import ClimaCoupler: SimOutput
 
 """
+    save_rmses_csv(path, rmse_var_dict)
+
+Write leaderboard RMSEs to `path` as CSV, one row per
+(`short_name`, `category`, `model`).
+
+`compute_leaderboard` renders these numbers into `bias_leaderboard.png` but
+never records them, so comparing one run's error against observations with
+the previous run's means reading values off a figure. Writing them next to
+the figure makes the same numbers available to downstream tooling.
+
+Entries that are `NaN` (a model with no value for that season) are skipped.
+Uses no serialization package, so this adds nothing to the extension's
+dependencies.
+"""
+function save_rmses_csv(path, rmse_var_dict)
+    open(path, "w") do io
+        println(io, "short_name,category,model,rmse,units")
+        for short_name in sort(collect(keys(rmse_var_dict)))
+            rmse_var = rmse_var_dict[short_name]
+            units = ClimaAnalysis.rmse_units(rmse_var)
+            for model in ClimaAnalysis.model_names(rmse_var)
+                for category in ClimaAnalysis.category_names(rmse_var)
+                    rmse = rmse_var[model, category]
+                    isnan(rmse) && continue
+                    unit = get(units, model, "")
+                    println(io, "$short_name,$category,$model,$rmse,$unit")
+                end
+            end
+        end
+    end
+    return path
+end
+
+"""
     compute_leaderboard(leaderboard_base_path, diagnostics_folder_path, spinup)
 
 Plot the biases and a leaderboard of various variables defined over longitude, latitude, and
@@ -182,6 +216,13 @@ function Plotting.compute_leaderboard(
             )
         end
     end
+
+    # Record the RMSEs as data before plotting them, so the numbers survive
+    # even if figure generation later fails
+    save_rmses_csv(
+        joinpath(leaderboard_base_path, "bias_leaderboard_rmse.csv"),
+        rmse_var_dict,
+    )
 
     # Plot box plots
     fig_leaderboard =

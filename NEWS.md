@@ -4,6 +4,15 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Write leaderboard RMSEs alongside the leaderboard figure
+`compute_leaderboard` now also writes `bias_leaderboard_rmse.csv` into the
+artifacts directory, with one row per (`short_name`, `category`, `model`).
+These are the same numbers already rendered into `bias_leaderboard.png`;
+previously they existed only as pixels, so tracking a run's error against
+observations over time meant reading them off a figure. The CSV is written
+before the figures are generated, so the values survive a plotting failure.
+No new dependencies.
+
 #### Route rain through sea-ice.
 The ocean now receives `P_liq + (1 - ℵ) P_snow`; rain drains through the ice
 instead of ponding on it (and being lost) while snow can still accumulate on

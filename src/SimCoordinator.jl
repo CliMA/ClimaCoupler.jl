@@ -18,6 +18,7 @@ module SimCoordinator
 import ClimaComms
 import ClimaDiagnostics as CD
 import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
+import ClimaUtilities.TimeManager: ITime
 import ClimaCore as CC
 import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
@@ -335,6 +336,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         land_spun_up_ic,
         land_ic_path,
         lai_source,
+        dt_drivers = ITime(Utilities.time_to_seconds(config_dict["dt_rad"])),
     )
 
     ocean_sim = Interfacer.OceanSimulation(

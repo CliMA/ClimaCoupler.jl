@@ -19,6 +19,7 @@ import ClimaUtilities.TimeVaryingInputs:
     LinearInterpolation, PeriodicCalendar, TimeVaryingInput
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
+import ClimaUtilities.TimeManager: ITime
 import ClimaCoupler:
     Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities, Plotting
 import ClimaTimeSteppers as CTS

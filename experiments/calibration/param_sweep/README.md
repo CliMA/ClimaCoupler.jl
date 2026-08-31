@@ -46,8 +46,9 @@ wall time.
 Rerunning the experiment file skips members that ClimaCalibrate recorded
 as completed, and a member that stopped partway resumes from its last
 checkpoint, so a partially failed sweep is resumable with the same
-command. The experiment file is the only record of the design, so keep it
-next to the sweep.
+command. A resumed member's diagnostics are affected by the restart, see
+Costs below. The experiment file is the only record of the design, so
+keep it next to the sweep.
 
 ## What a sweep produces
 
@@ -67,7 +68,14 @@ capped at 64 to catch a value list that accidentally asks for hundreds of
 these; raise `max_members` if a large sweep is what you want.
 
 Derecho charges exclusive jobs for all 4 GPUs of a node, so `q = "preempt"`
-in `worker_options` costs 20% of the regular charge. Members checkpoint
-every 10 simulated days and resume from the last checkpoint, so a
-preempted member loses at most 10 days of work; the tradeoff is that its
-walltime becomes unpredictable.
+in `worker_options` costs 20% of the regular charge, at the cost of an
+unpredictable walltime.
+
+A preempted member loses at most 10 simulated days of stepping, but the
+diagnostics are not that safe. Checkpoints are every 10 simulated days
+and do not line up with the monthly averaging windows the diagnostics
+use, and a checkpoint does not store the partially accumulated averages.
+A month that a restart falls inside is therefore averaged over only the
+part after the restart. Use `preempt` when the sweep is exploratory, and
+the regular queue when the diagnostics have to be comparable across
+members.

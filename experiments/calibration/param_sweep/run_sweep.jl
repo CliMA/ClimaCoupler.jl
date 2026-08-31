@@ -59,11 +59,6 @@ const DEFAULT_WORKER_OPTIONS = (; device = :gpu, time = 240)
 # what you want.
 const DEFAULT_MAX_MEMBERS = 64
 
-# `short_names` is required by `CalibrateConfig` because a calibration needs
-# observations to compare against. A sweep never reads them: the diagnostics
-# each member writes are whatever the coupler YAML asks for.
-const PLACEHOLDER_SHORT_NAMES = ["ta"]
-
 # ---------------------------------------------------------------------------
 # Member expansion
 # ---------------------------------------------------------------------------
@@ -217,7 +212,9 @@ function design(experiment_path)
     sample_date = Dates.DateTime(_get(:sample_date, "2010-10-01"))
     config = CalibrationTools.CalibrateConfig(;
         config_file,
-        short_names = PLACEHOLDER_SHORT_NAMES,
+        # `CalibrateConfig` requires `short_names` because a calibration needs
+        # observations to compare against, but these are never used in the sweep.
+        short_names = ["ta"],
         minibatch_size = 1,
         n_iterations = 1,
         sample_date_ranges = [(sample_date, sample_date)],

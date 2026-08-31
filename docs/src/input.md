@@ -171,7 +171,6 @@ specific timesteps should be specified, rather than only `dt`.
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
 | `--land_model` | String | `"bucket"` | `bucket`, `integrated` | Land model to use |
-| `--land_temperature_anomaly` | String | `"aquaplanet"` | `amip`, `aquaplanet`, `nothing` | Type of temperature anomaly for land model |
 | `--use_land_diagnostics` | Bool | `true` | `true`, `false` | Whether to compute and output land model diagnostics |
 | `--land_progress_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for printing land progress information. Set to `"never"` to disable. |
 | `--land_diagnostics_period` | String | `"1months"` | `"30mins"`, `"1hours"`, `"1days"`, `"10days"`, `"1months"` | Time interval between land diagnostic outputs. ClimaLand's diagnostics API only accepts a fixed set of periods, so the values listed here are the only supported options. |

@@ -21,6 +21,60 @@ flux_field(bc::OC.BoundaryConditions.DiscreteBoundaryFunction) = flux_field(bc.f
 # real salinity fluxes, we will add `MultipleFluxes` that follows this path
 flux_field(func::Function) = func.flux_field
 
+# Flat nodal vector of a 2-D ClimaCore field (Nv = 1). Same ordering as
+# ConservativeRegridding's `se_field_to_vec`, but a local call so the hot path
+# does not go through `Base.get_extension` (which is type-unstable).
+@inline se_nodal_vec(field::CC.Fields.Field) = vec(parent(CC.Fields.field_values(field)))
+
+const CT1 = CC.Geometry.Contravariant1Vector
+const CT2 = CC.Geometry.Contravariant2Vector
+const CT12 = CC.Geometry.Contravariant12Vector
+
+"""
+    uv_basis_coefficients(boundary_space)
+
+Precompute the linear maps between unit-contravariant (CT1/CT2) components and
+the global UV (east/north) basis at each SE node. Built once at setup; the
+per-step conversions are then parent-array saxpys that do not load
+`LocalGeometry` (which boxes a 22-float struct per node at `-O0`).
+"""
+function uv_basis_coefficients(boundary_space)
+    FT = CC.Spaces.undertype(boundary_space)
+    lg = CC.Fields.local_geometry_field(boundary_space)
+    onef = CC.Fields.ones(boundary_space)
+    zerof = CC.Fields.zeros(boundary_space)
+    uv_from_ct1 = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
+    uv_from_ct2 = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
+    @. uv_from_ct1 = CC.Geometry.UVVector(
+        CT12(
+            onef * CA.unit_basis_vector_data(CT1, lg),
+            zerof * CA.unit_basis_vector_data(CT2, lg),
+        ),
+        lg,
+    )
+    @. uv_from_ct2 = CC.Geometry.UVVector(
+        CT12(
+            zerof * CA.unit_basis_vector_data(CT1, lg),
+            onef * CA.unit_basis_vector_data(CT2, lg),
+        ),
+        lg,
+    )
+    uv_i = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
+    uv_j = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space)
+    @. uv_i = CC.Geometry.UVVector(one(FT), zero(FT))
+    @. uv_j = CC.Geometry.UVVector(zero(FT), one(FT))
+    return (;
+        ct1_to_u = uv_from_ct1.components.data.:1,
+        ct1_to_v = uv_from_ct1.components.data.:2,
+        ct2_to_u = uv_from_ct2.components.data.:1,
+        ct2_to_v = uv_from_ct2.components.data.:2,
+        u_to_ct1 = (@. CA.projected_vector_data(CT1, uv_i, lg)),
+        v_to_ct1 = (@. CA.projected_vector_data(CT1, uv_j, lg)),
+        u_to_ct2 = (@. CA.projected_vector_data(CT2, uv_i, lg)),
+        v_to_ct2 = (@. CA.projected_vector_data(CT2, uv_j, lg)),
+    )
+end
+
 """
     set_from_extrinsic_vector!(vector, grid, u_cc, v_cc)
 
@@ -86,42 +140,32 @@ Fields to Face/Center and Center/Face coordinates, respectively.
 end
 
 """
+    contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz, uv_basis)
     contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz)
 
-Convert the covariant vector components `ρτxz` and `ρτyz` from the
-contravariant basis (as they are output by the surface flux calculation)
-to the Cartesian basis. These are now in an extrinsic coordinate system
-that can be rotated onto the ocean/sea ice grid by `_rotate_vector!`.
+Convert the vector components `ρτxz` and `ρτyz` on the unit contravariant
+basis (as they are output by the surface flux calculation) to the Cartesian
+UV (east/north) basis. Exact inverse of [`cartesian_to_contravariant!`](@ref).
+
+The 4-argument form applies precomputed [`uv_basis_coefficients`](@ref) as
+parent-array saxpys so the hot path does not load `LocalGeometry`. The
+3-argument form builds those coefficients on the fly (setup / tests).
 """
-function contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz)
-    # Get the local geometry of the boundary space
-    local_geometry = CC.Fields.local_geometry_field(ρτxz)
+contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz) =
+    contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz, uv_basis_coefficients(axes(ρτxz)))
 
-    # Get the vector components in the CT1 and CT2 directions
-    xz = @. CT12(CT1(unit_basis_vector_data(CT1, local_geometry)), local_geometry)
-    yz = @. CT12(CT2(unit_basis_vector_data(CT2, local_geometry)), local_geometry)
-
-    # Convert the vector components to a UVVector on the Cartesian basis
-    @. ρτ_flux_uv = CC.Geometry.UVVector(ρτxz * xz + ρτyz * yz, local_geometry)
+function contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz, uv_basis)
+    u = parent(ρτ_flux_uv.components.data.:1)
+    v = parent(ρτ_flux_uv.components.data.:2)
+    a = parent(ρτxz)
+    b = parent(ρτyz)
+    p11 = parent(uv_basis.ct1_to_u)
+    p12 = parent(uv_basis.ct2_to_u)
+    p21 = parent(uv_basis.ct1_to_v)
+    p22 = parent(uv_basis.ct2_to_v)
+    @. u = p11 * a + p12 * b
+    @. v = p21 * a + p22 * b
     return nothing
-end
-
-# Define shorthands for ClimaCore types
-const CT1 = CC.Geometry.Contravariant1Vector
-const CT2 = CC.Geometry.Contravariant2Vector
-const CT12 = CC.Geometry.Contravariant12Vector
-
-"""
-    unit_basis_vector_data(type, local_geometry)
-
-The component of the vector of the specified type with length 1 in physical units.
-The type should correspond to a vector with only one component, i.e., a basis vector.
-
-Helper function used only in `contravariant_to_cartesian!`.
-"""
-function unit_basis_vector_data(::Type{V}, local_geometry) where {V}
-    FT = CC.Geometry.undertype(typeof(local_geometry))
-    return FT(1) / CC.Geometry._norm(V(FT(1)), local_geometry)
 end
 
 # Non-allocating ClimaCore -> Oceananigans remap.

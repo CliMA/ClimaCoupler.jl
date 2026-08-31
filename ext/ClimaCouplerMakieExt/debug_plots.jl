@@ -108,17 +108,10 @@ function Plotting.debug(
 )
     isdir(dir) || mkpath(dir)
     @info "plotting debug in $dir"
-    # These heatmaps crash on current Makie, which would abort the run during
-    # postprocessing after the science is already done. Profiling runs only need
-    # the timing output, so degrade to a warning instead of taking down the job.
-    try
-        for sim in cs.model_sims
-            Plotting.debug(sim, dir)
-        end
-        Plotting.debug(cs.fields, dir, cs_fields_ref)
-    catch e
-        @warn "debug plots failed; continuing" exception = (e, catch_backtrace())
+    for sim in cs.model_sims
+        Plotting.debug(sim, dir)
     end
+    Plotting.debug(cs.fields, dir, cs_fields_ref)
 end
 
 """

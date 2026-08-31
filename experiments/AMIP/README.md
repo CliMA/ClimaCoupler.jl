@@ -2,8 +2,8 @@
 
 This directory contains the Julia environment and driver scripts for running
 AMIP, slabplanet, and subseasonal simulations. It does **not** include
-dependencies needed for CMIP simulations (Oceananigans, ClimaOcean,
-ClimaSeaIce, KernelAbstractions). For CMIP, see `experiments/CMIP/`.
+dependencies needed for CMIP simulations (Oceananigans, ClimaSeaIce,
+KernelAbstractions, ConservativeRegridding). For CMIP, see `experiments/CMIP/`.
 
 ## Running
 

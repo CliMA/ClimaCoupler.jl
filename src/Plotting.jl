@@ -134,7 +134,15 @@ function postprocess(
     make_ocean_diagnostics_plots(ocean_output_dir, artifacts_dir, output_prefix = "ocean_")
 
     # Plot all model states and coupler fields (useful for debugging)
-    ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext && debug(cs, artifacts_dir)
+    # ClimaCoreMakie's fieldheatmap currently crashes on the resolved
+    # Makie/ComputePipeline stack; don't let debug plotting fail the run.
+    if ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext
+        try
+            debug(cs, artifacts_dir)
+        catch e
+            @warn "Skipping debug plots; debug() failed" exception = e
+        end
+    end
 
     # Helper function to find a tuple of (short_name, reduction, period, coord_type)
     # whose period is "1M".

@@ -7,6 +7,7 @@ module TimeManager
 
 import Dates
 import ClimaDiagnostics as CD
+import ClimaUtilities.TimeManager: ITime, date
 import ..Interfacer
 import ..Utilities: time_to_seconds
 
@@ -196,18 +197,25 @@ end
 """
     calendar_dt_schedule(period, start_date, t_start)
 
-Build an `EveryCalendarDtSchedule` for `period` (a time string or a
-`Dates.Period`) whose `date_last` is seeded from `t_start`.
+Build an `EveryCalendarDtSchedule` for `period`, which is either a `Dates.Period`
+or a string of the form `<NUM><unit>` accepted by [`time_to_period`](@ref), such
+as `"6hours"`.
 
-Without the seeding, a schedule built at `t_start > 0` believes it is overdue and
-fires on the first step of a restarted simulation, staying one coupling step out
-of phase from then on. Seeding `date_last` keeps a restarted schedule on the same
-calendar boundaries as the original run. For a fresh simulation `t_start` is 0 and
-the behavior is unchanged.
+`t_start` is the time the simulation starts from, either an `ITime` or a number of
+seconds since `start_date`. It is used to seed the schedule's `date_last`.
+
+!!! note "Use this instead of `EveryCalendarDtSchedule` directly"
+    A schedule built directly at `t_start > 0` has no record of the time that
+    already elapsed, so it considers itself overdue and fires on the first step of
+    a restarted simulation, remaining one coupling step out of phase from then on.
+    Seeding `date_last` keeps a restarted run on the same calendar boundaries as
+    the original one. A fresh simulation starts at `t_start = 0` and is unaffected.
 """
 function calendar_dt_schedule(period, start_date, t_start)
     period isa Dates.Period || (period = time_to_period(period))
-    date_last = start_date + Dates.Millisecond(round(Int64, 1000 * float(t_start)))
+    date_last =
+        t_start isa ITime ? date(t_start) :
+        start_date + Dates.Millisecond(round(Int64, 1000 * float(t_start)))
     return CD.Schedules.EveryCalendarDtSchedule(period; start_date, date_last)
 end
 

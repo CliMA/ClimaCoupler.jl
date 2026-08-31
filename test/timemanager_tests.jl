@@ -5,6 +5,7 @@ import Test: @testset, @test, @test_logs, @test_throws
 import Dates
 import ClimaDiagnostics as CD
 import ClimaCoupler: TimeManager
+import ClimaUtilities.TimeManager: ITime
 
 @testset "time_to_period" begin
     @test TimeManager.time_to_period("2months") == Dates.Month(2)
@@ -135,6 +136,19 @@ end
     # A Dates.Period is accepted as well as a time string
     periodic = TimeManager.calendar_dt_schedule(Dates.Day(1), start_date, 0.0)
     @test periodic((; t = 86400.0))
+
+    # ITime times behave the same way, with the date taken from the ITime itself
+    day = ITime(86400, epoch = start_date)
+    t0 = ITime(0, epoch = start_date)
+    fresh_itime = TimeManager.calendar_dt_schedule("1days", start_date, t0)
+    @test !fresh_itime((; t = 0 * day))
+    @test fresh_itime((; t = day))
+
+    restarted_itime = TimeManager.calendar_dt_schedule("1days", start_date, 2 * day)
+    step = ITime(180, epoch = start_date)
+    @test !restarted_itime((; t = 2 * day + step))
+    @test restarted_itime((; t = 3 * day))
+    @test !restarted_itime((; t = 3 * day + step))
 end
 
 @testset "walltime_schedule" begin

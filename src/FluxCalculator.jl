@@ -273,7 +273,7 @@ function get_surface_fluxes(
         update_q_vap_sfc,
     )
 
-    (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc) = outputs
+    (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc, ustar, L_MO) = outputs
 
     return (;
         F_turb_ρτxz = ρτxz,
@@ -282,6 +282,8 @@ function get_surface_fluxes(
         F_lh = lhf,
         F_turb_moisture = evaporation,
         T_sfc_new = T_sfc,
+        ustar = ustar,
+        L_MO = L_MO,
     )
 end
 
@@ -425,8 +427,18 @@ NVTX.@annotate function compute_surface_fluxes!(
 
     # Update the coupler fields and surface simulation with the fluxes
     update_flux_fields!(csf, sim, fluxes, accumulator)
+    compute_sslt_emission!(csf, sim, atmos_sim, fluxes)
     return nothing
 end
+
+"""
+    compute_sslt_emission!(csf, sim, atmos_sim, fluxes)
+
+No-op unless the surface emits sea salt (`AbstractOceanSimulation` or
+`PrescribedOceanSimulation`); see the full implementation in the ClimaAtmos
+extension.
+"""
+compute_sslt_emission!(csf, sim, atmos_sim, fluxes) = nothing
 
 """
     update_flux_fields!(csf, sim::Interfacer.AbstractSurfaceSimulation, fluxes, accumulator = nothing)

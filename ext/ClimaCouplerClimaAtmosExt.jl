@@ -559,6 +559,53 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
 end
 
 """
+    FluxCalculator.compute_sslt_emission!(csf, ocean_sim, atmos_sim::ClimaAtmosSimulation, fluxes)
+
+Compute ocean sim's sea salt emission mass flux by `area_fraction`,
+using its MOST solution (`fluxes.ustar`, `fluxes.L_MO`), and set it in the atmosphere's cache via
+`ClimaAtmos.set_sslt_surface_fluxes!`. Called from [`compute_surface_fluxes!`](@ref).
+No-op unless the atmosphere carries prognostic sea salt.
+"""
+function FluxCalculator.compute_sslt_emission!(
+    csf,
+    ocean_sim::Union{Interfacer.AbstractOceanSimulation,
+               Models.PrescribedOceanSimulation},
+    atmos_sim::ClimaAtmosSimulation,
+    fluxes,
+)
+    FT = eltype(atmos_sim.integrator.u)
+    p = atmos_sim.integrator.p
+    hasproperty(p.tracers, :sslt_sfc_fluxes) || return nothing
+    ap = atmos_sim.params.prognostic_aerosol_params
+    sfp = FluxCalculator.get_surface_params(atmos_sim)
+    area_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
+
+    u₁₀ = csf.scalar_temp3
+    @. u₁₀ = ifelse(
+        area_fraction ≈ 0,
+        FT(0),
+        CA.wind_at_height(FT(10), fluxes.ustar, fluxes.L_MO, sfp),
+    )
+
+    bin_flux = csf.scalar_temp4
+    bin_fluxes = ntuple(length(p.tracers.sslt_sfc_fluxes)) do i
+        @. bin_flux =
+            area_fraction * CA.sslt_bin_emission_flux(
+                u₁₀,
+                FT(ap.bin_mass_flux[i]),
+                ap.ssa_u_ref,
+                ap.gong_wind_exp,
+            )
+        temp_field_surface = similar(p.scratch.ᶠtemp_field_level)
+        Interfacer.remap!(temp_field_surface, bin_flux)
+        temp_field_surface
+    end
+
+    CA.set_sslt_surface_fluxes!(atmos_sim.integrator.u, p, bin_fluxes)
+    return nothing
+end
+
+"""
 Extend Interfacer.add_coupler_fields! to add the fields required for ClimaAtmosSimulation.
 
 The fields added are:

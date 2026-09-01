@@ -65,6 +65,7 @@ function BucketSimulation(
     era5_albedo_file_path::Union{Nothing, String} = nothing,
     coupled_param_dict = CP.create_toml_dict(FT),
     gustiness::FT = FT(1),
+    dt_drivers::ITime = ITime(3600),
     extra_kwargs...,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Get default land parameters from ClimaLand.LandParameters
@@ -205,6 +206,7 @@ function BucketSimulation(
         user_callbacks = (),
         diagnostics,
         timestepper,
+        updateat = dt_drivers,
     )
 
     # Scratch buffer for `turbulent_fluxes_at_a_point` output when the bucket is a slow

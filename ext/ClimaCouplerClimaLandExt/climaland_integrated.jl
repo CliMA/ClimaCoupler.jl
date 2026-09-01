@@ -46,7 +46,8 @@ end
         land_ic_path::Union{Nothing,String} = nothing,
         lai_source::String = "modis_monthly",
         gustiness::FT = FT(1),
-    ) where {FT, TT <: Union{Float64, ITime}}
+        dt_drivers::TT = ITime(3600),
+    ) where {FT, ITime <: Union{Float64, ITime}}
 
 Creates a ClimaLandSimulation object containing a land domain,
 a ClimaLand.LandModel, and an integrator.
@@ -54,6 +55,10 @@ a ClimaLand.LandModel, and an integrator.
 This type of model contains a canopy model, soil model, snow model, and
 soil CO2 model. Specific details about the complexity of the model
 can be found in the ClimaLand.jl documentation.
+
+`dt_drivers` is an ITime type, reflecting the integer number of seconds describing how often to
+update the zenith angle. The CouplerSimulation setup sets this equal to
+the callback period that the atmosphere uses to update radiation.
 
 # Arguments
 - `lai_source::String = "modis_monthly"`: Source for leaf area index data. Options:
@@ -81,6 +86,7 @@ function ClimaLandSimulation(
     land_ic_path::Union{Nothing, String} = nothing,
     lai_source::String = "modis_monthly",
     gustiness::FT = FT(1),
+    dt_drivers::ITime = ITime(3600),
     extra_kwargs...,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Get default land parameters from ClimaLand.LandParameters
@@ -242,6 +248,7 @@ function ClimaLandSimulation(
         set_ic!,
         user_callbacks = (),
         diagnostics,
+        updateat = dt_drivers,
     )
 
     # Initialize the surface emissivity so the atmosphere can compute radiation.

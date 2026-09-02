@@ -47,7 +47,7 @@ end
         land_ic_path::Union{Nothing,String} = nothing,
         lai_source::String = "modis_monthly",
         gustiness::FT = FT(1),
-        dt_drivers::TT = ITime(3600),
+        dt_drivers::ITime = ITime(3600),
     ) where {FT, TT <: Union{Float64, ITime}}
 
 Creates a ClimaLandSimulation object containing a land domain,

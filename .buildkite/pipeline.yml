@@ -238,6 +238,14 @@ steps:
         agents:
           slurm_mem: 20GB
 
+      - label: "Slabplanet aqua: prognostic sea salt emission"
+        key: "slabplanet_aqua_seasalt"
+        command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_aqua_seasalt.yml --job_id slabplanet_aqua_seasalt"
+        retry: *retry_policy
+        artifact_paths: "output/slabplanet_aqua_seasalt/artifacts/*"
+        agents:
+          slurm_mem: 20GB
+
       # AMIP EXPERIMENTS
 
       # Test default behavior with no config file or job ID provided

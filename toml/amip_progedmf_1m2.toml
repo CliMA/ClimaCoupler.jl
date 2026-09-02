@@ -81,3 +81,6 @@ value = 0.55
 
 [cloud_fraction_eps_rel]
 value = 0.05
+
+[Tq_correlation_coefficient]
+value = -0.6

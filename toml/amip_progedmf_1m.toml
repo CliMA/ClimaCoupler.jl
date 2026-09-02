@@ -74,10 +74,13 @@ value = 1360
 value = 2e-4
 
 [cloud_ice_specific_humidity_autoconversion_threshold]
-value = 1e-5
+value = 5e-6
 
 [cloud_fraction_steepness_scale]
 value = 0.55
 
 [cloud_fraction_eps_rel]
 value = 0.05
+
+[diagnostic_covariance_coeff]
+value = 8.4

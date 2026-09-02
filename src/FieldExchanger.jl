@@ -358,22 +358,44 @@ Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 """
 function step_model_sims!(model_sims, t, coupler_fields, thermo_params, step_concurrently)
     if step_concurrently && (haskey(model_sims, :ocean_sim) || haskey(model_sims, :ice_sim))
-        @sync begin
+        # Group 1: land and atmosphere. These are implicitly coupled, so they
+        # step sequentially inside a single task.
+        land_atmos_group = function ()
             if haskey(model_sims, :land_sim)
-                Threads.@spawn Interfacer.step!(model_sims.land_sim, model_sims.atmos_sim, t, coupler_fields, thermo_params)
+                Interfacer.step!(model_sims.land_sim, model_sims.atmos_sim, t, coupler_fields, thermo_params)
             else
-                Threads.@spawn begin
-                    # Same ordering requirement as the grouped land/atmos methods above:
-                    # the atmosphere needs its turbulent fluxes before it steps.
-                    FluxCalculator.update_turbulent_fluxes!(model_sims.atmos_sim, coupler_fields)
-                    Interfacer.step!(model_sims.atmos_sim, t)
-                end
+                # Same ordering requirement as the grouped land/atmos methods above:
+                # the atmosphere needs its turbulent fluxes before it steps.
+                FluxCalculator.update_turbulent_fluxes!(model_sims.atmos_sim, coupler_fields)
+                Interfacer.step!(model_sims.atmos_sim, t)
             end
-            if haskey(model_sims, :ocean_sim)
-                Threads.@spawn Interfacer.step!(model_sims.ocean_sim, t)
-            end
-            if haskey(model_sims, :ice_sim)
-                Threads.@spawn Interfacer.step!(model_sims.ice_sim, t)
+        end
+
+        # Group 2: sea ice and ocean. These must NOT be separate tasks. The sea
+        # ice model is built holding views into the ocean's live surface fields
+        # -- `ocean_surface_velocities` and `ocean_surface_salinity` return
+        # `view`s of `ocean.model.velocities.u/v` and `ocean.model.tracers.S`,
+        # which are captured in the ice model's `SemiImplicitStress` and
+        # `IceWaterThermalEquilibrium`. Stepping them in parallel lets the ice
+        # read ocean velocity and salinity while the ocean is writing them.
+        # Step the ice first, matching the ordering of the sequential branch
+        # below, so the ice sees the ocean state from before the ocean steps.
+        ice_ocean_group = function ()
+            haskey(model_sims, :ice_sim) && Interfacer.step!(model_sims.ice_sim, t)
+            haskey(model_sims, :ocean_sim) && Interfacer.step!(model_sims.ocean_sim, t)
+        end
+
+        if get(ENV, "COUPLER_SEQUENTIAL_GROUPS", "0") in ("1", "true", "TRUE", "yes")
+            # Diagnostic mode: identical grouping and ordering to the concurrent
+            # path, but with no parallelism between the two groups. Used to
+            # isolate whether a discrepancy comes from cross-group concurrency or
+            # from the regrouping itself.
+            land_atmos_group()
+            ice_ocean_group()
+        else
+            @sync begin
+                Threads.@spawn land_atmos_group()
+                Threads.@spawn ice_ocean_group()
             end
         end
     else

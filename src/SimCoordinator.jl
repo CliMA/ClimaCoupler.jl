@@ -250,6 +250,24 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     Random.seed!(random_seed)
     @info "Random seed set to $(random_seed)"
 
+    # Concurrent component stepping only pays off on a GPU, where each component
+    # occupies a single Julia thread and submits to its own CUDA stream. On a CPU
+    # device every component fans out over all threads through KernelAbstractions,
+    # so the components oversubscribe each other and nothing is gained. Neither
+    # case is incorrect, so warn rather than error.
+    if step_concurrently
+        if !(comms_ctx.device isa ClimaComms.CUDADevice)
+            @warn "`step_concurrently` is set, but the device is \
+                   $(nameof(typeof(comms_ctx.device))), not CUDADevice. Component models \
+                   will be stepped in separate tasks that contend for the same threads, \
+                   which adds overhead without speeding anything up."
+        elseif Threads.nthreads() == 1
+            @warn "`step_concurrently` is set, but Julia is running with a single thread, \
+                   so the component tasks will time-share it and run effectively \
+                   sequentially. Start Julia with `--threads=N` (N ≥ 2) to get concurrency."
+        end
+    end
+
     tspan = (t_start, t_end)
     @info "Starting from t_start $(t_start)"
 

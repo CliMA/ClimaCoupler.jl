@@ -134,13 +134,15 @@ function postprocess(
     make_ocean_diagnostics_plots(ocean_output_dir, artifacts_dir, output_prefix = "ocean_")
 
     # Plot all model states and coupler fields (useful for debugging)
-    # ClimaCoreMakie's fieldheatmap currently crashes on the resolved
-    # Makie/ComputePipeline stack; don't let debug plotting fail the run.
+    # Plot all model states and coupler fields (useful for debugging).
+    # Guarded: the ClimaCoreMakie/Makie debug heatmaps currently crash on this
+    # stack (ComputePipeline BoundsError); skip them so postprocess completes.
     if ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext
         try
             debug(cs, artifacts_dir)
-        catch e
-            @warn "Skipping debug plots; debug() failed" exception = e
+        catch err
+            @warn "Skipping debug plots; plotting stack error in postprocess" exception =
+                (err, catch_backtrace())
         end
     end
 

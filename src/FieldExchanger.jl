@@ -311,6 +311,12 @@ function Interfacer.step!(land_sim::Interfacer.AbstractLandSimulation, atmos_sim
     # Step the land simulation first
     Interfacer.step!(land_sim, t)
 
+    # Update the atmosphere with the fluxes across all surface models. An explicit-flux
+    # land model does not precompute fluxes the way an `AbstractImplicitFluxSimulation`
+    # does, but the atmosphere still must not be stepped before this update -- the serial
+    # branch of `step_model_sims!` always performs it.
+    FluxCalculator.update_turbulent_fluxes!(atmos_sim, coupler_fields)
+
     # Step the atmosphere model
     Interfacer.step!(atmos_sim, t)
 end
@@ -351,12 +357,17 @@ Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 - `thermo_params`: thermodynamic parameters.
 """
 function step_model_sims!(model_sims, t, coupler_fields, thermo_params, step_concurrently)
-    if step_concurrently && (haskey(model_sims, :ocean_sim) || haskey(model_sims, :seaice_sim))
+    if step_concurrently && (haskey(model_sims, :ocean_sim) || haskey(model_sims, :ice_sim))
         @sync begin
             if haskey(model_sims, :land_sim)
                 Threads.@spawn Interfacer.step!(model_sims.land_sim, model_sims.atmos_sim, t, coupler_fields, thermo_params)
             else
-                Threads.@spawn Interfacer.step!(model_sims.atmos_sim, t)
+                Threads.@spawn begin
+                    # Same ordering requirement as the grouped land/atmos methods above:
+                    # the atmosphere needs its turbulent fluxes before it steps.
+                    FluxCalculator.update_turbulent_fluxes!(model_sims.atmos_sim, coupler_fields)
+                    Interfacer.step!(model_sims.atmos_sim, t)
+                end
             end
             if haskey(model_sims, :ocean_sim)
                 Threads.@spawn Interfacer.step!(model_sims.ocean_sim, t)

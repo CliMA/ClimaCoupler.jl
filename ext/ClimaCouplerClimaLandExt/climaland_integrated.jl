@@ -38,6 +38,7 @@ end
         depth::FT = FT(15),
         dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
         shared_surface_space = nothing,
+        surface_elevation = nothing,
         land_spun_up_ic::Bool = true,
         atmos_h,
         initial_T,
@@ -46,8 +47,8 @@ end
         land_ic_path::Union{Nothing,String} = nothing,
         lai_source::String = "modis_monthly",
         gustiness::FT = FT(1),
-        dt_drivers::TT = ITime(3600),
-    ) where {FT, ITime <: Union{Float64, ITime}}
+        dt_drivers::ITime = ITime(3600),
+    ) where {FT, TT <: Union{Float64, ITime}}
 
 Creates a ClimaLandSimulation object containing a land domain,
 a ClimaLand.LandModel, and an integrator.
@@ -56,7 +57,7 @@ This type of model contains a canopy model, soil model, snow model, and
 soil CO2 model. Specific details about the complexity of the model
 can be found in the ClimaLand.jl documentation.
 
-`dt_drivers` is an ITime type, reflecting the integer number of seconds describing how often to
+`dt_drivers` is a number of seconds (as an ITime) describing how often to
 update the zenith angle. The CouplerSimulation setup sets this equal to
 the callback period that the atmosphere uses to update radiation.
 
@@ -76,6 +77,7 @@ function ClimaLandSimulation(
     depth::FT = FT(15),
     dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
     shared_surface_space = nothing,
+    surface_elevation = nothing,
     land_spun_up_ic::Bool = true,
     atmos_h,
     initial_T,
@@ -115,7 +117,12 @@ function ClimaLandSimulation(
     # of the land model.
     atmos_h = Interfacer.remap(surface_space, atmos_h)
     initial_T = Interfacer.remap(surface_space, initial_T)
-
+    # If provided, interpolate surface elevation field to surface space; otherwise use zero elevation
+    if isnothing(surface_elevation)
+        surface_elevation = CC.Fields.zeros(surface_space)
+    else
+        surface_elevation = Interfacer.remap(surface_space, surface_elevation)
+    end
     # `tspan` can contain non-zero values (e.g. (720.0, 900.0)) when restarting
     sim_start_date = start_date + Dates.Second(float(tspan[1]))
     sim_stop_date = start_date + Dates.Second(float(tspan[2]))
@@ -151,30 +158,10 @@ function ClimaLandSimulation(
             "Unknown lai_source: $lai_source. Must be \"modis_monthly\" or \"modis_monthly_climatology\"",
         )
     end
-    ground = CL.PrognosticGroundConditions{FT}()
-    canopy_forcing = (; forcing.atmos, forcing.radiation, ground)
+
     prognostic_land_components = (:canopy, :snow, :soil, :soilco2)
-    surface_domain = CL.Domains.obtain_surface_domain(domain)
-    photosynthesis = CL.Canopy.FarquharModel{FT}(surface_domain, toml_dict)
-    conductance = CL.Canopy.MedlynConductanceModel{FT}(surface_domain, toml_dict)
-    canopy = CL.Canopy.CanopyModel{FT}(
-        surface_domain,
-        canopy_forcing,
-        LAI,
-        toml_dict;
-        prognostic_land_components,
-        photosynthesis,
-        conductance,
-    )
-    model = CL.LandModel{FT}(
-        forcing,
-        LAI,
-        toml_dict,
-        domain,
-        dt;
-        prognostic_land_components,
-        canopy,
-    )
+    model =
+        CL.LandModel{FT}(forcing, LAI, toml_dict, domain, dt; prognostic_land_components)
 
     # Set up diagnostics
     if use_land_diagnostics
@@ -203,37 +190,35 @@ function ClimaLandSimulation(
     # Define functions to set initial conditions
     if !land_spun_up_ic && !isnothing(land_ic_path)
         @info "ClimaLand: using land IC file" land_ic_path
-        # Note: This `set_ic!` function does not require `p.drivers.T` to be set,
-        # so we do not need to use `_coupler_set_ic!` here.
-        set_ic! = CL.Simulations.make_set_subseasonal_initial_conditions(land_ic_path)
+        set_ic_land! = CL.Simulations.make_set_initial_state_from_era5land(land_ic_path)
+        extrapolation_bc =
+            (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
+        interpolation_method = Interpolations.Linear() # this matches the Linear interpolation used in the land IC function as well
+        surface_T = SpaceVaryingInput(
+            land_ic_path,
+            "skt",
+            domain.space.surface;
+            regridder_type = :InterpolationsRegridder,
+            regridder_kwargs = (; extrapolation_bc, interpolation_method),
+        )
     elseif land_spun_up_ic
         # Use artifact spun-up initial conditions
         ic_path = CL.Artifacts.soil_ic_2008_50m_path()
         @info "ClimaLand: using land IC file" ic_path
-
-        # Set initial conditions from file, and set air temperature to the input atmospheric temperature
-        spun_up_set_ic! = CL.Simulations.make_set_initial_state_from_file(
+        set_ic_land! = CL.Simulations.make_set_initial_state_from_file(
             ic_path,
             model;
             enforce_constraints = true,
         )
-        set_ic! =
-            (Y, p, t, model) -> _coupler_set_ic!(Y, p, t, model, initial_T, spun_up_set_ic!)
-
+        surface_T = initial_T
     else
-        set_ic_from_atmos_and_parameters! =
+        set_ic_land! =
             CL.Simulations.make_set_initial_state_from_atmos_and_parameters(model)
-        set_ic! =
-            (Y, p, t, model) -> _coupler_set_ic!(
-                Y,
-                p,
-                t,
-                model,
-                initial_T,
-                set_ic_from_atmos_and_parameters!,
-            )
+        surface_T = initial_T
     end
-
+    set_ic! =
+        (Y, p, t, model) ->
+            _coupler_set_ic!(Y, p, t, model, surface_T, surface_elevation, set_ic_land!)
     # Convert start_date and stop_date to ITime if using ITime
     if dt isa ITime
         start_date = tspan[1]

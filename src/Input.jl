@@ -233,10 +233,6 @@ function argparse_settings()
         help = "Land model to use. [`bucket` (default), `integrated`, `nothing`]"
         arg_type = String
         default = "bucket"
-        "--land_temperature_anomaly"
-        help = "Type of temperature anomaly for land model. [`amip`, `aquaplanet` (default), `nothing`]"
-        arg_type = String
-        default = "aquaplanet"
         "--use_land_diagnostics"
         help = "Boolean flag indicating whether to compute and output land model diagnostics [`true` (default), `false`]"
         arg_type = Bool
@@ -287,6 +283,10 @@ function argparse_settings()
         help = "Horizontal grid for Oceananigans ocean model. [`one_deg_tripolar` (default), `orca`]"
         arg_type = String
         default = "one_deg_tripolar"
+        "--use_intersection_grid"
+        help = "Boolean flag indicating whether to use the atmosphere-ocean intersection (exchange) grid for surface fractions and ocean/sea-ice fluxes with Oceananigans. Automatically disabled for unsupported setups (column mode, distributed runs). [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
         "--sst_adjustment"
         help = "Adjustment to add to prescribed SST after conversion to Kelvin (default: 0.0)"
         arg_type = Float64
@@ -591,7 +591,6 @@ function get_coupler_args(config_dict::Dict)
 
     # ClimaLand-specific information
     land_model = Val(Symbol(config_dict["land_model"]))
-    land_temperature_anomaly = lowercase(config_dict["land_temperature_anomaly"])
     use_land_diagnostics = config_dict["use_land_diagnostics"]
     land_spun_up_ic = config_dict["land_spun_up_ic"]
     lai_source = config_dict["lai_source"]
@@ -617,6 +616,7 @@ function get_coupler_args(config_dict::Dict)
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
     simple_ocean = config_dict["simple_ocean"]
     ocean_grid = Symbol(lowercase(config_dict["ocean_grid"]))
+    use_intersection_grid = config_dict["use_intersection_grid"]
     sst_adjustment = FT(config_dict["sst_adjustment"])
     ocean_progress_interval = config_dict["ocean_progress_interval"]
     ocean_diagnostic_interval = config_dict["ocean_diagnostic_interval"]
@@ -696,7 +696,6 @@ function get_coupler_args(config_dict::Dict)
         rmse_check,
         output_dir_root,
         land_model,
-        land_temperature_anomaly,
         land_spun_up_ic,
         lai_source,
         use_land_diagnostics,
@@ -709,6 +708,7 @@ function get_coupler_args(config_dict::Dict)
         ocean_model,
         simple_ocean,
         ocean_grid,
+        use_intersection_grid,
         sst_adjustment,
         ocean_progress_interval,
         ocean_diagnostic_interval,

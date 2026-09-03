@@ -39,8 +39,9 @@ end
 """
     OceanSlabParameters{FT}(coupled_param_dict; h = FT(20), ρ = FT(1500),
                             c = FT(800), T_init = FT(271), z0m = FT(5e-4),
-                            z0b = FT(5e-4), α = FT(0.38), ϵ = FT(1),
-                            evolving_switch = FT(1))
+                            z0b = FT(5e-4),
+                            α = FT(coupled_param_dict["idealized_ocean_albedo"]),
+                            ϵ = FT(1), evolving_switch = FT(1))
 
 Initialize the `OceanSlabParameters` object with the coupled parameters.
 
@@ -52,7 +53,7 @@ Initialize the `OceanSlabParameters` object with the coupled parameters.
 - `T_init`: initial temperature of the ocean [K] (default: 271)
 - `z0m`: roughness length for momentum [m] (default: 5e-4)
 - `z0b`: roughness length for heat [m] (default: 5e-4)
-- `α`: albedo of the ocean [0, 1] (default: 0.38)
+- `α`: albedo of the ocean [0, 1] (default: `idealized_ocean_albedo` from the param dict)
 - `ϵ`: emissivity of the ocean (default: 1)
 - `evolving_switch`: switch to turn off the evolution of the ocean temperature [0 or 1] (default: 1)
 
@@ -67,7 +68,7 @@ function OceanSlabParameters{FT}(
     T_init = FT(271),
     z0m = FT(5e-4),
     z0b = FT(5e-4),
-    α = FT(0.38),
+    α = FT(coupled_param_dict["idealized_ocean_albedo"]),
     ϵ = FT(1),
     evolving_switch = FT(1),
 ) where {FT}

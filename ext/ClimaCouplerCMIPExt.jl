@@ -28,6 +28,7 @@ import ClimaCoupler:
     Plotting
 import Oceananigans as OC
 import ClimaSeaIce as CSI
+import ClimaAtmos as CA # for basis conversions (projected_vector_data)
 import ClimaCore as CC
 import ClimaParams as CP
 using KernelAbstractions: @kernel, @index, @inbounds
@@ -39,6 +40,13 @@ import SparseArrays # for converting Regridder element types
 
 get_ConservativeRegriddingCCExt() =
     Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
+get_ConservativeRegriddingOCExt() =
+    Base.get_extension(CR, :ConservativeRegriddingOceananigansExt)
+
+# Exchange-grid geometry/weights and per-polygon flux machinery, used by the
+# ocean and sea-ice models below
+include("ClimaCouplerCMIPExt/exchange_grid.jl")
+include("ClimaCouplerCMIPExt/exchange_fluxes.jl")
 
 # Data readers first: the model files call into them during construction
 include("ClimaCouplerCMIPExt/ocean_data_artifacts.jl")

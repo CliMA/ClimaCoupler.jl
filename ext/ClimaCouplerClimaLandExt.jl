@@ -18,7 +18,10 @@ import Dates
 import ClimaUtilities.TimeVaryingInputs:
     LinearInterpolation, PeriodicCalendar, TimeVaryingInput, TimeVaryingInputs
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
+import ClimaUtilities.Regridders: InterpolationsRegridder
+import Interpolations
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
+import ClimaUtilities.TimeManager: ITime
 import ClimaCoupler:
     Checkpointer,
     ConservationChecker,
@@ -37,7 +40,6 @@ import ClimaComms
 import ClimaUtilities.TimeManager: ITime
 using NCDatasets
 import StaticArrays
-import Interpolations
 
 include("ClimaCouplerClimaLandExt/climaland_helpers.jl")
 include("ClimaCouplerClimaLandExt/climaland_bucket.jl")

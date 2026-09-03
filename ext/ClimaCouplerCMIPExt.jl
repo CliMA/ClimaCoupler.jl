@@ -19,6 +19,7 @@ module ClimaCouplerCMIPExt
 import ClimaCoupler
 import ClimaCoupler:
     Checkpointer,
+    ConservationChecker,
     FieldExchanger,
     FluxCalculator,
     Interfacer,

@@ -24,6 +24,7 @@ import LinearAlgebra
 import Statistics
 import ClimaCoupler:
     Checkpointer,
+    ConservationChecker,
     FieldExchanger,
     FluxCalculator,
     Interfacer,
@@ -106,8 +107,11 @@ function ClimaAtmosSimulation(atmos_config)
         ρ_flux_q_tot = integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot
         @. ρ_flux_q_tot = CC.Geometry.Covariant3Vector(FT(0.0))
 
+        # Zero the precipitation fluxes so that the first conservation check sees no
+        # precipitation in transit between the atmosphere and the surfaces
         integrator.p.precomputed.surface_rain_flux .= FT(0)
         integrator.p.precomputed.surface_snow_flux .= FT(0)
+        integrator.p.precomputed.col_integrated_precip_energy_tendency .= FT(0)
     end
 
     microphysics_model = integrator.p.atmos.microphysics_model
@@ -175,12 +179,13 @@ end
 
 
 """
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
+    radiative_energy_flux_toa(sim::ClimaAtmosSimulation)
 
-Extension of Interfacer.get_field to get the net TOA radiation, which is a sum of the
-upward and downward longwave and shortwave radiation.
+Compute the net TOA radiation, the sum of the upward and downward longwave and
+shortwave radiation, integrated over the globe (W). A positive value means the
+coupled system is losing energy to space.
 """
-function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy_flux_toa})
+function radiative_energy_flux_toa(sim::ClimaAtmosSimulation)
     FT = eltype(sim.integrator.u)
 
     if hasradiation(sim.integrator)
@@ -212,24 +217,24 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:radiative_energy
             nz_faces - CC.Utilities.half,
         )
 
-        return @. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA)
+        return Utilities.integral(@. -(LWd_TOA + SWd_TOA - LWu_TOA - SWu_TOA))
     else
-        return FT[0]
+        return zero(FT)
     end
 end
 
-function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:energy})
-    integrator = sim.integrator
-    p = integrator.p
+"""
+    total_energy(sim::ClimaAtmosSimulation)
 
-    # return total energy and (if EquilibriumMicrophysics0M) the energy lost due to precipitation removal
+Compute the total energy of the atmosphere, `∫ ρe_tot dV`, integrated over the whole
+domain (in Joules), plus the energy of the precipitation that is in transit between the
+atmosphere and the surfaces.
+"""
+function total_energy(sim::ClimaAtmosSimulation)
+    integrator = sim.integrator
     microphysics_model = integrator.p.atmos.microphysics_model
-    if microphysics_model isa CA.EquilibriumMicrophysics0M
-        (; ᶜρ_de_tot_dt) = p.precomputed
-        return integrator.u.c.ρe_tot .- ᶜρ_de_tot_dt .* float(integrator.dt)
-    else
-        return integrator.u.c.ρe_tot
-    end
+    return sum(integrator.u.c.ρe_tot) +
+           precip_energy_in_transit(microphysics_model, integrator)
 end
 
 # helpers for get_field extensions, dipatchable on different moisture model options and radiation modes
@@ -275,16 +280,34 @@ moisture_flux(
     integrator,
 ) = CC.Geometry.WVector.(integrator.p.precomputed.sfc_conditions.ρ_flux_q_tot)
 
-ρq_tot(::CA.DryModel, integrator) = eltype(integrator.u)(0)
-ρq_tot(
-    ::Union{
-        CA.EquilibriumMicrophysics0M,
-        CA.NonEquilibriumMicrophysics1M,
-        CA.NonEquilibriumMicrophysics2M,
-        CA.NonEquilibriumMicrophysics2MP3,
-    },
-    integrator,
-) = integrator.u.c.ρq_tot
+# A dry model holds no water to integrate
+integrated_ρq_tot(::CA.DryModel, integrator) = eltype(integrator.u)(0)
+
+# With the 1- and 2-moment schemes `ρq_tot` includes the precipitating species `ρq_rai`
+# and `ρq_sno`, so this is the total water the atmosphere holds under every moist scheme.
+integrated_ρq_tot(::CA.MoistMicrophysics, integrator) = sum(integrator.u.c.ρq_tot)
+
+# Add back energy and water of precipitation in transit between the atmosphere and the surfaces 
+# (Note that `dt` here is the atmosphere timestep, while precipitation is held up for one
+# coupling step, so this underestimates the amount in transit when `dt_atmos < dt_cpl`)
+
+precip_energy_in_transit(::CA.DryModel, integrator) = eltype(integrator.u)(0)
+precip_water_in_transit(::CA.DryModel, integrator) = eltype(integrator.u)(0)
+
+function precip_energy_in_transit(::CA.MoistMicrophysics, integrator)
+    (; col_integrated_precip_energy_tendency) = integrator.p.precomputed
+    FT = eltype(integrator.u.c.ρe_tot)
+    dt = FT(float(integrator.dt))
+    return -dt * Utilities.integral(col_integrated_precip_energy_tendency)
+end
+
+function precip_water_in_transit(::CA.MoistMicrophysics, integrator)
+    (; surface_rain_flux, surface_snow_flux) = integrator.p.precomputed
+    FT = eltype(integrator.u.c.ρq_tot)
+    dt = FT(float(integrator.dt))
+    return -dt *
+           (Utilities.integral(surface_rain_flux) + Utilities.integral(surface_snow_flux))
+end
 
 # extensions required by the Interfacer
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:air_pressure}) =
@@ -365,8 +388,39 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})
         CC.Utilities.half,
     )
 end
-Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:water}) =
-    ρq_tot(sim.integrator.p.atmos.microphysics_model, sim.integrator)
+
+"""
+    total_water(sim::ClimaAtmosSimulation)
+
+Return the total water of the atmosphere, `∫ ρq_tot dV`, integrated over the whole
+domain (in kilograms), plus the precipitation that is in transit between the atmosphere
+and the surfaces. Returns zero for a dry model.
+"""
+function total_water(sim::ClimaAtmosSimulation)
+    integrator = sim.integrator
+    microphysics_model = integrator.p.atmos.microphysics_model
+    return integrated_ρq_tot(microphysics_model, integrator) +
+           precip_water_in_transit(microphysics_model, integrator)
+end
+
+"""
+    ConservationChecker.contributions(cq, sim::ClimaAtmosSimulation)
+
+The atmosphere holds energy and water, and loses energy to space through the top of
+the atmosphere. The TOA radiation is a rate, so it is accumulated by the checker.
+"""
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalEnergy,
+    sim::ClimaAtmosSimulation,
+) = (;
+    reservoir = total_energy(sim), # J
+    toa_net = ConservationChecker.Accumulated(radiative_energy_flux_toa(sim)), # W
+)
+
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalWater,
+    sim::ClimaAtmosSimulation,
+) = (; reservoir = total_water(sim)) # kg
 
 function Interfacer.update_field!(
     sim::ClimaAtmosSimulation,

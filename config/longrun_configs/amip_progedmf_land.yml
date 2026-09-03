@@ -5,7 +5,7 @@ checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_progedmf.toml"]
 dt: "120secs"
 dt_cpl: "120secs"
-energy_check: false
+conservation_check: false
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta]
     period: 1months

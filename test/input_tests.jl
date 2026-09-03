@@ -87,7 +87,7 @@ end
         "land_diagnostics_reduction" => "average",
         "land_progress_interval" => "never",
         "evolving_ocean" => true,
-        "energy_check" => false,
+        "conservation_check" => false,
         "conservation_softfail" => false,
         "rmse_check" => false,
         "coupler_output_dir" => "test_output",

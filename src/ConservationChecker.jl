@@ -1,7 +1,7 @@
 """
     ConservationChecker
 
-This module contains functions that check global conservation of energy and water (and momentum - TODO).
+This module contains machinery for checking that conserved quantities are in fact conserved.
 """
 module ConservationChecker
 
@@ -9,51 +9,118 @@ import ..Interfacer, ..Utilities
 import ..Utilities: integral
 import ClimaCore as CC
 
-export AbstractConservationCheck,
-    EnergyConservationCheck, WaterConservationCheck, check_conservation!
+export ConservedQuantity,
+    TotalWater,
+    TotalEnergy,
+    ConservationCheck,
+    contributions,
+    Accumulated,
+    check_conservation!
 
-abstract type AbstractConservationCheck end
+abstract type ConservedQuantity end
+
+struct TotalWater <: ConservedQuantity end
+struct TotalEnergy <: ConservedQuantity end
+
+name(::TotalWater) = "water"
+units(::TotalWater) = "kg"
+
+name(::TotalEnergy) = "energy"
+units(::TotalEnergy) = "J"
 
 """
-    EnergyConservationCheck{A} <: AbstractConservationCheck
+    Accumulated(rate)
 
-Struct of type `AbstractConservationCheck` containing global energy conservation logs.
+Wrapper marking a contribution that is a rate rather than an amount, so that the
+checker integrates it in time instead of logging it directly. `rate` is the rate
+that applies over the coupling step *about to be taken*, since components are
+asked for their contributions before they step.
 """
-mutable struct EnergyConservationCheck <: AbstractConservationCheck
-    sums::NamedTuple
-    function EnergyConservationCheck(sums)
-        all_sims = (;)
-        for sim in sums
-            all_sims = merge(all_sims, [Base.nameof(typeof(sim)) => []])
+struct Accumulated{T}
+    rate::T
+end
+
+"""
+    contributions(cq::ConservedQuantity, sim::Interfacer.AbstractComponentSimulation)
+
+Return everything `sim` contributes to the budget of `cq`, as a `NamedTuple` of named
+terms (default: `(;)`, no contribution).
+
+Every term is expressed so that **the sum of all terms over all components is the
+total**, in the units of `cq`. A term describing something that has left the coupled
+system is therefore reported with the sign that adds it back, and a term describing
+something that appeared from outside is reported negated.
+
+Terms are either amounts, used as they are, or an [`Accumulated`](@ref) rate, which
+the checker integrates in time. By convention the amount a component holds is named
+`reservoir` and is logged under the component's own name; any other term `x` reported
+by component `C` is logged as `C_x`.
+
+For example, the integrated land model reports the water it holds, the runoff rate
+leaving the coupled system, and the water its prescribed LAI has conjured up:
+
+```julia
+ConservationChecker.contributions(::TotalWater, sim::ClimaLandSimulation) = (;
+    reservoir = <kg held>,
+    runoff = Accumulated(<kg / s leaving>),
+    lai_leakage = <-kg gained from the prescribed LAI>,
+)
+```
+"""
+contributions(::ConservedQuantity, ::Interfacer.AbstractComponentSimulation) = (;)
+
+"""
+    term_key(sim, term::Symbol)
+
+Return the key that a component's term is logged under: the component's own name for
+its `reservoir`, and `<component>_<term>` for anything else.
+"""
+term_key(sim, term::Symbol) =
+    term === :reservoir ? Symbol(Base.nameof(sim)) : Symbol(Base.nameof(sim), :_, term)
+
+"""
+    ConservationCheck(cq::ConservedQuantity, model_sims)
+
+A log of how much of `cq` the coupled system holds, with one timeseries per term
+reported by the component simulations. See [`contributions`](@ref).
+"""
+struct ConservationCheck{CQ <: ConservedQuantity, C}
+    conserved_quantity::CQ
+    components::C
+    pending_rates::Dict{Symbol, Float64}
+
+    function ConservationCheck(cq::ConservedQuantity, model_sims)
+        keys = Symbol[]
+        for sim in model_sims, term in propertynames(contributions(cq, sim))
+            push!(keys, term_key(sim, term))
         end
-        all_sims = (all_sims..., toa_net_source = [], total = [])
-        return new(all_sims)
+        # just using Float64 here because it's a diagnostic
+        components = NamedTuple{Tuple(keys)}(ntuple(_ -> Float64[], length(keys)))
+        return new{typeof(cq), typeof(components)}(cq, components, Dict{Symbol, Float64}())
     end
 end
-Base.nameof(::EnergyConservationCheck) = "energy [J]"
 
 """
-    WaterConservationCheck{A} <: AbstractConservationCheck
+    log_value!(cc, key, contribution, timeseries, Δt_cpl)
 
-Struct of type `AbstractConservationCheck` containing global water mass conservation logs.
+Return the value to append to `timeseries` for the term logged under `key`.
+
+Amounts are logged as they are; an [`Accumulated`](@ref) rate is integrated onto
+the running total (starting from 0), so that its timeseries holds the time
+integral of the rate.
 """
-mutable struct WaterConservationCheck <: AbstractConservationCheck
-    sums::NamedTuple
-    function WaterConservationCheck(sums)
-        all_sims = (;)
-        for sim in sums
-            all_sims = merge(all_sims, [Base.nameof(typeof(sim)) => []])
-        end
-        all_sims = (all_sims..., total = [])
-        return new(all_sims)
-    end
+log_value!(_cc, _key, contribution, _timeseries, _Δt_cpl) = contribution
+function log_value!(cc, key, contribution::Accumulated, timeseries, Δt_cpl)
+    running_total = isempty(timeseries) ? 0.0 : timeseries[end]
+    applied_rate = get(cc.pending_rates, key, 0.0)
+    cc.pending_rates[key] = float(contribution.rate)
+    return running_total + float(Δt_cpl) * applied_rate
 end
-Base.nameof(::WaterConservationCheck) = "water [kg]"
 
 """
     check_conservation!(coupler_sim::Interfacer.CoupledSimulation; runtime_check = false)
 
-itertes over all specified conservation checks and returns values.
+Iterates over all specified conservation checks and returns values.
 """
 function check_conservation!(
     coupler_sim::Interfacer.CoupledSimulation;
@@ -67,177 +134,36 @@ function check_conservation!(
 end
 
 """
-        check_conservation!(
-        cc::EnergyConservationCheck,
-        coupler_sim::Interfacer.CoupledSimulation,
-        runtime_check = false,
-        )
+    check_conservation!(cc::ConservationCheck,
+                        cs::Interfacer.CoupledSimulation,
+                        runtime_check = false)
 
-computes the total energy, ∫ ρe dV, of the model components
-of the coupled simulations and the TOA radiation, and updates
-`cc` with these values.
+Append one value to every timeseries in `cc.components`, and return the total amount
+of `cc.conserved_quantity` held by the coupled system.
 """
 function check_conservation!(
-    cc::EnergyConservationCheck,
-    coupler_sim::Interfacer.CoupledSimulation,
+    cc::ConservationCheck,
+    cs::Interfacer.CoupledSimulation,
     runtime_check = false,
 )
+    cq = cc.conserved_quantity
+    components = cc.components
 
-    ccs = cc.sums
-    (; model_sims) = coupler_sim
-
-    FT = CC.Spaces.undertype(Interfacer.boundary_space(coupler_sim))
-    total = FT(0)
-
-    # save surfaces
-    for sim in model_sims
-        sim_name = Symbol(Base.nameof(sim))
-        if sim isa Interfacer.AbstractAtmosSimulation
-            radiative_energy_flux_toa =
-                Interfacer.get_field(sim, Val(:radiative_energy_flux_toa))
-
-            if radiative_energy_flux_toa isa Number # Case with no radiation. TODO: Handle this better
-                radiation_sources_accum = 0
-            else
-                if isempty(ccs.toa_net_source)
-                    radiation_sources_accum =
-                        integral(radiative_energy_flux_toa) * FT(float(coupler_sim.Δt_cpl)) # ∫ J / m^2 dA
-                else
-                    radiation_sources_accum =
-                        integral(radiative_energy_flux_toa) *
-                        FT(float(coupler_sim.Δt_cpl)) + ccs.toa_net_source[end] # ∫ J / m^2 dA
-                end
-            end
-            push!(ccs.toa_net_source, radiation_sources_accum)
-
-            # save atmos
-            previous = getproperty(ccs, sim_name)
-            current = sum(Interfacer.get_field(sim, Val(:energy))) # # ∫ J / m^3 dV
-
-            push!(previous, current)
-            total += current + radiation_sources_accum
-        elseif sim isa Interfacer.AbstractSurfaceSimulation
-            # save surfaces
-            area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
-            if isnothing(Interfacer.get_field(sim, Val(:energy)))
-                previous = getproperty(ccs, sim_name)
-                current = FT(0)
-            else
-                previous = getproperty(ccs, sim_name)
-                # regrid each field onto the boundary space
-                current = integral(
-                    Interfacer.get_field(
-                        Interfacer.boundary_space(coupler_sim),
-                        sim,
-                        Val(:energy),
-                    ) .* area_fraction,
-                ) # # ∫ J / m^3 dV
-            end
-            push!(previous, current)
-            total += current
+    for sim in cs.model_sims
+        for (term, contribution) in pairs(contributions(cq, sim))
+            key = term_key(sim, term)
+            timeseries = getproperty(components, key)
+            push!(timeseries, log_value!(cc, key, contribution, timeseries, cs.Δt_cpl))
         end
-
     end
-    push!(ccs.total, total)
 
+    # `init` so that a quantity no component reports totals to zero rather than erroring
+    total = sum(last, values(components); init = 0.0)
     if runtime_check
-        @assert abs((ccs.total[end] - ccs.total[1]) / ccs.total[end]) < 1e-4
+        total_initial = sum(first, values(components); init = 0.0)
+        @assert abs((total - total_initial) / total) < 1e-4
     end
     return total
-
-end
-
-"""
-    check_conservation!(
-    cc::WaterConservationCheck,
-    coupler_sim::Interfacer.CoupledSimulation,
-    runtime_check = false,
-    )
-
-computes the total water, ∫ ρq_tot dV, of the various components
-of the coupled simulations, and updates `cc` with the values.
-
-Note: in the future this should not use `push!`.
-"""
-function check_conservation!(
-    cc::WaterConservationCheck,
-    coupler_sim::Interfacer.CoupledSimulation,
-    runtime_check = false,
-)
-
-    ccs = cc.sums
-    (; model_sims) = coupler_sim
-
-    # thin shell approx (boundary_space[z=0] = boundary_space[z_top])
-
-    total = 0
-
-    # net precipitation (for surfaces that don't collect water)
-    Interfacer.remap!(
-        coupler_sim.fields.scalar_temp1,
-        surface_water_gain_from_rates(coupler_sim),
-    )
-    coupler_sim.fields.P_net .+= coupler_sim.fields.scalar_temp1
-    PE_net = coupler_sim.fields.P_net
-
-    # save surfaces
-    for sim in model_sims
-        sim_name = Symbol(Base.nameof(sim))
-        if sim isa Interfacer.AbstractAtmosSimulation
-
-            # save atmos
-            previous = getproperty(ccs, sim_name)
-            water = Interfacer.get_field(sim, Val(:water))
-            if water isa Number  # Case with no moisture. TODO: Handle this better
-                current = 0
-            else
-                current = integral(Interfacer.get_field(sim, Val(:water))) # kg (∫kg of water / m^3 dV)
-            end
-            push!(previous, current)
-
-        elseif sim isa Interfacer.AbstractSurfaceSimulation
-            # save surfaces
-            area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
-            if isnothing(Interfacer.get_field(sim, Val(:water)))
-                previous = getproperty(ccs, sim_name)
-                current = integral(PE_net .* area_fraction) # kg (∫kg of water / m^3 dV)
-                push!(previous, current)
-            else
-                previous = getproperty(ccs, sim_name)
-                current = integral(
-                    Interfacer.get_field(
-                        Interfacer.boundary_space(coupler_sim),
-                        sim,
-                        Val(:water),
-                    ) .* area_fraction,
-                ) # kg (∫kg of water / m^3 dV)
-                push!(previous, current)
-            end
-        end
-        total += current
-
-
-    end
-    push!(ccs.total, total)
-
-    if runtime_check
-        @assert abs((ccs.total[end] - ccs.total[1]) / ccs.total[end]) < 1e-4
-    end
-
-    return total
-end
-
-"""
-    surface_water_gain_from_rates(cs::Interfacer.CoupledSimulation)
-
-Determines the total water content gain/loss of a surface from the beginning of the simulation based on evaporation and precipitation rates.
-"""
-function surface_water_gain_from_rates(cs::Interfacer.CoupledSimulation)
-    evaporation = cs.fields.F_turb_moisture # kg / m^2 / s / layer depth
-    precipitation_l = cs.fields.P_liq
-    precipitation_s = cs.fields.P_snow
-    FT = eltype(evaporation)
-    @. -(evaporation + precipitation_l + precipitation_s) * FT(float(cs.Δt_cpl)) # kg / m^2 / layer depth
 end
 
 end # module

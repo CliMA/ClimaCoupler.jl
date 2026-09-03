@@ -12,7 +12,7 @@ dt_land: "720secs" # 12 minutes
 dt_ocean: "1800secs" # 30 minutes
 dt_seaice: "1800secs" # 30 minutes
 dz_bottom: 100.0
-energy_check: false
+conservation_check: false
 h_elem: 8
 ice_model: "clima_seaice"
 land_diagnostics_period: "1hours"

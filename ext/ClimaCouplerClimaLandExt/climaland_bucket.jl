@@ -242,30 +242,44 @@ Interfacer.get_field(sim::BucketSimulation, ::Val{:surface_temperature}) =
 Interfacer.get_field(sim::BucketSimulation, ::Val{:roughness_model}) = :constant
 
 """
-    Interfacer.get_field(sim::BucketSimulation, ::Val{:energy})
+    total_energy(sim::BucketSimulation)
 
-Extension of Interfacer.get_field that provides the total energy contained in the bucket,
-computed from the temperature of the bucket and also including the latent heat of fusion
-of frozen water in the snow.
-
-This method is required by the ConservationChecker to check energy conservation.
+Extension of Interfacer.get_field that provides the total energy contained in the bucket
+(in J), computed from the temperature of the bucket and also including the latent heat of
+fusion of frozen water in the snow, integrated over the area the bucket covers.
 """
-Interfacer.get_field(sim::BucketSimulation, ::Val{:energy}) =
-    sim.integrator.p.bucket.total_energy
-
-"""
-    Interfacer.get_field(sim::BucketSimulation, ::Val{:water})
-
-Extension of Interfacer.get_field that provides the total water contained in the bucket.
-The total water contained in the bucket is the sum of the subsurface water storage `W`,
-the snow water equivalent `σS`, and surface water content `Ws`.
-
-This method is required by the ConservationChecker to check water conservation.
-"""
-function Interfacer.get_field(sim::BucketSimulation, ::Val{:water})
-    ρ_cloud_liq = CL.LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
-    return sim.integrator.p.bucket.total_water .* ρ_cloud_liq # kg water / m2
+function total_energy(sim::BucketSimulation)
+    total_energy = sim.integrator.p.bucket.total_energy
+    area_fraction = area_fraction_on(sim, axes(total_energy))
+    return Utilities.area_weighted_integral(total_energy, area_fraction)
 end
+
+"""
+    total_water(sim::BucketSimulation)
+
+Compute total water contained in the bucket (in kg) as the sum of the subsurface water 
+storage `W`, the snow water equivalent `σS`, and surface water content `Ws`, integrated 
+over the area the bucket covers.
+"""
+function total_water(sim::BucketSimulation)
+    ρ_cloud_liq = CL.LP.ρ_cloud_liq(sim.model.parameters.earth_param_set)
+    total_water = sim.integrator.p.bucket.total_water .* ρ_cloud_liq
+    area_fraction = area_fraction_on(sim, axes(total_water))
+    return Utilities.area_weighted_integral(total_water, area_fraction)
+end
+
+"""
+    ConservationChecker.contributions(cq, sim::BucketSimulation)
+
+The bucket holds energy and water and has no runoff, so it loses neither to the
+outside of the coupled system.
+"""
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalEnergy,
+    sim::BucketSimulation,
+) = (; reservoir = total_energy(sim)) # J
+ConservationChecker.contributions(::ConservationChecker.TotalWater, sim::BucketSimulation) =
+    (; reservoir = total_water(sim)) # kg
 
 function Interfacer.update_field!(
     sim::BucketSimulation,

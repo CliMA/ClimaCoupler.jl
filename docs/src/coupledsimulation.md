@@ -100,12 +100,11 @@ and, if enabled, component model progress-reporting callbacks. See [TimeManager]
 
 ## Conservation checks (`cs.conservation_checks`)
 
-When energy and water conservation checking is enabled (via the `energy_check`
-configuration option), `cs.conservation_checks` is a `NamedTuple` with keys
-`:energy` and `:water`, holding an `EnergyConservationCheck` and a
-`WaterConservationCheck` respectively. Otherwise it is `nothing`. Conservation
-checks are only supported for slabplanet simulations. See
-[ConservationChecker](@ref) for details.
+When energy and water conservation checking is enabled (via the
+`conservation_check` configuration option), `cs.conservation_checks` is a
+`NamedTuple` with keys `:energy` and `:water`, each holding a
+`ConservationCheck` for the corresponding conserved quantity. Otherwise it is
+`nothing`. See [ConservationChecker](@ref) for details.
 
 ## Diagnostics handler (`cs.diags_handler`)
 

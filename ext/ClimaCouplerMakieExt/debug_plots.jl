@@ -7,95 +7,101 @@ import ClimaCoupler: Interfacer, ConservationChecker, Plotting
 import StaticArrays
 
 """
-    plot_global_conservation(
-        cc::AbstractConservationCheck,
-        coupler_sim::Interfacer.CoupledSimulation,
-        softfail = false;
-        figname1 = "total.png",
-        figname2 = "total_log.png",
+    plot_conservation(
+        cc::ConservationChecker.ConservationCheck,
+        coupler_sim::Interfacer.CoupledSimulation;
+        figname = "conservation.png"
     )
 
-Creates two plots of the globally integrated quantity (energy, ``\\rho e``):
-1. global quantity of each model component as a function of time,
-relative to the initial value;
-2. fractional change in the sum of all components over time on a log scale.
+Plot globally integrated conserved quantity with time.
 
-Conservation checks are available for energy and water, and can be enabled by
-running a Slabplanet simulation with `energy_check` set to true.
-
-If `softfail` is false, asserts that the relative error in conservation of the
-provided quantity is less than a pre-determined threshold. This argument
-is controlled by the `conservation_softfail` simulation flag.
+The first panel is the evolution of the total conserved quantity and its
+components relative to their initial values, while the second panel plots
+the log of the relative error of the total conserved quantity.
 """
-function Plotting.plot_global_conservation(
-    cc::ConservationChecker.AbstractConservationCheck,
-    coupler_sim::Interfacer.CoupledSimulation,
-    softfail = false;
-    figname1 = "total.png",
-    figname2 = "total_log.png",
+function Plotting.plot_conservation(
+    cc::ConservationChecker.ConservationCheck,
+    coupler_sim::Interfacer.CoupledSimulation;
+    figname = "conservation.png",
 )
+    components = cc.components
+    name = ConservationChecker.name(cc.conserved_quantity)
+    units = ConservationChecker.units(cc.conserved_quantity)
 
-    model_sims = coupler_sim.model_sims
-    ccs = cc.sums
-
-    days = collect(1:length(ccs[1])) * float(coupler_sim.Δt_cpl) / 86400
-
-    # evolution of energy of each component relative to initial value
-    total = ccs.total  # total
-
-    var_name = nameof(cc)
-    cum_total = [0.0]
-    f = Makie.Figure()
-    ax = Makie.Axis(f[1, 1], xlabel = "time [days]", ylabel = "$var_name: (t) - (t=0)")
-    Makie.lines!(ax, days, total .- total[1], label = "total"; linewidth = 3)
-    for sim in model_sims
-        sim_name = nameof(sim)
-        global_field = getproperty(ccs, Symbol(sim_name))
-        diff_global_field = (global_field .- global_field[1])
-        Makie.lines!(ax, days, diff_global_field[1:length(days)], label = sim_name)
-        cum_total .+= abs.(global_field[end])
+    days = collect(1:length(components[1])) * float(coupler_sim.Δt_cpl) / 86400
+    total = zeros(length(components[1]))
+    abs_sum = 0.0 # this will be ∑ᵢ|xᵢ| at the final time step, used for relative error
+    f = Makie.Figure(size = (800, 500))
+    ax1 = Makie.Axis(f[1, 1], xlabel = "time (days)", ylabel = "Δ$name ($units)")
+    for (component, timeseries) in pairs(components)
+        Makie.lines!(ax1, days, timeseries .- timeseries[1], label = string(component))
+        abs_sum += abs(timeseries[end])
+        total .+= timeseries
     end
-    if cc isa ConservationChecker.EnergyConservationCheck
-        global_field = ccs.toa_net_source
-        diff_global_field = (global_field .- global_field[1])
-        Makie.lines!(ax, days, diff_global_field[1:length(days)], label = "toa_net")
-        cum_total .+= abs.(global_field[end])
-    end
-    Makie.axislegend(ax, position = :lb)
-    Makie.save(figname1, f)
+    Makie.lines!(
+        ax1,
+        days,
+        total .- total[1],
+        label = "total",
+        color = :black,
+        linestyle = :dash,
+    )
+    Makie.Legend(f[1, 2], ax1, framevisible = false)
 
-    # use the cumulative global sum at the final time step as a reference for the error calculation
-    rse = abs.((total .- total[1]) ./ cum_total)
-    l_rse = log.(rse)
-    # evolution of log error of total
-    lp = Makie.lines(days, l_rse, label = "rs error")
-    lp.axis.xlabel = "time [days]"
-    lp.axis.ylabel = "log( |x(t) - x(t=0)| / Σx(t=T) )"
-    l_rse_valid = filter(x -> !isinf(x) && !isnan(x), l_rse)
-    if !isempty(l_rse_valid)
-        y_min = minimum(l_rse_valid)
-        y_max = maximum(l_rse_valid)
+    # use ∑ᵢ|xᵢ| at the final time step as a reference for the error
+    err = abs.((total .- total[1]) ./ abs_sum)
+    l_err = log10.(err)
+    ax2 = Makie.Axis(
+        f[2, 1],
+        xlabel = "time (days)",
+        ylabel = "log( |Δtotal| / ∑|components| )",
+    )
+    Makie.lines!(ax2, days, l_err, color = :black)
+    l_err_valid = filter(x -> !isinf(x) && !isnan(x), l_err)
+    if !isempty(l_err_valid)
+        y_min = minimum(l_err_valid)
+        y_max = maximum(l_err_valid)
         if y_min != y_max
-            Makie.ylims!(y_min, y_max)
+            Makie.ylims!(ax2, y_min, y_max)
         else
             # If all values are the same, add a small padding to avoid Makie error
             padding = max(abs(y_min) * 0.01, 0.1)
-            Makie.ylims!(y_min - padding, y_max + padding)
+            Makie.ylims!(ax2, y_min - padding, y_max + padding)
         end
     end
-    Makie.axislegend(position = :lt)
-    Makie.save(figname2, lp)
+    Makie.resize_to_layout!(f)
+    Makie.save(figname, f)
 
-    # check that the relative error is small (TODO: reduce this to sqrt(eps(FT)))
-    if !softfail
-        @info typeof(cc)
-        @info rse[end]
-        @assert rse[end] < 0.055
+    # Summarize the budget at the end of the simulation with a table
+    header = ("Component", "Value ($units)", "Change ($units)", "Change (%)")
+    rows = [header]
+    for (component, timeseries) in pairs((; components..., total))
+        value = timeseries[end]
+        change = timeseries[end] - timeseries[1]
+        push!(
+            rows,
+            (
+                string(component),
+                Printf.@sprintf("%.3e", value),
+                Printf.@sprintf("%.3e", change),
+                iszero(value) ? "n/a" : Printf.@sprintf("%.2f", change / value * 100),
+            ),
+        )
     end
+    widths = [maximum(length(row[i]) for row in rows) for i in eachindex(header)]
+    format_row(row) =
+        "\n  " *
+        rpad(row[1], widths[1]) *
+        join("  " * lpad(row[i], widths[i]) for i in 2:lastindex(widths))
+    info_msg = "Total $name at end of simulation:"
+    info_msg *= format_row(header)
+    info_msg *= "\n  " * repeat("-", sum(widths) + 2 * (length(widths) - 1))
+    for row in rows[2:end]
+        info_msg *= format_row(row)
+    end
+    @info info_msg
 end
 
-
-# plotting functions for the coupled simulation
 """
     debug(cs::Interfacer.CoupledSimulation, dir = "debug", cs_fields_ref = nothing)
 

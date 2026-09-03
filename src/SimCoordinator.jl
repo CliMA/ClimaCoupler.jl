@@ -97,8 +97,7 @@ function step!(cs::Interfacer.CoupledSimulation)
     cs.t[] += cs.Δt_cpl
     cs.step[] += 1
 
-    # Compute global energy and water conservation checks
-    # (only for slabplanet if tracking conservation is enabled)
+    # Compute checks on conserved quantities
     ConservationChecker.check_conservation!(cs)
 
     # Step component model simulations sequentially for one coupling timestep (Δt_cpl)
@@ -210,7 +209,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         land_spun_up_ic,
         lai_source,
         bucket_albedo_type,
-        energy_check,
+        conservation_check,
         use_coupler_diagnostics,
         coupler_diagnostics_period,
         coupler_diagnostics_reduction,
@@ -393,7 +392,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     coupler_field_names = Interfacer.default_coupler_fields()
     foreach(sim -> Interfacer.add_coupler_fields!(coupler_field_names, sim), model_sims)
 
-    energy_check && push!(coupler_field_names, :P_net)
+    conservation_check && push!(coupler_field_names, :P_net)
 
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 
@@ -428,20 +427,19 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
             Interfacer.get_field(model_sims.ocean_sim, Val(:area_fraction))
     end
 
-    ## Conservation checks (only applicable to global slabplanet mode)
+    ## Conservation checks
     conservation_checks = nothing
-    if energy_check && domain_type == "global"
-        @assert(
-            sim_mode <: Interfacer.AbstractSlabplanetSimulationMode &&
-            comms_ctx isa ClimaComms.SingletonCommsContext,
-            "Only non-distributed slabplanet allowable for energy_check"
-        )
+    if conservation_check
         conservation_checks = (;
-            energy = ConservationChecker.EnergyConservationCheck(model_sims),
-            water = ConservationChecker.WaterConservationCheck(model_sims),
+            energy = ConservationChecker.ConservationCheck(
+                ConservationChecker.TotalEnergy(),
+                model_sims,
+            ),
+            water = ConservationChecker.ConservationCheck(
+                ConservationChecker.TotalWater(),
+                model_sims,
+            ),
         )
-    elseif energy_check && domain_type == "column"
-        @warn "Conservation checks are disabled for single-column mode."
     end
 
     ## Callbacks

@@ -6,7 +6,7 @@ coupler_toml: ["toml/amip_progedmf_1m.toml"]
 dt: "30secs"
 dt_cpl: "30secs"
 dt_rad: "600secs"
-energy_check: false
+conservation_check: false
 h_elem: 16
 land_model: "integrated"
 mode_name: "amip"

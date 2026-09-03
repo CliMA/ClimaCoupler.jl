@@ -838,6 +838,11 @@ function FluxCalculator.ocean_seaice_fluxes!(
     salt_flux .= Jˢ .+ surface_salinity .* Jʷ
     OC.interior(oc_flux_S, :, :, 1) .+= salt_flux
 
+    # Record the water behind the `Sᴺ * Jʷ` part of that salinity flux. `Jʷ` is the
+    # freshwater volume flux *into* the ocean, so `ρₒ Jʷ` is the water mass it gains
+    OC.interior(ocean_sim.water_flux, :, :, 1) .+=
+        Jʷ .* ocean_sim.ocean_properties.reference_density
+
     return nothing
 end
 
@@ -873,6 +878,85 @@ Arguments:
     oc_flux_v[i, j, 1] +=
         ρτyio[i, j, 1] * ρₒ⁻¹ * OC.Operators.ℑyᵃᶠᵃ(i, j, 1, grid, ice_concentration)
 end
+
+"""
+    frozen_mass(sim::ClimaSeaIceSimulation)
+
+Return the mass of ice and snow the model holds per unit area, in kg/m^2.
+
+Both thicknesses are per unit area of ice, so each is weighted by the ice concentration,
+matching `mass_fluxes.thermodynamics`, which reports the ice mass as `ρᵢ h ℵ`.
+"""
+function frozen_mass(sim::ClimaSeaIceSimulation)
+    model = sim.ice.model
+    ice_mass = model.sea_ice_density * model.ice_thickness
+    snow_mass = model.snow_density * model.snow_thickness
+    return (ice_mass + snow_mass) * model.ice_concentration
+end
+
+"""
+    total_water(sim::ClimaSeaIceSimulation)
+
+Compute total water of the sea ice (in kilograms) as ∫_ice (ρᵢ h + ρₛ hₛ) ℵ dA.
+
+The whole frozen mass counts as water, salt included, which is how it is exchanged: the
+ice/ocean freshwater flux `Jʷ` carries the full ice mass and the salt the ice held rides
+along separately in `Jˢ` (see `ocean_seaice_fluxes!`).
+"""
+total_water(sim::ClimaSeaIceSimulation) = sum(frozen_mass(sim) * OC.AbstractOperations.Az)
+
+"""
+    total_energy(sim::ClimaSeaIceSimulation)
+
+Compute total energy of the sea ice (in Joules) as -∫_ice (ρᵢ h + ρₛ hₛ) ℵ ℒ(T) dA.
+
+This is negative because it is measured against the same zero as the ocean's
+`total_energy`, liquid water at 0°C: freezing a kilogram of that water releases `ℒ` and
+leaves behind ice holding `-ℒ`. The ice gains and loses mass constantly, so unlike the
+ocean it cannot be referenced to an arbitrary zero — the scale has to be the one the
+ocean gives up its energy on, or freezing would manufacture energy from nothing.
+
+The slab stores no internal energy of its own (`prognostic_fields` of its thermodynamics
+is empty), so there is no sensible heat term to add: heat entering the slab either drives
+a phase change at one of its boundaries or conducts straight through. `ℒ` is evaluated at
+the ice/ocean interface temperature, which is where most growth and melt happen, rather
+than at the reference temperature. `ℒ` is linear in temperature,
+
+    ℒ(T) = ℒ₀ + (ρ_l c_l / ρ - c) (T - T₀),
+
+so this is a plain arithmetic expression over the fields rather than a call per point.
+"""
+function total_energy(sim::ClimaSeaIceSimulation)
+    phase_transitions = sim.ice.model.phase_transitions
+    (; reference_latent_heat, reference_temperature, density, heat_capacity) =
+        phase_transitions
+    (; liquid_density, liquid_heat_capacity) = phase_transitions
+
+    # dℒ/dT, from `ClimaSeaIce.SeaIceThermodynamics.latent_heat`
+    dℒ_dT = liquid_density * liquid_heat_capacity / density - heat_capacity
+
+    interface_temperature = sim.ocean_ice_interface.temperature
+    latent_heat =
+        reference_latent_heat + dℒ_dT * (interface_temperature - reference_temperature)
+
+    return -sum((frozen_mass(sim) * latent_heat) * OC.AbstractOperations.Az)
+end
+
+"""
+    ConservationChecker.contributions(cq, sim::ClimaSeaIceSimulation)
+
+The sea ice holds both energy and water. Everything it exchanges moves to or from another
+component that reports its own reservoir — heat and mass with the ocean, snow with the
+atmosphere — so it reports no separate terms for those.
+"""
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalEnergy,
+    sim::ClimaSeaIceSimulation,
+) = (; reservoir = total_energy(sim)) # J
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalWater,
+    sim::ClimaSeaIceSimulation,
+) = (; reservoir = total_water(sim)) # kg
 
 # Additional ClimaSeaIceSimulation getter methods for plotting debug fields
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:u}) = sim.ice.model.velocities.u

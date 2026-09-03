@@ -3,7 +3,8 @@ import ClimaTimeSteppers as CTS
 import ClimaUtilities
 import ClimaUtilities.TimeManager: ITime, date
 import SurfaceFluxes as SF
-import ..Checkpointer, ..FluxCalculator, ..Interfacer, ..Utilities, ..FieldExchanger
+import ..Checkpointer, ..ConservationChecker, ..FluxCalculator, ..Interfacer
+import ..Utilities, ..FieldExchanger
 
 ###
 ### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
@@ -99,8 +100,8 @@ function slab_ocean_space_init(space, params)
     # FT(271) close to the average of T_1 in atmos
     T_sfc = params.T_init .+ temp_anomaly.(coords)
 
-    # prognostic variable
-    Y = CC.Fields.FieldVector(; T_sfc = T_sfc)
+    # prognostic variables (`water` is just accumulated P - E for bookkeeping)
+    Y = CC.Fields.FieldVector(; T_sfc = T_sfc, water = CC.Fields.zeros(space))
 
     return Y
 end
@@ -161,6 +162,9 @@ function SlabOceanSimulation(
         α_diffuse = CC.Fields.ones(boundary_space) .* params.α,
         u_atmos = CC.Fields.zeros(boundary_space),
         v_atmos = CC.Fields.zeros(boundary_space),
+        F_turb_moisture = CC.Fields.zeros(boundary_space),
+        P_liq = CC.Fields.zeros(boundary_space),
+        P_snow = CC.Fields.zeros(boundary_space),
         # add dss_buffer to cache to avoid runtime dss allocation
         dss_buffer = Utilities.init_dss_buffer(Y),
         coare3_roughness_params,
@@ -171,7 +175,7 @@ function SlabOceanSimulation(
         T_exp! = slab_ocean_rhs!,
         dss! = (Y, p, t) -> Utilities.apply_dss!(Y, p.dss_buffer),
     )
-    if typeof(dt) isa Number
+    if dt isa Number
         dt = Float64(dt)
         tspan = Float64.(tspan)
         saveat = Float64.(saveat)
@@ -204,14 +208,44 @@ Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:coare3_roughness_params}) 
     sim.integrator.p.coare3_roughness_params
 
 """
-    Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:energy})
+    total_energy(sim::SlabOceanSimulation)
 
-Extension of Interfacer.get_field to get the energy of the ocean.
-It multiplies the the slab temperature by the heat capacity, density, and depth.
+Compute total energy of the slab ocean (in Joules) as ∫_ocean (h * ρ * c * T_sfc) dA
 """
-Interfacer.get_field(sim::SlabOceanSimulation, ::Val{:energy}) =
+total_energy(sim::SlabOceanSimulation) = Utilities.area_weighted_integral(
     sim.integrator.p.params.ρ .* sim.integrator.p.params.c .* sim.integrator.u.T_sfc .*
-    sim.integrator.p.params.h
+    sim.integrator.p.params.h,
+    Interfacer.get_field(sim, Val(:area_fraction)),
+)
+
+"""
+    total_water(sim::SlabOceanSimulation)
+
+Compute total water of the slab ocean (in kilograms).
+
+The slab ocean holds no water reservoir, so this is the net water it has received
+(precipitation minus evaporation) accumulated since the start of the simulation
+integrated over the ocean area. 
+"""
+total_water(sim::SlabOceanSimulation) = Utilities.area_weighted_integral(
+    sim.integrator.u.water,
+    Interfacer.get_field(sim, Val(:area_fraction)),
+)
+
+"""
+    ConservationChecker.contributions(cq, sim::SlabOceanSimulation)
+
+The slab ocean holds energy. It holds no water reservoir, so its water contribution
+is the net water it has received accumulated since the start of the simulation.
+"""
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalEnergy,
+    sim::SlabOceanSimulation,
+) = (; reservoir = total_energy(sim)) # J
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalWater,
+    sim::SlabOceanSimulation,
+) = (; reservoir = total_water(sim)) # kg
 
 function Interfacer.update_field!(
     sim::SlabOceanSimulation,
@@ -236,6 +270,20 @@ function Interfacer.update_field!(
 end
 function Interfacer.update_field!(
     sim::SlabOceanSimulation,
+    ::Val{:liquid_precipitation},
+    field,
+)
+    Interfacer.remap!(sim.integrator.p.P_liq, field)
+end
+function Interfacer.update_field!(
+    sim::SlabOceanSimulation,
+    ::Val{:snow_precipitation},
+    field,
+)
+    Interfacer.remap!(sim.integrator.p.P_snow, field)
+end
+function Interfacer.update_field!(
+    sim::SlabOceanSimulation,
     ::Val{:surface_direct_albedo},
     field::CC.Fields.Field,
 )
@@ -255,6 +303,7 @@ function FluxCalculator.update_turbulent_fluxes!(
     fields::NamedTuple,
 )
     Interfacer.update_field!(sim, Val(:turbulent_energy_flux), fields.F_lh .+ fields.F_sh)
+    Interfacer.remap!(sim.integrator.p.F_turb_moisture, fields.F_turb_moisture)
     return nothing
 end
 
@@ -282,6 +331,13 @@ function slab_ocean_rhs!(dY, Y, cache, t)
     # Note that the area fraction has already been applied to the fluxes,
     #  so we don't need to multiply by it here.
     @. dY.T_sfc = rhs * params.evolving_switch
+
+    # Accumulate the net water the ocean receives. Turbulent moisture fluxes are
+    # positive upward and precipitation is negative downward, so the water gained
+    # by the surface is the negative of their sum.
+    (; F_turb_moisture, P_liq, P_snow) = cache
+    water_rhs = @. -(F_turb_moisture + P_liq + P_snow)
+    @. dY.water = ifelse(cache.area_fraction ≈ 0, zero(water_rhs), water_rhs)
 end
 
 """

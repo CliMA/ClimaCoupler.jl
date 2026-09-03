@@ -16,14 +16,20 @@ import ClimaParams as CP
 import ClimaLand.Parameters as LP
 import Dates
 import ClimaUtilities.TimeVaryingInputs:
-    LinearInterpolation, PeriodicCalendar, TimeVaryingInput
+    LinearInterpolation, PeriodicCalendar, TimeVaryingInput, TimeVaryingInputs
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.Regridders: InterpolationsRegridder
 import Interpolations
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaUtilities.TimeManager: ITime
 import ClimaCoupler:
-    Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities, Plotting
+    Checkpointer,
+    ConservationChecker,
+    FieldExchanger,
+    FluxCalculator,
+    Interfacer,
+    Utilities,
+    Plotting
 import ClimaTimeSteppers as CTS
 import ClimaDiagnostics as CD
 import ClimaUtilities.TimeManager: ITime

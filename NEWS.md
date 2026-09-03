@@ -25,6 +25,22 @@ to the previous guess if the update is NaN.
 This PR also addresses a boundary condition bug in the
 sea-ice component, using the diagnosed skin temperature to compute the radiative emission term.(Previously the incorrect energy balance would result in rapid ice melt).
 
+#### Route rain to the ocean.
+Rain now reaches the ocean everywhere rather than only over open water.
+Previously the ocean received `(1 - ℵ)(P_liq + P_snow)` while the sea ice
+received only snow.
+
+#### Update `ConservationChecker`.
+The config flag `energy_check` is renamed to `conservation_check` and the
+separate `EnergyConservationCheck`/`WaterConservationCheck` types are replaced
+by a single `ConservationCheck` parameterized on a conserved quantity.
+`check_conservation!` is now one generic method over any conserved quantity, and
+each component model defines its own set of `contributions` to the conserved
+quantity and methods to calculate them. Integrals of the conserved quantities
+are now computed on each model's *native grid* rather than on the boundary
+space. `Plotting.plot_global_conservation` has also been updated and renamed to
+`Plotting.plot_conservation`.
+
 v0.2.3
 -------
 

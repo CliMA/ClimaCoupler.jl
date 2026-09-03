@@ -152,7 +152,7 @@ specific timesteps should be specified, rather than only `dt`.
 
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
-| `--energy_check` | Bool | `false` | `true`, `false` | Whether to check energy conservation |
+| `--conservation_check` | Bool | `false` | `true`, `false` | Whether to check that conservation properties hold |
 | `--conservation_softfail` | Bool | `false` | `true`, `false` | Whether to soft fail on conservation errors |
 | `--rmse_check` | Bool | `false` | `true`, `false` | Whether to check RMSE of some physical fields |
 

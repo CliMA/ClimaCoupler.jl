@@ -259,17 +259,119 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:area_fraction}) = sim.area
 Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:area_fraction}, field) =
     sim.area_fraction .= field
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:emissivity}) = sim.integrator.p.ϵ_sfc
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:energy}) =
-    CL.total_energy(sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_direct_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_diffuse_albedo}) =
     CL.surface_albedo(sim.model, sim.integrator.u, sim.integrator.p)
-Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water}) =
-    CL.total_water(sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature}) =
     sim.integrator.p.T_sfc
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:roughness_model}) = :constant
+
+"""
+    total_energy(sim::ClimaLandSimulation)
+
+Compute total energy held by the integrated land model (in J) summed over all of its 
+prognostic components (soil, canopy, snow, lake) and integrated over the land area.
+"""
+function total_energy(sim::ClimaLandSimulation)
+    (; u, p, t) = sim.integrator
+    # `total_energy_per_area!` needs a surface field to fill and one for scratch space
+    total_energy = CC.Fields.zeros(axes(p.T_sfc))
+    sfc_cache = CC.Fields.zeros(axes(p.T_sfc))
+    CL.total_energy_per_area!(total_energy, sim.model, u, p, t, sfc_cache)
+    area_fraction = area_fraction_on(sim, axes(total_energy))
+    return Utilities.area_weighted_integral(total_energy, area_fraction)
+end
+
+"""
+    total_water(sim::ClimaLandSimulation)
+
+Compute total water held by the integrated land model (in kg) summed over all of its 
+prognostic components (soil, canopy, snow, lake) and integrated over the land area.
+
+ClimaLand reports water volume per unit ground area that would result if all the water 
+were in the liquid phase, so we convert to a mass using the density of liquid water.
+"""
+function total_water(sim::ClimaLandSimulation)
+    (; u, p, t) = sim.integrator
+    ρ_cloud_liq = LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set)
+    # `total_liq_water_vol_per_area!` needs a surface field to fill and one for scratch space
+    total_water = CC.Fields.zeros(axes(p.T_sfc))
+    sfc_cache = CC.Fields.zeros(axes(p.T_sfc))
+    CL.total_liq_water_vol_per_area!(total_water, sim.model, u, p, t, sfc_cache)
+    total_water .*= ρ_cloud_liq
+    area_fraction = area_fraction_on(sim, axes(total_water))
+    return Utilities.area_weighted_integral(total_water, area_fraction)
+end
+
+"""
+    runoff(sim::ClimaLandSimulation)
+
+Compute the sum of the surface and subsurface runoff; this is not yet routed to
+the ocean, so it leaves the coupled system entirely :(
+"""
+function runoff(sim::ClimaLandSimulation)
+    (; u, p) = sim.integrator
+    runoff_model = sim.model.soil.boundary_conditions.top.runoff
+    R_s = CL.Soil.Runoff.get_surface_runoff(runoff_model, u, p)
+    R_ss = CL.Soil.Runoff.get_subsurface_runoff(runoff_model, u, p)
+    (isnothing(R_s) && isnothing(R_ss)) && return nothing # model configured without runoff
+
+    ρ_cloud_liq = LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set)
+    # Runoff is reported as a volume flux of liquid water per unit ground area
+    total_runoff = CC.Fields.zeros(axes(p.T_sfc))
+    isnothing(R_s) || (total_runoff .+= R_s)
+    isnothing(R_ss) || (total_runoff .+= R_ss)
+    total_runoff .*= ρ_cloud_liq
+    area_fraction = area_fraction_on(sim, axes(total_runoff))
+    return Utilities.area_weighted_integral(total_runoff, area_fraction) # kg / s
+end
+
+"""
+    lai_leakage(sim::ClimaLandSimulation)
+
+Compute the water leakage due to prescribed leaf area index (LAI) changes in the integrated
+land model. The canopy water content is `height * LAI * ϑ_l`, so prescribed LAI changes lead
+to reservoir changes. To track this, we compute the cumulative size of the artifact, 
+`height * (LAI(t) - LAI(0)) * ϑ_l(t)`.
+"""
+function lai_leakage(sim::ClimaLandSimulation)
+    (; u, p) = sim.integrator
+    biomass = sim.model.canopy.biomass
+
+    # Recover the LAI at the start of the simulation from the prescribed input
+    lai_initial = CC.Fields.zeros(axes(p.T_sfc))
+    TimeVaryingInputs.evaluate!(lai_initial, biomass.plant_area_index.LAI, 0.0)
+
+    ρ_cloud_liq = LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set)
+    lai = p.canopy.biomass.area_index.leaf
+    leakage =
+        @. biomass.height * (lai - lai_initial) * u.canopy.hydraulics.ϑ_l * ρ_cloud_liq
+    area_fraction = area_fraction_on(sim, axes(leakage))
+    return Utilities.area_weighted_integral(leakage, area_fraction) # kg
+end
+
+"""
+    ConservationChecker.contributions(cq, sim::ClimaLandSimulation)
+
+The land holds energy and water. It also sheds water as runoff (which currently just leaves 
+the coupled system) and gains water from its prescribed LAI (which never entered the system 
+in the first place).
+"""
+ConservationChecker.contributions(
+    ::ConservationChecker.TotalEnergy,
+    sim::ClimaLandSimulation,
+) = (; reservoir = total_energy(sim)) # J
+
+function ConservationChecker.contributions(
+    ::ConservationChecker.TotalWater,
+    sim::ClimaLandSimulation,
+)
+    R = runoff(sim) # kg / s
+    terms = (; reservoir = total_water(sim), lai_leakage = -lai_leakage(sim)) # kg
+    isnothing(R) && return terms # no runoff
+    return (; terms..., runoff = ConservationChecker.Accumulated(R))
+end
 
 # Update fields stored in land drivers
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:diffuse_fraction}, field)

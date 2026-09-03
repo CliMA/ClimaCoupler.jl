@@ -11,7 +11,7 @@ dt: "80secs"
 dt_cpl: "80secs"
 dt_seaice: "80secs"
 divergence_damping_factor: 20.0
-energy_check: false
+conservation_check: false
 h_elem: 16
 z_max: 70000.0
 z_elem: 70

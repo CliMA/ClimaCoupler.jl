@@ -141,8 +141,6 @@ Running a Slabplanet simulation is the same as running an AMIP simulation, excep
 julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl --config_file config/ci_configs/slabplanet_default.yml --job_id slabplanet_default
 ```
 
-To ensure that conservation is tracked throughout the experiment, the `energy_check` field of the configuration file must be set to true.
-
 ## Contributing
 
 Contributors should follow the shared CliMA engineering standards in [`docs/dev-guides/`](docs/dev-guides/), which cover architecture, performance, code quality, documentation, and workflows. These are vendored from [CliMA/DeveloperGuides](https://github.com/CliMA/DeveloperGuides). The repo's [`AGENTS.md`](AGENTS.md) is a starting point for AI agents with repo-specific guidance.

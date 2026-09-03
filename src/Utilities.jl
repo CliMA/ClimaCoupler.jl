@@ -17,6 +17,7 @@ export get_device,
     setup_output_dirs,
     time_to_seconds,
     integral,
+    area_weighted_integral,
     create_boundary_space,
     diagnostics_global_attribs
 
@@ -281,6 +282,17 @@ end
 
 function integral(field::AbstractArray)
     return sum(field)
+end
+
+"""
+    area_weighted_integral(field, area_fraction)
+
+Compute the integral (a scalar) of `field` weighted by `area_fraction`, ignoring the
+contribution from points that the surface does not cover.
+"""
+function area_weighted_integral(field, area_fraction)
+    FT = eltype(area_fraction)
+    return integral(area_fraction .* ifelse.(area_fraction .≈ 0, zero(FT), field))
 end
 
 """

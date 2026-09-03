@@ -2,7 +2,7 @@ FLOAT_TYPE: "Float32"
 atmos_config_file: "config/benchmark_configs/climaatmos_progedmf.yml"
 dt: "120secs"
 dt_cpl: "120secs"
-energy_check: false
+conservation_check: false
 land_model: "integrated"
 mode_name: "amip"
 monthly_checkpoint: false

@@ -27,6 +27,7 @@ export CoupledSimulation,
     AbstractOceanSimulation,
     get_field,
     update_field!,
+    update_sim!,
     AbstractSurfaceStub,
     SurfaceStub,
     step!,
@@ -444,6 +445,14 @@ NVTX.@annotate function step!(sim::AbstractComponentSimulation, t::ITime)
     end
     return nothing
 end
+
+"""
+    update_sim!(sim::AbstractComponentSimulation, csf)
+
+Update the component model with the coupler fields `csf`, other than the turbulent
+fluxes. Methods are defined in `FieldExchanger`.
+"""
+function update_sim! end
 
 """
     sim_dt(sim::AbstractComponentSimulation)

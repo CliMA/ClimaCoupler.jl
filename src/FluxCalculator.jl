@@ -23,6 +23,7 @@ export turbulent_fluxes!,
     ocean_seaice_fluxes!,
     FluxAccumulator,
     accumulate!,
+    accumulate_fluxes!,
     push_and_reset!,
     push_ready_accumulators!,
     reset!
@@ -95,30 +96,51 @@ Used by `turbulent_fluxes!` to push the time-averaged flux to a
 slow surface just before it steps. Allocated only for slow explicit
 surfaces; fast surfaces and implicit-flux surfaces do not have an accumulator.
 """
-struct FluxAccumulator{F <: CC.Fields.Field}
+struct FluxAccumulator{F <: CC.Fields.Field, D <: NamedTuple}
     F_lh::F
     F_sh::F
     F_turb_moisture::F
     F_turb_ρτxz::F
     F_turb_ρτyz::F
+    fluxes::D
     n_steps::Base.RefValue{Int}
 end
 
 """
-    FluxAccumulator(boundary_space)
+    FluxAccumulator(boundary_space, flux_names = ())
 
 Construct a zero-initialized `FluxAccumulator` whose fields live on the coupler
 boundary space (no regridding is needed during accumulation).
+
+`flux_names` are the coupler field names to time-average: the radiative and
+precipitation fluxes read in `update_sim!`, not the turbulent fluxes in `F_*`.
 """
-function FluxAccumulator(boundary_space)
+function FluxAccumulator(boundary_space, flux_names = ())
+    fluxes = NamedTuple{Tuple(flux_names)}(
+        Tuple(CC.Fields.zeros(boundary_space) for _ in flux_names),
+    )
     return FluxAccumulator(
         CC.Fields.zeros(boundary_space),
         CC.Fields.zeros(boundary_space),
         CC.Fields.zeros(boundary_space),
         CC.Fields.zeros(boundary_space),
         CC.Fields.zeros(boundary_space),
+        fluxes,
         Ref(0),
     )
+end
+
+"""
+    accumulate_fluxes!(acc::FluxAccumulator, csf)
+
+Add each declared coupler flux field in `csf` into the accumulator. Called from
+`FieldExchanger.update_model_sims!`, once per coupling step alongside `accumulate!`.
+"""
+function accumulate_fluxes!(acc::FluxAccumulator, csf)
+    for name in keys(acc.fluxes)
+        acc.fluxes[name] .+= getproperty(csf, name)
+    end
+    return nothing
 end
 
 """
@@ -143,13 +165,21 @@ end
 """
     push_and_reset!(sim, acc::FluxAccumulator)
 
-Compute the time-averaged flux (dividing the accumulator fields in-place by
-`n_steps`), push it to the surface via `update_turbulent_fluxes!(sim, ...)`,
-then zero the accumulator. A no-op if `n_steps` is zero.
+Divide the accumulator fields in place by `n_steps`, push the coupler fluxes via
+`update_sim!` and the turbulent fluxes via `update_turbulent_fluxes!`, then zero the
+accumulator. A no-op if `n_steps` is zero.
 """
 function push_and_reset!(sim, acc::FluxAccumulator)
     n = acc.n_steps[]
     iszero(n) && return nothing
+    # `update_sim!` runs before the turbulent push because a surface may reset its flux
+    # boundary conditions there.
+    if !isempty(acc.fluxes)
+        for name in keys(acc.fluxes)
+            acc.fluxes[name] ./= n
+        end
+        Interfacer.update_sim!(sim, acc.fluxes)
+    end
     # In-place division avoids allocating
     @. acc.F_lh /= n
     @. acc.F_sh /= n
@@ -171,10 +201,13 @@ end
 """
     reset!(acc::FluxAccumulator)
 
-Zero all accumulator fields and reset the step counter. Called by
-`push_and_reset!` after pushing the averaged flux to the surface.
+Zero all accumulator fields and the step counter. Called by `push_and_reset!` after
+pushing the averaged fluxes to the surface.
 """
 function reset!(acc::FluxAccumulator)
+    for name in keys(acc.fluxes)
+        fill!(acc.fluxes[name], 0)
+    end
     fill!(acc.F_lh, 0)
     fill!(acc.F_sh, 0)
     fill!(acc.F_turb_moisture, 0)
@@ -536,11 +569,15 @@ get_roughness_params(csf, sim, roughness_model) =
 Compute the fluxes between the ocean and sea ice simulations.
 This function does nothing by default - it should be extended
 for any ocean and sea ice models that support flux calculations.
+
+The `CoupledSimulation` method runs on the ocean/sea-ice cadence, not the coupling one.
 """
 function ocean_seaice_fluxes!(cs::Interfacer.CoupledSimulation)
-    haskey(cs.model_sims, :ocean_sim) &&
-        haskey(cs.model_sims, :ice_sim) &&
-        ocean_seaice_fluxes!(cs.model_sims.ocean_sim, cs.model_sims.ice_sim)
+    (haskey(cs.model_sims, :ocean_sim) && haskey(cs.model_sims, :ice_sim)) || return nothing
+    ocean_sim = cs.model_sims.ocean_sim
+    # The ocean and sea ice are required to share a timestep, so either answers for both.
+    Interfacer.will_step(ocean_sim, cs.t[] + cs.Δt_cpl) || return nothing
+    ocean_seaice_fluxes!(ocean_sim, cs.model_sims.ice_sim)
     return nothing
 end
 function ocean_seaice_fluxes!(

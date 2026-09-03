@@ -310,3 +310,38 @@ ClimaComms.device(s::StubCSForFluxAcc) = s.device
 
     rm(dir, force = true, recursive = true)
 end
+
+# Restarting mid-window must restore the partial coupler flux sums too. Without this,
+# the next `update_sim!` on a slow surface would average a different number of
+# contributions than the original run, so a restart would not reproduce it.
+@testset "FluxAccumulator coupler flux checkpoint round-trip" begin
+    boundary_space = space_checkpointer
+    device = ClimaComms.device(boundary_space)
+    flux_names = (:SW_d, :LW_d, :P_liq, :P_snow)
+
+    acc = FluxCalculator.FluxAccumulator(boundary_space, flux_names)
+    acc.F_lh .= FT(1)
+    acc.n_steps[] = 4
+    for (i, name) in enumerate(flux_names)
+        acc.fluxes[name] .= FT(100 * i)
+    end
+    original = (; ocean_sim = acc)
+
+    dir = mktempdir(; prefix = "test_flux_accumulator_fluxes_")
+    output_file = joinpath(dir, "checkpoint_flux_accumulators_1_100.jld2")
+    JLD2.jldsave(
+        output_file,
+        flux_accumulators = NamedTuple{keys(original)}(
+            map(Checkpointer._accumulator_to_cpu_nt, values(original)),
+        ),
+    )
+
+    fresh = (; ocean_sim = FluxCalculator.FluxAccumulator(boundary_space, flux_names))
+    cs = StubCSForFluxAcc(fresh, device)
+    Checkpointer.restart_flux_accumulators!(cs, output_file)
+
+    restored = cs.flux_accumulators.ocean_sim
+    for name in flux_names
+        @test parent(restored.fluxes[name]) == parent(acc.fluxes[name])
+    end
+end

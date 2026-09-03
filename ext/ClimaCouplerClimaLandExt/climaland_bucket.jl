@@ -492,6 +492,17 @@ end
 
 
 """
+    FieldExchanger.accumulated_coupler_fields(sim::BucketSimulation)
+
+The bucket reads the near-surface atmospheric state in `update_sim!` alongside
+radiation and precipitation, so a bucket stepping more slowly than the coupler
+must have all of them averaged over its timestep.
+"""
+function FieldExchanger.accumulated_coupler_fields(::BucketSimulation)
+    return (:SW_d, :LW_d, :P_liq, :P_snow, :T_atmos, :P_atmos, :q_tot_atmos, :u_int, :v_int)
+end
+
+"""
     update_sim!(sim::BucketSimulation, csf)
 
 Updates the surface component model cache with the current coupler fields besides turbulent fluxes.

@@ -9,8 +9,10 @@ module FieldExchanger
 import ClimaCore as CC
 
 import ..Interfacer, ..FluxCalculator, ..Utilities
+import ..Interfacer: update_sim!
 
 export update_sim!,
+    accumulated_coupler_fields,
     update_model_sims!,
     step_model_sims!,
     exchange!,
@@ -260,17 +262,35 @@ function update_sim!(sim::Interfacer.AbstractSurfaceSimulation, csf)
 end
 
 """
-    update_model_sims!(model_sims, csf)
+    accumulated_coupler_fields(sim::Interfacer.AbstractSurfaceSimulation)
+
+Return the coupler fields to time-average over this surface's timestep before
+handing them to `update_sim!`.
+"""
+accumulated_coupler_fields(::Interfacer.AbstractSurfaceSimulation) =
+    (:SW_d, :LW_d, :P_liq, :P_snow)
+
+"""
+    update_model_sims!(model_sims, csf, flux_accumulators = (;))
 
 Iterates `update_sim!` over all component model simulations saved in `cs.model_sims`.
+
+For a surface in `flux_accumulators`, the fields it declared in
+`accumulated_coupler_fields` are also added to the accumulator, and
+`FluxCalculator.push_and_reset!` overwrites them with the window average just before
+the surface steps.
 
 # Arguments
 - `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
 - `csf`: [NamedTuple] containing coupler fields.
+- `flux_accumulators`: [NamedTuple] of `FluxCalculator.FluxAccumulator`s keyed by
+    surface simulation name.
 """
-function update_model_sims!(model_sims, csf)
-    for sim in model_sims
+function update_model_sims!(model_sims, csf, flux_accumulators = (;))
+    for (name, sim) in pairs(model_sims)
         update_sim!(sim, csf)
+        accumulator = get(flux_accumulators, name, nothing)
+        isnothing(accumulator) || FluxCalculator.accumulate_fluxes!(accumulator, csf)
     end
 end
 
@@ -408,7 +428,7 @@ function exchange!(cs::Interfacer.CoupledSimulation)
     import_combined_surface_fields!(cs.fields, cs.model_sims)
 
     # Update the component model simulations with the coupler fields
-    update_model_sims!(cs.model_sims, cs.fields)
+    update_model_sims!(cs.model_sims, cs.fields, cs.flux_accumulators)
     return nothing
 end
 

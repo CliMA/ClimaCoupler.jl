@@ -453,3 +453,130 @@ end
         @test all(parent(ocean_acc.F_lh) .== 0)
     end
 end
+
+# The accumulator must also time-average the radiative and precipitation fluxes a slow
+# surface reads in `update_sim!`, not just the turbulent fluxes. Without this, a surface
+# stepping at dt > Δt_cpl is driven by an instantaneous sample of SW_d, LW_d, P_liq and
+# P_snow taken on the last coupling step before it steps.
+mutable struct FluxRecordingSurface{F} <: Interfacer.AbstractSurfaceSimulation
+    received::F
+    turbulent_count::Int
+end
+function FieldExchanger.update_sim!(sim::FluxRecordingSurface, csf)
+    sim.received.SW_d .= csf.SW_d
+    sim.received.P_liq .= csf.P_liq
+    return nothing
+end
+function FluxCalculator.update_turbulent_fluxes!(sim::FluxRecordingSurface, fields)
+    sim.received.F_lh .= fields.F_lh
+    sim.turbulent_count += 1
+    return nothing
+end
+
+@testset "push_and_reset! pushes averaged coupler fluxes" begin
+    for FT in (Float32, Float64)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6.371e6),
+            n_quad_points = 4,
+            h_elem = 4,
+        )
+        flux_names = (:SW_d, :LW_d, :P_liq, :P_snow)
+        acc = FluxCalculator.FluxAccumulator(boundary_space, flux_names)
+        @test all(all(parent(acc.fluxes[name]) .== 0) for name in flux_names)
+
+        csf = Interfacer.init_coupler_fields(
+            FT,
+            Interfacer.default_coupler_fields(),
+            boundary_space,
+        )
+        contributions = (FT(1), FT(4), FT(10))
+        for c in contributions
+            csf.SW_d .= c
+            csf.P_liq .= c + FT(200)
+            FluxCalculator.accumulate_fluxes!(acc, csf)
+            FluxCalculator.accumulate!(
+                acc,
+                (;
+                    F_lh = ones(boundary_space) .* c,
+                    F_sh = zeros(boundary_space),
+                    F_turb_moisture = zeros(boundary_space),
+                    F_turb_ρτxz = zeros(boundary_space),
+                    F_turb_ρτyz = zeros(boundary_space),
+                ),
+            )
+        end
+        @test all(parent(acc.fluxes.SW_d) .≈ sum(contributions))
+
+        received = (;
+            SW_d = CC.Fields.zeros(boundary_space),
+            P_liq = CC.Fields.zeros(boundary_space),
+            F_lh = CC.Fields.zeros(boundary_space),
+        )
+        sim = FluxRecordingSurface(received, 0)
+        FluxCalculator.push_and_reset!(sim, acc)
+
+        # One shared step count drives both averages, and the coupler fluxes reach the
+        # surface through `update_sim!` before the turbulent push.
+        n = length(contributions)
+        @test all(parent(sim.received.SW_d) .≈ sum(contributions) / n)
+        @test all(parent(sim.received.P_liq) .≈ (sum(contributions) + 3 * FT(200)) / n)
+        @test all(parent(sim.received.F_lh) .≈ sum(contributions) / n)
+        @test sim.turbulent_count == 1
+
+        # Both windows are closed together.
+        @test acc.n_steps[] == 0
+        @test all(all(parent(acc.fluxes[name]) .== 0) for name in flux_names)
+        @test all(parent(acc.F_lh) .== 0)
+    end
+end
+
+# `compute_sea_ice_ocean_fluxes!` takes a single `Δt` and its result is consumed by one
+# ocean step and one sea-ice step, so `ocean_seaice_fluxes!` runs on that cadence rather
+# than on every coupling step.
+mutable struct SteppingOcean{I} <: Interfacer.AbstractOceanSimulation
+    integrator::I
+end
+struct CountingSeaIce <: Interfacer.AbstractSeaIceSimulation
+    call_count::Base.RefValue{Int}
+end
+FluxCalculator.ocean_seaice_fluxes!(::SteppingOcean, ice_sim::CountingSeaIce) =
+    (ice_sim.call_count[] += 1; nothing)
+
+@testset "ocean_seaice_fluxes! runs on the ocean/sea-ice cadence" begin
+    ice_sim = CountingSeaIce(Ref(0))
+    ocean_sim = SteppingOcean((; t = 0.0, dt = 600.0))
+    cs = Interfacer.CoupledSimulation{Float64}(
+        nothing,                    # start_date
+        nothing,                    # fields
+        nothing,                    # conservation_checks
+        nothing,                    # tspan
+        200.0,                      # Δt_cpl
+        Ref(0.0),                   # t
+        Ref(-1),                    # prev_checkpoint_t
+        (; ocean_sim, ice_sim),
+        (;),                        # callbacks
+        (;),                        # dir_paths
+        nothing,                    # thermo_params
+        nothing,                    # diags_handler
+        true,                       # save_cache
+        (;),                        # flux_accumulators
+    )
+
+    # Coupling steps strictly inside the window: neither component steps at t + Δt_cpl.
+    for t in (0.0, 200.0)
+        cs.t[] = t
+        FluxCalculator.ocean_seaice_fluxes!(cs)
+        @test ice_sim.call_count[] == 0
+    end
+
+    # t + Δt_cpl = 600 is when both components step, so the fluxes are assembled once.
+    cs.t[] = 400.0
+    FluxCalculator.ocean_seaice_fluxes!(cs)
+    @test ice_sim.call_count[] == 1
+
+    cs.t[] = 600.0
+    ocean_sim.integrator = (; t = 600.0, dt = 600.0)
+    FluxCalculator.ocean_seaice_fluxes!(cs)
+    @test ice_sim.call_count[] == 1
+end

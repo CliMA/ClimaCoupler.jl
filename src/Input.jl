@@ -845,6 +845,14 @@ function parse_component_dts!(config_dict)
         end
     end
 
+    # The ocean and sea ice exchange fluxes through one interface computation that takes
+    # a single Δt and is consumed by one step of each.
+    if get(config_dict, "ocean_model", nothing) == "oceananigans" &&
+       get(config_dict, "ice_model", nothing) == "clima_seaice"
+        dt_ocean, dt_seaice = component_dt_dict["dt_ocean"], component_dt_dict["dt_seaice"]
+        @assert dt_ocean == dt_seaice "dt_ocean and dt_seaice must be equal, found $dt_ocean and $dt_seaice"
+    end
+
     config_dict["component_dt_dict"] = component_dt_dict
     return nothing
 end

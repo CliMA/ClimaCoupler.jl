@@ -331,10 +331,21 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     SW_d = csf.SW_d
     LW_d = csf.LW_d
     T_melt = FT(sim.ice_properties.C_to_K) # Melting temperature (freezing point of water)
+    maximum_temperature_step = FT(5) # Largest surface temperature change per solver iteration
 
     # Build element-wise `update_T_sfc_cb` closures (each closes over local ice parameters)
     update_T_sfc_cb =
-        ClimaCouplerCMIPExt.update_T_sfc.(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
+        ClimaCouplerCMIPExt.update_T_sfc.(
+            R,
+            T_i,
+            σ,
+            ϵ,
+            SW_d,
+            LW_d,
+            α_albedo,
+            T_melt,
+            maximum_temperature_step,
+        )
 
     # Surface temperature guess from last timestep
     Interfacer.get_field!(csf.scalar_temp1, sim, Val(:surface_temperature))
@@ -406,7 +417,9 @@ end
 Update the turbulent fluxes in the simulation using the values stored in the coupler fields.
 These include latent heat flux, sensible heat flux, momentum fluxes, and moisture flux.
 
-The input `fields` are already area-weighted, so there's no need to weight them again.
+The input `fields` are per unit surface area of this model, while ClimaSeaIce reads
+`external_heat_fluxes.top` as a grid-cell mean (it divides by the ice concentration to
+recover the per-ice flux), so the heat fluxes are weighted by the ice concentration here.
 
 Note that currently the moisture flux has no effect on the sea ice model, which has
 constant salinity.
@@ -461,13 +474,12 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
     remapped_F_sh = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
 
     # Update the sea ice heat flux only where the concentration is greater than zero.
-    # With PrescribedTemperature the top heat flux is a FluxFunction, not a Field;
-    # the flux is determined from the diagnosed T_sfc so we skip writing here.
+    # The Boolean mask has to multiply last so that a NaN under open water is zeroed.
     si_flux_heat = sim.ice.model.external_heat_fluxes.top
     if si_flux_heat isa OC.Field
+        ℵ = OC.interior(ice_concentration, :, :, 1)
         OC.interior(si_flux_heat, :, :, 1) .+=
-            (OC.interior(ice_concentration, :, :, 1) .> 0) .*
-            (remapped_F_lh .+ remapped_F_sh)
+            (ℵ .> 0) .* (ℵ .* (remapped_F_lh .+ remapped_F_sh))
     end
 
     return nothing
@@ -487,6 +499,12 @@ by the coupler.
 Update the portion of the surface_fluxes for T that is due to radiation, and the snow
 precipitation that drives snow accumulation. The rest will be updated in `update_turbulent_fluxes!`.
 
+The radiative part carries the emitted longwave `σϵT_sfc⁴` alongside the absorbed shortwave
+and longwave, and is weighted by the ice concentration, since ClimaSeaIce reads
+`external_heat_fluxes.top` as a grid-cell mean. `T_sfc` is the same surface temperature the
+atmosphere used for its own upwelling longwave over this cell, so the emitted longwave
+leaving the atmosphere's budget is the one entering the ice's.
+
 A note on sign conventions:
 ClimaAtmos and ClimaSeaIce both use the convention that a positive flux is an upward flux.
 No sign change is needed during the exchange for radiation. Precipitation is the exception:
@@ -505,16 +523,25 @@ function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
 
     # Update only the part due to radiative fluxes. For the full update, the component due
     # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
-    # With PrescribedTemperature the top heat flux is a FluxFunction, not a Field;
-    # the flux is determined from the diagnosed T_sfc so we skip writing here.
+    # The Boolean mask has to multiply last so that a NaN under open water is zeroed.
     si_flux_heat = sim.ice.model.external_heat_fluxes.top
     if si_flux_heat isa OC.Field
         α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
         ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
+        FT = eltype(sim.ice.model)
+        σ = FT(sim.ice_properties.σ)
+        C_to_K = FT(sim.ice_properties.C_to_K)
+
+        ℵ = OC.interior(ice_concentration, :, :, 1)
+        T_sfc = OC.interior(top_thermodynamics(sim).top_surface_temperature, :, :, 1)
 
         OC.interior(si_flux_heat, :, :, 1) .=
-            (OC.interior(ice_concentration, :, :, 1) .> 0) .*
-            (-(1 .- α) .* remapped_SW_d .- ϵ .* remapped_LW_d)
+            (ℵ .> 0) .* (
+                ℵ .* (
+                    -(1 .- α) .* remapped_SW_d .-
+                    ϵ .* (remapped_LW_d .- σ .* (C_to_K .+ T_sfc) .^ 4)
+                )
+            )
     end
 
     # Snow precipitation drives snow accumulation (sign flip: downward atmospheric mass 

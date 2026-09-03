@@ -560,3 +560,58 @@ for FT in (Float32, Float64)
         @test cs.fields.P_snow == atmos_init_field
     end
 end
+
+# `update_sim!` runs every coupling step for every surface: a surface that computes its
+# own turbulent fluxes reads the atmospheric state it writes, so freezing it over a slow
+# surface's window would accumulate fluxes against stale state. A slow surface instead
+# also accumulates the coupler fields it declared, and `FluxCalculator.push_and_reset!`
+# overwrites them with the window average just before the surface steps.
+mutable struct CouplerFieldRecordingSurface{F} <: Interfacer.AbstractSurfaceSimulation
+    received::F
+    update_count::Int
+end
+Interfacer.get_field(sim::CouplerFieldRecordingSurface, ::Val{:area_fraction}) =
+    CC.Fields.ones(axes(sim.received.SW_d))
+function FieldExchanger.update_sim!(sim::CouplerFieldRecordingSurface, csf)
+    sim.received.SW_d .= csf.SW_d
+    sim.update_count += 1
+    return nothing
+end
+
+@testset "update_model_sims! accumulates coupler fluxes for slow surfaces" begin
+    for FT in (Float32, Float64)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6.371e6),
+            n_quad_points = 4,
+            h_elem = 4,
+        )
+        received = (; SW_d = CC.Fields.zeros(boundary_space))
+        slow_sim = CouplerFieldRecordingSurface(received, 0)
+        csf = Interfacer.init_coupler_fields(
+            FT,
+            Interfacer.default_coupler_fields(),
+            boundary_space,
+        )
+        acc = FluxCalculator.FluxAccumulator(
+            boundary_space,
+            FieldExchanger.accumulated_coupler_fields(slow_sim),
+        )
+
+        for c in (FT(1), FT(4))
+            csf.SW_d .= c
+            FieldExchanger.update_model_sims!((; slow_sim), csf, (; slow_sim = acc))
+        end
+
+        # The surface saw each coupling step's instantaneous value, and the accumulator
+        # holds their sum.
+        @test slow_sim.update_count == 2
+        @test all(parent(slow_sim.received.SW_d) .≈ FT(4))
+        @test all(parent(acc.fluxes.SW_d) .≈ FT(5))
+
+        # A surface with no accumulator is updated too, and nothing is accumulated.
+        fast_sim = CouplerFieldRecordingSurface(received, 0)
+        FieldExchanger.update_model_sims!((; fast_sim), csf, (;))
+        @test fast_sim.update_count == 1
+    end
+end

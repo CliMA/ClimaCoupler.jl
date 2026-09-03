@@ -15,17 +15,26 @@ import SurfaceFluxes as SF
 import Thermodynamics as TD
 
 """
-    update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
+    update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt, maximum_temperature_step)
 
-Create a callback for `SurfaceFluxes.jl` that updates surface temperature using
-a semi-implicit linearization of the LW emission term:
+Create a callback for `SurfaceFluxes.jl` that updates surface temperature from a
+semi-implicit linearization of the surface flux balance
 
-    Tₛⁿ⁺¹ = (Tᵢ - R · (Jᵃ - 4σϵTₛⁿ⁴)) / (1 + 4RσϵTₛⁿ³)
+    Qᵃ(Tₛ) + Ωᵀ (Tᵃ - Tₛ) + (Tₛ - Tᵢ)/R = 0
 
-where Jᵃ = σϵTₛⁿ⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh  (positive upward).
+where `Qᵃ = σϵTₛ⁴ - (1-α)SW↓ - ϵLW↓ + F_lh` collects every upward flux except the sensible heat, and
+`Ωᵀ = F_sh/(Tᵃ - Tₛ)` is the linearized sensible heat coefficient. Linearizing the emitted longwave as
+`σϵTₛ⁴ ≈ σϵTₙ⁴ + β(Tₛ - Tₙ)` with `β = 4σϵTₙ³` gives the Newton-like update
 
-The result is capped at the melting temperature T_melt to prevent the surface
-temperature from exceeding the melting point under heating fluxes.
+    Tₛⁿ⁺¹ = (Tᵢ + βR Tₙ - Ωᵀ R Tᵃ - Qᵃ R) / (1 + βR - Ωᵀ R)
+
+Both the radiative and the sensible response to Tₛ appear in the denominator. Carrying the sensible term
+implicitly is what makes the iteration a contraction: `Ωᵀ ≈ -ρ cₚ Cₕ |U|` is an order of magnitude larger
+than `β` under Arctic conditions, so a scheme that holds it fixed amplifies the error by
+`|Ωᵀ| R / (1 + βR)` per iteration and oscillates between the melting point and arbitrarily cold values.
+
+The step is capped at `maximum_temperature_step` per iteration, and the result at the melting temperature
+`T_melt`.
 
 # Arguments
 - `R`: Conductive resistance of the column [m² K W⁻¹] (snow and ice in series)
@@ -36,65 +45,65 @@ temperature from exceeding the melting point under heating fluxes.
 - `LW_d`: Downward longwave radiation [W m⁻²]
 - `α_albedo`: Surface albedo [-]
 - `T_melt`: Melting temperature [K] (typically 273.15 K for freshwater ice)
+- `maximum_temperature_step`: Largest surface temperature change allowed in a single iteration [K]
 """
-function update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
+function update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt, maximum_temperature_step)
     return function (ζ, param_set, thermo_params_callback, inputs, scheme, u_star, z0m, z0s)
-        T_sfc_n = inputs.T_sfc_guess
+        Tₛ⁻ = inputs.T_sfc_guess
 
-        # Surface density and saturation specific humidity at T_sfc_n
-        ρ_sfc = SF.surface_density(
+        # Surface density and saturation specific humidity at Tₛ⁻
+        ρₛ = SF.surface_density(
             param_set,
             inputs.T_int,
             inputs.ρ_int,
-            T_sfc_n,
+            Tₛ⁻,
             inputs.Δz,
             inputs.q_tot_int,
             inputs.q_liq_int,
             inputs.q_ice_int,
         )
-        q_vap_sfc = TD.q_vap_saturation(
+        qₛ = TD.q_vap_saturation(
             thermo_params_callback,
-            T_sfc_n,
-            ρ_sfc,
+            Tₛ⁻,
+            ρₛ,
             inputs.q_liq_int,
             inputs.q_ice_int,
         )
 
-        F_sh = SF.sensible_heat_flux(
+        𝒬ᵀ = SF.sensible_heat_flux(
             param_set,
             ζ,
             u_star,
             inputs,
             z0m,
             z0s,
-            T_sfc_n,
-            q_vap_sfc,
-            inputs.ρ_int,
+            Tₛ⁻,
+            qₛ,
+            ρₛ,
             scheme,
         )
-        F_lh = SF.latent_heat_flux(
-            param_set,
-            ζ,
-            u_star,
-            inputs,
-            z0m,
-            z0s,
-            q_vap_sfc,
-            inputs.ρ_int,
-            scheme,
-        )
+        𝒬ᵛ = SF.latent_heat_flux(param_set, ζ, u_star, inputs, z0m, z0s, qₛ, ρₛ, scheme)
 
-        # Net upward flux: Jᵃ = σϵT⁴ - (1-α)SW↓ - ϵLW↓ + F_sh + F_lh
-        J_a = σ * ϵ * T_sfc_n^4 - (1 - α_albedo) * SW_d - ϵ * LW_d + F_sh + F_lh
+        # Everything upward except the sensible heat, which is carried implicitly below
+        Qᵃ = σ * ϵ * Tₛ⁻^4 - (1 - α_albedo) * SW_d - ϵ * LW_d + 𝒬ᵛ
 
-        # Semi-implicit solve: linearize σϵT⁴ ≈ -3σϵTₙ⁴ + 4σϵTₙ³T
-        numerator = T_i - R * (J_a - 4 * σ * ϵ * T_sfc_n^4)
-        denominator = 1 + 4 * R * σ * ϵ * T_sfc_n^3
-        T_sfc_new = numerator / denominator
+        # Secant slope of the sensible heat flux. Physically Ωᵀ ≤ 0; the geopotential
+        # offset between T_int and the dry static energy makes the quotient change sign
+        # for |Δ| below ~0.1 K, where 𝒬ᵀ itself is negligible.
+        Tᵃ = inputs.T_int
+        Δ = Tᵃ - Tₛ⁻
+        Ωᵀ = min(𝒬ᵀ / Δ, zero(Δ))
+        Ωᵀ = ifelse(isfinite(Ωᵀ), Ωᵀ, zero(Δ))
 
-        # Cap surface temperature at melting temperature 
-        T_sfc_new = min(T_sfc_new, T_melt)
+        # Newton linearization of the emitted longwave: σϵTₛ⁴ ≈ σϵTₛ⁻⁴ + β (Tₛ - Tₛ⁻)
+        β = 4 * σ * ϵ * Tₛ⁻^3
 
-        return T_sfc_new
+        D = 1 + β * R - Ωᵀ * R
+        Tₛ = (T_i + β * R * Tₛ⁻ - Ωᵀ * R * Tᵃ - Qᵃ * R) / D
+        Tₛ = ifelse((D == zero(D)) | isnan(Tₛ), Tₛ⁻, Tₛ)
+
+        # Cap the step for iteration stability, then cap at the melting temperature
+        Tₛ = Tₛ⁻ + clamp(Tₛ - Tₛ⁻, -maximum_temperature_step, maximum_temperature_step)
+        return min(Tₛ, T_melt)
     end
 end

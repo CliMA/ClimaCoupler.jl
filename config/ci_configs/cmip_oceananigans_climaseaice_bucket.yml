@@ -35,8 +35,10 @@ surface_setup: "PrescribedSurface"
 t_end: "3hours"
 topo_smoothing: true
 topography: "Earth"
+use_intersection_grid: true
 use_itime: true
 viscous_sponge: true
+walltime_debug: true
 z_elem: 39
 z_max: 60000.0
 check_nan_every: 1

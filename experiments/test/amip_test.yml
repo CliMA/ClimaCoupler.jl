@@ -8,7 +8,8 @@ dz_bottom: 100.0
 energy_check: false
 h_elem: 4
 checkpoint_dt: "720hours"
-bucket_albedo_type: "map_temporal"
+# This test is used for downstream test, and we don't have the WeatherModel initial condtion in the artifacts
+initial_condition: DecayingProfile
 land_model: "integrated"
 land_spun_up_ic: false
 mode_name: "amip"
@@ -16,6 +17,7 @@ netcdf_interpolation_num_points: [90, 45, 31]
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 orographic_gravity_wave: ~
+radiation_reset_rng_seed: true
 rayleigh_sponge: true
 reproducible_restart: true
 start_date: "20100101"

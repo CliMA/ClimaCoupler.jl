@@ -5,7 +5,6 @@ import Oceananigans.BoundaryConditions: Zipper
 
 ocean_reference_density(ocean::OC.Simulation, FT) =
     convert(FT, ocean.model.buoyancy.formulation.equation_of_state.reference_density)
-ocean_reference_density(::Nothing, FT) = convert(FT, 1026.0)
 
 @inline u_immersed_side_drag(i, j, k, grid, clock, Φ, μ) =
     @inbounds -μ * Φ.u[i, j, k] * spᶠᶜᶜ(i, j, k, grid, Φ)
@@ -160,6 +159,10 @@ function sea_ice_simulation(
     )
 
     bottom_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    # Coupler writes the full upward surface net flux Jᵃ (see `update_T_sfc`):
+    # Jᵃ = σϵTₛ⁴ − (1−α)SW↓ − ϵLW↓ + F_sh + F_lh, matching the skin balance
+    # Jᵃ + (Tₛ − Tᵢ)/R = 0 so the Stefan residual vanishes at equilibrium and
+    # retains melt energy when Tₛ is capped at T_melt.
     top_heat_flux = OC.Field{OC.Center, OC.Center, Nothing}(grid)
     snowfall = OC.Field{OC.Center, OC.Center, Nothing}(grid)
 

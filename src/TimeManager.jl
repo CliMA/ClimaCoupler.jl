@@ -1,12 +1,13 @@
 """
     TimeManager
 
-This module facilitates calendar functions and temporal interpolations
-of data.
+This module facilitates calendar functions and temporal interpolations of data.
 """
 module TimeManager
 
 import Dates
+import ClimaDiagnostics as CD
+import ClimaUtilities.TimeManager: ITime, date
 import ..Interfacer
 import ..Utilities: time_to_seconds
 
@@ -62,17 +63,22 @@ simulated_years_per_day(t_start, t_end, walltime) =
 """
     Callback
 
-A small struct containing a schedule, and the function to be executed if the
+A small struct containing a schedule and the function to be executed if the
 schedule is true.
 
-A `schedule` is a callable object (ie, a function) that takes an integrator-type
-of object and returns true or false.
+A `schedule` is a callable object (i.e., a function) that returns `true` or `false`. It
+is called with an integrator-like object with two fields:
+- `t`: the current simulation time (unwrapped from `cs.t`), and
+- `step`: the number of coupling steps taken so far (unwrapped from `cs.step`).
+
+This is the interface that the schedules in `ClimaDiagnostics.Schedules` expect,
+so any of them can be used here.
 
 The function `func` calls the coupled state `cs`.
 """
-struct Callback{SCHEDULE, FUNC}
-    schedule::SCHEDULE
-    func::FUNC
+struct Callback{S, F}
+    schedule::S
+    func::F
 end
 
 """
@@ -81,8 +87,8 @@ end
 Check if it is time to call `callback`, if yes, call its function on `cs`.
 """
 function maybe_trigger_callback(callback, cs)
-    t = cs.t[]
-    callback.schedule((; t)) && callback.func(cs)
+    t, step = cs.t[], cs.step[]
+    callback.schedule((; t, step)) && callback.func(cs)
     return nothing
 end
 
@@ -99,15 +105,140 @@ function callbacks!(cs)
     return nothing
 end
 
+#### Schedules
 
 """
+    NeverSchedule()
+
 A schedule that is never true. Useful to disable something.
-
-TODO: Move this to ClimaUtilities once we move Schedules there
 """
-struct NeverSchedule end
+struct NeverSchedule <: CD.Schedules.AbstractSchedule end
 function (::NeverSchedule)(args...)
     return false
+end
+
+CD.Schedules.short_name(::NeverSchedule) = "never"
+CD.Schedules.long_name(::NeverSchedule) = "never"
+
+"""
+    OnceSchedule()
+
+A schedule that is only true at the first step of the simulation.
+"""
+struct OnceSchedule <: CD.Schedules.AbstractSchedule end
+
+function (::OnceSchedule)(integrator)
+    return integrator.step == 1
+end
+
+CD.Schedules.short_name(::OnceSchedule) = "once"
+CD.Schedules.long_name(::OnceSchedule) = "once at the first step of the simulation"
+
+"""
+    PowerOfTwoSchedule()
+
+A schedule that is true on every step whose number is a power of two.
+
+This is useful to sample densely at the beginning of a run and increasingly
+sparsely as it goes on. Note that `cs.step` is not checkpointed, so a restarted
+simulation starts sampling densely again from the restart.
+"""
+struct PowerOfTwoSchedule <: CD.Schedules.AbstractSchedule end
+
+function (::PowerOfTwoSchedule)(integrator)::Bool
+    return ispow2(integrator.step)
+end
+
+CD.Schedules.short_name(::PowerOfTwoSchedule) = "pow2"
+CD.Schedules.long_name(::PowerOfTwoSchedule) = "every power-of-two iteration"
+
+"""
+    OrSchedule(schedules...)
+
+A schedule that is true whenever any of the given `schedules` is true.
+
+# Examples
+```julia
+julia> schedule = OrSchedule(PowerOfTwoSchedule(), NeverSchedule());
+
+julia> schedule((; t = 8.0, step = 8))
+true
+```
+"""
+struct OrSchedule{S <: Tuple} <: CD.Schedules.AbstractSchedule
+    schedules::S
+
+    function OrSchedule(schedules::Tuple)
+        isempty(schedules) && error(
+            "OrSchedule needs at least one schedule (use a NeverSchedule to disable something)",
+        )
+        return new{typeof(schedules)}(schedules)
+    end
+end
+
+OrSchedule(schedules...) = OrSchedule(schedules)
+
+function (schedule::OrSchedule)(integrator)::Bool
+    # Must call *every* schedule: some of them (e.g., EveryDtSchedule) only 
+    # advance their internal state when they return true. This is why the 
+    # results are collected before being reduced.
+    triggered = map(s -> s(integrator), schedule.schedules)
+    return any(triggered)
+end
+
+function CD.Schedules.short_name(schedule::OrSchedule)
+    return join(map(CD.Schedules.short_name, schedule.schedules), "_or_")
+end
+
+function CD.Schedules.long_name(schedule::OrSchedule)
+    return join(map(CD.Schedules.long_name, schedule.schedules), " or ")
+end
+
+"""
+    calendar_dt_schedule(period, start_date, t_start)
+
+Build an `EveryCalendarDtSchedule` for `period`, which is either a `Dates.Period`
+or a string of the form `<NUM><unit>` accepted by [`time_to_period`](@ref), such
+as `"6hours"`.
+
+`t_start` is the time the simulation starts from, either an `ITime` or a number of
+seconds since `start_date`. It is used to seed the schedule's `date_last`.
+
+!!! note "Use this instead of `EveryCalendarDtSchedule` directly"
+    A schedule built directly at `t_start > 0` has no record of the time that
+    already elapsed, so it considers itself overdue and fires on the first step of
+    a restarted simulation, remaining one coupling step out of phase from then on.
+    Seeding `date_last` keeps a restarted run on the same calendar boundaries as
+    the original one. A fresh simulation starts at `t_start = 0` and is unaffected.
+"""
+function calendar_dt_schedule(period, start_date, t_start)
+    period isa Dates.Period || (period = time_to_period(period))
+    date_last =
+        t_start isa ITime ? date(t_start) :
+        start_date + Dates.Millisecond(round(Int64, 1000 * float(t_start)))
+    return CD.Schedules.EveryCalendarDtSchedule(period; start_date, date_last)
+end
+
+"""
+    walltime_schedule(walltime_dt, walltime_debug, start_date, t_start = 0)
+
+Return the schedule to be used for walltime reporting, or `nothing` if walltime
+reporting is disabled.
+
+Reporting happens every `walltime_dt` (a string, as described in
+[`time_to_period`](@ref)), or never if `walltime_dt` is `"never"`.
+
+If `walltime_debug` is `true`, reporting also happens on every coupling step whose
+number is a power of two (see [`PowerOfTwoSchedule`](@ref)). Note that this is the
+only reporting if `walltime_dt` is `"never"`.
+"""
+function walltime_schedule(walltime_dt, walltime_debug, start_date, t_start = 0)
+    if walltime_dt == "never"
+        return walltime_debug ? PowerOfTwoSchedule() : nothing
+    end
+    schedule_periodic = calendar_dt_schedule(walltime_dt, start_date, t_start)
+    walltime_debug || return schedule_periodic
+    return OrSchedule(schedule_periodic, PowerOfTwoSchedule())
 end
 
 """
@@ -139,7 +270,7 @@ function (reporter::WalltimeReporter)(cs)
     date = cs.start_date + Dates.Second(round(Int, t))
 
     # compute the number of steps completed, total number of steps, and percent complete
-    n_steps = max(1, round(Int, (t - t_start) / Δt_cpl))
+    n_steps = cs.step[]
     n_steps_total = ceil(Int, (t_end - t_start) / Δt_cpl) #TODO: This doesn't support t_end = Inf
     percent_complete = round(100 * (t - t_start) / (t_end - t_start); digits = 1)
 

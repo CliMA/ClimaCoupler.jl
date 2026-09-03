@@ -8,8 +8,8 @@ import ClimaCoupler
 import ClimaCoupler.FluxCalculator
 
 # Every trigger package must be imported for ClimaCouplerCMIPExt to load
-import Oceananigans,
-    ClimaOcean, ClimaSeaIce, KernelAbstractions, ConservativeRegridding, Adapt
+import Adapt,
+    ClimaAtmos, ClimaSeaIce, ConservativeRegridding, KernelAbstractions, Oceananigans
 const CMIPExt = Base.get_extension(ClimaCoupler, :ClimaCouplerCMIPExt)
 
 const FT = Float64
@@ -18,7 +18,6 @@ const thermo_params = SF.Parameters.thermodynamics_params(sf_params)
 
 const σ = FT(5.670374419e-8)
 const T_melt = FT(273.15)
-const maximum_temperature_step = FT(5)
 const height_int = FT(20)
 const height_sfc = FT(0)
 const z0 = FT(5.8e-5)
@@ -61,7 +60,6 @@ function step_surface(c::Column, T_guess)
         c.LW_d,
         c.α,
         T_melt,
-        maximum_temperature_step,
     )
     config = SF.SurfaceFluxConfig(
         SF.ConstantRoughnessParams(z0, z0),
@@ -173,11 +171,18 @@ const melting_column =
         end
     end
 
-    @testset "step is bounded from any guess" begin
-        for (_, c) in columns, T_guess in (FT(150), FT(200), FT(250), T_melt)
-            Tₛ⁺ = step_surface(c, T_guess).T_sfc_new
-            @test abs(Tₛ⁺ - T_guess) <= maximum_temperature_step + sqrt(eps(FT))
-            @test Tₛ⁺ <= T_melt
+    @testset "one solve never moves away from the converged temperature" begin
+        # How far a single `SurfaceFluxes` solve advances the skin temperature depends on how
+        # many times that version applies the callback, so assert the property that does not:
+        # a contraction can only shrink the distance to the fixed point, never grow it. This is
+        # what a map whose turbulent response is held explicit fails to do.
+        for (_, c) in columns
+            T∞ = converge(c, T_melt).T_sfc_new
+            for T_guess in (FT(150), FT(200), FT(250), T_melt)
+                Tₛ⁺ = step_surface(c, T_guess).T_sfc_new
+                @test abs(Tₛ⁺ - T∞) <= abs(T_guess - T∞) + FT(0.05)
+                @test Tₛ⁺ <= T_melt
+            end
         end
     end
 

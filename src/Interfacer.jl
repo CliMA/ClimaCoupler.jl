@@ -53,6 +53,7 @@ abstract type AbstractSimulation{FT} end
 
 """
     CoupledSimulation
+
 Stores information needed to run a simulation with the coupler.
 """
 struct CoupledSimulation{
@@ -63,9 +64,10 @@ struct CoupledSimulation{
     TS,
     DTI,
     TT,
+    ST,
     CTT,
     NTMS <: NamedTuple,
-    CALLBACKS,
+    C,
     NTP <: NamedTuple,
     TP,
     DH,
@@ -78,9 +80,10 @@ struct CoupledSimulation{
     tspan::TS
     Δt_cpl::DTI
     t::TT
+    step::ST
     prev_checkpoint_t::CTT
     model_sims::NTMS
-    callbacks::CALLBACKS
+    callbacks::C
     dir_paths::NTP
     thermo_params::TP
     diags_handler::DH
@@ -559,7 +562,7 @@ abstract type SubseasonalMode <: AbstractSimulationMode end
 
 An abstract type representing the CMIP simulation mode. CMIP is currently the most complex
 configuration of the CoupledSimulation object. It runs a ClimaAtmos.jl atmosphere model,
-ClimaLand.jl bucket land model, a ClimaOcean ocean model, and a simple thermal sea ice model.
+ClimaLand.jl bucket land model, an Oceananigans ocean model, and a simple thermal sea ice model.
 """
 abstract type CMIPMode <: AbstractSimulationMode end
 

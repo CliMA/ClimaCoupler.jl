@@ -20,13 +20,13 @@ value = 0
 value = 0.1
 
 [min_area_limiter_scale]
-value = 0.0001
+value = 0.001
 
 [min_area_limiter_power]
 value = 1
 
 [turb_entr_param_vec]
-value = [0.0001, 10000]
+value = [0.001, 1e5]
 
 [entr_detr_limit_inv_tau]
 value = 0
@@ -51,6 +51,9 @@ value = 0.001
 
 [max_area_limiter_power]
 value = 1
+
+[mixing_length_Prandtl_maximum]
+value = 100
 
 [precipitation_timescale]
 value = 1200

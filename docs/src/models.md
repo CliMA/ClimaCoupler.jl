@@ -161,12 +161,12 @@ over ocean/sea ice regions, so it cannot be used in simulations that ignore the 
 ### Ocean and sea ice models (`ClimaCouplerCMIPExt`)
 
 This extension is loaded when [Oceananigans.jl](https://github.com/CliMA/Oceananigans.jl),
-[ClimaOcean.jl](https://github.com/CliMA/ClimaOcean.jl),
 [ClimaSeaIce.jl](https://github.com/CliMA/ClimaSeaIce.jl),
-and KernelAbstractions.jl are available. It provides:
+[ClimaAtmos.jl](https://github.com/CliMA/ClimaAtmos.jl),
+ConservativeRegridding.jl, KernelAbstractions.jl, and Adapt.jl are available. It provides:
 
 - **`OceananigansSimulation`**: A full ocean circulation model implemented in Oceananigans.jl and
-  initialized from EN4 or ECCO reanalysis data via ClimaOcean.jl. The ocean evolves
+  initialized from EN4 or ECCO reanalysis data. The ocean evolves
   prognostically in response to atmospheric fluxes. For details on the ocean model physics, see
   the [Oceananigans.jl documentation](https://clima.github.io/OceananigansDocumentation/stable/).
 
@@ -223,7 +223,7 @@ a different set of simulation modes:
 
 Use this environment for `amip`, `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`,
 and `subseasonal` modes. It omits the Oceananigans-related dependencies (`Oceananigans`,
-`ClimaOcean`, `ClimaSeaIce`, `KernelAbstractions`), resulting in a lighter environment
+`ClimaSeaIce`, `KernelAbstractions`), resulting in a lighter environment
 with faster precompilation.
 
 ```bash

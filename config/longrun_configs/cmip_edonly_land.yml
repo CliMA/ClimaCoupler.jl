@@ -37,4 +37,6 @@ surface_setup: "PrescribedSurface"
 t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
+use_intersection_grid: true
 use_itime: true
+walltime_debug: true

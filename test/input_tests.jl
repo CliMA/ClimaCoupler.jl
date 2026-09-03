@@ -92,8 +92,7 @@ end
         "rmse_check" => false,
         "coupler_output_dir" => "test_output",
         "land_model" => "bucket",
-        "land_temperature_anomaly" => "aquaplanet",
-        "land_spun_up_ic" => false,
+        "land_spun_up_ic" => true,
         "lai_source" => "modis_monthly",
         "bucket_albedo_type" => "map_static",
         "bucket_initial_condition" => "",
@@ -106,6 +105,7 @@ end
         "seaice_diagnostic_mode" => "average",
         "seaice_progress_interval" => "never",
         "simple_ocean" => false,
+        "use_intersection_grid" => true,
         "ocean_grid" => "one_deg_tripolar",
         "sst_adjustment" => 2.0,
         "ice_model" => "prescribed",
@@ -168,6 +168,12 @@ end
     config_dict["walltime_dt"] = "never"
     @test Input.get_coupler_args(config_dict).walltime_dt == "never"
     delete!(config_dict, "walltime_dt") # undo
+
+    # walltime_debug is off by default and passed through when set
+    @test args.walltime_debug == false
+    config_dict["walltime_debug"] = true
+    @test Input.get_coupler_args(config_dict).walltime_debug == true
+    delete!(config_dict, "walltime_debug") # undo
 end
 
 @testset "get_diag_period" begin

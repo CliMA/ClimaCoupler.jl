@@ -1,5 +1,5 @@
 import ClimaDiagnostics as CD
-import ClimaCoupler: Interfacer, Utilities
+import ClimaCoupler: Interfacer, TimeManager, Utilities
 import Dates
 
 export diagnostics_setup, get_reduction
@@ -21,22 +21,6 @@ get_reduction(val) = error(
     "Diagnostic reduction $val not supported. " *
     "Supported reductions are: `:instantaneous`, `:average`, `:max`, `:min`.",
 )
-
-#### Custom Schedule for diagnostics that only get output once at the beginning of the simulation
-
-struct OnceSchedule <: CD.Schedules.AbstractSchedule end
-
-function (::OnceSchedule)(integrator)
-    return integrator.step == 1
-end
-
-function CD.Schedules.short_name(::OnceSchedule)
-    return "once"
-end
-
-function CD.Schedules.long_name(::OnceSchedule)
-    return "once at the first step of the simulation"
-end
 
 #### Diagnostics orchestration and setup functions
 
@@ -109,10 +93,13 @@ function diagnostics_setup(
         end,
     )
 
-    # Schedule the turbulent energy fluxes to save at every step and output at the configured period
+    # Schedule the turbulent energy fluxes to save at every step and output at the configured period.
+    # All schedules here are seeded with t_start so that a restarted simulation
+    # stays on the same calendar boundaries as the original run (see
+    # TimeManager.calendar_dt_schedule).
     compute_sched = CD.Schedules.EveryStepSchedule()  # Note that these are stateful, so we create new ones for each diagnostic
     output_sched =
-        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
+        TimeManager.calendar_dt_schedule(coupler_diagnostics_period, start_date, t_start)
     reduction_time_func = get_reduction(Val(reduction))
     # `pre_output_hook!` is only needed to finalize the running mean for `:average`;
     # all other reductions don't require post-processing.
@@ -147,8 +134,8 @@ function diagnostics_setup(
     )
 
     # Schedule the land fraction to save and output at the first step only
-    compute_sched = OnceSchedule()
-    output_sched = OnceSchedule()
+    compute_sched = TimeManager.OnceSchedule()
+    output_sched = TimeManager.OnceSchedule()
     land_fraction_diag_sched = CD.ScheduledDiagnostic(
         variable = land_fraction_diag,
         output_writer = netcdf_writer,
@@ -179,9 +166,9 @@ function diagnostics_setup(
     # Schedule the ocean fraction to save and output at diagnostic frequency
     # since it can change in time with evolving sea ice
     compute_sched =
-        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
+        TimeManager.calendar_dt_schedule(coupler_diagnostics_period, start_date, t_start)
     output_sched =
-        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
+        TimeManager.calendar_dt_schedule(coupler_diagnostics_period, start_date, t_start)
     ocean_fraction_diag_sched = CD.ScheduledDiagnostic(
         variable = ocean_fraction_diag,
         output_writer = netcdf_writer,
@@ -211,9 +198,9 @@ function diagnostics_setup(
 
     # Schedule the ice fraction to save and output at diagnostic frequency
     compute_sched =
-        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
+        TimeManager.calendar_dt_schedule(coupler_diagnostics_period, start_date, t_start)
     output_sched =
-        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
+        TimeManager.calendar_dt_schedule(coupler_diagnostics_period, start_date, t_start)
     ice_fraction_diag_sched = CD.ScheduledDiagnostic(
         variable = ice_fraction_diag,
         output_writer = netcdf_writer,

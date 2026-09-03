@@ -165,21 +165,13 @@ end
 """
     push_and_reset!(sim, acc::FluxAccumulator)
 
-Divide the accumulator fields in place by `n_steps`, push the coupler fluxes via
-`update_sim!` and the turbulent fluxes via `update_turbulent_fluxes!`, then zero the
-accumulator. A no-op if `n_steps` is zero.
+Compute the time-averaged flux (dividing the accumulator fields in-place by
+`n_steps`), push it to the surface via `update_turbulent_fluxes!(sim, ...)`,
+then zero the accumulator. A no-op if `n_steps` is zero.
 """
 function push_and_reset!(sim, acc::FluxAccumulator)
     n = acc.n_steps[]
     iszero(n) && return nothing
-    # `update_sim!` runs before the turbulent push because a surface may reset its flux
-    # boundary conditions there.
-    if !isempty(acc.fluxes)
-        for name in keys(acc.fluxes)
-            acc.fluxes[name] ./= n
-        end
-        Interfacer.update_sim!(sim, acc.fluxes)
-    end
     # In-place division avoids allocating
     @. acc.F_lh /= n
     @. acc.F_sh /= n
@@ -220,10 +212,9 @@ end
 """
     push_ready_accumulators!(model_sims, flux_accumulators, t_next; force = false)
 
-For each surface model present in `flux_accumulators`, check
-whether the surface will step at time `t_next`. If so, compute the
-time-averaged flux from the accumulator and write it to the surface boundary
-conditions via `push_and_reset!`.
+For each surface model present in `flux_accumulators`, check whether the surface will
+step at time `t_next`. If so, push the time-averaged coupler fluxes via `update_sim!`
+and the time-averaged turbulent fluxes via `push_and_reset!`.
 
 Called by `turbulent_fluxes!(cs)` with `t_next = cs.t[] + cs.Δt_cpl`
 immediately after accumulation.
@@ -239,9 +230,19 @@ function push_ready_accumulators!(
     force::Bool = false,
 )
     for name in keys(flux_accumulators)
-        if force || Interfacer.will_step(model_sims[name], t_next)
-            push_and_reset!(model_sims[name], flux_accumulators[name])
+        sim, acc = model_sims[name], flux_accumulators[name]
+        (force || Interfacer.will_step(sim, t_next)) || continue
+        n = acc.n_steps[]
+        # Pushed here rather than from `push_and_reset!`, which a surface may specialize,
+        # and before it so a surface that resets its flux boundary conditions in
+        # `update_sim!` does not discard the turbulent push.
+        if !iszero(n) && !isempty(acc.fluxes)
+            for flux_name in keys(acc.fluxes)
+                acc.fluxes[flux_name] ./= n
+            end
+            Interfacer.update_sim!(sim, acc.fluxes)
         end
+        push_and_reset!(sim, acc)
     end
     return nothing
 end

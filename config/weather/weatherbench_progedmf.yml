@@ -1,0 +1,105 @@
+# Under development — not run in CI yet. Currently used for WeatherBench / ProgEDMF
+# experiments on Derecho (NCAR); paths below assume that machine.
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
+strict_params: false
+mode_name: "subseasonal"
+
+# derecho machine data paths
+era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_0p25deg_dev/no_hz"
+coupler_output_dir: "/glade/derecho/scratch/cchristo/coupler_runs_v2/weatherbench"
+initial_condition: "WeatherModel"
+era5_ic_full_pressure: true
+checkpoint_dt: "1000days"
+dt: "50secs"
+dt_cpl: "50secs"
+dt_seaice: "50secs"
+energy_check: false
+h_elem: 30
+dz_bottom: 30.0
+z_elem: 130
+z_max: 70000.0
+
+vorticity_hyperdiffusion_coefficient: 0.12
+hyperdiffusion_prandtl_number: 1.0
+divergence_damping_factor: 20.0
+topography_damping_factor: 1.15
+### Microphysics
+### 0M Microphysics ##
+microphysics_model: "0M"
+coupler_toml: ["toml/amip_progedmf.toml"]
+
+### 1M Microphysics ###
+# microphysics_model: "1M"
+# coupler_toml: ["toml/amip_progedmf_1m.toml"]
+# dt: "20secs" # 1M requires shorter timesteps, empirically ~20secs
+# dt_cpl: "20secs"
+
+
+land_fraction_source: "era5"
+binary_area_fraction: false
+
+### integrated land ###
+land_model: "integrated"
+lai_source: "modis_monthly_climatology"
+
+### bucket land ###
+# land_model: "bucket"
+# bucket_albedo_type: "map_temporal"
+
+land_spun_up_ic: false
+land_temperature_anomaly: "nothing"
+use_land_diagnostics: false
+radiation_reset_rng_seed: true
+start_date: "20200101"
+surface_setup: "PrescribedSurface"
+atmos_progress_interval: "1days"
+topo_smoothing: false
+topography: "Earth"
+t_end: "10days"
+netcdf_output_at_levels: true
+output_default_diagnostics: false
+use_coupler_diagnostics: true
+extra_atmos_diagnostics:
+  ### daily average (surface + model-level)
+  - short_name: [zg, orog, tas, mslp, pr, lwp, iwp, clt, ta, hus, ua, va, zg, clw, cli, cl, pfull]
+    period: 1days
+    reduction_time: average
+  - short_name: [tas, mslp, ta, hus, zg, ua, va, pfull]
+    period: 1days
+    reduction_time: inst
+
+    ### hourly inst (surface + model-level)
+  # - short_name: [ts, tas, mslp, pr, prra, clt, prw, lwp, iwp, clwvi, rsdt, rsut, rlut, rsutcs, rlutcs]
+  #   reduction_time: inst
+  #   period: 1hours
+  # - short_name: [ta, ua, va, wa, husv, hus, cl, clw, cli, zg, orog, pfull, rhoa]
+  #   reduction_time: inst
+  #   period: 1hours
+
+  ### daily average on pressure levels (3D fields)
+  # - short_name: [ta, hus, ua, va, zg, clw, cli, cl, pfull]
+  #   period: 1days
+  #   reduction_time: average
+  #   pressure_coordinates: true
+    ### hourly inst (surface + model-level)
+  # - short_name: [tas, uas, vas, ts, tas, mslp, pr, prra, clt, prw, lwp, iwp, clwvi, rsdt, rsut, rlut, rsutcs, rlutcs]
+  #   reduction_time: inst
+  #   period: 1hours
+  # - short_name: [ta, ua, va, wa, husv, hus, cl, clw, cli, zg, orog, pfull, rhoa]
+  #   reduction_time: inst
+  #   period: 1hours
+
+  # ### daily mean (pressure + selected model-level) ###
+  # - short_name: [ta, ua, va, wa, husv, hus, clw, cl, cli, zg, pfull, edt, evu, tke, arup, waup]
+  #   reduction_time: average
+  #   period: 1days
+  #   pressure_coordinates: true
+  # - short_name: [zg, orog, thetaa, edt, evu]
+  #   period: 1days
+  #   reduction_time: average
+  # - short_name: [ta, ua, va, wa, husv, hus, clw, cli, zg, pfull]
+  #   reduction_time: average
+  #   period: 1hours
+  #   pressure_coordinates: true

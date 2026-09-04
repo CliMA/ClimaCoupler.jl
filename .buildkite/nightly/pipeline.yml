@@ -16,7 +16,7 @@ env:
   # UPSTREAM_PACKAGES environment variable. For example, if you pass
   # `UPSTREAM_PACKAGES="ClimaAtmos SurfaceFluxes@1.1.0", then the main branch
   # of ClimaAtmos and SurfaceFluxes v1.1.0 will be used.
-  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore ClimaCoreMakie ClimaTimeSteppers Thermodynamics ClimaLand SurfaceFluxes RRTMGP CloudMicrophysics}"
+  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos#tr/release ClimaCore Thermodynamics ClimaLand#kp/release SurfaceFluxes RRTMGP CloudMicrophysics}"
 
 timeout_in_minutes: 840
 
@@ -31,7 +31,7 @@ steps:
       # For this pipeline, use the main branches of certain upstream packages
       # see UPSTREAM_PACKAGES environment variable
       - |
-        julia --project=experiments/AMIP/ -e '
+        JULIA_PKG_PRECOMPILE_AUTO=0 julia --project=experiments/AMIP/ -e '
           using Pkg
           Pkg.add(map(split(ENV["UPSTREAM_PACKAGES"])) do entry
               if occursin("@", entry)

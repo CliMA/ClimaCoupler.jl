@@ -13,7 +13,7 @@ initial_condition: "WeatherModel"
 insolation: "timevarying"
 netcdf_output_at_levels: true
 ode_algo: ARS343
-prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05", "OC1", "OC2", "SO4", "SSLT01", "SSLT02", "SSLT03", "SSLT04", "SSLT05"]
+prescribed_aerosols: ["CB", "DST", "OC", "SO4", "SSLT"]
 rad: "allskywithclear"
 rayleigh_sponge: true
 surface_setup: "DefaultMoninObukhov"

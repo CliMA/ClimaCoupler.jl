@@ -71,6 +71,7 @@ struct CoupledSimulation{
     TP,
     DH,
     SC <: Bool,
+    ST <: Bool,
     NTFA <: NamedTuple,
 }
     start_date::D
@@ -87,6 +88,7 @@ struct CoupledSimulation{
     thermo_params::TP
     diags_handler::DH
     save_cache::SC
+    step_concurrently::ST
     flux_accumulators::NTFA
 end
 

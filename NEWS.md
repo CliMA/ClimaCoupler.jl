@@ -4,6 +4,11 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Always use the mutable (z*) ocean vertical grid.
+`simple_ocean = true` (used in CI and software testing) previously used a
+linear free surface, which turned out to dramatically violate energy
+conservation.
+
 #### Exchange (intersection) grid for CMIP surface fractions and fluxes. PR [#2051](https://github.com/CliMA/ClimaCoupler.jl/pull/2051)
 When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange
 grid — the polygons where the cubed-sphere spectral elements intersect the

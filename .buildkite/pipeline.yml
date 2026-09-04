@@ -83,6 +83,37 @@ steps:
           slurm_ntasks: 2
           slurm_mem: 16GB
 
+  - group: "ERA5 initial conditions (network)"
+    steps:
+      # Resolves the subseasonal initial condition directory the way a run
+      # does, which downloads from the Copernicus Climate Data Store when the
+      # artifact does not cover the date. ERA5InitialConditions tests the
+      # download itself; this checks the coupler reaches a usable directory.
+      #
+      # Off by default: it needs CDS credentials on the agent, either
+      # ~/.cdsapirc or the CDSAPI_URL and CDSAPI_KEY environment variables, and
+      # the Copernicus queue can take hours. To run it, start a build with the
+      # environment variable RUN_ERA5_NETWORK_TESTS=true.
+      #
+      # `soft_fail` keeps a slow or unavailable CDS from blocking a merge. Read
+      # the step log rather than the pipeline status to see the result.
+      - label: "ERA5 initial conditions: resolution chain"
+        key: "era5_network_tests"
+        if: build.env("RUN_ERA5_NETWORK_TESTS") == "true"
+        command:
+          # Download into the build checkout, since /tmp on a compute node may
+          # be too small for a 1 to 2 GB download
+          - "mkdir -p era5_network_tmp"
+          - "julia -O0 --color=yes --project=test/ test/era5_network_tests.jl"
+        retry: *retry_policy
+        timeout_in_minutes: 180
+        soft_fail: true
+        env:
+          CLIMACOUPLER_ERA5_NETWORK_TESTS: "true"
+          TMPDIR: "${BUILDKITE_BUILD_CHECKOUT_PATH}/era5_network_tmp"
+        agents:
+          slurm_mem: 32GB
+
   - group: "GPU: unit tests"
     steps:
       - label: "GPU runtests"

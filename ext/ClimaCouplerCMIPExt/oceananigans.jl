@@ -929,10 +929,13 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     Interfacer.remap!(sim.remapping.scratch_field_oc2, csf.P_snow, sim.remapping) # snow precipitation
     remapped_P_snow = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
 
+    # Rain drains through ice while snow can accumulate there (see the sea-ice `update_sim!`)
+    ocean_precipitation = remapped_P_liq .+ (1.0 .- ice_concentration) .* remapped_P_snow
+
     # Note the negative sign here to account for the sign change from precipitation to salinity flux
     OC.interior(oc_flux_S, :, :, 1) .-=
-        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* (1.0 .- ice_concentration) .*
-        (remapped_P_liq .+ remapped_P_snow) ./ reference_density
+        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* ocean_precipitation ./
+        reference_density
     return nothing
 end
 

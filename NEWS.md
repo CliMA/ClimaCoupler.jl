@@ -4,6 +4,11 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Route rain through sea-ice.
+The ocean now receives `P_liq + (1 - ℵ) P_snow`; rain drains through the ice
+instead of ponding on it (and being lost) while snow can still accumulate on
+the ice.
+
 #### Exchange (intersection) grid for CMIP surface fractions and fluxes. PR [#2051](https://github.com/CliMA/ClimaCoupler.jl/pull/2051)
 When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange
 grid — the polygons where the cubed-sphere spectral elements intersect the

@@ -57,8 +57,10 @@ function make_land_domain(
         nelems = nelements_vert,
         reverse_mode = true,
     )
-    verttopology = CC.Topologies.IntervalTopology(vertmesh)
-    vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(verttopology)
+    vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(
+        ClimaComms.device(shared_surface_space),
+        vertmesh,
+    )
     subsurface_space =
         CC.Spaces.ExtrudedFiniteDifferenceSpace(shared_surface_space, vert_center_space)
     subsurface_face_space = CC.Spaces.face_space(subsurface_space)

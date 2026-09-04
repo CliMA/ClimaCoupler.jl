@@ -95,7 +95,7 @@ The available extensions are:
   integrating [Oceananigans.jl](https://github.com/CliMA/Oceananigans.jl) as the ocean model
   and [ClimaSeaIce.jl](https://github.com/CliMA/ClimaSeaIce.jl) as the sea ice model.
 - `ClimaCouplerMakieExt`: Implements all [Plotting](@ref) functions using Makie.jl,
-  CairoMakie.jl, ClimaCoreMakie.jl, and GeoMakie.jl. Loaded automatically when these packages
+  CairoMakie.jl, and GeoMakie.jl. Loaded automatically when these packages
   are available.
 - `ClimaCouplerCMIPMakieExt`: Extends the Makie plotting support to handle
   Oceananigans.jl fields when Oceananigans is used as the ocean component model.

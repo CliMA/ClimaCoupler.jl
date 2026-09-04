@@ -37,7 +37,7 @@ function compute_pfull_leaderboard end
 
 # Maps required packages (as a tuple) to the functions provided by that extension
 extension_fns = [
-    (:Makie, :CairoMakie, :ClimaCoreMakie, :GeoMakie, :Poppler_jll, :Printf) => [
+    (:Makie, :CairoMakie, :GeoMakie, :Poppler_jll, :Printf) => [
         :make_diagnostics_plots,
         :make_ocean_diagnostics_plots,
         :debug,
@@ -48,15 +48,8 @@ extension_fns = [
         :compute_leaderboard,
         :compute_pfull_leaderboard,
     ],
-    (
-        :Makie,
-        :CairoMakie,
-        :ClimaCoreMakie,
-        :GeoMakie,
-        :Poppler_jll,
-        :Printf,
-        :Oceananigans,
-    ) => [:debug_plot!, :print_extrema],
+    (:Makie, :CairoMakie, :GeoMakie, :Poppler_jll, :Printf, :Oceananigans) =>
+        [:debug_plot!, :print_extrema],
 ]
 
 """

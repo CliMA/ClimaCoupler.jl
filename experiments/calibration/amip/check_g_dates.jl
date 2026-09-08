@@ -89,25 +89,38 @@ newdims = copy(template.dims)
 newdims[tname] = times_s
 newattribs = Dict{String, Any}(string(k) => v for (k, v) in template.attributes)
 newattribs["start_date"] = Dates.format(run_start, dateformat"yyyy-mm-ddTHH:MM:SS")
-synth = ClimaAnalysis.remake(
-    template;
-    data = newdata,
-    dims = newdims,
-    attributes = newattribs,
-)
-@info "Synthetic slice dates as ClimaAnalysis sees them" ClimaAnalysis.dates(synth)
+# One synthetic var per GRADED variable (a single-var synthetic can only fill
+# its own block, so a multi-variable observation would always "fail"). All are
+# clones of the same template slab: values are dummies; only shapes, dates,
+# units and conventions matter. NOTE the template's units (W m^-2) must match
+# every graded variable - true for rlut/rsut/rlutcs/rsutcs/lwcre/swcre; a
+# future config grading a different-unit variable needs its own template.
+synths = map(CALIBRATE_CONFIG.short_names) do name
+    attribs = copy(newattribs)
+    attribs["short_name"] = name
+    ClimaAnalysis.remake(
+        template;
+        data = newdata,
+        dims = newdims,
+        attributes = attribs,
+    )
+end
+@info "Synthetic slice dates as ClimaAnalysis sees them" ClimaAnalysis.dates(synths[1])
 
 # --- the real pipeline --------------------------------------------------------
-vars = preprocess_sim_vars(Any[synth])
+vars = preprocess_sim_vars(Any[synths...])
 @info "After preprocess_sim_vars" ClimaAnalysis.dates(vars[1])
 
-ok = EnsembleBuilder.fill_g_ens_col!(
-    g_ens_builder,
-    1,
-    vars[1];
-    checkers = (SequentialIndicesChecker(),),
-    verbose = true,
-)
+fills = map(vars) do v
+    EnsembleBuilder.fill_g_ens_col!(
+        g_ens_builder,
+        1,
+        v;
+        checkers = (SequentialIndicesChecker(),),
+        verbose = true,
+    )
+end
+ok = all(fills)
 missing_names = EnsembleBuilder.missing_short_names(g_ens_builder, 1)
 g = EnsembleBuilder.get_g_ensemble(g_ens_builder)
 n_filled = count(!isnan, view(g, :, 1))

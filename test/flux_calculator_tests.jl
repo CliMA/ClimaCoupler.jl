@@ -473,7 +473,65 @@ function FluxCalculator.update_turbulent_fluxes!(sim::FluxRecordingSurface, fiel
     return nothing
 end
 
-@testset "push_and_reset! pushes averaged coupler fluxes" begin
+# A surface may specialize `push_and_reset!` to push through its own machinery and then
+# call `reset!` (the CMIP exchange-grid path does). The averaged coupler fluxes must
+# still reach it, so they are pushed by `push_ready_accumulators!`, which is the single
+# unspecialized gate, rather than from inside `push_and_reset!`.
+mutable struct SpecializedPushSurface{I, F} <: Interfacer.AbstractSurfaceSimulation
+    integrator::I
+    received::F
+end
+function FieldExchanger.update_sim!(sim::SpecializedPushSurface, csf)
+    sim.received.SW_d .= csf.SW_d
+    return nothing
+end
+FluxCalculator.push_and_reset!(
+    sim::SpecializedPushSurface,
+    acc::FluxCalculator.FluxAccumulator,
+) = FluxCalculator.reset!(acc)
+
+@testset "push_ready_accumulators! pushes coupler fluxes past a specialized push" begin
+    for FT in (Float32, Float64)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6.371e6),
+            n_quad_points = 4,
+            h_elem = 4,
+        )
+        csf = Interfacer.init_coupler_fields(
+            FT,
+            Interfacer.default_coupler_fields(),
+            boundary_space,
+        )
+        sim = SpecializedPushSurface(
+            (; t = 0.0, dt = 600.0),
+            (; SW_d = CC.Fields.zeros(boundary_space)),
+        )
+        acc = FluxCalculator.FluxAccumulator(
+            boundary_space,
+            FieldExchanger.accumulated_coupler_fields(sim),
+        )
+        zero_turbulent = (;
+            F_lh = CC.Fields.zeros(boundary_space),
+            F_sh = CC.Fields.zeros(boundary_space),
+            F_turb_moisture = CC.Fields.zeros(boundary_space),
+            F_turb_ρτxz = CC.Fields.zeros(boundary_space),
+            F_turb_ρτyz = CC.Fields.zeros(boundary_space),
+        )
+        for c in (FT(2), FT(6))
+            csf.SW_d .= c
+            FluxCalculator.accumulate_fluxes!(acc, csf)
+            FluxCalculator.accumulate!(acc, zero_turbulent)
+        end
+
+        FluxCalculator.push_ready_accumulators!((; sim), (; sim = acc), 600.0)
+        @test all(parent(sim.received.SW_d) .≈ FT(4))
+        @test acc.n_steps[] == 0
+        @test all(parent(acc.fluxes.SW_d) .== 0)
+    end
+end
+
+@testset "coupler and turbulent fluxes share one step count" begin
     for FT in (Float32, Float64)
         boundary_space = CC.CommonSpaces.CubedSphereSpace(
             FT;
@@ -514,10 +572,9 @@ end
             F_lh = CC.Fields.zeros(boundary_space),
         )
         sim = FluxRecordingSurface(received, 0)
-        FluxCalculator.push_and_reset!(sim, acc)
+        FluxCalculator.push_ready_accumulators!((; sim), (; sim = acc), 0.0; force = true)
 
-        # One shared step count drives both averages, and the coupler fluxes reach the
-        # surface through `update_sim!` before the turbulent push.
+        # One shared step count drives both averages.
         n = length(contributions)
         @test all(parent(sim.received.SW_d) .≈ sum(contributions) / n)
         @test all(parent(sim.received.P_liq) .≈ (sum(contributions) + 3 * FT(200)) / n)
@@ -553,6 +610,7 @@ FluxCalculator.ocean_seaice_fluxes!(::SteppingOcean, ice_sim::CountingSeaIce) =
         nothing,                    # tspan
         200.0,                      # Δt_cpl
         Ref(0.0),                   # t
+        Ref(0),                     # step
         Ref(-1),                    # prev_checkpoint_t
         (; ocean_sim, ice_sim),
         (;),                        # callbacks

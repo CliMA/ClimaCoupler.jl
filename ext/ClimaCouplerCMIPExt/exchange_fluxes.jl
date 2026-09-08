@@ -25,8 +25,9 @@ import ClimaComms
 
 Device-resident per-polygon scratch for the exchange-grid flux computation of
 one surface model (one instance for the ocean, one for sea ice): the gathered
-atmospheric and surface state (momentum in the UV basis; `T_sfc` in [K]), the
-flux outputs (`F_*`), running time accumulators for the slow-surface path
+atmospheric and surface state (momentum in the UV basis; downwelling
+radiation `SW_d`/`LW_d` and precipitation `P_liq`/`P_snow`; `T_sfc` in [K]),
+the flux outputs (`F_*`), running time accumulators for the slow-surface path
 (`acc_*`, with `n_acc` counting contributions), and two generic scratch
 vectors.
 """
@@ -40,6 +41,10 @@ struct ExchangeFluxState{FT, VF <: AbstractVector{FT}}
     v_atmos::VF
     height_int::VF
     height_sfc::VF
+    SW_d::VF
+    LW_d::VF
+    P_liq::VF
+    P_snow::VF
     T_sfc::VF
     sic::VF
     F_sh::VF
@@ -79,15 +84,13 @@ ExchangeFluxState{FT}(arch, n_poly::Int) where {FT} =
 Per-polygon scratch for the sea-ice exchange-grid flux computation: the
 common [`ExchangeFluxState`](@ref) plus the ice-specific inputs of the
 skin-temperature flux balance (`R` — conductive resistance, `T_i` — ice
-internal/interface temperature [K], downwelling `SW_d`/`LW_d`) and the
-diagnosed surface temperature output `T_sfc_new` [K].
+internal/interface temperature [K]; the downwelling radiation comes from
+`fluxes`) and the diagnosed surface temperature output `T_sfc_new` [K].
 """
 struct IceExchangeState{FT, VF <: AbstractVector{FT}}
     fluxes::ExchangeFluxState{FT, VF}
     R::VF
     T_i::VF
-    SW_d::VF
-    LW_d::VF
     T_sfc_new::VF
 end
 
@@ -303,8 +306,10 @@ NVTX.@annotate function compute_ocean_polygon_fluxes!(
     return nothing
 end
 
-@inline _kernel_state(is::IceExchangeState) =
-    merge(_kernel_state(is.fluxes), (; is.R, is.T_i, is.SW_d, is.LW_d, is.T_sfc_new))
+@inline _kernel_state(is::IceExchangeState) = merge(
+    _kernel_state(is.fluxes),
+    (; is.R, is.T_i, is.fluxes.SW_d, is.fluxes.LW_d, is.T_sfc_new),
+)
 
 # SurfaceFluxes evaluation with skin-temperature diagnosis for one sea-ice
 # polygon. Polygons without ice short-circuit to zero flux. Mirrors the nodal

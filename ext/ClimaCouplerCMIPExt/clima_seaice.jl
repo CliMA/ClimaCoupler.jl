@@ -533,8 +533,8 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
     # Atmospheric state, including the downwelling radiation entering the
     # skin-temperature balance.
     gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec, remapping.uv_basis)
-    gather_nodes_to_polys!(is.SW_d, eg, se_nodal_vec(csf.SW_d))
-    gather_nodes_to_polys!(is.LW_d, eg, se_nodal_vec(csf.LW_d))
+    gather_nodes_to_polys!(fs.SW_d, eg, se_nodal_vec(csf.SW_d))
+    gather_nodes_to_polys!(fs.LW_d, eg, se_nodal_vec(csf.LW_d))
 
     # Ice state from the owning cells. Conductive resistance
     # R = h_ice/k_ice + h_snow/k_snow (series; reduces to h_ice/k_ice with no
@@ -709,6 +709,10 @@ by the coupler.
 Update the portion of the surface_fluxes for T that is due to radiation, and the snow
 precipitation that drives snow accumulation. The rest will be updated in `update_turbulent_fluxes!`.
 
+When the exchange grid is active, the work is done per polygon in
+[`push_exchange_radiation_to_ice!`](@ref); the fallback below remaps with
+`sim.remapping`, whose regridder is unaware of the immersed mask.
+
 A note on sign conventions:
 ClimaAtmos and ClimaSeaIce both use the convention that a positive flux is an upward flux.
 No sign change is needed during the exchange for radiation. Precipitation is the exception:
@@ -716,6 +720,9 @@ ClimaAtmos provides snowfall as a negative (downward) mass flux at the surface, 
 ClimaSeaIce expects `snowfall` as a positive accumulation rate, so the sign is flipped.
 """
 function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
+    if sim.remapping.use_exchange_grid
+        return push_exchange_radiation_to_ice!(sim, csf)
+    end
     ice_concentration = sim.ice.model.ice_concentration
 
     # Absorbed radiative part of Jᵃ (upward positive): −(1−α)SW↓ − ϵLW↓.
@@ -747,6 +754,60 @@ function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
         remapped_P_snow = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
         OC.interior(snowfall, :, :, 1) .=
             (OC.interior(ice_concentration, :, :, 1) .> 0) .* (.-remapped_P_snow)
+    end
+    return nothing
+end
+
+"""
+    push_exchange_radiation_to_ice!(sim::ClimaSeaIceSimulation, csf)
+
+Exchange-grid form of the radiative and snowfall part of
+[`FieldExchanger.update_sim!`](@ref): gather the downwelling radiation and
+snowfall onto the polygons and scatter them onto the ClimaSeaIce forcing
+fields, so only wet polygons contribute and dry cells receive exactly
+nothing. Fluxes are per unit ice area, matching the boundary-space path: the
+absorbed radiation written here is completed into the full skin balance
+`Jᵃ = σϵTₛ⁴ − (1−α)SW↓ − ϵLW↓ + F_sh + F_lh` by
+[`compute_ice_top_heat_flux!`](@ref).
+"""
+NVTX.@annotate function push_exchange_radiation_to_ice!(sim::ClimaSeaIceSimulation, csf)
+    remapping = sim.remapping
+    eg = remapping.exchange_grid
+    fs = remapping.ice_flux_state.fluxes
+    grid = sim.ice.model.grid
+    FT = eltype(fs.T_sfc)
+    α = FT(Interfacer.get_field(sim, Val(:surface_direct_albedo))) # scalar
+    ϵ = FT(Interfacer.get_field(sim, Val(:emissivity))) # scalar
+
+    gather_cells_to_polys!(
+        fs.sic,
+        eg,
+        vec(OC.interior(sim.ice.model.ice_concentration, :, :, 1)),
+    )
+
+    # Absorbed radiative part of Jᵃ (upward positive): −(1−α)SW↓ − ϵLW↓.
+    si_flux_heat = sim.ice.model.external_heat_fluxes.top
+    if si_flux_heat isa OC.Field
+        gather_nodes_to_polys!(fs.SW_d, eg, se_nodal_vec(csf.SW_d))
+        gather_nodes_to_polys!(fs.LW_d, eg, se_nodal_vec(csf.LW_d))
+        @. fs.scratch1 = (fs.sic > 0) * (-(1 - α) * fs.SW_d - ϵ * fs.LW_d)
+        heat_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
+        scatter_polys_to_cells!(heat_cells, eg, fs.scratch1)
+        mirror_fold_partners!(heat_cells, grid)
+        OC.interior(si_flux_heat, :, :, 1) .=
+            OC.interior(remapping.scratch_field_oc1, :, :, 1)
+    end
+
+    # Snow precipitation drives snow accumulation (sign flip: downward
+    # atmospheric mass flux to positive `snowfall`).
+    snowfall = sim.ice.model.snowfall
+    if snowfall isa OC.Field
+        gather_nodes_to_polys!(fs.P_snow, eg, se_nodal_vec(csf.P_snow))
+        @. fs.scratch1 = -(fs.sic > 0) * fs.P_snow
+        snow_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
+        scatter_polys_to_cells!(snow_cells, eg, fs.scratch1)
+        mirror_fold_partners!(snow_cells, grid)
+        OC.interior(snowfall, :, :, 1) .= OC.interior(remapping.scratch_field_oc1, :, :, 1)
     end
     return nothing
 end

@@ -116,6 +116,21 @@ function make_data_informed_observation_vector(
         covariance_date_ranges;
         FT = Float64,
     )
+    # Save the recipe's INPUT next to its output, so the fully preprocessed
+    # samples can be inspected or reused (e.g. rebuilding the covariance with
+    # a different estimator) without rerunning the pipeline. One file per
+    # noise group, named by the group's variables.
+    if @isdefined(CALIBRATE_CONFIG)
+        JLD2.save_object(
+            joinpath(
+                CALIBRATE_CONFIG.output_dir,
+                "sample_collection_" *
+                join(ClimaAnalysis.short_name.(vars), "_") *
+                ".jld2",
+            ),
+            sample_collection,
+        )
+    end
     obs_vec = map(sample_date_ranges) do sample_date_range
         idx = findfirst(==(sample_date_range), covariance_date_ranges)
         isnothing(idx) && error(

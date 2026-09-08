@@ -16,10 +16,3 @@ surface_setup: "PrescribedSurface"
 t_end: "1200secs"
 topo_smoothing: true
 topography: "Earth"
-
-# EXPERIMENT 2026-09-08: price the SGS quadrature by collapsing it to a single
-# point. This CHANGES RESULTS and is not a proposed change -- it exists to put a
-# reproducible number on what the nine-point quadrature costs, for the science
-# question in calkit.yaml. The 7.93% previously quoted came from an untagged run
-# whose evidence pointer (results/summary.json) has since been overwritten.
-quadrature_order: 1

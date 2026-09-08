@@ -363,6 +363,63 @@ function check_season_months(var, ranges)
     return var
 end
 
+"""
+    apply_region_mask(var; lat_bounds, lon_ranges)
+
+Return a copy of `var` with everything OUTSIDE the requested box NaN'd:
+latitudes outside `lat_bounds = (lo, hi)` and longitudes outside every
+`(lo, hi)` in `lon_ranges`. `lon_ranges` is a VECTOR of ranges so a region
+straddling the dateline can be given as two boxes on the -180..180 grid the
+regridder produces (e.g. the tropical Pacific is
+`[(120, 180), (-180, -90)]`).
+
+Implementation note: this allocates an all-NaN array and copies the KEPT
+region back through views of the source, rather than NaN-ing views of the
+original. A view aliases its parent, so writing NaN into a view of
+`var.data` would mutate the caller's array in place - fine when the caller
+owns the only reference, silently destructive otherwise (the observation
+loaders hand out vars backed by cached arrays). Copying into a fresh array
+keeps the view trick for the indexing while staying non-destructive.
+
+The index tuple is built from `var.dim2index`, so it works whatever order
+the longitude / latitude / time dimensions are stored in.
+"""
+function apply_region_mask(var; lat_bounds, lon_ranges)
+    (ClimaAnalysis.has_longitude(var) && ClimaAnalysis.has_latitude(var)) || error(
+        "apply_region_mask needs longitude and latitude dimensions; got " *
+        "$(collect(keys(var.dims)))",
+    )
+    lonname = ClimaAnalysis.longitude_name(var)
+    latname = ClimaAnalysis.latitude_name(var)
+    loni = var.dim2index[lonname]
+    lati = var.dim2index[latname]
+    lons = collect(var.dims[lonname])
+    lats = collect(var.dims[latname])
+
+    latlo, lathi = lat_bounds
+    lat_idx = findall(l -> latlo <= l <= lathi, lats)
+    isempty(lat_idx) && error(
+        "apply_region_mask: no latitudes in $lat_bounds (grid spans " *
+        "$(extrema(lats)))",
+    )
+
+    out = similar(var.data)
+    fill!(out, NaN)
+    for (lonlo, lonhi) in lon_ranges
+        lon_idx = findall(l -> lonlo <= l <= lonhi, lons)
+        isempty(lon_idx) && error(
+            "apply_region_mask: no longitudes in ($lonlo, $lonhi) (grid spans " *
+            "$(extrema(lons)); ranges must use the same convention)",
+        )
+        idx = ntuple(
+            d -> d == loni ? lon_idx : d == lati ? lat_idx : Colon(),
+            ndims(var.data),
+        )
+        view(out, idx...) .= view(var.data, idx...)
+    end
+    return ClimaAnalysis.remake(var; data = out)
+end
+
 "Collapse `(t0, t1)` sample/covariance ranges to `(t0, t0)`: after
 `ClimaAnalysis.average_season_across_time` each season is one slice stamped
 at its first date (SON -> Sep 1), so the builders select by that date."

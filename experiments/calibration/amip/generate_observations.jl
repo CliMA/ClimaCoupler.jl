@@ -231,6 +231,25 @@ if abspath(PROGRAM_FILE) == @__FILE__
         end
     end
 
+    # A config may define REGION_LAT / REGION_LON to restrict the loss to a
+    # lat-lon box (or a union of boxes, for regions crossing the dateline).
+    # Applied after the ocean mask so all spatial masking happens together,
+    # and before the seasonal mean - NaNs propagate through the time average
+    # either way, but the covariance and flattening must see the final mask.
+    # As with the ocean mask, the simulation side needs no matching code:
+    # the observation metadata's drop_mask carries it into
+    # ClimaAnalysis.flatten(sim_var, metadata).
+    if @isdefined(REGION_LAT) && @isdefined(REGION_LON)
+        vars = map(
+            v -> apply_region_mask(v; lat_bounds = REGION_LAT, lon_ranges = REGION_LON),
+            vars,
+        )
+        for v in vars
+            @info "Applied region mask to $(ClimaAnalysis.short_name(v))" REGION_LAT REGION_LON n_kept =
+                count(isfinite, v.data) n_total = length(v.data)
+        end
+    end
+
     # A config may define SEASONAL_MEAN = true to grade SEASONAL means:
     # ClimaAnalysis.average_season_across_time reduces each season occurrence
     # to one time-mean slice, KEEPING the time dimension with each season

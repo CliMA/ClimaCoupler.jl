@@ -27,9 +27,15 @@ export turbulent_fluxes!,
     push_ready_accumulators!,
     reset!
 
-function turbulent_fluxes!(cs::Interfacer.CoupledSimulation)
+function turbulent_fluxes!(cs::Interfacer.CoupledSimulation; slow_frozen::Bool = false)
     turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params, cs.flux_accumulators)
-    push_ready_accumulators!(cs.model_sims, cs.flux_accumulators, cs.t[] + cs.Δt_cpl)
+    # Accumulation is coupler-side and always safe. Pushing is not: it writes the
+    # window-averaged flux into the surface's boundary conditions, and it tests
+    # `will_step`, which reads the ocean clock. Both are unsafe while an
+    # overlapped ice/ocean step is in flight. By construction the push falls due
+    # on a sync step, when nothing is in flight, so skipping here loses nothing.
+    slow_frozen ||
+        push_ready_accumulators!(cs.model_sims, cs.flux_accumulators, cs.t[] + cs.Δt_cpl)
     return nothing
 end
 

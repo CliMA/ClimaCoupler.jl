@@ -71,6 +71,9 @@ function run!(
             step!(cs)
         end
     end
+    # Nothing may outlive the coupling loop with ice/ocean state in flight.
+    FieldExchanger.wait_slow_sims!(cs)
+
     @info "Simulation took $(walltime) seconds"
 
     save_sypd_walltime_to_disk(cs, walltime, t_timed_start)
@@ -97,24 +100,42 @@ function step!(cs::Interfacer.CoupledSimulation)
     cs.t[] += cs.Δt_cpl
     cs.step[] += 1
 
+    # With `overlap_slow_surfaces`, an ice/ocean step launched earlier may still
+    # be running. It is joined here, at the top of the coupling step on which
+    # their next forcing falls due, so that the rest of this step sees settled
+    # ice and ocean state and behaves exactly as it would without overlap.
+    if cs.overlap_slow_surfaces && slow_surfaces_due(cs)
+        FieldExchanger.wait_slow_sims!(cs)
+    end
+    frozen = FieldExchanger.slow_step_in_flight(cs)
+
     # Compute global energy and water conservation checks
     # (only for slabplanet if tracking conservation is enabled)
-    ConservationChecker.check_conservation!(cs)
+    frozen || ConservationChecker.check_conservation!(cs)
 
     # Step component model simulations sequentially for one coupling timestep (Δt_cpl)
-    FieldExchanger.step_model_sims!(cs)
+    # Under overlap the slow group is advanced only by the asynchronous task, never
+    # here: when the slow timestep equals the coupling timestep they would otherwise
+    # be stepped both synchronously and again by the task.
+    FieldExchanger.step_model_sims!(cs; skip_slow = frozen || cs.overlap_slow_surfaces)
 
     # Update the surface fractions for surface models
-    FieldExchanger.update_surface_fractions!(cs)
+    FieldExchanger.update_surface_fractions!(cs; slow_frozen = frozen)
 
     # Exchange all non-turbulent flux fields between models, including radiative and precipitation fluxes
-    FieldExchanger.exchange!(cs)
+    FieldExchanger.exchange!(cs; slow_frozen = frozen)
 
     # Calculate turbulent fluxes in the coupler and update the model simulations with them
-    FluxCalculator.turbulent_fluxes!(cs)
+    FluxCalculator.turbulent_fluxes!(cs; slow_frozen = frozen)
 
     # Compute any ocean-sea ice fluxes
-    FluxCalculator.ocean_seaice_fluxes!(cs)
+    frozen || FluxCalculator.ocean_seaice_fluxes!(cs)
+
+    # The slow surfaces' forcing is now fully assembled, so their step can be
+    # launched and left to run across the coupling steps that follow.
+    if cs.overlap_slow_surfaces && !frozen && slow_surfaces_due(cs)
+        FieldExchanger.launch_slow_sims!(cs)
+    end
 
     # Maybe call the callbacks
     TimeManager.callbacks!(cs)
@@ -122,6 +143,30 @@ function step!(cs::Interfacer.CoupledSimulation)
     # Compute and save coupler diagnostics
     CD.orchestrate_diagnostics(cs)
     return nothing
+end
+
+"""
+    slow_surfaces_due(cs)
+
+Whether the overlapped ice/ocean group would take a step at the next coupling
+time. This is the same predicate `push_ready_accumulators!` uses to decide when
+to deliver their window-averaged forcing, so launching on it guarantees the
+forcing is complete before the step begins.
+"""
+function slow_surfaces_due(cs::Interfacer.CoupledSimulation)
+    t_next = cs.t[] + cs.Δt_cpl
+    target = FieldExchanger.slow_step_target(cs)
+    if !isnothing(target)
+        # A step is in flight, so the ocean clock is being written and must not
+        # be read. Once the step lands the clock will read `target`, so the next
+        # step falls due one slow timestep after that.
+        return Float64(float(t_next)) >= target + FieldExchanger.slow_sim_dt(cs)
+    end
+    for sim in cs.model_sims
+        Interfacer.is_overlapped(sim) || continue
+        Interfacer.will_step(sim, t_next) && return true
+    end
+    return false
 end
 
 """
@@ -189,6 +234,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         Δt_cpl,
         component_dt_dict,
         step_concurrently,
+        overlap_slow_surfaces,
         share_surface_space,
         nh_poly_coupler,
         h_elem_coupler,
@@ -412,6 +458,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     foreach(sim -> Interfacer.add_coupler_fields!(coupler_field_names, sim), model_sims)
 
     energy_check && push!(coupler_field_names, :P_net)
+    overlap_slow_surfaces &&
+        append!(coupler_field_names, Interfacer.overlap_cache_fields())
 
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 
@@ -496,7 +544,21 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         progress_cb = TimeManager.Callback(
             schedule_progress,
             let sim_name = sim_name
-                cs -> Interfacer.progress(cs.model_sims[sim_name], cs)
+                cs -> begin
+                    sim = cs.model_sims[sim_name]
+                    # `progress` takes extrema and maxima over the model's own
+                    # fields. For an overlapped sim those fields are being
+                    # written by its in-flight step, so report from the snapshot
+                    # the stepping task gathered when it last finished, rather
+                    # than reducing over state that is moving underneath us.
+                    if Interfacer.is_overlapped(sim) &&
+                       FieldExchanger.slow_step_in_flight(cs)
+                        snapshot = FieldExchanger.slow_progress_snapshot(cs, sim_name)
+                        isnothing(snapshot) && return nothing
+                        return Interfacer.progress(sim, cs, snapshot)
+                    end
+                    Interfacer.progress(sim, cs)
+                end
             end,
         )
         callbacks = (callbacks..., progress_cb)
@@ -536,6 +598,9 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         diags_handler,
         save_cache,
         step_concurrently,
+        overlap_slow_surfaces,
+        Ref{Any}(nothing),
+        Ref{Any}(nothing),
         flux_accumulators,
     )
 

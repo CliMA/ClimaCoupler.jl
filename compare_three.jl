@@ -14,9 +14,11 @@ import Printf: @printf
 const RUN_A = length(ARGS) > 0 ? ARGS[1] : "cc_serialA"
 const RUN_B = length(ARGS) > 1 ? ARGS[2] : "cc_serialB"
 const RUN_C = length(ARGS) > 2 ? ARGS[3] : "cc_concurrent"
-const A = joinpath("output", RUN_A, "output_active")
-const B = joinpath("output", RUN_B, "output_active")
-const C = joinpath("output", RUN_C, "output_active")
+# accept "name" (uses output_active) or "name/output_0000" (explicit run dir)
+resolve_run(n) = occursin('/', n) ? joinpath("output", n) : joinpath("output", n, "output_active")
+const A = resolve_run(RUN_A)
+const B = resolve_run(RUN_B)
+const C = resolve_run(RUN_C)
 const COMPONENTS = ("clima_atmos", "clima_coupler", "clima_land", "clima_ocean", "clima_seaice")
 const COORDS = Set(["lat", "lon", "time", "time_bnds", "z", "z_bnds", "date", "long"])
 

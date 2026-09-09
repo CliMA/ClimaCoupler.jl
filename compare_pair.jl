@@ -10,8 +10,10 @@ import NCDatasets, JLD2
 include("compare_runs_lib.jl")
 
 function compare_pair(runA, runB; label = "")
-    A = joinpath("output", runA, "output_active")
-    B = joinpath("output", runB, "output_active")
+    # accept "name" (uses output_active) or "name/output_0000" (explicit run dir)
+    resolve(n) = occursin('/', n) ? joinpath("output", n) : joinpath("output", n, "output_active")
+    A = resolve(runA)
+    B = resolve(runB)
     worst = 0.0
     worstwhere = ""
     nfields = 0

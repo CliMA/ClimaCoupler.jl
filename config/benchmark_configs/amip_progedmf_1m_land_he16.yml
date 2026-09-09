@@ -16,17 +16,3 @@ surface_setup: "PrescribedSurface"
 t_end: "1200secs"
 topo_smoothing: true
 topography: "Earth"
-
-# EXPERIMENT 2026-09-09: the shipping configuration -- quadrature_order 2 on top
-# of the full optimisation stack (CM fusion, ClimaCore launch bounds, ClimaAtmos
-# evaluator param-args). Fills the one gap in the matrix:
-#
-#   full stack, order 3   +4.52%   exp/2026-09-07-evaluator-repeat
-#   upstream,   order 2   +6.14%   exp/2026-09-08-quadrature-order-2-isolated
-#   full stack, order 1   +9.72%   exp/2026-09-08-quadrature-order-1
-#   full stack, order 2   <- this
-#
-# The two levers act on different factors -- the optimisations cut the cost per
-# quadrature point, the order cuts the number of points -- so they should
-# compose sub-additively rather than summing to 10.66%.
-quadrature_order: 2

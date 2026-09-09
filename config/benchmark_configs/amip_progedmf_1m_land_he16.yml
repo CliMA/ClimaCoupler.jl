@@ -16,3 +16,14 @@ surface_setup: "PrescribedSurface"
 t_end: "1200secs"
 topo_smoothing: true
 topography: "Earth"
+
+# EXPERIMENT 2026-09-08: isolate the cost of the SGS quadrature order for the
+# science team. Every other submodule is checked out to the SAME commit the
+# baseline arm runs, so this config value is the ONLY difference between arms --
+# `arms_differ_in` in results/treatment.json should name no code package.
+#
+# Order 2 (a 2x2 rule, 4 points) rather than 1, because reducing the order is
+# the plausible proposal; order 1 is the upper bound and was measured separately
+# in exp/2026-09-08-quadrature-order-1, which had the full optimisation stack on
+# top and so could not isolate this.
+quadrature_order: 2

@@ -392,7 +392,7 @@ end
 Update the turbulent fluxes in the simulation using the values stored in the coupler fields.
 These include latent heat flux, sensible heat flux, momentum fluxes, and moisture flux.
 
-The input `fields` are already area-weighted, so there's no need to weight them again.
+The input `fields` are per unit surface area of this model.
 
 Note that currently the moisture flux has no effect on the sea ice model, which has
 constant salinity.
@@ -427,6 +427,8 @@ The absorbed radiative part `−(1−α)SW↓ − ϵLW↓` is written in `update
 This adds surface emission (from the diagnosed `top_surface_temperature`) and
 the turbulent fluxes. At skin equilibrium `Jᵃ = Q_conductive`, so the Stefan
 residual vanishes; when `Tₛ` is capped at `T_melt`, the residual drives melt.
+
+`Jᵃ` is per unit ice area; the Field is a grid-cell mean, so it is weighted by `ℵ`.
 """
 function compute_ice_top_heat_flux!(
     sim::ClimaSeaIceSimulation,
@@ -443,10 +445,10 @@ function compute_ice_top_heat_flux!(
     C_to_K = FT(sim.ice_properties.C_to_K)
     ϵ = FT(Interfacer.get_field(sim, Val(:emissivity)))
 
-    ice_mask = OC.interior(ice_concentration, :, :, 1) .> 0
+    ℵ = OC.interior(ice_concentration, :, :, 1)
     T_K = OC.interior(T_sfc_C, :, :, 1) .+ C_to_K
     OC.interior(si_flux_heat, :, :, 1) .+=
-        ice_mask .* (σ .* ϵ .* T_K .^ 4 .+ remapped_F_lh .+ remapped_F_sh)
+        ℵ .* (σ .* ϵ .* T_K .^ 4 .+ remapped_F_lh .+ remapped_F_sh)
     return nothing
 end
 
@@ -625,7 +627,7 @@ end
 Push the per-polygon ice turbulent fluxes currently held in
 `sim.remapping.ice_flux_state` into the ClimaSeaIce boundary conditions
 (momentum stresses when dynamics are active; complete top heat flux Jᵃ).
-Fluxes are per unit ice area, matching `_update_ice_turbulent_fluxes_boundary!`.
+The momentum stresses are per unit ice area; the heat flux is a grid-cell mean.
 """
 NVTX.@annotate function push_exchange_fluxes_to_ice!(sim::ClimaSeaIceSimulation)
     remapping = sim.remapping
@@ -718,7 +720,7 @@ ClimaSeaIce expects `snowfall` as a positive accumulation rate, so the sign is f
 function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
     ice_concentration = sim.ice.model.ice_concentration
 
-    # Absorbed radiative part of Jᵃ (upward positive): −(1−α)SW↓ − ϵLW↓.
+    # Absorbed radiative part of Jᵃ (upward positive): −(1−α)SW↓ − ϵLW↓, weighted to a cell mean.
     # Emission σϵTₛ⁴ and turbulent fluxes are added in
     # `compute_ice_top_heat_flux!` after Tₛ is diagnosed, so the Field holds
     # the full skin-balance net flux when the ice steps.
@@ -734,9 +736,9 @@ function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
         α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
         ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
 
+        ℵ = OC.interior(ice_concentration, :, :, 1)
         OC.interior(si_flux_heat, :, :, 1) .=
-            (OC.interior(ice_concentration, :, :, 1) .> 0) .*
-            (-(1 .- α) .* remapped_SW_d .- ϵ .* remapped_LW_d)
+            ℵ .* (-(1 .- α) .* remapped_SW_d .- ϵ .* remapped_LW_d)
     end
 
     # Snow precipitation drives snow accumulation (sign flip: downward atmospheric mass 

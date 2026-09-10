@@ -70,10 +70,42 @@ Accumulators are not allocated for fast surfaces (`sim_dt ≤ Δt_cpl`),
 `AbstractSurfaceStub`s, or `AbstractImplicitFluxSimulation`s (which compute
 their own fluxes inside `step!`).
 
+## Coupler flux accumulation for slow surfaces
+
+The same argument applies to the fluxes a surface reads in
+[`FieldExchanger.update_sim!`](@ref) — radiation and precipitation, and for the bucket
+land model the near-surface atmospheric state. A slow surface takes one step covering
+many coupling steps, so an instantaneous sample of `SW_d` scaled up to the surface's
+timestep does not carry the energy the atmosphere actually lost over that interval.
+
+The same accumulator carries them, under the same step count and the same push:
+
+- Each coupling step, [`FieldExchanger.update_model_sims!`](@ref) calls `update_sim!` as
+  usual and additionally calls [`FluxCalculator.accumulate_fluxes!`](@ref) for the fields
+  the surface declared in [`FieldExchanger.accumulated_coupler_fields`](@ref).
+- [`FluxCalculator.push_and_reset!`](@ref) then pushes the averaged coupler fluxes
+  through `update_sim!` before the turbulent push, overwriting the instantaneous values
+  written that step.
+
+`update_sim!` keeps running every coupling step because a surface that computes its own
+turbulent fluxes reads the atmospheric state it writes.
+
+## Ice-ocean fluxes
+
+[`FluxCalculator.ocean_seaice_fluxes!`](@ref) runs on the ocean/sea-ice cadence rather
+than the coupling cadence. `compute_sea_ice_ocean_fluxes!` takes a single `Δt` and its
+result is consumed by one ocean step and one sea-ice step; its frazil half also clamps
+supercooled ocean temperature in place, so recomputing it every coupling step would leave
+the ice reading a value computed against an ocean that had already been clamped. The
+`CoupledSimulation` method therefore assembles the interface fluxes on the coupling step
+that precedes the shared step, and `dt_ocean == dt_seaice` is required when coupling
+Oceananigans to ClimaSeaIce so that shared cadence exists.
+
 ## FluxCalculator API
 
 ```@docs
     FluxCalculator.turbulent_fluxes!
+    FluxCalculator.ocean_seaice_fluxes!
     FluxCalculator.compute_surface_fluxes!
     FluxCalculator.get_surface_fluxes
     FluxCalculator.update_turbulent_fluxes!
@@ -81,6 +113,7 @@ their own fluxes inside `step!`).
     FluxCalculator.get_roughness_params
     FluxCalculator.FluxAccumulator
     FluxCalculator.accumulate!
+    FluxCalculator.accumulate_fluxes!
     FluxCalculator.push_and_reset!
     FluxCalculator.push_ready_accumulators!
     FluxCalculator.reset!

@@ -4,6 +4,13 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Replace `DataLayouts.AbstractData`, removed in ClimaCore v0.16
+`ClimaCore.DataLayouts.AbstractData` was an alias for `DataLayout` kept for
+backwards compatibility, and ClimaCore v0.16 removes it. The nine uses here —
+in `Checkpointer.restore!`, `Checkpointer.is_leaf`, and the `_compare` helpers
+of the AMIP and CMIP experiment tests — now spell it `DataLayout`. The two are
+the same type, so this is a spelling change only.
+
 #### Exchange (intersection) grid for CMIP surface fractions and fluxes. PR [#2051](https://github.com/CliMA/ClimaCoupler.jl/pull/2051)
 When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange
 grid — the polygons where the cubed-sphere spectral elements intersect the

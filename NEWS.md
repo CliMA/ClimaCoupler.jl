@@ -49,6 +49,11 @@ coupling step that precedes the shared ocean/sea-ice step. **`dt_ocean == dt_sea
 required** when coupling Oceananigans to ClimaSeaIce, so that shared cadence exists; every
 existing CMIP configuration already satisfies it.
 
+#### Route rain through sea-ice.
+The ocean now receives `P_liq + (1 - ℵ) P_snow`; rain drains through the ice
+instead of ponding on it (and being lost) while snow can still accumulate on
+the ice.
+
 #### Exchange (intersection) grid for CMIP surface fractions and fluxes. PR [#2051](https://github.com/CliMA/ClimaCoupler.jl/pull/2051)
 When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange
 grid — the polygons where the cubed-sphere spectral elements intersect the
@@ -69,6 +74,14 @@ to the previous guess if the update is NaN.
 
 This PR also addresses a boundary condition bug in the
 sea-ice component, using the diagnosed skin temperature to compute the radiative emission term.(Previously the incorrect energy balance would result in rapid ice melt).
+
+#### Update to use ClimaCore v0.16
+The compat entries now require ClimaCore 0.16, ClimaAtmos 0.42.9, ClimaLand
+1.12.1, ClimaDiagnostics 0.3.9, and ClimaUtilities 0.1.32.
+
+ClimaCore 0.16 has a Makie extension, so ClimaCoreMakie is no longer a
+dependency of ClimaCoupler or of the AMIP/CMIP experiment environments. All
+calls are now though `ClimaCore.Visualize`.
 
 v0.2.3
 -------

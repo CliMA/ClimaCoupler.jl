@@ -97,16 +97,18 @@ Plotting.debug(cs, "debug_output")
 # Produces: debug_output/debug_coupler.png, debug_output/debug_<ModelName>.png, etc.
 ```
 
-You can also plot individual ClimaCore fields with ClimaCoreMakie directly:
+You can also plot individual ClimaCore fields with `ClimaCore.Visualize`:
+directly
 
 ```julia
-using ClimaCoreMakie, CairoMakie, Makie
+import ClimaCore as CC
+using CairoMakie, Makie
 
 field = cs.fields.T_sfc  # any ClimaCore surface field
 
 fig = Figure()
 ax = Axis(fig[1, 1], title = "T_sfc $(extrema(field))")
-hm = fieldheatmap!(ax, field)
+hm = CC.Visualize.fieldheatmap!(ax, field)
 Colorbar(fig[:, end+1], hm)
 Makie.save("T_sfc.png", fig)
 ```

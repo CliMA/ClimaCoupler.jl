@@ -10,6 +10,11 @@ sample_date_ranges =
 # directory (e.g. "/glade/derecho/scratch")
 output_dir = joinpath(pkgdir(ClimaCoupler), "amip_calibration")
 
+# Interannual sample dates used to estimate the SVDplusDCovariance. Every entry
+# of sample_date_ranges must be contained in these.
+const COVARIANCE_DATE_RANGES =
+    [(Dates.DateTime(y, 10, 1), Dates.DateTime(y, 10, 1)) for y in 2006:2010]
+
 const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     config_file,
     # Note: Pressure-level variables require model output with
@@ -24,9 +29,21 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     rng_seed = 42,
 )
 
+# Per-group model error floors: the covariance diagonal gets
+# (model_error_scale * field mean)^2, the bias the model keeps at the best
+# parameter values. 0.2 for lwp is validated against interannual spread
+const OBS_NOISE_GROUPS = [
+    (short_names = ["lwp"], model_error_scale = 0.2),
+    (short_names = ["ta", "hur"], model_error_scale = 0.1),
+]
+
 # Used in generate_observations.jl and observation_map.jl
 # Units: Pa (not hPa)
 const PRESSURE_LEVELS = 100.0 .* [200.0, 500.0, 850.0]
+
+# Spatial reduction. An integer block-averages the lon-lat grid by that factor,
+# `nothing` takes a zonal average instead.
+const COARSEN_FACTOR = nothing
 
 # To disable normalization, update generate_observations.jl to not apply the
 # normalization. You may want to do the same in the observation map as well.

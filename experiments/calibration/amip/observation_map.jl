@@ -43,6 +43,26 @@ function preprocess_sim_vars(vars)
     lat_right = 90
     vars = apply_lat_window.(vars, lat_left, lat_right)
 
+    # Mask the simulation to the observation's coverage, so both sides average
+    # over the same points.
+    coverage_fp = coverage_mask_path(CALIBRATE_CONFIG.output_dir)
+    if isfile(coverage_fp)
+        coverage_masks = JLD2.load_object(coverage_fp)
+        vars = map(vars) do var
+            entry = get(coverage_masks, ClimaAnalysis.short_name(var), nothing)
+            isnothing(entry) && return var
+            return apply_coverage_mask(var, entry...)
+        end
+    else
+        @warn "No coverage masks found; simulation zonal means will average all \
+               longitudes even where the observation has no data. Regenerate the \
+               observations to create them." coverage_fp
+    end
+
+    # Must match the reduction in generate_observations.jl so G aligns with
+    # the observation vector
+    vars = reduce_spatial.(vars, COARSEN_FACTOR)
+
     if isfile(NORMALIZATION_STATS_FP)
         # Note: This should not be used with SVDplusDCovariance matrix
         normalization_stats = JLD2.load_object(NORMALIZATION_STATS_FP)

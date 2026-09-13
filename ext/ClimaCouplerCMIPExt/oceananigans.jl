@@ -878,6 +878,10 @@ precipitation. The rest will be updated in `update_turbulent_fluxes!`.
 This function sets the surface fluxes directly, overwriting any previous values.
 Additional contributions will be made in `update_turbulent_fluxes!` and `ocean_seaice_fluxes!`.
 
+When the exchange grid is active, the work is done per polygon in
+[`push_exchange_radiation_to_ocean!`](@ref); the fallback below remaps with
+`sim.remapping`, whose regridder is unaware of the immersed mask.
+
 A note on sign conventions:
 ClimaAtmos and Oceananigans both use the convention that a positive flux is an upward flux.
 No sign change is needed during the exchange, except for precipitation/salinity fluxes.
@@ -896,6 +900,10 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     OC.interior(oc_flux_T, :, :, 1) .= 0
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     OC.interior(oc_flux_S, :, :, 1) .= 0
+
+    if sim.remapping.use_exchange_grid
+        return push_exchange_radiation_to_ocean!(sim, csf)
+    end
 
     # Remap shortwave and longwave onto separate scratch fields
     Interfacer.remap!(sim.remapping.scratch_field_oc3, csf.SW_d, sim.remapping)
@@ -936,6 +944,68 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     OC.interior(oc_flux_S, :, :, 1) .-=
         OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* ocean_precipitation ./
         reference_density
+    return nothing
+end
+
+"""
+    push_exchange_radiation_to_ocean!(sim::OceananigansSimulation, csf)
+
+Exchange-grid form of the radiative and freshwater part of
+[`FieldExchanger.update_sim!`](@ref): gather the downwelling radiation and
+precipitation onto the polygons, weight them by the open-water fraction
+`(1 - SIC)` *per polygon*, and scatter the result onto the tracer flux BCs.
+Only wet polygons exist, so dry cells receive exactly nothing. Assumes the 
+tracer flux BCs have just been zeroed.
+"""
+NVTX.@annotate function push_exchange_radiation_to_ocean!(sim::OceananigansSimulation, csf)
+    remapping = sim.remapping
+    eg = remapping.exchange_grid
+    fs = remapping.ocean_flux_state
+    grid = sim.ocean.model.grid
+    Nz = grid.Nz
+    FT = eltype(fs.T_sfc)
+    ρ_ref = FT(sim.ocean_properties.reference_density)
+    c_p = FT(sim.ocean_properties.heat_capacity)
+    σ = FT(sim.ocean_properties.σ)
+    C_to_K = FT(sim.ocean_properties.C_to_K)
+    α = FT(Interfacer.get_field(sim, Val(:surface_direct_albedo))) # scalar
+    ϵ = FT(Interfacer.get_field(sim, Val(:emissivity))) # scalar
+
+    # `update_sim!` runs before `compute_surface_fluxes!` in a coupling step,
+    # so the surface state gathered there is one step stale here: re-gather.
+    gather_cells_to_polys!(
+        fs.T_sfc,
+        eg,
+        vec(OC.interior(sim.ocean.model.tracers.T, :, :, Nz)),
+    )
+    fs.T_sfc .+= C_to_K
+    gather_cells_to_polys!(fs.sic, eg, vec(OC.interior(sim.ice_concentration, :, :, 1)))
+    gather_nodes_to_polys!(fs.SW_d, eg, se_nodal_vec(csf.SW_d))
+    gather_nodes_to_polys!(fs.LW_d, eg, se_nodal_vec(csf.LW_d))
+    gather_nodes_to_polys!(fs.P_liq, eg, se_nodal_vec(csf.P_liq))
+    gather_nodes_to_polys!(fs.P_snow, eg, se_nodal_vec(csf.P_snow))
+
+    # TODO: Note, SW radiation penetrates the surface. Right now, we just put
+    # everything on the surface, but later we will need to account for this.
+    @. fs.scratch1 =
+        (1 - fs.sic) * (-(1 - α) * fs.SW_d - ϵ * (fs.LW_d - σ * fs.T_sfc^4)) / (ρ_ref * c_p)
+    rad_cells = vec(OC.interior(remapping.scratch_field_oc3, :, :, 1))
+    scatter_polys_to_cells!(rad_cells, eg, fs.scratch1)
+    mirror_fold_partners!(rad_cells, grid)
+    oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
+    OC.interior(oc_flux_T, :, :, 1) .+= OC.interior(remapping.scratch_field_oc3, :, :, 1)
+
+    # Rain drains through ice while snow can accumulate there (see the sea-ice
+    # `update_sim!`). Note the negative sign below to account for the sign
+    # change from precipitation to salinity flux.
+    @. fs.scratch1 = (fs.P_liq + (1 - fs.sic) * fs.P_snow) / ρ_ref
+    precip_cells = vec(OC.interior(remapping.scratch_field_oc3, :, :, 1))
+    scatter_polys_to_cells!(precip_cells, eg, fs.scratch1)
+    mirror_fold_partners!(precip_cells, grid)
+    oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
+    OC.interior(oc_flux_S, :, :, 1) .-=
+        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .*
+        OC.interior(remapping.scratch_field_oc3, :, :, 1)
     return nothing
 end
 

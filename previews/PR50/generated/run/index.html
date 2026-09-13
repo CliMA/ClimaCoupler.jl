@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Heat Equation + Slab Tutorial · ClimaCoupler.jl</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="ClimaCoupler.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit">ClimaCoupler.jl</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Examples</span><ul><li class="is-active"><a class="tocitem" href>Heat Equation + Slab Tutorial</a><ul class="internal"><li class="toplevel"><a class="tocitem" href="#Model-1"><span>Model 1</span></a></li><li class="toplevel"><a class="tocitem" href="#Model-2"><span>Model 2</span></a></li><li class="toplevel"><a class="tocitem" href="#Coupling-and-Flux-Calculation"><span>Coupling and Flux Calculation</span></a></li><li class="toplevel"><a class="tocitem" href="#Implementation"><span>Implementation</span></a></li><li><a class="tocitem" href="#Loading-code-coupler"><span>Loading Packages</span></a></li><li><a class="tocitem" href="#Define-Parameters"><span>Define Parameters</span></a></li><li><a class="tocitem" href="#Define-Model-Functions"><span>Define Model Functions</span></a></li><li><a class="tocitem" href="#Model-Initialization"><span>Model Initialization</span></a></li><li><a class="tocitem" href="#Define-the-sequential-coupling-loop"><span>Define the sequential coupling loop</span></a></li><li><a class="tocitem" href="#Run-the-Coupler-Model-Simulation"><span>Run the Coupler Model Simulation</span></a></li><li><a class="tocitem" href="#Postprocessing-and-Visualization"><span>Postprocessing and Visualization</span></a></li></ul></li></ul></li><li><span class="tocitem">Coupler Interface</span><ul><li><a class="tocitem" href="../../couplerstate/">Coupler State</a></li><li><a class="tocitem" href="../../timestepping/">Coupled Simulations &amp; Timestepping</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Heat Equation + Slab Tutorial</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Heat Equation + Slab Tutorial</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/CliMA/ClimaCoupler.jl/blob/master/docs/src/generated/run.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Heat-Equation-Slab-Tutorial"><a class="docs-heading-anchor" href="#Heat-Equation-Slab-Tutorial">Heat Equation + Slab Tutorial</a><a id="Heat-Equation-Slab-Tutorial-1"></a><a class="docs-heading-anchor-permalink" href="#Heat-Equation-Slab-Tutorial" title="Permalink"></a></h1><p>In this tutorial, we demonstrate simple sequential coupling of two PDE models using the <code>ClimaCore.jl</code> backends.</p><h1 id="Model-1"><a class="docs-heading-anchor" href="#Model-1">Model 1</a><a id="Model-1-1"></a><a class="docs-heading-anchor-permalink" href="#Model-1" title="Permalink"></a></h1><p>Model 1 represents a simplified atmosphere (atm) and solves the <a href="https://en.wikipedia.org/wiki/Heat_equation">heat equation</a> in a one-column domain:</p><p><span>$\frac{∂ T}{∂ t} + ∇ ⋅ (-μ ∇T) = 0$</span></p><p>with top and bottom boundary conditions set to fixed-temperature (non-zero Dirichlet) and fixed-flux (non-zero Neumann) conditions, respectively:</p><p><span>$T_{top}  = 280 K, \,\,\,\,\,\,\, \frac{∂ T_{bottom}}{∂ t} = - ∇ F_{sfc}$</span></p><p>where</p><ul><li><code>t</code> is time</li><li><code>μ</code> is the thermal diffusivity</li><li><code>T</code> is the temperature</li><li><code>F_sfc</code> is the thermal boundary flux (see below for calculation)</li></ul><h1 id="Model-2"><a class="docs-heading-anchor" href="#Model-2">Model 2</a><a id="Model-2-1"></a><a class="docs-heading-anchor-permalink" href="#Model-2" title="Permalink"></a></h1><p>Model 2 assumes a simplified soil (lnd) domain to be a slab, represented by an ODE for its surface temperature:</p><p><span>$\frac{dT_{sfc}}{dt} = - (F_{accumulated} + G ) / h_{lnd}$</span></p><p>where</p><p><span>$F_{accumulated} = {F_{integrated}} / Δt_{coupler}$</span></p><p>where</p><ul><li><code>Δt_coupler</code> is the duration of the coupling cycle</li><li><code>T_sfc</code> is the temperature</li><li><code>h_lnd</code> is the slab thickness</li><li><code>F_integrated</code> and <code>F_accumulated</code> thermal boundary fluxes, respectively (see below for calculation)</li><li><code>G</code> represents soil physics, which we assume to be 0 for now</li></ul><h1 id="Coupling-and-Flux-Calculation"><a class="docs-heading-anchor" href="#Coupling-and-Flux-Calculation">Coupling and Flux Calculation</a><a id="Coupling-and-Flux-Calculation-1"></a><a class="docs-heading-anchor-permalink" href="#Coupling-and-Flux-Calculation" title="Permalink"></a></h1><p>We use this Model 1 (usually this is done by the model with the shortest timestep) to calculate and accumulate the downward surface fluxes, <code>F_sfc</code>:</p><p><span>$F_{sfc} = - λ (T_{sfc} - T1)$</span></p><p><span>$d(F_{integrated})/dt  = F_{sfc}$</span></p><p>where</p><ul><li><code>T1</code> is the atm temperature near the surface (here assumed equal to the first model level)</li><li><code>λ</code> a constant relaxation timescale</li></ul><p>Note that in a more realistic setup the above equations would be weighted by their domains&#39; densities and thermal heat capacities, so that the thermal flux would have the units of W m<span>$^{-2}$</span>. Here we assume these are unity for both domains.</p><p>Sequential coupling has the following steps:</p><ol><li>pre-Model 1: supply Model 1 with <code>T_sfc</code> for the <code>F_sfc</code> calculation; reset <code>F_integrated</code> to zero</li><li>run Model 1: step forward for all Model 1 timesteps within one coupling cycle using <code>F_sfc</code> as the bottom boundary condition; accumulate <code>F_integrated</code> at each (sub-)step</li><li>post-Model 1: pass <code>F_integrated</code> into coupler and convert to <code>F_accumulated</code> for the correct units.</li><li>pre-Model 2: supply Model 2 with <code>F_accumulated</code></li><li>run Model 2: step forward for all Model 2 timesteps within one coupling cycle;</li><li>post-Model 2: state variable, <code>T_sfc</code> of Model 2 into coupler.</li><li>repeat steps 1-6 for all coupling timesteps.</li></ol><h1 id="Implementation"><a class="docs-heading-anchor" href="#Implementation">Implementation</a><a id="Implementation-1"></a><a class="docs-heading-anchor-permalink" href="#Implementation" title="Permalink"></a></h1><h2 id="Loading-code-coupler"><a class="docs-heading-anchor" href="#Loading-code-coupler">Loading Packages</a><a id="Loading-code-coupler-1"></a><a class="docs-heading-anchor-permalink" href="#Loading-code-coupler" title="Permalink"></a></h2><p>First, we&#39;ll load our pre-requisites:</p><ul><li>load CliMA packages under development - you may need to add unregistered packages in Pkg, e.g.:</li></ul><pre><code class="language-julia"># import Pkg; Pkg.add(url=&quot;https://github.com/CliMA/ClimaCore.jl&quot;,rev=&quot;main&quot;)</code></pre><ul><li>load external packages:</li></ul><pre><code class="language-julia">import LinearAlgebra, UnPack
+import ClimaCore: Fields, Domains, Topologies, Meshes, DataLayouts, Operators, Geometry, Spaces
+
+using Base: show_supertypes
+using OrdinaryDiffEq: ODEProblem, solve, SSPRK33
+
+using Logging: global_logger
+using TerminalLoggers: TerminalLogger
+
+using RecursiveArrayTools
+
+using OrdinaryDiffEq
+
+using Statistics</code></pre><h2 id="Define-Parameters"><a class="docs-heading-anchor" href="#Define-Parameters">Define Parameters</a><a id="Define-Parameters-1"></a><a class="docs-heading-anchor-permalink" href="#Define-Parameters" title="Permalink"></a></h2><ul><li>Global Constants</li></ul><pre><code class="language-julia">const FT = Float64;</code></pre><ul><li>Experiment-specific Parameters</li></ul><pre><code class="language-julia">parameters = (
+    # atmos parameters
+    zmin_atm = FT(0.0), # height of atm stack bottom [m]
+    zmax_atm = FT(1.0), # height of atm stack top [m]
+    n = 15,  # number of elements in atm stack
+    μ = FT(0.0001), # diffusion coefficient [m^2 / s]
+    T_top = FT(280.0), # fixed temperature at the top of the domain_atm [K]
+    T_atm_ini = FT(280.0), # initial condition of at temperature (isothermal) [K]
+    # slab parameters
+    h_lnd = FT(0.5), # depth of slab layer [m]
+    T_lnd_ini = FT(260.0), # initial condition of at temperature (isothermal) [K]
+    # coupling parameters
+    λ = FT(1e-5), # transfer coefficient
+)</code></pre><pre><code class="language-none">(zmin_atm = 0.0, zmax_atm = 1.0, n = 15, μ = 0.0001, T_top = 280.0, T_atm_ini = 280.0, h_lnd = 0.5, T_lnd_ini = 260.0, λ = 1.0e-5)</code></pre><h2 id="Define-Model-Functions"><a class="docs-heading-anchor" href="#Define-Model-Functions">Define Model Functions</a><a id="Define-Model-Functions-1"></a><a class="docs-heading-anchor-permalink" href="#Define-Model-Functions" title="Permalink"></a></h2><ul><li>Model 1 (atm) Equations</li></ul><pre><code class="language-julia">&quot;&quot;&quot;
+    ∑tendencies_atm!(du, u, (parameters, T_sfc), t)
+
+Heat diffusion equation
+    dT/dt =  ∇ μ ∇ T
+    where
+        T  = 280 K              at z = zmax_atm
+        dT/dt = - ∇ F_sfc       at z = zmin_atm
+
+We also use this model to calculate and accumulate the downward surface fluxes, F_sfc:
+    F_sfc = - λ * (T_sfc - T1)
+    d(F_integrated)/dt  = F_sfc
+    where
+        F_integrated is reset to 0 at the beginning of each coupling cycle
+        T1 = atm temperature near the surface (here assumed equal to the first model level)
+&quot;&quot;&quot;
+function ∑tendencies_atm!(du, u, (parameters, T_sfc), t)
+    T = u.x[1] # u.x = vector of prognostic variables from DifferentialEquations
+    F_sfc = calculate_flux(T_sfc[1], parent(T)[1], parameters)
+    # set BCs
+    bcs_bottom = Operators.SetValue(Geometry.Cartesian3Vector(F_sfc)) # F_sfc is converted to a Cartesian vector in direction 3 (vertical)
+    bcs_top = Operators.SetValue(FT(parameters.T_top))
+
+    gradc2f = Operators.GradientC2F(top = bcs_top) # Dirichlet BC (center-to-face)
+    gradf2c = Operators.DivergenceF2C(bottom = bcs_bottom) # Neumann BC (face-to-center)
+
+    # tendency calculations
+    @. du.x[1] = gradf2c(parameters.μ * gradc2f(T)) # dT/dt
+    du.x[2] .= -F_sfc[1] # d(F_integrated)/dt
+end</code></pre><pre><code class="language-none">Main.##438.∑tendencies_atm!</code></pre><ul><li>Model 2 (lnd) Equations</li></ul><pre><code class="language-julia">&quot;&quot;&quot;
+    ∑tendencies_lnd!(dT_sfc, T_sfc, (parameters, F_accumulated), t)
+
+Slab layer equation
+    lnd d(T_sfc)/dt = - (F_accumulated + G) / h_lnd
+    where
+        F_accumulated = F_integrated / Δt_coupler
+&quot;&quot;&quot;
+function ∑tendencies_lnd!(dT_sfc, T_sfc, (parameters, F_accumulated), t)
+    G = 0.0 # place holder for soil dynamics
+    @. dT_sfc = (-F_accumulated + G) / parameters.h_lnd
+end</code></pre><pre><code class="language-none">Main.##438.∑tendencies_lnd!</code></pre><ul><li>Surface Flux Calculation (coarse bulk formula)</li></ul><pre><code class="language-julia">calculate_flux(T_sfc, T1, parameters) = -parameters.λ * (T_sfc - T1);</code></pre><ul><li>Coupler Communication Functions</li></ul><p>These functions export / import / transform variables These functions are now just place holders for coupler transformations (e.g. regridding, masking, etc)</p><pre><code class="language-julia">coupler_get_(x) = x;
+coupler_put_(x) = x;</code></pre><h2 id="Model-Initialization"><a class="docs-heading-anchor" href="#Model-Initialization">Model Initialization</a><a id="Model-Initialization-1"></a><a class="docs-heading-anchor-permalink" href="#Model-Initialization" title="Permalink"></a></h2><ul><li>initialize atm model domain and grid</li></ul><pre><code class="language-julia">domain_atm = Domains.IntervalDomain(
+    Geometry.ZPoint{FT}(parameters.zmin_atm),
+    Geometry.ZPoint{FT}(parameters.zmax_atm);
+    boundary_tags = (:bottom, :top),
+);
+mesh_atm = Meshes.IntervalMesh(domain_atm, nelems = parameters.n); # struct, allocates face boundaries to 5,6: atmos
+center_space_atm = Spaces.CenterFiniteDifferenceSpace(mesh_atm); # collection of the above, discretises space into FD and provides coords</code></pre><ul><li>initialize prognostic variables, either as ClimaCore&#39;s Field objects or as Arrays</li></ul><pre><code class="language-julia">T_atm_0 = Fields.ones(FT, center_space_atm) .* parameters.T_atm_ini; # initiates a spatially uniform atm progostic var
+T_lnd_0 = [parameters.T_lnd_ini]; # initiates lnd progostic var
+ics = (; atm = T_atm_0, lnd = T_lnd_0)</code></pre><pre><code class="language-none">(atm = Float64-valued Field:
+  [280.0, 280.0, 280.0, 280.0, 280.0, 280.0, 280.0, 280.0, 280.0, 280.0, 280.0, 280.0, 280.0, 280.0, 280.0], lnd = [260.0])</code></pre><ul><li>specify timestepping information</li></ul><pre><code class="language-julia">stepping = (;
+    Δt_min = 0.02,
+    timerange = (0.0, 6.0),
+    Δt_coupler = 1.0,
+    odesolver = SSPRK33(),
+    nsteps_atm = 8, # number of timesteps of atm per coupling cycle
+    nsteps_lnd = 1, # number of timesteps of lnd per coupling cycle
+);</code></pre><h2 id="Define-the-sequential-coupling-loop"><a class="docs-heading-anchor" href="#Define-the-sequential-coupling-loop">Define the sequential coupling loop</a><a id="Define-the-sequential-coupling-loop-1"></a><a class="docs-heading-anchor-permalink" href="#Define-the-sequential-coupling-loop" title="Permalink"></a></h2><pre><code class="language-julia">function coupler_solve!(stepping, ics, parameters)
+    t = 0.0
+    Δt_min = stepping.Δt_min
+    Δt_coupler = stepping.Δt_coupler
+    t_start = stepping.timerange[1]
+    t_end = stepping.timerange[2]
+
+    # init coupler fields
+    coupler_F_sfc = [0.0]
+    coupler_T_lnd = copy(ics.lnd)
+
+    # atmos copies of coupler variables
+    atm_T_lnd = copy(coupler_T_lnd)
+    atm_F_sfc = copy(coupler_F_sfc)
+
+    ## SETUP ATMOS
+    # put all prognostic variable arrays into a vector and ensure that solve can partition them
+    T_atm = ics.atm
+    Y_atm = ArrayPartition((T_atm, atm_F_sfc))
+    prob_atm = ODEProblem(∑tendencies_atm!, Y_atm, (t_start, t_end), (parameters, atm_T_lnd))
+    integ_atm = init(prob_atm, stepping.odesolver, dt = Δt_min, saveat = 10 * Δt_min)
+
+    # land copies of coupler variables
+    T_lnd = ics.lnd
+    lnd_F_sfc = copy(coupler_F_sfc)
+
+    ## SETUP LAND
+    prob_lnd = ODEProblem(∑tendencies_lnd!, T_lnd, (t_start, t_end), (parameters, lnd_F_sfc))
+    integ_lnd = init(prob_lnd, stepping.odesolver, dt = Δt_min, saveat = 10 * Δt_min)
+
+    # coupler stepping
+    for t in (t_start:Δt_coupler:t_end)
+
+        # STEP ATMOS
+        # pre_atmos
+        integ_atm.p[2] .= coupler_get_(coupler_T_lnd) # integ_atm.p is the parameter vector of an ODEProblem from DifferentialEquations
+        integ_atm.u.x[2] .= [0.0] # surface flux to be accumulated
+
+        # run atmos
+        # NOTE: use (t - integ_atm.t) here instead of Δt_coupler to avoid accumulating roundoff error in our timestepping.
+        OrdinaryDiffEq.step!(integ_atm, t - integ_atm.t, true)
+
+        # post_atmos
+        coupler_F_sfc .= coupler_put_(integ_atm.u.x[2]) / Δt_coupler
+
+        # STEP LAND
+        # pre_land
+        lnd_F_sfc .= coupler_get_(coupler_F_sfc)
+
+        # run land
+        OrdinaryDiffEq.step!(integ_lnd, t - integ_lnd.t, true)
+
+        # post land
+        coupler_T_lnd .= coupler_put_(integ_lnd.u) # update T_sfc
+    end
+
+    return integ_atm, integ_lnd
+end;</code></pre><h2 id="Run-the-Coupler-Model-Simulation"><a class="docs-heading-anchor" href="#Run-the-Coupler-Model-Simulation">Run the Coupler Model Simulation</a><a id="Run-the-Coupler-Model-Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Run-the-Coupler-Model-Simulation" title="Permalink"></a></h2><pre><code class="language-julia">integ_atm, integ_lnd = coupler_solve!(stepping, ics, parameters);
+sol_atm, sol_lnd = integ_atm.sol, integ_lnd.sol;</code></pre><h2 id="Postprocessing-and-Visualization"><a class="docs-heading-anchor" href="#Postprocessing-and-Visualization">Postprocessing and Visualization</a><a id="Postprocessing-and-Visualization-1"></a><a class="docs-heading-anchor-permalink" href="#Postprocessing-and-Visualization" title="Permalink"></a></h2><p>Each integrator output (<code>sol_atm</code>, <code>sol_lnd</code>), contains the DifferentialEquations variable <code>.u</code> (the name is hard coded). If <code>ArrayPartition</code> was used for combining multiple prognostic variables, <code>u</code> will include an additional variable <code>x</code> (also hard coded) <code>parent()</code> accesses the <code>Field</code> values. So, for example, the structure of <code>u</code> from Model 1 is:</p><p><code>parent(sol_atm.u[&lt;time-index&gt;].x[&lt;ArrayPartition-index&gt;])[&lt;z-index&gt;,&lt;variable-index&gt;]</code></p><pre><code class="language-julia">ENV[&quot;GKSwstype&quot;] = &quot;nul&quot;
+import Plots
+Plots.GRBackend()
+
+show_plots = isdefined(Main, :SHOWPLOTS) ? SHOWPLOTS : true
+
+path = joinpath(dirname(@__FILE__), &quot;images/&quot;)
+mkpath(path);</code></pre><ul><li>Vertical profile at start and end</li></ul><pre><code class="language-julia">t0_ = parent(sol_atm.u[1].x[1])[:, 1];
+tend_ = parent(sol_atm.u[end].x[1])[:, 1];
+z_centers = parent(Fields.coordinate_field(center_space_atm))[:, 1];
+show_plots ?
+Plots.png(
+    Plots.plot(
+        [t0_ tend_],
+        z_centers,
+        title = &quot;model 1: atm&quot;,
+        labels = [&quot;t=0&quot; &quot;t=end&quot;],
+        xlabel = &quot;T (K)&quot;,
+        ylabel = &quot;z (m)&quot;,
+    ),
+    joinpath(path, &quot;tc1_f1.png&quot;),
+) : nothing</code></pre><p><img src="../images/tc1_f1.png" alt/></p><ul><li>Conservation: absolute &quot;energy&quot; of both models with time</li></ul><p>convert to the same units (analogous to energy conservation, assuming that is both domains density=1 and thermal capacity=1)</p><pre><code class="language-julia">lnd_sfc_u_t = [u[1] for u in sol_lnd.u] .* parameters.h_lnd;
+atm_sum_u_t = [sum(parent(u.x[1])[:]) for u in sol_atm.u] .* (parameters.zmax_atm - parameters.zmin_atm) ./ parameters.n;
+v1 = lnd_sfc_u_t .- lnd_sfc_u_t[1];
+v2 = atm_sum_u_t .- atm_sum_u_t[1];
+show_plots ?
+Plots.png(
+    Plots.plot(
+        sol_lnd.t,
+        [v1 v2 v1 + v2],
+        labels = [&quot;lnd&quot; &quot;atm&quot; &quot;tot&quot;],
+        xlabel = &quot;time (s)&quot;,
+        ylabel = &quot;pseudo-energy (J / m2)&quot;,
+    ),
+    joinpath(path, &quot;tc1_f2.png&quot;),
+) : nothing</code></pre><p><img src="../images/tc1_f2.png" alt/></p><ul><li>Conservation: relative error with time</li></ul><pre><code class="language-julia">total = atm_sum_u_t + lnd_sfc_u_t;
+rel_error = (total .- total[1]) / mean(total);
+show_plots ?
+Plots.png(
+    Plots.plot(sol_lnd.t, rel_error, labels = [&quot;tot&quot;], xlabel = &quot;time (s)&quot;, ylabel = &quot;relative error&quot;),
+    joinpath(path, &quot;tc1_f3.png&quot;),
+) : nothing</code></pre><p><img src="../images/tc1_f3.png" alt/></p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../../couplerstate/">Coupler State »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 19 May 2022 16:24">Thursday 19 May 2022</span>. Using Julia version 1.7.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

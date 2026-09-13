@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Atmospheric Model · ClimaCoupler.jl</title><script data-outdated-warner src="../../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../../assets/documenter.js"></script><script src="../../../siteinfo.js"></script><script src="../../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../../"><img src="../../../assets/logo.svg" alt="ClimaCoupler.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../../">ClimaCoupler.jl</a></span></div><form class="docs-search" action="../../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../../">Home</a></li><li><span class="tocitem">Examples</span><ul><li><input class="collapse-toggle" id="menuitem-2-1" type="checkbox" checked/><label class="tocitem" for="menuitem-2-1"><span class="docs-label">Sea Breeze</span><i class="docs-chevron"></i></label><ul class="collapsed"><li class="is-active"><a class="tocitem" href>Atmospheric Model</a><ul class="internal"><li><a class="tocitem" href="#Atmosphere-Conservation-Equations"><span>Atmosphere Conservation Equations</span></a></li><li><a class="tocitem" href="#Model-Code"><span>Model Code</span></a></li><li><a class="tocitem" href="#Coupled-Atmos-Wrappers"><span>Coupled Atmos Wrappers</span></a></li><li><a class="tocitem" href="#Coupled-Boundary-Conditions"><span>Coupled Boundary Conditions</span></a></li></ul></li><li><a class="tocitem" href="../land_rhs/">Land Model</a></li><li><a class="tocitem" href="../ocean_rhs/">Ocean Model</a></li><li><a class="tocitem" href="../run/">Coupled Sea Breeze</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-2-2" type="checkbox"/><label class="tocitem" for="menuitem-2-2"><span class="docs-label">AMIP</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../amip/run_amip/">AMIP Driver</a></li></ul></li></ul></li><li><span class="tocitem">Coupler Interface</span><ul><li><a class="tocitem" href="../../../bcreader/">BCReader</a></li><li><a class="tocitem" href="../../../checkpointer/">Checkpointer</a></li><li><a class="tocitem" href="../../../conservation/">Conservation Checks</a></li><li><a class="tocitem" href="../../../diagnostics/">Diagnostics</a></li><li><a class="tocitem" href="../../../fieldexchanger/">FieldExchanger</a></li><li><a class="tocitem" href="../../../fluxcalculator/">FluxCalculator</a></li><li><a class="tocitem" href="../../../interfacer/">Interfacer</a></li><li><a class="tocitem" href="../../../postprocessor/">PostProcessor</a></li><li><a class="tocitem" href="../../../regridder/">Regridder</a></li><li><a class="tocitem" href="../../../testhelper/">TestHelper</a></li><li><a class="tocitem" href="../../../timemanager/">TimeManager</a></li><li><a class="tocitem" href="../../../utilities/">Utilities</a></li></ul></li><li><span class="tocitem">Performance</span><ul><li><a class="tocitem" href="../../../performance/">Performance Analysis Tools</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li><a class="is-disabled">Sea Breeze</a></li><li class="is-active"><a href>Atmospheric Model</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Atmospheric Model</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/CliMA/ClimaCoupler.jl/blob/main/docs/src/generated/sea_breeze/atmos_rhs.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Atmospheric-Model"><a class="docs-heading-anchor" href="#Atmospheric-Model">Atmospheric Model</a><a id="Atmospheric-Model-1"></a><a class="docs-heading-anchor-permalink" href="#Atmospheric-Model" title="Permalink"></a></h1><h2 id="Atmosphere-Conservation-Equations"><a class="docs-heading-anchor" href="#Atmosphere-Conservation-Equations">Atmosphere Conservation Equations</a><a id="Atmosphere-Conservation-Equations-1"></a><a class="docs-heading-anchor-permalink" href="#Atmosphere-Conservation-Equations" title="Permalink"></a></h2><p>Density:</p><p class="math-container">\[\frac{\partial \rho}{\partial t} + \nabla \cdot ({\rho \vec{u}})= S(\chi, ...).\]</p><p>Momentum (flux form):</p><p class="math-container">\[\frac{\partial \rho \vec{u}}{\partial t} + \nabla \cdot ({\rho \vec{u} \otimes \vec{u} + pI})= \nabla \cdot (\rho \tau) - \rho g + F_{B}(...).\]</p><p>Potential temperature:</p><p class="math-container">\[\frac{\partial \rho \theta}{\partial t} + \nabla \cdot (\rho \theta \vec{u}) = \nabla \cdot (\kappa \rho \nabla \theta).\]</p><p>Total Energy (possibly replace potential temperature equation with total energy conservation):</p><p class="math-container">\[\frac{\partial \rho e_{tot}}{\partial t} + \nabla \cdot ((\rho e_{tot} + p )\vec{u}) = \nabla \cdot (\kappa \rho \nabla h_{tot}),\]</p><p>where <span>$h_{tot}$</span> is the total specific enthalpy given by internal and potential energy contributions.</p><p>Tracer transport:</p><p class="math-container">\[\frac{\partial \rho \chi}{\partial t} + \nabla \cdot (\rho \chi \vec{u}) = \nabla \cdot (\kappa \rho \nabla \chi) + S(\chi, ...).\]</p><p>Diffusion (Constant Viscosity): The simplest model to represent diffusive processes is a constant-viscosity model, with prescribed kinematic viscosity <span>$\nu$</span> such that the stress tensor can be modelled by</p><p class="math-container">\[\rho\tau = -2\rho\nu\nabla u.\]</p><p>Smagorinsky Closure: The Smagorinsky closure is an eddy-viscosity model that captures the effect of energy transfer to the smallest scales of motion in the flow.</p><p class="math-container">\[\begin{aligned}
+\rho\tau &amp;= -2\rho\nu\vec{S}, \\
+\vec{S} &amp;= \frac{1}{2}((\nabla u) + (\nabla u)^{T}), \\
+\nu &amp;= (C_{s}\Delta_{x,y,z})^2\sqrt{2S_{ij}S_{ij}}.
+\end{aligned}\]</p><p>with <span>$\Delta_{x,y,z}$</span> the grid lengthscale (sometimes approximated as a geometric average <span>$\Delta = (\Delta_x\Delta_y\Delta_z)^{1/3}$</span>), <span>$\nu$</span> is a spatially varying kinematic viscosity that depends on the local shear, <span>$\vec{S}$</span> the symmetric rate-of-strain tensor, <span>$\tau$</span> the diffusive momentum flux tensor. In stratified flows, we can apply a correction to the eddy viscosity to account for buoyancy effects. Thermal diffusivities are related to the modelled eddy-viscosity through the turbulent Prandtl number which takes a typical value of <span>$Pr_{t}= 1/3$</span> such that <span>$\kappa_{2} = \nu/Pr_{t}$</span>.</p><p>Tendencies for fourth-order hyperdiffusion are included in the <code>rhs!</code> construction, but the coefficient <span>$\kappa_{4}$</span> is <span>$0$</span> in this demonstrative case. Hyperdiffusive tendencies are typically included as a scale-selective diffusion mechanism for high-frequency noise (e.g. stabilization in GCMs).</p><p>Consider components of the viscous stress tensor in three dimensions:</p><p class="math-container">\[\begin{aligned}
+\tau_{xx} = 2\nu \frac{\partial u}{\partial x}, \\
+
+\tau_{yy} = 2\nu \frac{\partial v}{\partial y}, \\
+
+\tau_{zz} = 2\nu \frac{\partial w}{\partial z}, \\
+
+\tau_{xy} = \nu \Big(\frac{\partial u}{\partial y} +  \frac{\partial v}{\partial x}\Big), \\
+
+\tau_{xz} = \nu \Big(\frac{\partial u}{\partial z} +  \frac{\partial w}{\partial x}\Big), \\
+
+\tau_{yz} = \nu \Big(\frac{\partial v}{\partial z} +  \frac{\partial w}{\partial y}\Big).
+\end{aligned}\]</p><p>Assume terms in the <span>$y$</span>-direction are neglected (2-dimensional simplicfication). The contributions to the momentum equation are then given by:</p><p class="math-container">\[\begin{aligned}
+(\rho u):  \partial_{x} (\rho \tau_{xx}) + \partial_{z}(\rho\tau_{xz})  &amp;= \partial_x  \Big(2\nu \frac{\partial u}{\partial x}\Big) + \partial_z\Big(\nu \frac{\partial u}{\partial z}\Big) + \partial_z\Big(\nu \frac{\partial w}{\partial x}\Big), \\
+(\rho w): \partial_{x} (\rho \tau_{zx})+ \partial_{z}(\rho\tau_{zz})  &amp;= \partial_x\Big(\nu \frac{\partial u}{\partial z}\Big) +  \partial_x\Big(\nu \frac{\partial w}{\partial x}\Big) + \partial_z\Big(2\nu\frac{\partial w}{\partial z} \Big). \\
+\end{aligned}\]</p><p>Which can be interpreted as, for horizontal-momentum:</p><ol><li>Horizontal divergence of vertical gradients of cell-centered variables <span>$u$</span></li><li>Vertical divergence of vertical gradients of cell-centered variables <span>$u$</span></li><li>Vertical divergence of horizontal gradients of cell-face variables <span>$w$</span></li></ol><p>and for vertical-momentum, as:</p><ol><li>Horizontal divergence of vertical gradients of cell-centered variables <span>$u$</span></li><li>Horizontal divergence of horizontal gradients of cell-face variables <span>$w$</span></li><li>Vertical divergence of vertical gradients of cell-face variables <span>$w$</span>.</li></ol><h2 id="Model-Code"><a class="docs-heading-anchor" href="#Model-Code">Model Code</a><a id="Model-Code-1"></a><a class="docs-heading-anchor-permalink" href="#Model-Code" title="Permalink"></a></h2><pre><code class="language-julia hljs">push!(LOAD_PATH, joinpath(@__DIR__, &quot;..&quot;, &quot;..&quot;, &quot;..&quot;))
+
+using IntervalSets # for `..`
+import LinearAlgebra
+import Logging
+import SciMLBase
+import StaticArrays
+import TerminalLoggers
+
+import ClimaCore as CC
+import ClimaCore.Geometry: ⊗
+
+Logging.global_logger(TerminalLoggers.TerminalLogger())</code></pre><p>Load coupled simulation code</p><pre><code class="language-julia hljs">include(&quot;../CoupledSims/coupled_sim.jl&quot;)
+
+# set up function space
+function hvspace_2D(xlim = (-π, π), zlim = (0, 4π), helem = 20, velem = 20, npoly = 1)
+    FT = Float64
+    vertdomain = CC.Domains.IntervalDomain(
+        CC.Geometry.ZPoint{FT}(zlim[1]),
+        CC.Geometry.ZPoint{FT}(zlim[2]);
+        boundary_names = (:bottom, :top),
+    )
+    vertmesh = CC.Meshes.IntervalMesh(vertdomain, nelems = velem)
+    vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(vertmesh)
+
+    horzdomain =
+        CC.Domains.IntervalDomain(CC.Geometry.XPoint{FT}(xlim[1]) .. CC.Geometry.XPoint{FT}(xlim[2]), periodic = true)
+    horzmesh = CC.Meshes.IntervalMesh(horzdomain; nelems = helem)
+    horztopology = CC.Topologies.IntervalTopology(horzmesh)
+
+    quad = CC.Spaces.Quadratures.GLL{npoly + 1}()
+    horzspace = CC.Spaces.SpectralElementSpace1D(horztopology, quad)
+
+    hv_center_space = CC.Spaces.ExtrudedFiniteDifferenceSpace(horzspace, vert_center_space)
+    hv_face_space = CC.Spaces.FaceExtrudedFiniteDifferenceSpace(hv_center_space)
+    return (hv_center_space, hv_face_space)
+end
+
+function pressure(ρθ)
+    if ρθ &gt;= 0
+        return MSLP * (R_d * ρθ / MSLP)^γ
+    else
+        return NaN
+    end
+end
+
+Φ(z) = grav * z
+
+abstract type BCtag end
+struct ZeroFlux &lt;: BCtag end
+
+bc_divF2C_bottom!(::ZeroFlux, dY, Y, p, t) = CC.Operators.SetValue(CC.Geometry.WVector(0.0))
+bc_divF2C_top!(::ZeroFlux, dY, Y, p, t) = CC.Operators.SetValue(CC.Geometry.WVector(0.0))
+
+function init_sea_breeze_2d(x, z)
+    θ₀ = atm_T_ini
+    cp_d = C_p
+    cv_d = C_v
+    p₀ = MSLP
+    g = grav
+    γ = cp_d / cv_d
+    z_c = 100.0
+    θ_b = atm_T_ini
+    θ_p = z &lt; z_c ? rand() - 0.5 : 0.0 # potential temperature perturbation
+    θ = θ_b + θ_p # potential temperature
+    π_exn = 1.0 - g * z / cp_d / θ # exner function
+    T = π_exn * θ # temperature
+    p = p₀ * π_exn^(cp_d / R_d) # pressure
+    ρ = p / R_d / T # density
+    ρθ = ρ * θ # potential temperature density
+    return (ρ = ρ, ρθ = ρθ, ρuₕ = ρ * CC.Geometry.UVector(0.0))
+end
+
+function atm_rhs!(dY, Y, params, t)
+    ρw = Y.ρw
+    Yc = Y.Yc
+    dYc = dY.Yc
+    dρw = dY.ρw
+
+    center_coords = CC.Fields.coordinate_field(axes(Yc))
+
+    # spectral horizontal operators
+    hdiv = CC.Operators.Divergence()
+    hgrad = CC.Operators.Gradient()
+    hwdiv = CC.Operators.WeakDivergence()
+    hwgrad = CC.Operators.WeakGradient()
+
+    # vertical FD operators with BC&#39;s
+    vdivf2c = CC.Operators.DivergenceF2C(
+        bottom = CC.Operators.SetValue(CC.Geometry.WVector(0.0)),
+        top = CC.Operators.SetValue(CC.Geometry.WVector(0.0)),
+    )
+    vvdivc2f = CC.Operators.DivergenceC2F(
+        bottom = CC.Operators.SetDivergence(CC.Geometry.WVector(0.0)),
+        top = CC.Operators.SetDivergence(CC.Geometry.WVector(0.0)),
+    )
+    uvdivf2c = CC.Operators.DivergenceF2C(
+        bottom = CC.Operators.SetValue(CC.Geometry.WVector(0.0) ⊗ CC.Geometry.UVector(0.0)),
+        top = CC.Operators.SetValue(CC.Geometry.WVector(0.0) ⊗ CC.Geometry.UVector(0.0)),
+    )
+    If = CC.Operators.InterpolateC2F(bottom = CC.Operators.Extrapolate(), top = CC.Operators.Extrapolate())
+    Ic = CC.Operators.InterpolateF2C()
+    ∂ = CC.Operators.DivergenceF2C(
+        bottom = CC.Operators.SetValue(CC.Geometry.WVector(0.0)),
+        top = CC.Operators.SetValue(CC.Geometry.WVector(0.0)),
+    )
+    ∂f = CC.Operators.GradientC2F()
+    ∂c = CC.Operators.GradientF2C()
+    B = CC.Operators.SetBoundaryOperator(
+        bottom = CC.Operators.SetValue(CC.Geometry.WVector(0.0)),
+        top = CC.Operators.SetValue(CC.Geometry.WVector(0.0)),
+    )
+
+    ∇_z_ρθ = CC.Operators.DivergenceF2C(
+        bottom = bc_divF2C_bottom!(params.bc.ρθ.bottom, dY, Y, params, t),
+        top = bc_divF2C_top!(params.bc.ρθ.top, dY, Y, params, t),
+    )
+
+    uₕ = @. Yc.ρuₕ / Yc.ρ
+    w = @. ρw / If(Yc.ρ)
+    wc = @. Ic(ρw) / Yc.ρ
+    p = @. pressure(Yc.ρθ)
+    θ = @. Yc.ρθ / Yc.ρ
+    Yfρ = @. If(Yc.ρ)
+
+    ### HYPERVISCOSITY
+    # 1) compute hyperviscosity coefficients
+    @. dYc.ρθ = hwdiv(hgrad(θ))
+    @. dYc.ρuₕ = hwdiv(hgrad(uₕ))
+    @. dρw = hwdiv(hgrad(w))
+    CC.Spaces.weighted_dss!(dYc)
+    CC.Spaces.weighted_dss!(dρw)
+
+    κ₄ = 0.0 # m^4/s
+    @. dYc.ρθ = -κ₄ * hwdiv(Yc.ρ * hgrad(dYc.ρθ))
+    @. dYc.ρuₕ = -κ₄ * hwdiv(Yc.ρ * hgrad(dYc.ρuₕ))
+    @. dρw = -κ₄ * hwdiv(Yfρ * hgrad(dρw))
+
+    # density
+    @. dYc.ρ = -∂(ρw)
+    @. dYc.ρ -= hdiv(Yc.ρuₕ)
+
+    # potential temperature
+    @. dYc.ρθ += -(∇_z_ρθ(ρw * If(Yc.ρθ / Yc.ρ)))
+    @. dYc.ρθ -= hdiv(uₕ * Yc.ρθ)
+
+    # horizontal momentum
+    Ih = Ref(CC.Geometry.Axis2Tensor((CC.Geometry.UAxis(), CC.Geometry.UAxis()), StaticArrays.@SMatrix [1.0]))
+    @. dYc.ρuₕ += -uvdivf2c(ρw ⊗ If(uₕ))
+    @. dYc.ρuₕ -= hdiv(Yc.ρuₕ ⊗ uₕ + p * Ih)
+
+    # vertical momentum
+    @. dρw += B(
+        CC.Geometry.transform(CC.Geometry.WAxis(), -(∂f(p)) - If(Yc.ρ) * ∂f(Φ(center_coords.z))) - vvdivc2f(Ic(ρw ⊗ w)),
+    )
+    uₕf = @. If(Yc.ρuₕ / Yc.ρ) # requires boundary conditions
+    @. dρw -= hdiv(uₕf ⊗ ρw)
+
+    # DIFFUSION
+    κ₂ = 5.0 # m^2/s
+    #  1a) horizontal div of horizontal grad of horiz momentun
+    @. dYc.ρuₕ += hwdiv(κ₂ * (Yc.ρ * hgrad(Yc.ρuₕ / Yc.ρ)))
+    #  1b) vertical div of vertical grad of horiz momentun
+    @. dYc.ρuₕ += uvdivf2c(κ₂ * (Yfρ * ∂f(Yc.ρuₕ / Yc.ρ)))
+
+    #  1c) horizontal div of horizontal grad of vert momentum
+    @. dρw += hwdiv(κ₂ * (Yfρ * hgrad(ρw / Yfρ)))
+    #  1d) vertical div of vertical grad of vert momentun
+    @. dρw += vvdivc2f(κ₂ * (Yc.ρ * ∂c(ρw / Yfρ)))
+
+    #  2a) horizontal div of horizontal grad of potential temperature
+    @. dYc.ρθ += hwdiv(κ₂ * (Yc.ρ * hgrad(Yc.ρθ / Yc.ρ)))
+    #  2b) vertical div of vertial grad of potential temperature
+    @. dYc.ρθ += ∇_z_ρθ(κ₂ * (Yfρ * ∂f(Yc.ρθ / Yc.ρ)))
+
+    CC.Spaces.weighted_dss!(dYc)
+    CC.Spaces.weighted_dss!(dρw)
+    return dY
+end
+
+# init simulation
+function atm_init(; xmin = -500, xmax = 500, zmin = 0, zmax = 1000, npoly = 3, helem = 20, velem = 20, bc = nothing)
+
+    # construct domain spaces
+    hv_center_space, hv_face_space = hvspace_2D((xmin, xmax), (zmin, zmax), helem, velem, npoly) # [m]
+    center_coords = CC.Fields.coordinate_field(hv_center_space)
+    face_coords = CC.Fields.coordinate_field(hv_face_space)
+    domain = (hv_center_space = hv_center_space, hv_face_space = hv_face_space)
+
+    # initialize prognostic variables
+    Yc = map(center_coords) do coord
+        sea_breeze = init_sea_breeze_2d(coord.x, coord.z)
+        sea_breeze
+    end
+
+    ρw = map(face_coords) do coord
+        CC.Geometry.WVector(0.0)
+    end
+
+    Y = CC.Fields.FieldVector(Yc = Yc, ρw = ρw)
+
+    # select boundary conditions
+    if bc === nothing
+        bc = (
+            ρθ = (bottom = CoupledFlux(), top = ZeroFlux()),
+            ρu = nothing, # for now BCs are hard coded, except for ρθ
+        )
+    end
+
+    return Y, bc, domain
+end</code></pre><h2 id="Coupled-Atmos-Wrappers"><a class="docs-heading-anchor" href="#Coupled-Atmos-Wrappers">Coupled Atmos Wrappers</a><a id="Coupled-Atmos-Wrappers-1"></a><a class="docs-heading-anchor-permalink" href="#Coupled-Atmos-Wrappers" title="Permalink"></a></h2><pre><code class="language-julia hljs"># Atmos Simulation - later to live in ClimaAtmos
+struct AtmosSim &lt;: AbstractAtmosSim
+    integrator::Any
+end
+
+function AtmosSim(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
+    ode_algo = CTS.ExplicitAlgorithm(timestepper)
+    ode_function = CTS.ClimaODEFunction(T_exp! = atm_rhs!)
+
+    problem = SciMLBase.ODEProblem(ode_function, Y_init, (t_start, t_end), p)
+    atm_integ = SciMLBase.init(
+        problem,
+        ode_algo,
+        dt = dt,
+        saveat = saveat,
+        adaptive = false,
+        progress = true,
+        progress_message = (dt, u, params, t) -&gt; t,
+        callback = callbacks,
+    )
+
+    return AtmosSim(atm_integ)
+end
+
+function coupler_push!(coupler::CouplerState, atmos::AtmosSim)
+    coupler_put!(coupler, :F_sfc, atmos.integrator.u.F_sfc, atmos)
+end
+
+function coupler_pull!(atmos::AtmosSim, coupler::CouplerState)
+    # reset flux accumulator
+    atmos.integrator.u.F_sfc .= 0.0 # reset surface flux to be accumulated
+
+    T_sfc_ocean = coupler_get(coupler, :T_sfc_ocean, atmos)
+    T_sfc_land = coupler_get(coupler, :T_sfc_land, atmos)
+    atmos.integrator.p.T_sfc .= T_sfc_land .+ T_sfc_ocean
+end</code></pre><h2 id="Coupled-Boundary-Conditions"><a class="docs-heading-anchor" href="#Coupled-Boundary-Conditions">Coupled Boundary Conditions</a><a id="Coupled-Boundary-Conditions-1"></a><a class="docs-heading-anchor-permalink" href="#Coupled-Boundary-Conditions" title="Permalink"></a></h2><p>The standalone atmosphere model uses two boundary condition methods in its tendency: <code>bc_divF2C_bottom!</code> and <code>bc_divF2C_top!</code>. Since the bottom boundary is coupled, <code>bc_divF2C_bottom!</code> must be altered when running in coupled mode to properly calculate and accumulate the boundary flux from the ocean and land components.</p><p>To solve this, a <code>CoupledFlux</code> boundary tag is set for the bottom boundary during initialization. Then, a new method of <code>bc_divF2C_bottom!</code> is written to dispatch on the <code>CoupledFlux</code> boundary tag. This method can then compute the flux appropriately.</p><pre><code class="language-julia hljs">struct CoupledFlux &lt;: BCtag end
+function bc_divF2C_bottom!(::CoupledFlux, dY, Y, p, t)
+    # flux calculation
+    Yc = Y.Yc
+    uₕ = Yc.ρuₕ ./ Yc.ρ
+    ρw = Y.ρw
+    If2c = CC.Operators.InterpolateF2C()
+    Ic2f = CC.Operators.InterpolateC2F(bottom = CC.Operators.Extrapolate(), top = CC.Operators.Extrapolate())
+    w = If2c.(ρw) ./ Yc.ρ
+    cuv = @. CC.Geometry.UWVector(uₕ)
+    windspeed = @. LinearAlgebra.norm(cuv)
+    windspeed_boundary = CC.Fields.level(windspeed, 1)
+    θ_boundary = CC.Fields.level(Yc.ρθ ./ Yc.ρ, 1)
+    ρ_boundary = CC.Fields.level(Yc.ρ, 1)
+
+    # build atmos face fields on surface boundary space to enable broadcasting
+    windspeed_boundary = CC.Fields.Field(CC.Fields.field_values(windspeed_boundary), axes(p.T_sfc))
+    θ_boundary = CC.Fields.Field(CC.Fields.field_values(θ_boundary), axes(p.T_sfc))
+    ρ_boundary = CC.Fields.Field(CC.Fields.field_values(ρ_boundary), axes(p.T_sfc))
+
+    λ = @. p.cpl_p.C_p * p.cpl_p.C_H * ρ_boundary * windspeed_boundary
+    dθ = @. θ_boundary - p.T_sfc
+    heat_flux = @. -λ * dθ
+    @. dY.F_sfc += heat_flux # accumulation
+
+    return CC.Operators.SetValue(CC.Geometry.WVector.(heat_flux))
+end</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../../">« Home</a><a class="docs-footer-nextpage" href="../land_rhs/">Land Model »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.25 on <span class="colophon-date" title="Tuesday 23 July 2024 23:43">Tuesday 23 July 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

@@ -687,7 +687,20 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     # slow group an arbitrary amount ahead rather than a whole window.
     if overlap_slow_surfaces && prime_slow_surfaces
         cs.slow_next_boundary[] = FieldExchanger.slow_step_boundary(cs)
-        @info "Overlapped group's next launch at coupler time $(cs.slow_next_boundary[])"
+        @info """Priming is on: the ocean and sea ice run ahead of coupler time.
+                 Next overlapped launch at coupler time $(cs.slow_next_boundary[]).
+
+                 Their own diagnostics are written by their own output writers on
+                 their own clocks, so those files carry times that lead coupler
+                 time by up to one slow step. That is the honest label: the state
+                 in them really is the state at that model time, forced through
+                 one window earlier. Coupler diagnostics are on coupler time and
+                 hold the surface state the atmosphere actually saw, which priming
+                 keeps aligned with a non-overlapped run.
+
+                 Comparing a primed run against a non-primed one by output index
+                 therefore compares different model times for the slow components;
+                 compare by time, or expect an offset of one slow step."""
     end
 
     Utilities.show_memory_usage()

@@ -110,7 +110,7 @@ function argparse_settings()
         arg_type = Bool
         default = false
         "--prime_slow_surfaces"
-        help = "With `overlap_slow_surfaces`, advance the ocean/sea ice one step during initialization so the overlapped step runs ahead of the coupler. Removes the extra lag in the ocean state the atmosphere sees, in exchange for forcing the ocean with the previous window's fluxes."
+        help = "With `overlap_slow_surfaces`, advance the ocean/sea ice one step during initialization so the overlapped step runs ahead of the coupler. Removes the extra lag in the ocean state the atmosphere sees, in exchange for forcing the ocean with the previous window's fluxes. Note that the slow components' own diagnostics are then written on their own clocks, which lead coupler time by up to one slow step; coupler diagnostics remain on coupler time."
         arg_type = Bool
         default = false
         "--overlap_slow_surfaces"

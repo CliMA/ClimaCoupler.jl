@@ -2,6 +2,7 @@ FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
 checkpoint_dt: "1months"
+cloud_liquid_freezing: ~
 coupler_toml: ["toml/amip_progedmf_1m.toml"]
 dt: "120secs"
 dt_cpl: "120secs"

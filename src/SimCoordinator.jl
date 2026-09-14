@@ -142,6 +142,11 @@ function step!(cs::Interfacer.CoupledSimulation)
        !frozen &&
        (cs.prime_slow_surfaces ? at_slow_boundary(cs) : slow_surfaces_due(cs))
         FieldExchanger.launch_slow_sims!(cs)
+        if cs.prime_slow_surfaces
+            cs.slow_next_boundary[] =
+                cs.slow_next_boundary[] +
+                FieldExchanger.slow_window_steps(cs) * cs.Δt_cpl
+        end
     end
 
     # Maybe call the callbacks
@@ -163,8 +168,9 @@ away from coupler time. Integer step counting also sidesteps comparing times as
 floats, which is the reason `ITime` exists.
 """
 function at_slow_boundary(cs::Interfacer.CoupledSimulation)
-    k = FieldExchanger.slow_window_steps(cs)
-    return k > 0 && cs.step[] % k == 0
+    nb = cs.slow_next_boundary[]
+    isnothing(nb) && return false
+    return Float64(float(cs.t[])) >= Float64(float(nb))
 end
 
 """
@@ -625,6 +631,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         prime_slow_surfaces,
         Ref{Any}(nothing),
         Ref{Any}(nothing),
+        Ref{Any}(nothing),
         flux_accumulators,
     )
 
@@ -671,6 +678,18 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
             @info "Primed slow surfaces one step ($k coupling steps) ahead of the coupler"
         end
     end
+    # Seed the overlapped-group schedule from where the slow components actually
+    # are. This must come after both the restart restore and any priming step.
+    #
+    # It cannot be a count of coupling steps: `cs.step[]` starts again at zero on
+    # a restart while the component clocks do not, and `checkpoint_sims` joins an
+    # in-flight step before saving, so a checkpoint taken mid-window leaves the
+    # slow group an arbitrary amount ahead rather than a whole window.
+    if overlap_slow_surfaces && prime_slow_surfaces
+        cs.slow_next_boundary[] = FieldExchanger.slow_step_boundary(cs)
+        @info "Overlapped group's next launch at coupler time $(cs.slow_next_boundary[])"
+    end
+
     Utilities.show_memory_usage()
     return cs
 end

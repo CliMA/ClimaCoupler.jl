@@ -144,8 +144,7 @@ function step!(cs::Interfacer.CoupledSimulation)
         FieldExchanger.launch_slow_sims!(cs)
         if cs.prime_slow_surfaces
             cs.slow_next_boundary[] =
-                cs.slow_next_boundary[] +
-                FieldExchanger.slow_window_steps(cs) * cs.Δt_cpl
+                cs.slow_next_boundary[] + FieldExchanger.slow_window_steps(cs) * cs.Δt_cpl
         end
     end
 
@@ -487,8 +486,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     foreach(sim -> Interfacer.add_coupler_fields!(coupler_field_names, sim), model_sims)
 
     energy_check && push!(coupler_field_names, :P_net)
-    overlap_slow_surfaces &&
-        append!(coupler_field_names, Interfacer.overlap_cache_fields())
+    overlap_slow_surfaces && append!(coupler_field_names, Interfacer.overlap_cache_fields())
 
     coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
 

@@ -2,11 +2,13 @@
 
 "Max absolute and max relative difference between two arrays, ignoring non-finite entries."
 function diffstats(a, b)
-    a = Array(a); b = Array(b)
+    a = Array(a);
+    b = Array(b)
     size(a) == size(b) || return (nothing, nothing, 0)
     ok = isfinite.(a) .& isfinite.(b)
     any(ok) || return (0.0, 0.0, 0)
-    av = Float64.(a[ok]); bv = Float64.(b[ok])
+    av = Float64.(a[ok]);
+    bv = Float64.(b[ok])
     absd = abs.(av .- bv)
     maxabs = maximum(absd)
     denom = max.(abs.(av), abs.(bv))

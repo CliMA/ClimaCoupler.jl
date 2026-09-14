@@ -338,8 +338,13 @@ function update_model_sims!(model_sims, csf; slow_frozen::Bool = false)
     end
 end
 
-function Interfacer.step!(land_sim::Interfacer.AbstractLandSimulation, atmos_sim::Interfacer.AbstractAtmosSimulation,
-    t, coupler_fields, thermo_params)
+function Interfacer.step!(
+    land_sim::Interfacer.AbstractLandSimulation,
+    atmos_sim::Interfacer.AbstractAtmosSimulation,
+    t,
+    coupler_fields,
+    thermo_params,
+)
     # Step the land simulation first
     Interfacer.step!(land_sim, t)
 
@@ -353,8 +358,13 @@ function Interfacer.step!(land_sim::Interfacer.AbstractLandSimulation, atmos_sim
     Interfacer.step!(atmos_sim, t)
 end
 
-function Interfacer.step!(implicit_flux_sim::Interfacer.AbstractImplicitFluxSimulation, atmos_sim::Interfacer.AbstractAtmosSimulation,
-    t, coupler_fields, thermo_params)
+function Interfacer.step!(
+    implicit_flux_sim::Interfacer.AbstractImplicitFluxSimulation,
+    atmos_sim::Interfacer.AbstractAtmosSimulation,
+    t,
+    coupler_fields,
+    thermo_params,
+)
     # Step the implicit flux simulation first
     Interfacer.step!(implicit_flux_sim, t)
 
@@ -401,7 +411,13 @@ function step_model_sims!(
         # step sequentially inside a single task.
         land_atmos_group = function ()
             if haskey(model_sims, :land_sim)
-                Interfacer.step!(model_sims.land_sim, model_sims.atmos_sim, t, coupler_fields, thermo_params)
+                Interfacer.step!(
+                    model_sims.land_sim,
+                    model_sims.atmos_sim,
+                    t,
+                    coupler_fields,
+                    thermo_params,
+                )
             else
                 # Same ordering requirement as the grouped land/atmos methods above:
                 # the atmosphere needs its turbulent fluxes before it steps.

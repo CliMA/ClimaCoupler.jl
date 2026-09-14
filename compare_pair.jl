@@ -11,7 +11,8 @@ include("compare_runs_lib.jl")
 
 function compare_pair(runA, runB; label = "")
     # accept "name" (uses output_active) or "name/output_0000" (explicit run dir)
-    resolve(n) = occursin('/', n) ? joinpath("output", n) : joinpath("output", n, "output_active")
+    resolve(n) =
+        occursin('/', n) ? joinpath("output", n) : joinpath("output", n, "output_active")
     A = resolve(runA)
     B = resolve(runB)
     worst = 0.0
@@ -20,7 +21,8 @@ function compare_pair(runA, runB; label = "")
     nfiles = 0
     changed = Tuple{String, Float64}[]
 
-    for comp in ("clima_atmos", "clima_coupler", "clima_land", "clima_ocean", "clima_seaice")
+    for comp in
+        ("clima_atmos", "clima_coupler", "clima_land", "clima_ocean", "clima_seaice")
         d = joinpath(A, comp)
         isdir(d) || continue
         for fn in sort(readdir(d))

@@ -72,7 +72,8 @@ end
 
 "True if the slow surfaces will step when the coupler advances to the next time."
 slow_steps_next(cs) = any(
-    sim -> Interfacer.is_overlapped(sim) && Interfacer.will_step(sim, cs.t[] + cs.Δt_cpl),
+    sim ->
+        Interfacer.is_overlapped(sim) && Interfacer.will_step(sim, cs.t[] + cs.Δt_cpl),
     values(cs.model_sims),
 )
 
@@ -122,24 +123,40 @@ kA = k * A
 
 println("\n", "="^70)
 println("config: $NAME    k = $k    step_concurrently = $(cs.step_concurrently)")
-println("  coupling step, ocean idle    : ", round(step_no_ocean, digits = 3), " s   n=",
-        length(without_ocean))
-println("  coupling step, ocean steps   : ", round(step_ocean, digits = 3), " s   n=",
-        length(with_ocean))
+println(
+    "  coupling step, ocean idle    : ",
+    round(step_no_ocean, digits = 3),
+    " s   n=",
+    length(without_ocean),
+)
+println(
+    "  coupling step, ocean steps   : ",
+    round(step_ocean, digits = 3),
+    " s   n=",
+    length(with_ocean),
+)
 println("  => O (one ocean+ice step)    : ", round(O, digits = 3), " s")
 println("  => A (coupling step w/o ocean): ", round(A, digits = 3), " s")
 println("-"^70)
 println("  cross-check, timed directly:")
 println("    atmos+land group           : ", round(t_atmos_group, digits = 3), " s")
 println("    exchange + fluxes          : ", round(t_exchange, digits = 3), " s")
-println("    sum vs 'ocean idle' step   : ",
-        round(t_atmos_group + t_exchange, digits = 3), " s vs ",
-        round(step_no_ocean, digits = 3), " s")
+println(
+    "    sum vs 'ocean idle' step   : ",
+    round(t_atmos_group + t_exchange, digits = 3),
+    " s vs ",
+    round(step_no_ocean, digits = 3),
+    " s",
+)
 println("-"^70)
 println("  O/A = ", round(O / A, digits = 3))
 println("  k*A = ", round(kA, digits = 3), " s")
 saving = O > 0 ? min(kA, O) / (kA + O) : 0.0
-println("  predicted overlap saving = min(kA,O)/(kA+O) = ", round(100 * saving, digits = 1), "%")
+println(
+    "  predicted overlap saving = min(kA,O)/(kA+O) = ",
+    round(100 * saving, digits = 1),
+    "%",
+)
 println("  (peaks at 50% when O == k*A)")
 println("-"^70)
 mean_step = (sum(with_ocean) + sum(without_ocean)) / n_meas

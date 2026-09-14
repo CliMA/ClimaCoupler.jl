@@ -81,10 +81,27 @@ function build_cs_itime(; dt_cpl, dt_slow, overlap, prime = false)
     Δt = ITime(Int64(dt_cpl), period = Dates.Second(1), epoch = epoch)
     t0 = ITime(Int64(0), period = Dates.Second(1), epoch = epoch)
     cs = Interfacer.CoupledSimulation{Float64}(
-        epoch, nothing, nothing, (t0, t0), Δt, Ref(t0), Ref(0), Ref(-1),
+        epoch,
+        nothing,
+        nothing,
+        (t0, t0),
+        Δt,
+        Ref(t0),
+        Ref(0),
+        Ref(-1),
         (; ice_sim = ice, ocean_sim = ocean),
-        (), (;), nothing, nothing, false, true, overlap, prime,
-        Ref{Any}(nothing), Ref{Any}(nothing), Ref{Any}(nothing), (;),
+        (),
+        (;),
+        nothing,
+        nothing,
+        false,
+        true,
+        overlap,
+        prime,
+        Ref{Any}(nothing),
+        Ref{Any}(nothing),
+        Ref{Any}(nothing),
+        (;),
     )
     return cs, ocean, ice
 end
@@ -130,8 +147,9 @@ function drive!(cs, ocean, nsteps)
         cs.t[] += cs.Δt_cpl
         cs.step[] += 1
 
-        due() = cs.prime_slow_surfaces ? SimCoordinator.at_slow_boundary(cs) :
-                SimCoordinator.slow_surfaces_due(cs)
+        due() =
+            cs.prime_slow_surfaces ? SimCoordinator.at_slow_boundary(cs) :
+            SimCoordinator.slow_surfaces_due(cs)
         if cs.overlap_slow_surfaces && due()
             FieldExchanger.wait_slow_sims!(cs)
             visible = ocean.clock
@@ -162,8 +180,14 @@ function drive!(cs, ocean, nsteps)
         end
         push!(
             log,
-            (; step = cs.step[], t = cs.t[], frozen, stepped_sync, launched,
-               ocean_clock_seen = clock_at_exchange),
+            (;
+                step = cs.step[],
+                t = cs.t[],
+                frozen,
+                stepped_sync,
+                launched,
+                ocean_clock_seen = clock_at_exchange,
+            ),
         )
     end
     FieldExchanger.wait_slow_sims!(cs)
@@ -183,9 +207,20 @@ function report(label; dt_cpl, dt_slow, nsteps, overlap)
     println("\n### $label   (dt_cpl=$dt_cpl, dt_slow=$dt_slow, k=$k, overlap=$overlap)")
     println("  step |    t | frozen | sync-stepped | launched | ocean clock at entry")
     for r in log
-        println("  ", lpad(r.step, 4), " | ", lpad(Int(r.t), 4), " | ",
-                lpad(r.frozen, 6), " | ", lpad(r.stepped_sync, 12), " | ",
-                lpad(r.launched, 8), " | ", lpad(Int(r.ocean_clock_seen), 6))
+        println(
+            "  ",
+            lpad(r.step, 4),
+            " | ",
+            lpad(Int(r.t), 4),
+            " | ",
+            lpad(r.frozen, 6),
+            " | ",
+            lpad(r.stepped_sync, 12),
+            " | ",
+            lpad(r.launched, 8),
+            " | ",
+            lpad(Int(r.ocean_clock_seen), 6),
+        )
     end
 
     # invariants
@@ -208,8 +243,10 @@ function report(label; dt_cpl, dt_slow, nsteps, overlap)
         ok = false
     end
     overlapped = count(r -> r.frozen, log)
-    println("  ocean steps: $(ocean.nsteps) (expected $expected_steps), ",
-            "final clock: $(ocean.clock), coupler: $(nsteps*dt_cpl)")
+    println(
+        "  ocean steps: $(ocean.nsteps) (expected $expected_steps), ",
+        "final clock: $(ocean.clock), coupler: $(nsteps*dt_cpl)",
+    )
     println("  coupling steps overlapped with an in-flight slow step: $overlapped")
     println(ok ? "  PASS" : "  FAIL")
     return ok
@@ -227,7 +264,9 @@ function report_itime(label; dt_cpl, dt_slow, nsteps, overlap)
     end
     expected = Int(floor(nsteps * dt_cpl / dt_slow))
     ok = ocean.nsteps == expected && ice.nsteps == ocean.nsteps
-    println("\n### $label (ITime)   (dt_cpl=$dt_cpl, dt_slow=$dt_slow, k=$k, overlap=$overlap)")
+    println(
+        "\n### $label (ITime)   (dt_cpl=$dt_cpl, dt_slow=$dt_slow, k=$k, overlap=$overlap)",
+    )
     println("  ocean steps: $(ocean.nsteps) (expected $expected), ice: $(ice.nsteps)")
     println(ok ? "  PASS" : "  FAIL")
     return ok
@@ -258,15 +297,27 @@ function report_lag(; dt_cpl, dt_slow, nsteps)
     println("\n### ocean time the atmosphere sees, by coupling step (k=$k)")
     println("  step |  t_n | baseline | overlap | primed")
     for i in 1:nsteps
-        println("  ", lpad(i, 4), " | ", lpad(Int(i * dt_cpl), 4), " | ",
-                lpad(Int(seen["baseline"][i]), 8), " | ", lpad(Int(seen["overlap"][i]), 7),
-                " | ", lpad(Int(seen["primed"][i]), 6))
+        println(
+            "  ",
+            lpad(i, 4),
+            " | ",
+            lpad(Int(i * dt_cpl), 4),
+            " | ",
+            lpad(Int(seen["baseline"][i]), 8),
+            " | ",
+            lpad(Int(seen["overlap"][i]), 7),
+            " | ",
+            lpad(Int(seen["primed"][i]), 6),
+        )
     end
     # after the first window, primed should match baseline exactly
     tail = (k + 1):nsteps
     primed_ok = all(seen["primed"][i] == seen["baseline"][i] for i in tail)
     overlap_lags = any(seen["overlap"][i] < seen["baseline"][i] for i in tail)
-    println("  ocean steps taken: ", [l => counts[l] for l in ("baseline", "overlap", "primed")])
+    println(
+        "  ocean steps taken: ",
+        [l => counts[l] for l in ("baseline", "overlap", "primed")],
+    )
     println("  primed matches baseline after the first window: ", primed_ok)
     println("  plain overlap lags baseline: ", overlap_lags)
     ok = primed_ok && overlap_lags
@@ -275,12 +326,42 @@ function report_lag(; dt_cpl, dt_slow, nsteps)
 end
 
 allok = true
-allok &= report("k=1  (dt_ocean == dt_cpl)"; dt_cpl = 360.0, dt_slow = 360.0, nsteps = 8, overlap = true)
-allok &= report("k=5  (the usual case)";     dt_cpl = 360.0, dt_slow = 1800.0, nsteps = 20, overlap = true)
-allok &= report("k=2";                        dt_cpl = 360.0, dt_slow = 720.0, nsteps = 10, overlap = true)
-allok &= report("k=1, overlap OFF (control)"; dt_cpl = 360.0, dt_slow = 360.0, nsteps = 8, overlap = false)
-allok &= report_itime("k=1  (dt_ocean == dt_cpl)"; dt_cpl = 360.0, dt_slow = 360.0, nsteps = 8, overlap = true)
-allok &= report_itime("k=5  (the usual case)";     dt_cpl = 360.0, dt_slow = 1800.0, nsteps = 20, overlap = true)
+allok &= report(
+    "k=1  (dt_ocean == dt_cpl)";
+    dt_cpl = 360.0,
+    dt_slow = 360.0,
+    nsteps = 8,
+    overlap = true,
+)
+allok &= report(
+    "k=5  (the usual case)";
+    dt_cpl = 360.0,
+    dt_slow = 1800.0,
+    nsteps = 20,
+    overlap = true,
+)
+allok &= report("k=2"; dt_cpl = 360.0, dt_slow = 720.0, nsteps = 10, overlap = true)
+allok &= report(
+    "k=1, overlap OFF (control)";
+    dt_cpl = 360.0,
+    dt_slow = 360.0,
+    nsteps = 8,
+    overlap = false,
+)
+allok &= report_itime(
+    "k=1  (dt_ocean == dt_cpl)";
+    dt_cpl = 360.0,
+    dt_slow = 360.0,
+    nsteps = 8,
+    overlap = true,
+)
+allok &= report_itime(
+    "k=5  (the usual case)";
+    dt_cpl = 360.0,
+    dt_slow = 1800.0,
+    nsteps = 20,
+    overlap = true,
+)
 """
 Restart scenario. `cs.step[]` always begins again at zero on a restart, and
 `checkpoint_sims` joins any in-flight slow step before saving, so a checkpoint
@@ -300,23 +381,45 @@ function report_restart(; dt_cpl, dt_slow, restart_t, ocean_ahead_to, nsteps)
     cs.slow_next_boundary[] = FieldExchanger.slow_step_boundary(cs)
 
     println("\n### restart: coupler at $restart_t, slow group at $ocean_ahead_to (k=$k)")
-    println("  derived next launch: ", cs.slow_next_boundary[],
-            "   (expected ", ocean_ahead_to, ")")
+    println(
+        "  derived next launch: ",
+        cs.slow_next_boundary[],
+        "   (expected ",
+        ocean_ahead_to,
+        ")",
+    )
     log = drive!(cs, ocean, nsteps)
     for r in log
-        println("  step ", lpad(r.step, 2), "  t=", lpad(Int(r.t), 5),
-                "  frozen=", lpad(r.frozen, 5), "  launched=", lpad(r.launched, 5),
-                "  visible ocean=", lpad(Int(r.ocean_clock_seen), 5))
+        println(
+            "  step ",
+            lpad(r.step, 2),
+            "  t=",
+            lpad(Int(r.t), 5),
+            "  frozen=",
+            lpad(r.frozen, 5),
+            "  launched=",
+            lpad(r.launched, 5),
+            "  visible ocean=",
+            lpad(Int(r.ocean_clock_seen), 5),
+        )
     end
-    ok = cs.slow_next_boundary[] != restart_t + dt_slow || ocean_ahead_to == restart_t + dt_slow
+    ok =
+        cs.slow_next_boundary[] != restart_t + dt_slow ||
+        ocean_ahead_to == restart_t + dt_slow
     derived_ok = true
     # the first launch must happen when the coupler reaches the slow group's clock
     first_launch = findfirst(r -> r.launched, log)
     if first_launch !== nothing
         t_launch = log[first_launch].t
         derived_ok = t_launch >= ocean_ahead_to && t_launch < ocean_ahead_to + dt_slow
-        println("  first launch at t=", Int(t_launch), " -- within the window that starts at ",
-                Int(ocean_ahead_to), ": ", derived_ok)
+        println(
+            "  first launch at t=",
+            Int(t_launch),
+            " -- within the window that starts at ",
+            Int(ocean_ahead_to),
+            ": ",
+            derived_ok,
+        )
     end
     no_sync_while_frozen = !any(r -> r.frozen && r.stepped_sync, log)
     println("  no synchronous slow step while frozen: ", no_sync_while_frozen)
@@ -327,9 +430,19 @@ end
 
 allok &= report_lag(; dt_cpl = 360.0, dt_slow = 1800.0, nsteps = 15)
 # clean boundary checkpoint: slow group exactly one window ahead
-allok &= report_restart(; dt_cpl = 360.0, dt_slow = 1800.0, restart_t = 3600.0,
-                        ocean_ahead_to = 5400.0, nsteps = 10)
+allok &= report_restart(;
+    dt_cpl = 360.0,
+    dt_slow = 1800.0,
+    restart_t = 3600.0,
+    ocean_ahead_to = 5400.0,
+    nsteps = 10,
+)
 # mid-window checkpoint: slow group ahead by an amount that is NOT a whole window
-allok &= report_restart(; dt_cpl = 360.0, dt_slow = 1800.0, restart_t = 2520.0,
-                        ocean_ahead_to = 3600.0, nsteps = 10)
+allok &= report_restart(;
+    dt_cpl = 360.0,
+    dt_slow = 1800.0,
+    restart_t = 2520.0,
+    ocean_ahead_to = 3600.0,
+    nsteps = 10,
+)
 println("\n", allok ? "ALL PASS" : "FAILURES ABOVE")

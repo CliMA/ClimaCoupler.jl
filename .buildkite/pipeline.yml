@@ -317,6 +317,20 @@ steps:
 
   - group: "CMIP"
     steps:
+      - label: "CPU sea-ice top heat flux exchange"
+        key: "cmip_sea_ice_fluxes"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/test/sea_ice_fluxes_test.jl"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 16GB
+
+      - label: "CPU sea-ice skin temperature solver"
+        key: "cmip_skin_temperature"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/test/skin_temperature_test.jl"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 16GB
+
       - label: "CPU exchange (intersection) grid unit tests"
         key: "cpu_intersection_grid_tests"
         command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/test/intersection_grid_test.jl"

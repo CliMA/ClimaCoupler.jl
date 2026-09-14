@@ -30,6 +30,8 @@ the atmosphere and each surface model.
 ```@docs
     FieldExchanger.exchange!
     FieldExchanger.update_sim!
+    FieldExchanger.update_model_sims!
+    FieldExchanger.accumulated_coupler_fields
     FieldExchanger.step_model_sims!
     FieldExchanger.update_surface_fractions!
     FieldExchanger.set_caches!

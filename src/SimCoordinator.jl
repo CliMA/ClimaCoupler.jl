@@ -104,7 +104,8 @@ function step!(cs::Interfacer.CoupledSimulation)
     # be running. It is joined here, at the top of the coupling step on which
     # their next forcing falls due, so that the rest of this step sees settled
     # ice and ocean state and behaves exactly as it would without overlap.
-    if cs.overlap_slow_surfaces && slow_surfaces_due(cs)
+    if cs.overlap_slow_surfaces &&
+       (cs.prime_slow_surfaces ? at_slow_boundary(cs) : slow_surfaces_due(cs))
         FieldExchanger.wait_slow_sims!(cs)
     end
     frozen = FieldExchanger.slow_step_in_flight(cs)
@@ -126,14 +127,20 @@ function step!(cs::Interfacer.CoupledSimulation)
     FieldExchanger.exchange!(cs; slow_frozen = frozen)
 
     # Calculate turbulent fluxes in the coupler and update the model simulations with them
-    FluxCalculator.turbulent_fluxes!(cs; slow_frozen = frozen)
+    FluxCalculator.turbulent_fluxes!(
+        cs;
+        slow_frozen = frozen,
+        force_slow_push = cs.prime_slow_surfaces && !frozen && at_slow_boundary(cs),
+    )
 
     # Compute any ocean-sea ice fluxes
     frozen || FluxCalculator.ocean_seaice_fluxes!(cs)
 
     # The slow surfaces' forcing is now fully assembled, so their step can be
     # launched and left to run across the coupling steps that follow.
-    if cs.overlap_slow_surfaces && !frozen && slow_surfaces_due(cs)
+    if cs.overlap_slow_surfaces &&
+       !frozen &&
+       (cs.prime_slow_surfaces ? at_slow_boundary(cs) : slow_surfaces_due(cs))
         FieldExchanger.launch_slow_sims!(cs)
     end
 
@@ -143,6 +150,21 @@ function step!(cs::Interfacer.CoupledSimulation)
     # Compute and save coupler diagnostics
     CD.orchestrate_diagnostics(cs)
     return nothing
+end
+
+"""
+    at_slow_boundary(cs)
+
+Whether the coupler has just reached a slow-step boundary.
+
+Used only when priming. The window is counted in coupling steps rather than
+derived from a component clock, because priming deliberately moves those clocks
+away from coupler time. Integer step counting also sidesteps comparing times as
+floats, which is the reason `ITime` exists.
+"""
+function at_slow_boundary(cs::Interfacer.CoupledSimulation)
+    k = FieldExchanger.slow_window_steps(cs)
+    return k > 0 && cs.step[] % k == 0
 end
 
 """
@@ -235,6 +257,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         component_dt_dict,
         step_concurrently,
         overlap_slow_surfaces,
+        prime_slow_surfaces,
         share_surface_space,
         nh_poly_coupler,
         h_elem_coupler,
@@ -599,6 +622,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         save_cache,
         step_concurrently,
         overlap_slow_surfaces,
+        prime_slow_surfaces,
         Ref{Any}(nothing),
         Ref{Any}(nothing),
         flux_accumulators,
@@ -631,6 +655,21 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
             cs.t[];
             force = true,
         )
+
+        # Priming: take the slow group's first step here, synchronously, so it
+        # ends up one window ahead of the coupler. Thereafter each overlapped
+        # step integrates the window that is about to happen rather than the one
+        # that just did, and its result is ready when the atmosphere needs it --
+        # removing the extra lag in the ocean state the atmosphere sees. The
+        # forcing it uses is the previous window's, which the slow components
+        # can absorb: their timestep is several coupling steps long precisely
+        # because their physics is slow, so they already integrate under forcing
+        # held constant across a whole window.
+        if overlap_slow_surfaces && prime_slow_surfaces
+            k = FieldExchanger.slow_window_steps(cs)
+            FieldExchanger.step_slow_sims!(cs.model_sims, cs.t[] + k * cs.Δt_cpl)
+            @info "Primed slow surfaces one step ($k coupling steps) ahead of the coupler"
+        end
     end
     Utilities.show_memory_usage()
     return cs

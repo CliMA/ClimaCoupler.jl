@@ -75,6 +75,7 @@ struct CoupledSimulation{
     SC <: Bool,
     SCC <: Bool,
     OSS <: Bool,
+    PSS <: Bool,
     STK,
     SPG,
     NTFA <: NamedTuple,
@@ -95,6 +96,8 @@ struct CoupledSimulation{
     save_cache::SC
     step_concurrently::SCC
     overlap_slow_surfaces::OSS
+    "Run the overlapped group one slow step ahead of the coupler. See `Input`."
+    prime_slow_surfaces::PSS
     "`(; task, target)` for an in-flight asynchronous ice/ocean step, or `nothing`. See `FieldExchanger.launch_slow_sims!`."
     slow_task::STK
     "Progress scalars gathered at the end of the last completed slow step. See `Interfacer.progress_snapshot`."

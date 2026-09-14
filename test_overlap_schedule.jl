@@ -74,7 +74,7 @@ function Interfacer.step!(s::StubIT, t::ITime)
     return nothing
 end
 
-function build_cs_itime(; dt_cpl, dt_slow, overlap)
+function build_cs_itime(; dt_cpl, dt_slow, overlap, prime = false)
     epoch = Dates.DateTime(2010, 1, 1)
     ocean = StubOceanIT(epoch, Dates.Second(Int(dt_slow)), epoch, 0)
     ice = StubIceIT(epoch, Dates.Second(Int(dt_slow)), epoch, 0)
@@ -83,13 +83,13 @@ function build_cs_itime(; dt_cpl, dt_slow, overlap)
     cs = Interfacer.CoupledSimulation{Float64}(
         epoch, nothing, nothing, (t0, t0), Δt, Ref(t0), Ref(0), Ref(-1),
         (; ice_sim = ice, ocean_sim = ocean),
-        (), (;), nothing, nothing, false, true, overlap,
+        (), (;), nothing, nothing, false, true, overlap, prime,
         Ref{Any}(nothing), Ref{Any}(nothing), (;),
     )
     return cs, ocean, ice
 end
 
-function build_cs(; dt_cpl, dt_slow, overlap)
+function build_cs(; dt_cpl, dt_slow, overlap, prime = false)
     ocean = StubOcean(0.0, dt_slow, 0)
     ice = StubIce(0.0, dt_slow, 0)
     cs = Interfacer.CoupledSimulation{Float64}(
@@ -109,6 +109,7 @@ function build_cs(; dt_cpl, dt_slow, overlap)
         false,                         # save_cache
         true,                          # step_concurrently
         overlap,                       # overlap_slow_surfaces
+        prime,                         # prime_slow_surfaces
         Ref{Any}(nothing),             # slow_task
         Ref{Any}(nothing),             # slow_progress
         (;),                           # flux_accumulators
@@ -123,9 +124,12 @@ function drive!(cs, ocean, nsteps)
         cs.t[] += cs.Δt_cpl
         cs.step[] += 1
 
-        if cs.overlap_slow_surfaces && SimCoordinator.slow_surfaces_due(cs)
+        due() = cs.prime_slow_surfaces ? SimCoordinator.at_slow_boundary(cs) :
+                SimCoordinator.slow_surfaces_due(cs)
+        if cs.overlap_slow_surfaces && due()
             FieldExchanger.wait_slow_sims!(cs)
         end
+
         frozen = FieldExchanger.slow_step_in_flight(cs)
 
         # step_model_sims! advances the slow group only when neither frozen nor overlapping
@@ -133,16 +137,20 @@ function drive!(cs, ocean, nsteps)
         (frozen || cs.overlap_slow_surfaces) ||
             FieldExchanger.step_slow_sims!(cs.model_sims, cs.t[])
         stepped_sync = ocean.clock != clock_before
+        # Sample where `exchange!` runs, i.e. after the stepping phase. In the
+        # baseline the slow sims step inside the loop, so sampling before that
+        # would understate what the atmosphere actually sees.
+        clock_at_exchange = ocean.clock
 
         launched = false
-        if cs.overlap_slow_surfaces && !frozen && SimCoordinator.slow_surfaces_due(cs)
+        if cs.overlap_slow_surfaces && !frozen && due()
             FieldExchanger.launch_slow_sims!(cs)
             launched = true
         end
         push!(
             log,
             (; step = cs.step[], t = cs.t[], frozen, stepped_sync, launched,
-               ocean_clock_seen = clock_before),
+               ocean_clock_seen = clock_at_exchange),
         )
     end
     FieldExchanger.wait_slow_sims!(cs)
@@ -212,6 +220,46 @@ function report_itime(label; dt_cpl, dt_slow, nsteps, overlap)
     return ok
 end
 
+"""
+Compare the ocean state the atmosphere would see, step by step, across the three
+schedules. Priming claims to remove the extra lag that plain overlap introduces;
+this checks that claim directly rather than inferring it.
+"""
+function report_lag(; dt_cpl, dt_slow, nsteps)
+    k = Int(dt_slow / dt_cpl)
+    seen = Dict{String, Vector{Float64}}()
+    counts = Dict{String, Int}()
+    for (label, overlap, prime) in
+        (("baseline", false, false), ("overlap", true, false), ("primed", true, true))
+        cs, ocean, _ = build_cs(; dt_cpl, dt_slow, overlap, prime)
+        if prime
+            # what the constructor does when prime_slow_surfaces is set
+            FieldExchanger.step_slow_sims!(cs.model_sims, cs.t[] + k * cs.Δt_cpl)
+        end
+        log = drive!(cs, ocean, nsteps)
+        seen[label] = [r.ocean_clock_seen for r in log]
+        counts[label] = ocean.nsteps
+    end
+
+    println("\n### ocean time the atmosphere sees, by coupling step (k=$k)")
+    println("  step |  t_n | baseline | overlap | primed")
+    for i in 1:nsteps
+        println("  ", lpad(i, 4), " | ", lpad(Int(i * dt_cpl), 4), " | ",
+                lpad(Int(seen["baseline"][i]), 8), " | ", lpad(Int(seen["overlap"][i]), 7),
+                " | ", lpad(Int(seen["primed"][i]), 6))
+    end
+    # after the first window, primed should match baseline exactly
+    tail = (k + 1):nsteps
+    primed_ok = all(seen["primed"][i] == seen["baseline"][i] for i in tail)
+    overlap_lags = any(seen["overlap"][i] < seen["baseline"][i] for i in tail)
+    println("  ocean steps taken: ", [l => counts[l] for l in ("baseline", "overlap", "primed")])
+    println("  primed matches baseline after the first window: ", primed_ok)
+    println("  plain overlap lags baseline: ", overlap_lags)
+    ok = primed_ok && overlap_lags
+    println(ok ? "  PASS" : "  FAIL")
+    return ok
+end
+
 allok = true
 allok &= report("k=1  (dt_ocean == dt_cpl)"; dt_cpl = 360.0, dt_slow = 360.0, nsteps = 8, overlap = true)
 allok &= report("k=5  (the usual case)";     dt_cpl = 360.0, dt_slow = 1800.0, nsteps = 20, overlap = true)
@@ -219,4 +267,5 @@ allok &= report("k=2";                        dt_cpl = 360.0, dt_slow = 720.0, n
 allok &= report("k=1, overlap OFF (control)"; dt_cpl = 360.0, dt_slow = 360.0, nsteps = 8, overlap = false)
 allok &= report_itime("k=1  (dt_ocean == dt_cpl)"; dt_cpl = 360.0, dt_slow = 360.0, nsteps = 8, overlap = true)
 allok &= report_itime("k=5  (the usual case)";     dt_cpl = 360.0, dt_slow = 1800.0, nsteps = 20, overlap = true)
+allok &= report_lag(; dt_cpl = 360.0, dt_slow = 1800.0, nsteps = 15)
 println("\n", allok ? "ALL PASS" : "FAILURES ABOVE")

@@ -30,6 +30,7 @@ export update_sim!,
     slow_launch_target,
     slow_progress_snapshot,
     slow_sim_dt,
+    slow_window_steps,
     launch_slow_sims!,
     wait_slow_sims!,
     slow_step_in_flight,
@@ -524,6 +525,13 @@ whenever the slow timestep equals the coupling timestep.
 """
 function slow_launch_target(cs::Interfacer.CoupledSimulation)
     t_now = cs.t[]
+    if cs.prime_slow_surfaces
+        # Primed, the slow group is already level with the coupler at a window
+        # boundary and is about to run one window ahead, so the target is simply
+        # one slow step on. `will_step` cannot be used here: it compares against
+        # the component clock, which priming has moved.
+        return t_now + slow_window_steps(cs) * cs.Δt_cpl
+    end
     for sim in cs.model_sims
         Interfacer.is_overlapped(sim) || continue
         # Pass the coupler time through unconverted. Under `use_itime` the
@@ -585,6 +593,15 @@ end
 "Model time the in-flight slow step is advancing to, or `nothing`."
 slow_step_target(cs::Interfacer.CoupledSimulation) =
     isnothing(cs.slow_task[]) ? nothing : cs.slow_task[].target
+
+"""
+    slow_window_steps(cs)
+
+Number of coupling steps spanned by one slow step. Reads only immutable model
+fields, so it is safe to call while a slow step is in flight.
+"""
+slow_window_steps(cs::Interfacer.CoupledSimulation) =
+    round(Int, slow_sim_dt(cs) / Float64(float(cs.Δt_cpl)))
 
 "Shortest timestep among the overlapped sims. Reads only immutable fields."
 function slow_sim_dt(cs::Interfacer.CoupledSimulation)

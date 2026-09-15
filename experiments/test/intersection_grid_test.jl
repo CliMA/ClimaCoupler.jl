@@ -561,6 +561,12 @@ import ClimaCoupler: FieldExchanger, FluxCalculator, Utilities
                 weight_cov_scratch,
                 temp_uv_vec,
                 uv_basis,
+                # FLUX CLAMP HACK
+                limiter_scratch = (;
+                    lo = CC.Fields.zeros(boundary_space),
+                    hi = CC.Fields.zeros(boundary_space),
+                    cnt = CC.Fields.zeros(boundary_space),
+                ),
                 exchange_grid = eg_d,
             )
 
@@ -688,6 +694,12 @@ end
             weight_cov_scratch,
             temp_uv_vec,
             uv_basis,
+            # FLUX CLAMP HACK
+            limiter_scratch = (;
+                lo = CC.Fields.zeros(boundary_space),
+                hi = CC.Fields.zeros(boundary_space),
+                cnt = CC.Fields.zeros(boundary_space),
+            ),
             exchange_grid = eg_d,
         )
         CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg_d, fs_d, fs_d.sic)
@@ -748,6 +760,12 @@ end
         weight_cov_scratch = CC.Fields.zeros(boundary_space),
         temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space),
         uv_basis,
+        # FLUX CLAMP HACK
+        limiter_scratch = (;
+            lo = CC.Fields.zeros(boundary_space),
+            hi = CC.Fields.zeros(boundary_space),
+            cnt = CC.Fields.zeros(boundary_space),
+        ),
         exchange_grid = eg,
     )
     fs = CMIPExt.ExchangeFluxState{FT}(exchange_arch(), eg.n_poly)

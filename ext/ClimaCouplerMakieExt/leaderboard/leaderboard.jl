@@ -5,6 +5,19 @@ import Dates
 import ClimaCoupler: SimOutput
 
 """
+    _csv_field(x)
+
+Render `x` as a CSV field, quoting it only if it contains a comma, double quote, or
+newline. Model names and unit strings are free text, so this keeps a stray comma from
+shifting every later column.
+"""
+function _csv_field(x)
+    s = string(x)
+    occursin(r"[\",\n]", s) || return s
+    return "\"" * replace(s, "\"" => "\"\"") * "\""
+end
+
+"""
     save_rmses_csv(path, rmse_var_dict)
 
 Write leaderboard RMSEs to `path` as CSV, one row per
@@ -30,8 +43,84 @@ function save_rmses_csv(path, rmse_var_dict)
                     rmse = rmse_var[model, category]
                     isnan(rmse) && continue
                     unit = get(units, model, "")
-                    println(io, "$short_name,$category,$model,$rmse,$unit")
+                    fields = (short_name, category, model, rmse, unit)
+                    println(io, join(_csv_field.(fields), ","))
                 end
+            end
+        end
+    end
+    return path
+end
+
+"""
+    save_global_bias_rmse_csv(path, sim_obs_comparison_dict, seasons)
+
+Write the global bias and global RMSE of every compared variable to `path` as CSV, one
+row per (`short_name`, `season`).
+
+These are the values `plot_bias_on_globe!` prints in the titles of the `bias_*_ANN.png`
+and `bias_*_all_seasons.png` maps, which otherwise exist only as text in those images.
+They cover every variable with observations, not only the few that have a CMIP cohort in
+`bias_leaderboard_rmse.csv`. Bias is signed, so it also shows whether a variable runs high
+or low, which RMSE alone cannot.
+
+`sim_obs_comparison_dict` maps each short name to a `Dict` from season to a time-averaged
+`(sim, obs)` pair, as built in `compute_leaderboard`. Seasons with no data are skipped.
+"""
+function save_global_bias_rmse_csv(path, sim_obs_comparison_dict, seasons)
+    open(path, "w") do io
+        println(io, "short_name,season,global_bias,global_rmse,units")
+        for short_name in sort(collect(keys(sim_obs_comparison_dict)))
+            for season in seasons
+                sim_var, obs_var = sim_obs_comparison_dict[short_name][season]
+                ClimaAnalysis.isempty(sim_var) && continue
+                bias = ClimaAnalysis.global_bias(sim_var, obs_var)
+                rmse = ClimaAnalysis.global_rmse(sim_var, obs_var)
+                units = ClimaAnalysis.units(sim_var)
+                fields = (short_name, season, bias, rmse, units)
+                println(io, join(_csv_field.(fields), ","))
+            end
+        end
+    end
+    return path
+end
+
+"""
+    save_pfull_global_bias_rmse_csv(path, sim_obs_comparison_dict, target_p_lvls)
+
+Write the global bias and global RMSE of each pressure-coordinate variable at each level in
+`target_p_lvls` to `path` as CSV, one row per (`short_name`, pressure level).
+
+These are the values printed in the titles of the pressure-level bias maps from
+`compute_pfull_leaderboard`. As there, slicing picks the nearest available level, so both
+the requested and the actual level are recorded.
+
+`sim_obs_comparison_dict` maps each short name to a time-averaged `(; sim, obs)` pair, as
+built in `compute_pfull_leaderboard`.
+"""
+function save_pfull_global_bias_rmse_csv(path, sim_obs_comparison_dict, target_p_lvls)
+    open(path, "w") do io
+        println(
+            io,
+            "short_name,target_pressure_level,pressure_level,pressure_units," *
+            "global_bias,global_rmse,units",
+        )
+        for short_name in sort(collect(keys(sim_obs_comparison_dict)))
+            (; sim, obs) = sim_obs_comparison_dict[short_name]
+            # `slice` names the attribute recording the level it picked after the
+            # dimension's actual name, which differs between data sources (e.g. `pfull`,
+            # `pressure_level`), so look that name up rather than assuming one
+            p_name = ClimaAnalysis.pressure_name(sim)
+            p_units = ClimaAnalysis.dim_units(sim, p_name)
+            for p_lvl in target_p_lvls
+                sim_slice = ClimaAnalysis.slice(sim, pressure_level = p_lvl)
+                obs_slice = ClimaAnalysis.slice(obs, pressure_level = p_lvl)
+                real_p_lvl = parse(Float64, sim_slice.attributes["slice_$p_name"])
+                bias = ClimaAnalysis.global_bias(sim_slice, obs_slice)
+                rmse = ClimaAnalysis.global_rmse(sim_slice, obs_slice)
+                units = ClimaAnalysis.units(sim_slice)
+                fields = (short_name, p_lvl, real_p_lvl, p_units, bias, rmse, units)
+                println(io, join(_csv_field.(fields), ","))
             end
         end
     end
@@ -122,6 +211,14 @@ function Plotting.compute_leaderboard(
     # Filter seasons to remove seasons with no dates
     _, var = first(sim_obs_comparsion_dict)
     filter!(season -> !ClimaAnalysis.isempty(var[season][1]), seasons)
+
+    # Record the global bias and RMSE shown in the bias map titles as data before plotting,
+    # so the numbers survive even if figure generation later fails
+    save_global_bias_rmse_csv(
+        joinpath(leaderboard_base_path, "global_bias_rmse.csv"),
+        sim_obs_comparsion_dict,
+        seasons,
+    )
 
     # Plot annual plots
     for compare_vars_biases in compare_vars_biases_groups
@@ -327,6 +424,13 @@ function Plotting.compute_pfull_leaderboard(
     # actual pressure levels that we get when slicing
     target_p_lvls = [850.0, 500.0, 250.0]
     real_p_lvls = []
+
+    # Record the global bias and RMSE at each pressure level as data before plotting
+    save_pfull_global_bias_rmse_csv(
+        joinpath(leaderboard_base_path, "global_bias_rmse_pfull.csv"),
+        sim_obs_comparsion_dict,
+        target_p_lvls,
+    )
 
     # Get units for pressure for plotting
     p_units = ClimaAnalysis.dim_units(first(sim_obs_comparsion_dict)[2].sim, "pfull")

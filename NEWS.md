@@ -4,14 +4,19 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
-#### Write leaderboard RMSEs alongside the leaderboard figure
-`compute_leaderboard` now also writes `bias_leaderboard_rmse.csv` into the
-artifacts directory, with one row per (`short_name`, `category`, `model`).
-These are the same numbers already rendered into `bias_leaderboard.png`;
-previously they existed only as pixels, so tracking a run's error against
-observations over time meant reading them off a figure. The CSV is written
-before the figures are generated, so the values survive a plotting failure.
-No new dependencies.
+#### Write leaderboard error metrics as CSV alongside the figures
+The leaderboard now writes its error metrics as data into the artifacts directory, next to
+the figures that previously held them only as pixels:
+- `bias_leaderboard_rmse.csv`: RMSE per (`short_name`, `category`, `model`) for CliMA and
+  the CMIP cohort, as in `bias_leaderboard.png`.
+- `global_bias_rmse.csv`: signed global bias and global RMSE per (`short_name`, `season`)
+  for every variable compared against observations, as printed in the `bias_*.png` titles.
+- `global_bias_rmse_pfull.csv`: the same at the 850, 500, and 250 hPa pressure levels, with
+  the actual level used.
+
+This makes a run's error against observations trackable over time without reading values
+off figures. The CSVs are written before the figures are generated, so the values survive a
+plotting failure. No new dependencies.
 
 #### Route rain through sea-ice.
 The ocean now receives `P_liq + (1 - ℵ) P_snow`; rain drains through the ice

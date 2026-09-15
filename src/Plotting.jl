@@ -37,7 +37,7 @@ function compute_pfull_leaderboard end
 
 # Maps required packages (as a tuple) to the functions provided by that extension
 extension_fns = [
-    (:Makie, :CairoMakie, :ClimaCoreMakie, :GeoMakie, :Poppler_jll, :Printf) => [
+    (:Makie, :CairoMakie, :GeoMakie, :Poppler_jll, :Printf) => [
         :make_diagnostics_plots,
         :make_ocean_diagnostics_plots,
         :debug,
@@ -48,15 +48,8 @@ extension_fns = [
         :compute_leaderboard,
         :compute_pfull_leaderboard,
     ],
-    (
-        :Makie,
-        :CairoMakie,
-        :ClimaCoreMakie,
-        :GeoMakie,
-        :Poppler_jll,
-        :Printf,
-        :Oceananigans,
-    ) => [:debug_plot!, :print_extrema],
+    (:Makie, :CairoMakie, :GeoMakie, :Poppler_jll, :Printf, :Oceananigans) =>
+        [:debug_plot!, :print_extrema],
 ]
 
 """
@@ -134,17 +127,7 @@ function postprocess(
     make_ocean_diagnostics_plots(ocean_output_dir, artifacts_dir, output_prefix = "ocean_")
 
     # Plot all model states and coupler fields (useful for debugging)
-    # Plot all model states and coupler fields (useful for debugging).
-    # Guarded: the ClimaCoreMakie/Makie debug heatmaps currently crash on this
-    # stack (ComputePipeline BoundsError); skip them so postprocess completes.
-    if ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext
-        try
-            debug(cs, artifacts_dir)
-        catch err
-            @warn "Skipping debug plots; plotting stack error in postprocess" exception =
-                (err, catch_backtrace())
-        end
-    end
+    ClimaComms.context(cs) isa ClimaComms.SingletonCommsContext && debug(cs, artifacts_dir)
 
     # Helper function to find a tuple of (short_name, reduction, period, coord_type)
     # whose period is "1M".

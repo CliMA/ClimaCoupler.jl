@@ -46,7 +46,7 @@ n_elem = 6 * 4^2
 # at 55°N, regular southern boundary at 80°S, folded top row.
 Nx, Ny, Nz = 36, 18, 1
 arch = OC.CPU()
-underlying_tripolar = OC.TripolarGrid(
+tripolar_grid_on(arch) = OC.TripolarGrid(
     arch;
     size = (Nx, Ny, Nz),
     southernmost_latitude = -80,
@@ -56,6 +56,7 @@ underlying_tripolar = OC.TripolarGrid(
     z = (-100.0, 0.0),
     halo = (4, 4, 4),
 )
+underlying_tripolar = tripolar_grid_on(arch)
 
 # Fully wet grid: bottom below the deepest z everywhere.
 wet_grid = OC.ImmersedBoundaryGrid(
@@ -65,12 +66,16 @@ wet_grid = OC.ImmersedBoundaryGrid(
 )
 
 # Half-dry grid: an idealized land hemisphere. TripolarGrid longitudes are
-# not restricted to [-180, 180), so wrap before comparing.
-coastal_grid = OC.ImmersedBoundaryGrid(
-    underlying_tripolar,
-    OC.GridFittedBottom((x, y) -> mod(x, 360) < 180 ? 100.0 : -200.0);
+# not restricted to [-180, 180), so wrap before comparing. Built per
+# architecture so a test that mixes ocean fields with coupler fields can put
+# both in the same memory space.
+coastal_bottom(x, y) = mod(x, 360) < 180 ? 100.0 : -200.0
+coastal_grid_on(arch) = OC.ImmersedBoundaryGrid(
+    tripolar_grid_on(arch),
+    OC.GridFittedBottom(coastal_bottom);
     active_cells_map = false,
 )
+coastal_grid = coastal_grid_on(arch)
 uv_basis = CMIPExt.uv_basis_coefficients(boundary_space)
 
 # Ground-truth wet area of an immersed grid: the sum of the cell areas of
@@ -439,7 +444,7 @@ end
 import SurfaceFluxes as SF
 import Thermodynamics.Parameters as TDP
 import ClimaParams as CP
-import ClimaCoupler: FluxCalculator, Utilities
+import ClimaCoupler: FieldExchanger, FluxCalculator, Utilities
 
 @testset "Per-polygon ocean fluxes" begin
     eg = CMIPExt.build_exchange_grid(boundary_space, coastal_grid)
@@ -626,8 +631,8 @@ end
     fs.sic[1:2:end] .= FT(0.8)
     is.R .= FT(1.0) / FT(2.0) # 1 m of ice at conductivity 2 W/m/K
     is.T_i .= FT(271.2)
-    is.SW_d .= FT(50)
-    is.LW_d .= FT(200)
+    fs.SW_d .= FT(50)
+    fs.LW_d .= FT(200)
     is.T_sfc_new .= 0
 
     CMIPExt.compute_ice_polygon_fluxes!(
@@ -774,4 +779,98 @@ end
         @test allocated < 100_000
     end
     @test all(isfinite, to_cpu(parent(flux_scratch.F_sh)))
+end
+
+# Stand-in for an Oceananigans model in the `update_sim!` radiation path, which
+# reads only the grid, the tracers (and their top flux BCs) and the float type.
+struct FakeOceanModel{G, T}
+    grid::G
+    tracers::T
+end
+Base.eltype(::FakeOceanModel) = FT
+
+@testset "Exchange-grid radiation and precipitation" begin
+    # Make sure both the boundary space and the ocean grid are on the same device
+    ocean_arch = exchange_arch()
+    grid = coastal_grid_on(ocean_arch)
+    eg_cpu = CMIPExt.build_exchange_grid(boundary_space, grid)
+    eg = on_exchange_device(eg_cpu)
+
+    # Only the tracers, their top flux BCs, the grid and `eltype` are read, so
+    # a full `HydrostaticFreeSurfaceModel` is unnecessary.
+    tracer(flux) = OC.CenterField(
+        grid,
+        boundary_conditions = OC.FieldBoundaryConditions(
+            grid,
+            (OC.Center(), OC.Center(), OC.Center());
+            top = OC.FluxBoundaryCondition(flux),
+        ),
+    )
+    surface_field() = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    T_flux, S_flux = surface_field(), surface_field()
+    model = FakeOceanModel(grid, (; T = tracer(T_flux), S = tracer(S_flux)))
+    T_sfc, S_sfc = FT(12), FT(35) # [°C], [psu]
+    OC.set!(model.tracers.T, T_sfc)
+    OC.set!(model.tracers.S, S_sfc)
+
+    ocean_properties = (;
+        reference_density = FT(1020),
+        heat_capacity = FT(3995),
+        σ = FT(5.67e-8),
+        C_to_K = FT(273.15),
+    )
+    remapping = (;
+        use_exchange_grid = true,
+        exchange_grid = eg,
+        ocean_flux_state = CMIPExt.ExchangeFluxState{FT}(ocean_arch, eg_cpu.n_poly),
+        scratch_field_oc3 = surface_field(),
+    )
+    sim = CMIPExt.OceananigansSimulation(
+        (; model),
+        nothing,
+        ocean_properties,
+        remapping,
+        surface_field(), # ice concentration: ice-free
+        nothing,
+    )
+
+    # Uniform forcing: the node gather preserves constants exactly and the cell
+    # scatter conserves the area integral, so every wet cell must reproduce the
+    # single-column answer to roundoff.
+    uniform(v) = (f = CC.Fields.zeros(boundary_space); f .= FT(v); f)
+    SW_d, LW_d, P_liq, P_snow = FT(300), FT(350), FT(-1e-5), FT(-2e-6)
+    csf = (;
+        SW_d = uniform(SW_d),
+        LW_d = uniform(LW_d),
+        P_liq = uniform(P_liq),
+        P_snow = uniform(P_snow),
+    )
+    FieldExchanger.update_sim!(sim, csf)
+
+    (; reference_density, heat_capacity, σ, C_to_K) = ocean_properties
+    α = FT(0.011) # `Val(:surface_direct_albedo)`
+    ϵ = FT(0.97)  # `Val(:emissivity)`
+    expected_T =
+        (-(1 - α) * SW_d - ϵ * (LW_d - σ * (T_sfc + C_to_K)^4)) /
+        (reference_density * heat_capacity)
+    expected_S = -S_sfc * (P_liq + P_snow) / reference_density
+
+    cell_values(f) = vec(OC.interior(OC.on_architecture(OC.CPU(), f), :, :, 1))
+    flux_T = cell_values(CMIPExt.surface_flux(model.tracers.T))
+    flux_S = cell_values(CMIPExt.surface_flux(model.tracers.S))
+    n_wet = 0
+    # Skip the fold row, whose shadow cells are filled by mirroring rather than
+    # by the scatter.
+    for c in 1:((Ny - 1) * Nx)
+        if eg_cpu.oc_wet_area[c] > 0
+            n_wet += 1
+            @test flux_T[c] ≈ expected_T rtol = 1e-12
+            @test flux_S[c] ≈ expected_S rtol = 1e-12
+        else
+            # Dry cells receive nothing: the property this path exists for.
+            @test flux_T[c] == 0
+            @test flux_S[c] == 0
+        end
+    end
+    @test n_wet > 0
 end

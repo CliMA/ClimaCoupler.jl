@@ -98,6 +98,10 @@ type = "float"
 value = 2e-4
 type = "float"
 
+[cloud_ice_specific_humidity_autoconversion_threshold]
+value = 5e-6
+type = "float"
+
 [cloud_fraction_steepness_scale]
 value = 0.55
 type = "float"

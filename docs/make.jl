@@ -1,7 +1,7 @@
 using ClimaCoupler
 using Documenter, Literate
 # Import packages needed to load plotting extensions
-import CairoMakie, ClimaCoreMakie, GeoMakie, Makie, Poppler_jll, Printf, Oceananigans
+import CairoMakie, GeoMakie, Makie, Poppler_jll, Printf, Oceananigans
 # Import packages for ClimaCouplerCMIPExt
 import Adapt, ClimaSeaIce, ConservativeRegridding, KernelAbstractions
 # Import packages for ClimaCouplerClimaLandExt

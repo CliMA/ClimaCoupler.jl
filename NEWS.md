@@ -4,6 +4,11 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Route rain through sea-ice.
+The ocean now receives `P_liq + (1 - ℵ) P_snow`; rain drains through the ice
+instead of ponding on it (and being lost) while snow can still accumulate on
+the ice.
+
 #### Concurrent and overlapped component stepping. PR [#1723](https://github.com/CliMA/ClimaCoupler.jl/pull/1723)
 `step_concurrently` advances the component models as two concurrent groups —
 land then atmosphere in one task, sea ice then ocean in another. The ice and
@@ -52,6 +57,14 @@ to the previous guess if the update is NaN.
 
 This PR also addresses a boundary condition bug in the
 sea-ice component, using the diagnosed skin temperature to compute the radiative emission term.(Previously the incorrect energy balance would result in rapid ice melt).
+
+#### Update to use ClimaCore v0.16
+The compat entries now require ClimaCore 0.16, ClimaAtmos 0.42.9, ClimaLand
+1.12.1, ClimaDiagnostics 0.3.9, and ClimaUtilities 0.1.32.
+
+ClimaCore 0.16 has a Makie extension, so ClimaCoreMakie is no longer a
+dependency of ClimaCoupler or of the AMIP/CMIP experiment environments. All
+calls are now though `ClimaCore.Visualize`.
 
 v0.2.3
 -------

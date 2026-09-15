@@ -93,10 +93,13 @@ function diagnostics_setup(
         end,
     )
 
-    # Schedule the turbulent energy fluxes to save at every step and output at the configured period
+    # Schedule the turbulent energy fluxes to save at every step and output at the configured period.
+    # All schedules here are seeded with t_start so that a restarted simulation
+    # stays on the same calendar boundaries as the original run (see
+    # TimeManager.calendar_dt_schedule).
     compute_sched = CD.Schedules.EveryStepSchedule()  # Note that these are stateful, so we create new ones for each diagnostic
     output_sched =
-        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
+        TimeManager.calendar_dt_schedule(coupler_diagnostics_period, start_date, t_start)
     reduction_time_func = get_reduction(Val(reduction))
     # `pre_output_hook!` is only needed to finalize the running mean for `:average`;
     # all other reductions don't require post-processing.
@@ -163,9 +166,9 @@ function diagnostics_setup(
     # Schedule the ocean fraction to save and output at diagnostic frequency
     # since it can change in time with evolving sea ice
     compute_sched =
-        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
+        TimeManager.calendar_dt_schedule(coupler_diagnostics_period, start_date, t_start)
     output_sched =
-        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
+        TimeManager.calendar_dt_schedule(coupler_diagnostics_period, start_date, t_start)
     ocean_fraction_diag_sched = CD.ScheduledDiagnostic(
         variable = ocean_fraction_diag,
         output_writer = netcdf_writer,
@@ -195,9 +198,9 @@ function diagnostics_setup(
 
     # Schedule the ice fraction to save and output at diagnostic frequency
     compute_sched =
-        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
+        TimeManager.calendar_dt_schedule(coupler_diagnostics_period, start_date, t_start)
     output_sched =
-        CD.Schedules.EveryCalendarDtSchedule(coupler_diagnostics_period; start_date)
+        TimeManager.calendar_dt_schedule(coupler_diagnostics_period, start_date, t_start)
     ice_fraction_diag_sched = CD.ScheduledDiagnostic(
         variable = ice_fraction_diag,
         output_writer = netcdf_writer,

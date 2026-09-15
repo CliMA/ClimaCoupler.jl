@@ -17,7 +17,7 @@ module SimCoordinator
 
 import ClimaComms
 import ClimaDiagnostics as CD
-import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
+import ClimaUtilities.TimeManager: ITime
 import ClimaCore as CC
 import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
@@ -321,7 +321,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         land_progress_interval,
         evolving_ocean,
         land_model,
-        land_temperature_anomaly,
         land_spun_up_ic,
         lai_source,
         bucket_albedo_type,
@@ -422,6 +421,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         Interfacer.get_field(boundary_space, atmos_sim, Val(:height_int))
     atmos_h =
         Interfacer.get_atmos_height_delta(atmos_bottom_center_height, surface_elevation)
+    initial_T = CC.Fields.zeros(boundary_space)
+    initial_T .= Interfacer.get_field(boundary_space, atmos_sim, Val(:air_temperature))
 
     land_fraction = Input.get_land_fraction(
         boundary_space,
@@ -454,9 +455,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         output_dir = dir_paths.land_output_dir,
         area_fraction = land_fraction,
         shared_surface_space,
-        surface_elevation,
         atmos_h,
-        land_temperature_anomaly,
+        initial_T,
         use_land_diagnostics,
         land_diagnostics_period,
         land_diagnostics_reduction,
@@ -467,6 +467,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         land_spun_up_ic,
         land_ic_path,
         lai_source,
+        dt_drivers = ITime(Utilities.time_to_seconds(config_dict["dt_rad"])),
     )
 
     ocean_sim = Interfacer.OceanSimulation(
@@ -580,14 +581,16 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     # TODO: Move callbacks code somewhere else (maybe in TimeManager?) so that it doesn't clutter up the constructor
 
     # checkpoint
+    # Schedules are seeded with t_start so that a restarted simulation stays on
+    # the same calendar boundaries as the original run (see calendar_dt_schedule).
     schedule_checkpoint =
-        EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date)
+        TimeManager.calendar_dt_schedule(checkpoint_dt, start_date, t_start)
     checkpoint_cb =
         TimeManager.Callback(schedule_checkpoint, sim -> Checkpointer.checkpoint_sims(sim))
 
     # walltime reporting
     schedule_walltime =
-        TimeManager.walltime_schedule(walltime_dt, walltime_debug, start_date)
+        TimeManager.walltime_schedule(walltime_dt, walltime_debug, start_date, t_start)
     if isnothing(schedule_walltime)
         callbacks = (checkpoint_cb,)
     else
@@ -605,8 +608,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     )
     for (sim_name, interval) in pairs(progress_intervals)
         (haskey(model_sims, sim_name) && interval != "never") || continue
-        schedule_progress =
-            EveryCalendarDtSchedule(TimeManager.time_to_period(interval); start_date)
+        schedule_progress = TimeManager.calendar_dt_schedule(interval, start_date, t_start)
         progress_cb = TimeManager.Callback(
             schedule_progress,
             let sim_name = sim_name

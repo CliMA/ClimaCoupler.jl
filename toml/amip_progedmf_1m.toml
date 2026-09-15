@@ -73,6 +73,9 @@ value = 1360
 [cloud_liquid_water_specific_humidity_autoconversion_threshold]
 value = 2e-4
 
+[cloud_ice_specific_humidity_autoconversion_threshold]
+value = 5e-6
+
 [cloud_fraction_steepness_scale]
 value = 0.55
 

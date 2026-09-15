@@ -11,10 +11,21 @@ import .Threads
 
 import ..Interfacer, ..FluxCalculator, ..Utilities
 
-"True when the coupler fields carry the overlap cache (i.e. `overlap_slow_surfaces` is on)."
-has_slow_cache(csf, val) = slow_cache_name(val) in propertynames(csf)
+"True when this quantity has an overlap cache and the coupler fields carry it."
+function has_slow_cache(csf, val)
+    name = slow_cache_name(val)
+    return !isnothing(name) && name in propertynames(csf)
+end
 
-"Coupler field parking the slow surfaces' contribution to each blended quantity."
+"""
+Coupler field parking the slow surfaces' contribution to each blended quantity,
+or `nothing` for quantities that have no such cache.
+
+`combine_surfaces!` is generic over the field name, so this needs a fallback:
+only the four quantities blended by `import_combined_surface_fields!` are cached
+across an overlapped step, but callers may ask for any field.
+"""
+slow_cache_name(::Val) = nothing
 slow_cache_name(::Val{:emissivity}) = :slow_emissivity
 slow_cache_name(::Val{:surface_temperature}) = :slow_LW_up
 slow_cache_name(::Val{:surface_direct_albedo}) = :slow_direct_albedo

@@ -87,6 +87,12 @@ for FT in (Float32, Float64)
             nothing, # thermo_params
             nothing, # diags_handler
             true, # save_cache
+            false, # step_concurrently
+            false, # overlap_slow_surfaces
+            false, # prime_slow_surfaces
+            Ref{Any}(nothing), # slow_next_boundary
+            Ref{Any}(nothing), # slow_task
+            Ref{Any}(nothing), # slow_progress
             (;), # flux_accumulators
         )
 
@@ -192,6 +198,12 @@ for FT in (Float32, Float64)
             nothing, # thermo_params
             nothing, # diags_handler
             true, # save_cache
+            false, # step_concurrently
+            false, # overlap_slow_surfaces
+            false, # prime_slow_surfaces
+            Ref{Any}(nothing), # slow_next_boundary
+            Ref{Any}(nothing), # slow_task
+            Ref{Any}(nothing), # slow_progress
             (;), # flux_accumulators
         )
 

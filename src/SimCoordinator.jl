@@ -100,25 +100,14 @@ function step!(cs::Interfacer.CoupledSimulation)
     cs.t[] += cs.Δt_cpl
     cs.step[] += 1
 
-    # With `overlap_slow_surfaces`, an ice/ocean step launched earlier may still
-    # be running. It is joined here, at the top of the coupling step on which
-    # their next forcing falls due, so that the rest of this step sees settled
-    # ice and ocean state and behaves exactly as it would without overlap.
-    if cs.overlap_slow_surfaces &&
-       (cs.prime_slow_surfaces ? at_slow_boundary(cs) : slow_surfaces_due(cs))
-        FieldExchanger.wait_slow_sims!(cs)
-    end
-    frozen = FieldExchanger.slow_step_in_flight(cs)
+    frozen = join_slow_if_due!(cs)
 
     # Compute global energy and water conservation checks
     # (only for slabplanet if tracking conservation is enabled)
     frozen || ConservationChecker.check_conservation!(cs)
 
     # Step component model simulations sequentially for one coupling timestep (Δt_cpl)
-    # Under overlap the slow group is advanced only by the asynchronous task, never
-    # here: when the slow timestep equals the coupling timestep they would otherwise
-    # be stepped both synchronously and again by the task.
-    FieldExchanger.step_model_sims!(cs; skip_slow = frozen || cs.overlap_slow_surfaces)
+    FieldExchanger.step_model_sims!(cs; skip_slow = skip_slow_stepping(cs, frozen))
 
     # Update the surface fractions for surface models
     FieldExchanger.update_surface_fractions!(cs; slow_frozen = frozen)
@@ -138,15 +127,7 @@ function step!(cs::Interfacer.CoupledSimulation)
 
     # The slow surfaces' forcing is now fully assembled, so their step can be
     # launched and left to run across the coupling steps that follow.
-    if cs.overlap_slow_surfaces &&
-       !frozen &&
-       (cs.prime_slow_surfaces ? at_slow_boundary(cs) : slow_surfaces_due(cs))
-        FieldExchanger.launch_slow_sims!(cs)
-        if cs.prime_slow_surfaces
-            cs.slow_next_boundary[] =
-                cs.slow_next_boundary[] + FieldExchanger.slow_window_steps(cs) * cs.Δt_cpl
-        end
-    end
+    launch_slow_if_due!(cs, frozen)
 
     # Maybe call the callbacks
     TimeManager.callbacks!(cs)
@@ -154,6 +135,64 @@ function step!(cs::Interfacer.CoupledSimulation)
     # Compute and save coupler diagnostics
     CD.orchestrate_diagnostics(cs)
     return nothing
+end
+
+"""
+    slow_step_due(cs)
+
+Whether the overlapped group's step boundary falls on this coupling step.
+
+Priming moves the component clocks away from coupler time, so the two schedules
+ask different questions: without priming, whether the components are due to step;
+with it, whether the coupler has reached the recorded window boundary.
+"""
+slow_step_due(cs::Interfacer.CoupledSimulation) =
+    cs.prime_slow_surfaces ? at_slow_boundary(cs) : slow_surfaces_due(cs)
+
+"""
+    join_slow_if_due!(cs) -> frozen
+
+Join an overlapped ice/ocean step if this coupling step needs its result, and
+report whether one is still in flight afterwards.
+
+Joining at the top of the step means the rest of it sees settled ice and ocean
+state and behaves as it would without overlap. `frozen` is what every
+slow-surface-touching call in `step!` keys off.
+"""
+function join_slow_if_due!(cs::Interfacer.CoupledSimulation)
+    cs.overlap_slow_surfaces && slow_step_due(cs) && FieldExchanger.wait_slow_sims!(cs)
+    return FieldExchanger.slow_step_in_flight(cs)
+end
+
+"""
+    skip_slow_stepping(cs, frozen)
+
+Whether `step_model_sims!` should leave the slow group alone.
+
+Under overlap they are advanced only by the asynchronous task, never in the loop:
+when the slow timestep equals the coupling timestep they would otherwise be
+stepped both synchronously and again by the task.
+"""
+skip_slow_stepping(cs::Interfacer.CoupledSimulation, frozen::Bool) =
+    frozen || cs.overlap_slow_surfaces
+
+"""
+    launch_slow_if_due!(cs, frozen) -> launched
+
+Launch the next overlapped ice/ocean step if this coupling step is a boundary,
+and advance the recorded boundary when priming.
+
+Called after the slow group's forcing is fully assembled, so the step it starts
+integrates with complete inputs.
+"""
+function launch_slow_if_due!(cs::Interfacer.CoupledSimulation, frozen::Bool)
+    (cs.overlap_slow_surfaces && !frozen && slow_step_due(cs)) || return false
+    FieldExchanger.launch_slow_sims!(cs)
+    if cs.prime_slow_surfaces
+        cs.slow_next_boundary[] =
+            cs.slow_next_boundary[] + FieldExchanger.slow_window_steps(cs) * cs.Δt_cpl
+    end
+    return true
 end
 
 """

@@ -6,6 +6,7 @@
 #
 #   julia --project=experiments/CMIP test_overlap_schedule.jl
 
+using Test
 using ClimaCoupler
 import Dates
 import ClimaUtilities.TimeManager: ITime, date
@@ -135,49 +136,37 @@ function build_cs(; dt_cpl, dt_slow, overlap, prime = false)
     return cs, ocean, ice
 end
 
-"Mirror the scheduling in SimCoordinator.step! (the parts that touch slow sims)."
+"""
+Drive the schedule using the very functions `SimCoordinator.step!` uses, rather
+than restating their order here. An earlier version of this file duplicated that
+order and went stale the moment `step!` changed, failing for a reason unrelated
+to the code under test.
+
+The rest of `step!` (exchange, fluxes, diagnostics) needs a real
+`CoupledSimulation`, so it is not driven here; only the slow-surface schedule is.
+"""
 function drive!(cs, ocean, nsteps)
     log = NamedTuple[]
-    # The ocean state the coupler is *permitted* to read. While a slow step is in
-    # flight the coupler is frozen out, so the visible value is whatever the last
-    # join left behind -- reading ocean.clock directly would race the task and
-    # report a value the real coupler could not have used.
+    # The ocean state the coupler is *permitted* to read. While a step is in
+    # flight the coupler is frozen out, so reading ocean.clock directly would
+    # race the task and report a value the real coupler could not have used.
     visible = ocean.clock
     for _ in 1:nsteps
         cs.t[] += cs.Δt_cpl
         cs.step[] += 1
 
-        due() =
-            cs.prime_slow_surfaces ? SimCoordinator.at_slow_boundary(cs) :
-            SimCoordinator.slow_surfaces_due(cs)
-        if cs.overlap_slow_surfaces && due()
-            FieldExchanger.wait_slow_sims!(cs)
-            visible = ocean.clock
-        end
+        frozen = SimCoordinator.join_slow_if_due!(cs)
 
-        frozen = FieldExchanger.slow_step_in_flight(cs)
-
-        # step_model_sims! advances the slow group only when neither frozen nor overlapping
         clock_before = ocean.clock
-        (frozen || cs.overlap_slow_surfaces) ||
+        SimCoordinator.skip_slow_stepping(cs, frozen) ||
             FieldExchanger.step_slow_sims!(cs.model_sims, cs.t[])
         stepped_sync = ocean.clock != clock_before
-        # In the baseline the slow sims step inside the loop and nothing is
-        # frozen, so the freshly stepped value is visible immediately.
-        cs.overlap_slow_surfaces || (visible = ocean.clock)
-        clock_at_exchange = visible
 
-        launched = false
-        if cs.overlap_slow_surfaces && !frozen && due()
-            FieldExchanger.launch_slow_sims!(cs)
-            # Mirror SimCoordinator.step!: the boundary advances on launch.
-            if cs.prime_slow_surfaces
-                cs.slow_next_boundary[] =
-                    cs.slow_next_boundary[] +
-                    FieldExchanger.slow_window_steps(cs) * cs.Δt_cpl
-            end
-            launched = true
-        end
+        # Safe to read whenever nothing is in flight; covers both the baseline
+        # (stepped in the loop just above) and a boundary step (just joined).
+        frozen || (visible = ocean.clock)
+
+        launched = SimCoordinator.launch_slow_if_due!(cs, frozen)
         push!(
             log,
             (;
@@ -186,7 +175,7 @@ function drive!(cs, ocean, nsteps)
                 frozen,
                 stepped_sync,
                 launched,
-                ocean_clock_seen = clock_at_exchange,
+                ocean_clock_seen = visible,
             ),
         )
     end
@@ -223,53 +212,37 @@ function report(label; dt_cpl, dt_slow, nsteps, overlap)
         )
     end
 
-    # invariants
-    ok = true
     expected_steps = Int(floor(nsteps * dt_cpl / dt_slow))
-    if ocean.nsteps != expected_steps
-        println("  FAIL: ocean took $(ocean.nsteps) steps, expected $expected_steps")
-        ok = false
-    end
-    if ice.nsteps != ocean.nsteps
-        println("  FAIL: ice took $(ice.nsteps) steps, ocean took $(ocean.nsteps)")
-        ok = false
-    end
-    if any(r -> r.frozen && r.stepped_sync, log)
-        println("  FAIL: a slow sim was stepped synchronously while a step was in flight")
-        ok = false
-    end
-    if ocean.clock > nsteps * dt_cpl
-        println("  FAIL: ocean ran past the coupler ($(ocean.clock) > $(nsteps*dt_cpl))")
-        ok = false
-    end
+    @test ocean.nsteps == expected_steps
+    @test ice.nsteps == ocean.nsteps
+    # nothing may be stepped in the loop while its task owns it
+    @test !any(r -> r.frozen && r.stepped_sync, log)
+    # the slow group must never run past the coupler
+    @test ocean.clock <= nsteps * dt_cpl
     overlapped = count(r -> r.frozen, log)
     println(
         "  ocean steps: $(ocean.nsteps) (expected $expected_steps), ",
         "final clock: $(ocean.clock), coupler: $(nsteps*dt_cpl)",
     )
     println("  coupling steps overlapped with an in-flight slow step: $overlapped")
-    println(ok ? "  PASS" : "  FAIL")
-    return ok
+    return nothing
 end
 
 "Same schedule, but with ITime times and stubs that reject Float64 coercion."
 function report_itime(label; dt_cpl, dt_slow, nsteps, overlap)
     cs, ocean, ice = build_cs_itime(; dt_cpl, dt_slow, overlap)
     k = Int(dt_slow / dt_cpl)
-    try
-        drive!(cs, ocean, nsteps)
-    catch e
-        println("\n### $label (ITime)  -> THREW: ", sprint(showerror, e))
-        return false
-    end
+    # Any coercion of coupler time to Float64 throws here, because the ITime
+    # stubs deliberately define only ITime methods.
+    @test (drive!(cs, ocean, nsteps); true)
     expected = Int(floor(nsteps * dt_cpl / dt_slow))
-    ok = ocean.nsteps == expected && ice.nsteps == ocean.nsteps
     println(
         "\n### $label (ITime)   (dt_cpl=$dt_cpl, dt_slow=$dt_slow, k=$k, overlap=$overlap)",
     )
     println("  ocean steps: $(ocean.nsteps) (expected $expected), ice: $(ice.nsteps)")
-    println(ok ? "  PASS" : "  FAIL")
-    return ok
+    @test ocean.nsteps == expected
+    @test ice.nsteps == ocean.nsteps
+    return nothing
 end
 
 """
@@ -320,42 +293,41 @@ function report_lag(; dt_cpl, dt_slow, nsteps)
     )
     println("  primed matches baseline after the first window: ", primed_ok)
     println("  plain overlap lags baseline: ", overlap_lags)
-    ok = primed_ok && overlap_lags
-    println(ok ? "  PASS" : "  FAIL")
-    return ok
+    @test primed_ok
+    @test overlap_lags
+    return nothing
 end
 
-allok = true
-allok &= report(
+report(
     "k=1  (dt_ocean == dt_cpl)";
     dt_cpl = 360.0,
     dt_slow = 360.0,
     nsteps = 8,
     overlap = true,
 )
-allok &= report(
+report(
     "k=5  (the usual case)";
     dt_cpl = 360.0,
     dt_slow = 1800.0,
     nsteps = 20,
     overlap = true,
 )
-allok &= report("k=2"; dt_cpl = 360.0, dt_slow = 720.0, nsteps = 10, overlap = true)
-allok &= report(
+report("k=2"; dt_cpl = 360.0, dt_slow = 720.0, nsteps = 10, overlap = true)
+report(
     "k=1, overlap OFF (control)";
     dt_cpl = 360.0,
     dt_slow = 360.0,
     nsteps = 8,
     overlap = false,
 )
-allok &= report_itime(
+report_itime(
     "k=1  (dt_ocean == dt_cpl)";
     dt_cpl = 360.0,
     dt_slow = 360.0,
     nsteps = 8,
     overlap = true,
 )
-allok &= report_itime(
+report_itime(
     "k=5  (the usual case)";
     dt_cpl = 360.0,
     dt_slow = 1800.0,
@@ -423,14 +395,14 @@ function report_restart(; dt_cpl, dt_slow, restart_t, ocean_ahead_to, nsteps)
     end
     no_sync_while_frozen = !any(r -> r.frozen && r.stepped_sync, log)
     println("  no synchronous slow step while frozen: ", no_sync_while_frozen)
-    ok = derived_ok && no_sync_while_frozen
-    println(ok ? "  PASS" : "  FAIL")
-    return ok
+    @test derived_ok
+    @test no_sync_while_frozen
+    return nothing
 end
 
-allok &= report_lag(; dt_cpl = 360.0, dt_slow = 1800.0, nsteps = 15)
+report_lag(; dt_cpl = 360.0, dt_slow = 1800.0, nsteps = 15)
 # clean boundary checkpoint: slow group exactly one window ahead
-allok &= report_restart(;
+report_restart(;
     dt_cpl = 360.0,
     dt_slow = 1800.0,
     restart_t = 3600.0,
@@ -438,11 +410,10 @@ allok &= report_restart(;
     nsteps = 10,
 )
 # mid-window checkpoint: slow group ahead by an amount that is NOT a whole window
-allok &= report_restart(;
+report_restart(;
     dt_cpl = 360.0,
     dt_slow = 1800.0,
     restart_t = 2520.0,
     ocean_ahead_to = 3600.0,
     nsteps = 10,
 )
-println("\n", allok ? "ALL PASS" : "FAILURES ABOVE")

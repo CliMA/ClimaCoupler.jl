@@ -25,6 +25,11 @@ sample_date_ranges =
 # directory (e.g. "/glade/derecho/scratch")
 output_dir = joinpath(pkgdir(ClimaCoupler), "amip_calibration")
 
+# Interannual sample dates used to estimate the SVDplusDCovariance. Every entry
+# of sample_date_ranges must be contained in these.
+const COVARIANCE_DATE_RANGES =
+    [(Dates.DateTime(y, 10, 1), Dates.DateTime(y, 10, 1)) for y in 2006:2010]
+
 # spinup and sample_date_ranges are chosen to match the only dates
 # available in the wxquest_initial_conditions artifact
 const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
@@ -46,6 +51,10 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
 # Used in generate_observations.jl and observation_map.jl
 # Units: Pa (not hPa)
 const PRESSURE_LEVELS = 100.0 .* [200.0, 500.0, 850.0]
+
+# Spatial reduction. An integer block-averages the lon-lat grid by that factor,
+# `nothing` takes a zonal average instead.
+const COARSEN_FACTOR = nothing
 
 # To disable normalization, update generate_observations.jl to not apply the
 # normalization. You may want to do the same in the observation map as well.

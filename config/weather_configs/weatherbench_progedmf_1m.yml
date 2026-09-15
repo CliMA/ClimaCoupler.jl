@@ -1,0 +1,67 @@
+# Under development — not run in CI yet. Currently used for WeatherBench / ProgEDMF
+# experiments on Derecho (NCAR); paths below assume that machine.
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+strict_params: false
+mode_name: "subseasonal"
+
+# derecho machine data paths
+era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_0p25deg_dev/no_hz"
+coupler_output_dir: "/glade/derecho/scratch/cchristo/coupler_runs_v2/weatherbench"
+initial_condition: "WeatherModel"
+era5_ic_full_pressure: true
+checkpoint_dt: "1000days"
+dt_seaice: "50secs"
+energy_check: false
+h_elem: 30
+dz_bottom: 30.0
+z_elem: 130
+z_max: 70000.0
+
+hyperdiffusion_prandtl_number: 1.0
+divergence_damping_factor: 20.0
+topography_damping_factor: 1.15
+
+### Microphysics: 1M ###
+# 1M requires shorter timesteps (empirically ~20secs) and stronger vorticity
+# hyperdiffusion than the 0M base.
+microphysics_model: "1M"
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
+coupler_toml: ["toml/amip_progedmf_1m.toml"]
+dt: "20secs"
+dt_cpl: "20secs"
+vorticity_hyperdiffusion_coefficient: 0.16
+
+land_fraction_source: "era5"
+binary_area_fraction: false
+
+### integrated land ###
+land_model: "integrated"
+lai_source: "modis_monthly_climatology"
+
+### bucket land ###
+# land_model: "bucket"
+# bucket_albedo_type: "map_temporal"
+
+land_spun_up_ic: false
+land_temperature_anomaly: "nothing"
+use_land_diagnostics: false
+radiation_reset_rng_seed: true
+start_date: "20200101"
+surface_setup: "PrescribedSurface"
+atmos_progress_interval: "1days"
+topo_smoothing: false
+topography: "Earth"
+t_end: "10days"
+netcdf_output_at_levels: true
+output_default_diagnostics: false
+use_coupler_diagnostics: true
+extra_atmos_diagnostics:
+  ### daily inst (surface + model-level)
+  - short_name: [tas, mslp, ta, hus, zg, ua, va, wa, pfull, clw, cli, cl, clt, pr]
+    period: 1days
+    reduction_time: inst
+  ### daily average (surface + model-level)
+  - short_name: [zg, orog, tas, mslp, pr, lwp, iwp, clt, ta, hus, ua, va, wa, clw, cli, cl, pfull, waup, arup, tke]
+    period: 1days
+    reduction_time: average

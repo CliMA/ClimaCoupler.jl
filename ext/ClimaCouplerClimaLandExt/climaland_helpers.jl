@@ -57,8 +57,10 @@ function make_land_domain(
         nelems = nelements_vert,
         reverse_mode = true,
     )
-    verttopology = CC.Topologies.IntervalTopology(vertmesh)
-    vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(verttopology)
+    vert_center_space = CC.Spaces.CenterFiniteDifferenceSpace(
+        ClimaComms.device(shared_surface_space),
+        vertmesh,
+    )
     subsurface_space =
         CC.Spaces.ExtrudedFiniteDifferenceSpace(shared_surface_space, vert_center_space)
     subsurface_face_space = CC.Spaces.face_space(subsurface_space)
@@ -118,20 +120,23 @@ function make_land_domain(
 end
 
 """
-    _coupler_set_ic!(Y, p, t, model, atmos_T, set_ic!)
+    _coupler_set_ic!(Y, p, t, model::BucketModel, T_sfc, set_ic!)
 
 Helper function to set initial conditions using the provided set_ic! function.
 
 
-The land model expects the air temperature driver to be set before the set_ic! function
-is called, which is why we have this wrapper. We also use it to set the cache variables
+The land model expects a reasonable guess for surface temperature to be set before the set_ic! function
+is called, which is why we have this wrapper. This is used to make reasonable guesses for 
+initial conditions for certain prognostic variables. Note that if the state Y is saved and used
+as initial conditions, this would not
+be required. We also use it to set the cache variables
 required to compute radiation in the atmosphere.
 
 Note that when running a restarted simulation, any values set here will be overwritten by
 the saved state and cache values in the restart file.
 """
-function _coupler_set_ic!(Y, p, t, model::CL.Bucket.BucketModel, atmos_T, set_ic!)
-    p.drivers.T .= atmos_T
+function _coupler_set_ic!(Y, p, t, model::CL.Bucket.BucketModel, T_sfc, set_ic!)
+    p.drivers.T .= T_sfc
     set_ic!(Y, p, t, model)
 
     # Set albedo and T_sfc so that the atmosphere can compute radiation.
@@ -146,8 +151,37 @@ function _coupler_set_ic!(Y, p, t, model::CL.Bucket.BucketModel, atmos_T, set_ic
     )
     p.bucket.T_sfc .= CL.Domains.top_center_to_surface(Y.bucket.T)
 end
-function _coupler_set_ic!(Y, p, t, model::CL.LandModel, atmos_T, set_ic!)
-    p.drivers.T .= atmos_T
+"""
+    _coupler_set_ic!(Y, p, t, model::LandModel, T_sfc, surface_elevation, set_ic!)
+
+Helper function to set initial conditions using the provided set_ic! function. 
+We also use it to set the cache variables
+required to compute radiation in the atmosphere.
+
+The land model expects a reasonable guess for air temperature, air pressure, air specific humidity 
+and co2 fraction to be set before the set_ic! function
+is called, which is why we have this wrapper. These are used to make reasonable guesses for 
+initial conditions for certain prognostic variables. If the below guesses do not provided
+realistic enough IC, one could also pass in the initial conditions from the atmosphere.
+Note that if the state Y is saved, these are not required at all.
+
+Note that when running a restarted simulation, any values set here will be overwritten by
+the saved state and cache values in the restart file.
+"""
+function _coupler_set_ic!(Y, p, t, model::CL.LandModel, T_sfc, surface_elevation, set_ic!)
+    FT = eltype(T_sfc)
+    p.drivers.T .= T_sfc
+    thermo_params = LP.thermodynamic_parameters(model.canopy.earth_param_set)
+    R_d = TD.Parameters.R_d(thermo_params)
+    T_surf_ref = TD.Parameters.T_surf_ref(thermo_params)
+    grav = TD.Parameters.grav(thermo_params)
+    MSLP = TD.Parameters.MSLP(thermo_params)
+    scale_height = R_d * T_surf_ref / grav
+    elevation_correction = @. exp(-surface_elevation/scale_height)
+    p.drivers.P .= MSLP .* elevation_correction # standard pressure in Pa with an elevation correction
+    ρ_sfc = @. p.drivers.P/(R_d*p.drivers.T) # Ideal gas law
+    @. p.drivers.q = TD.q_vap_saturation(thermo_params, T_sfc, ρ_sfc)
+    p.drivers.c_co2 .= FT(4.2e-4) # Reasonable value; in the future we may wish to ensure this is consistent with atmos, but this is only used for the initial conditions
     set_ic!(Y, p, t, model)
 
     # Set albedo, T_sfc, and emissivity so that the atmosphere can compute radiation.

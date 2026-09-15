@@ -129,6 +129,22 @@ function argparse_settings()
         help = "Boolean flag indicating whether to also report the walltime on every coupling step whose number is a power of two (1, 2, 4, 8, ...), in addition to the `walltime_dt` interval [`false` (default), `true`]"
         arg_type = Bool
         default = false
+        "--flux_snapshot_interval"
+        help = "Time interval for writing exchange-grid flux snapshots, for `Plotting.plot_flux_snapshot` [\"never\" (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"never\"]"
+        arg_type = String
+        default = "never"
+        "--flux_snapshot_start"
+        help = "Earliest simulation time to write flux snapshots at [nothing (default): `t_start`; allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\"]"
+        arg_type = String
+        default = nothing
+        "--flux_snapshot_end"
+        help = "Latest simulation time to write flux snapshots at [nothing (default): `t_end`; allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\"]"
+        arg_type = String
+        default = nothing
+        "--flux_snapshot_on_nan"
+        help = "Boolean flag indicating whether to write one flux snapshot on the first coupling step with a NaN in the coupler turbulent fluxes [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
         # Space information
         "--h_elem"
         help = "Number of horizontal elements to use for the atmosphere horizontal space [16 (default)]"
@@ -557,6 +573,18 @@ function get_coupler_args(config_dict::Dict)
     end
     walltime_debug = get(config_dict, "walltime_debug", false)
 
+    # Flux snapshot information (for plotting fluxes on every grid)
+    flux_snapshot_interval = get(config_dict, "flux_snapshot_interval", "never")
+    flux_snapshot_start = get(config_dict, "flux_snapshot_start", nothing)
+    flux_snapshot_start =
+        isnothing(flux_snapshot_start) ? float(t_start) :
+        Float64(Utilities.time_to_seconds(flux_snapshot_start))
+    flux_snapshot_end = get(config_dict, "flux_snapshot_end", nothing)
+    flux_snapshot_end =
+        isnothing(flux_snapshot_end) ? float(t_end) :
+        Float64(Utilities.time_to_seconds(flux_snapshot_end))
+    flux_snapshot_on_nan = get(config_dict, "flux_snapshot_on_nan", true)
+
     # Atmos progress reporting information
     atmos_progress_interval = config_dict["atmos_progress_interval"]
 
@@ -681,6 +709,10 @@ function get_coupler_args(config_dict::Dict)
         checkpoint_dt,
         walltime_dt,
         walltime_debug,
+        flux_snapshot_interval,
+        flux_snapshot_start,
+        flux_snapshot_end,
+        flux_snapshot_on_nan,
         atmos_progress_interval,
         detect_restart_files,
         restart_dir,

@@ -195,6 +195,10 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         checkpoint_dt,
         walltime_dt,
         walltime_debug,
+        flux_snapshot_interval,
+        flux_snapshot_start,
+        flux_snapshot_end,
+        flux_snapshot_on_nan,
         atmos_progress_interval,
         detect_restart_files,
         restart_dir,
@@ -464,6 +468,29 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         walltime_cb =
             TimeManager.Callback(schedule_walltime, TimeManager.WalltimeReporter())
         callbacks = (checkpoint_cb, walltime_cb)
+    end
+
+    # flux snapshots: periodic within a window, and one on the first NaN
+    schedule_flux_snapshot = TimeManager.flux_snapshot_schedule(
+        flux_snapshot_interval,
+        flux_snapshot_start,
+        flux_snapshot_end,
+        start_date,
+        t_start,
+    )
+    if !isnothing(schedule_flux_snapshot)
+        flux_snapshot_cb = TimeManager.Callback(
+            schedule_flux_snapshot,
+            cs -> SimOutput.write_flux_snapshot(cs),
+        )
+        callbacks = (callbacks..., flux_snapshot_cb)
+    end
+    if flux_snapshot_on_nan
+        nan_snapshot_cb = TimeManager.Callback(
+            CD.Schedules.EveryStepSchedule(),
+            SimOutput.NaNFluxSnapshot(),
+        )
+        callbacks = (callbacks..., nan_snapshot_cb)
     end
 
     # component model progress reporting

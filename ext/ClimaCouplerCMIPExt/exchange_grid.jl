@@ -108,6 +108,47 @@ function _build_csr(rows::Vector{Int}, n_rows::Int)
 end
 
 """
+    exchange_polygons(boundary_space_cpu, grid_oc)
+
+The SE-element × FV-cell intersection polygons, in the order every
+exchange-grid array uses, as
+`(; elem_of_poly, oc_of_poly, polys, keep, manifold, n_elem, n_oc)`.
+`keep[k]` is false for polygons over dry (immersed) surface cells.
+
+Shared by [`build_exchange_grid`](@ref) and [`exchange_grid_geometry`](@ref), so
+both number the polygons identically.
+"""
+function exchange_polygons(boundary_space_cpu, grid_oc)
+    R = Float64(CC.Spaces.topology(boundary_space_cpu).mesh.domain.radius)
+    manifold = CR.Spherical(; radius = R)
+    grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), underlying_grid(grid_oc))
+
+    dst_tree = CR.Trees.treeify(manifold, boundary_space_cpu)
+    src_tree = CR.Trees.treeify(manifold, grid_oc_underlying_cpu)
+    intersections = CR.intersection_areas(
+        manifold,
+        CR.False(),
+        dst_tree,
+        src_tree;
+        intersection_operator = CR.IntersectionGridOperator(manifold),
+    )
+    elem_of_poly, oc_of_poly, polys = SparseArrays.findnz(intersections)
+    n_elem, n_oc = size(intersections)
+
+    keep = trues(length(polys))
+    if grid_oc isa OC.ImmersedBoundaryGrid
+        grid_with_mask_cpu = OC.on_architecture(OC.CPU(), grid_oc)
+        Nx_oc, Ny_oc, Nz_oc = size(grid_with_mask_cpu)
+        for k in eachindex(keep)
+            c = oc_of_poly[k]
+            i, j = mod1(c, Nx_oc), (c - 1) ÷ Nx_oc + 1
+            keep[k] = !OC.ImmersedBoundaries.immersed_cell(i, j, Nz_oc, grid_with_mask_cpu)
+        end
+    end
+    return (; elem_of_poly, oc_of_poly, polys, keep, manifold, n_elem, n_oc)
+end
+
+"""
     build_exchange_grid(boundary_space, grid_oc)
 
 Construct an [`ExchangeGrid`](@ref) between a ClimaCore cubed-sphere
@@ -124,39 +165,14 @@ function build_exchange_grid(boundary_space, grid_oc)
     GO = CRExt.GO
 
     boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
-    grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), underlying_grid(grid_oc))
-
     FT = CC.Spaces.undertype(boundary_space_cpu)
-    R = Float64(CC.Spaces.topology(boundary_space_cpu).mesh.domain.radius)
-    manifold = CR.Spherical(; radius = R)
 
-    # 1. SE-element × FV-cell intersection polygons.
-    dst_tree = CR.Trees.treeify(manifold, boundary_space_cpu)
-    src_tree = CR.Trees.treeify(manifold, grid_oc_underlying_cpu)
-    intersections = CR.intersection_areas(
-        manifold,
-        CR.False(),
-        dst_tree,
-        src_tree;
-        intersection_operator = CR.IntersectionGridOperator(manifold),
-    )
-    elem_of_poly, oc_of_poly, polys = SparseArrays.findnz(intersections)
-    n_elem, n_oc = size(intersections)
+    # 1–2. Intersection polygons, and which of them lie over wet cells. Dry
+    #      polygons are dropped from the exchange grid but still contribute to
+    #      the geometric coverage `node_cov_total`.
+    (; elem_of_poly, oc_of_poly, polys, keep, manifold, n_elem, n_oc) =
+        exchange_polygons(boundary_space_cpu, grid_oc)
     area = [GO.area(manifold, poly) for poly in polys]
-
-    # 2. Mark polygons over dry (immersed) surface cells. They are dropped
-    #    from the exchange grid but still contribute to the geometric
-    #    coverage `node_cov_total`.
-    keep = trues(length(area))
-    if grid_oc isa OC.ImmersedBoundaryGrid
-        grid_with_mask_cpu = OC.on_architecture(OC.CPU(), grid_oc)
-        Nx_oc, Ny_oc, Nz_oc = size(grid_with_mask_cpu)
-        for k in eachindex(keep)
-            c = oc_of_poly[k]
-            i, j = mod1(c, Nx_oc), (c - 1) ÷ Nx_oc + 1
-            keep[k] = !OC.ImmersedBoundaries.immersed_cell(i, j, Nz_oc, grid_with_mask_cpu)
-        end
-    end
 
     # 3. SEM basis integrals B_kn over each polygon. All polygons contribute
     #    to node_cov_total; only kept (wet) polygons produce COO weights,

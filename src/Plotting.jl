@@ -35,6 +35,8 @@ function compute_leaderboard end
 
 function compute_pfull_leaderboard end
 
+function plot_flux_snapshot end
+
 # Maps required packages (as a tuple) to the functions provided by that extension
 extension_fns = [
     (:Makie, :CairoMakie, :GeoMakie, :Poppler_jll, :Printf) => [
@@ -47,6 +49,7 @@ extension_fns = [
         :plot_global_conservation,
         :compute_leaderboard,
         :compute_pfull_leaderboard,
+        :plot_flux_snapshot,
     ],
     (:Makie, :CairoMakie, :GeoMakie, :Poppler_jll, :Printf, :Oceananigans) =>
         [:debug_plot!, :print_extrema],

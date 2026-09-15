@@ -23,6 +23,7 @@ include(joinpath("ClimaCouplerMakieExt", "diagnostics_plots.jl"))
 
 # Debug plots
 include(joinpath("ClimaCouplerMakieExt", "debug_plots.jl"))
+include(joinpath("ClimaCouplerMakieExt", "flux_snapshot_plots.jl"))
 
 # Leaderboard
 include(joinpath("ClimaCouplerMakieExt", "leaderboard", "data_sources.jl"))

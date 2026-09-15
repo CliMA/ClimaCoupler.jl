@@ -332,6 +332,22 @@ steps:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_mem: 16GB
+
+      - label: "CPU flux snapshot tests"
+        key: "cpu_flux_snapshot_tests"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/test/flux_snapshots_test.jl"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 16GB
+
+      - label: "GPU flux snapshot tests"
+        key: "gpu_flux_snapshot_tests"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/test/flux_snapshots_test.jl"
+        retry: *retry_policy
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_mem: 16GB
           slurm_gpus: 1
 
       - label: "GPU CMIP: ClimaAtmos + bucket land + Oceananigans + ClimaSeaIce"

@@ -242,6 +242,47 @@ function walltime_schedule(walltime_dt, walltime_debug, start_date, t_start = 0)
 end
 
 """
+    WindowSchedule(schedule, t_first, t_last)
+
+Wrap `schedule` so it only fires while the simulation time `t` (in seconds, as
+`float(t)`) lies in `[t_first, t_last]`.
+
+The wrapped schedule is evaluated on every call, even outside the window, so a
+stateful calendar schedule stays in phase.
+"""
+struct WindowSchedule{S} <: CD.Schedules.AbstractSchedule
+    schedule::S
+    t_first::Float64
+    t_last::Float64
+end
+
+function (window::WindowSchedule)(integrator)::Bool
+    fires = window.schedule(integrator)
+    t = float(integrator.t)
+    return fires && window.t_first <= t <= window.t_last
+end
+
+CD.Schedules.short_name(window::WindowSchedule) =
+    CD.Schedules.short_name(window.schedule) * "_windowed"
+
+CD.Schedules.long_name(window::WindowSchedule) =
+    CD.Schedules.long_name(window.schedule) *
+    " between t = $(window.t_first) s and t = $(window.t_last) s"
+
+"""
+    flux_snapshot_schedule(interval, t_first, t_last, start_date, t_start)
+
+Schedule for writing flux snapshots every `interval` (a string, as described in
+[`time_to_period`](@ref)) while `t_first <= t <= t_last` (seconds), or `nothing`
+if `interval` is `"never"`.
+"""
+function flux_snapshot_schedule(interval, t_first, t_last, start_date, t_start)
+    interval == "never" && return nothing
+    periodic = calendar_dt_schedule(interval, start_date, t_start)
+    return WindowSchedule(periodic, float(t_first), float(t_last))
+end
+
+"""
     WalltimeReporter()
 
 A callable object that logs the progress of a coupled simulation.

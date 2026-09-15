@@ -24,7 +24,8 @@ import ClimaCoupler:
     Interfacer,
     TimeManager,
     Utilities,
-    Plotting
+    Plotting,
+    SimOutput
 import Oceananigans as OC
 import ClimaSeaIce as CSI
 import ClimaAtmos as CA # for basis conversions (projected_vector_data)
@@ -55,6 +56,7 @@ include("ClimaCouplerCMIPExt/orca_grid.jl")
 include("ClimaCouplerCMIPExt/oceananigans.jl")
 include("ClimaCouplerCMIPExt/clima_seaice.jl")
 include("ClimaCouplerCMIPExt/climaocean_helpers.jl")
+include("ClimaCouplerCMIPExt/flux_snapshots.jl")
 
 # Include skin temperature utilities
 include("ClimaCouplerCMIPExt/skin_temperature.jl")

@@ -116,6 +116,10 @@ Note: the `mode_name` determines which Julia environment to use. Use `experiment
 | `--checkpoint_dt` | String | `"90days"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Time interval for checkpointing |
 | `--walltime_dt` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for walltime reporting. Defaults to a tenth of the simulation length, at most 30 days. Set to `"never"` to disable. |
 | `--walltime_debug` | Bool | `false` | `true`, `false` | Also report the walltime on every coupling step whose number is a power of two (1, 2, 4, 8, ...), in addition to the `walltime_dt` interval. If `walltime_dt` is `"never"`, this is the only reporting. |
+| `--flux_snapshot_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"never"` | Time interval for writing exchange-grid flux snapshots to `<output>/clima_coupler/fluxes/`, for `Plotting.plot_flux_snapshot`. |
+| `--flux_snapshot_start` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"` | Earliest simulation time to write flux snapshots at. Defaults to `t_start`. |
+| `--flux_snapshot_end` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"` | Latest simulation time to write flux snapshots at. Defaults to `t_end`. |
+| `--flux_snapshot_on_nan` | Bool | `true` | `true`, `false` | Write one flux snapshot, suffixed `_nan`, on the first coupling step with a NaN in the coupler turbulent fluxes. |
 
 Note: If any component model-specific timestep is specified, _all_ component-model
 specific timesteps should be specified, rather than only `dt`.

@@ -7,6 +7,7 @@ module SimOutput
 
 include("benchmarks.jl")
 include("diagnostics.jl")
+include("flux_snapshots.jl")
 include("sim_obs_data.jl")
 include("rmse_check.jl")
 

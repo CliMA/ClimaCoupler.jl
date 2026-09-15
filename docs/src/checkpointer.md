@@ -121,6 +121,30 @@ accumulators to a per-rank JLD2 file whenever they are non-empty, and
 a restart. Configurations without slow surfaces leave `flux_accumulators`
 empty and no accumulator file is written.
 
+### Overlapped slow surfaces
+
+When `overlap_slow_surfaces` is set, an ocean/sea ice step may be in flight when
+a checkpoint falls due. [`Checkpointer.checkpoint_sims`](@ref) joins it before
+reading any component state, so a checkpoint never captures a half-stepped
+ocean. Two consequences follow.
+
+First, the join completes whatever step was running, so a checkpoint taken
+part-way through a slow-surface window saves the slow group already advanced to
+the end of that window. Together with `prime_slow_surfaces`, which runs the slow
+group a step ahead by design, this means the ocean and sea ice in a checkpoint
+are generally at a *later* model time than the coupler and the other components,
+and by an amount that is not necessarily a whole slow step.
+
+Second, that offset cannot be recovered by counting coupling steps on restart:
+`cs.step[]` starts again at zero while the component clocks do not. The
+overlapped-group schedule is therefore re-derived at construction from where the
+slow components actually are, after the restart restore, and held in
+`slow_next_boundary`.
+
+Their diagnostics carry their own clocks for the same reason, so those files lead
+coupler time. See [Concurrent component stepping](@ref) for the stepping scheme
+these follow from.
+
 ### Adding checkpointing to a new component model
 
 There are two ways to add checkpoint/restart support for a new component model:

@@ -17,10 +17,15 @@ surface_setup: "PrescribedSurface"
 #
 # Was 1200secs (40 steps), which is too short in two independent ways:
 #
-#  * Shorter than the gravity-wave period. Both schemes are enabled here and
-#    fire every 1800 s = 60 steps, so NEITHER EVER RAN in a 40-step window, and
-#    SYPD measured over it excluded them. Cloud fraction and the diagnostics
-#    write (both hourly = 120 steps) never ran either.
+#  * Shorter than the 120-step processes. Cloud fraction and the diagnostics
+#    write are hourly = 120 steps, so neither ever ran in a 40-step window.
+#    Radiation is NOT one of them: dt_rad 600 s = every 20 steps, so 40 steps
+#    is exactly two full periods and weights radiation correctly. What missed
+#    radiation was the 10-step nsys window, which at a 20-step period caught it
+#    0 or 1 times depending on phase (docs/learnings.md 4g, 4t). Gravity waves
+#    are enabled via the atmos config and also fire every 20 steps, not 60 as
+#    this comment previously claimed; at 0.66% of GPU kernel time they are not
+#    a reason to size the window either way.
 #  * Dominated by first-call compilation. The model reported 0.2767 s per
 #    coupling step over 40 steps while steady-state steps measure 0.146 s by
 #    direct CUDA-event timing -- roughly half the reported per-step cost was JIT

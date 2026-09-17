@@ -99,7 +99,7 @@ Note: the `mode_name` determines which Julia environment to use. Use `experiment
 | `--FLOAT_TYPE` | String | `"Float64"` | `Float64`, `Float32` | Floating point precision |
 | `--device` | String | `"auto"` | `auto`, `CPUSingleThreaded`, `CPUMultiThreaded`, `CUDADevice` | Device type to control running on CPU or GPU |
 | `--step_concurrently` | Bool | `false` | `true`, `false` | Step the component models concurrently, as two groups: land then atmosphere in one task, sea ice then ocean in another. Only worthwhile on a GPU; see [SimCoordinator](@ref) |
-| `--overlap_slow_surfaces` | Bool | `false` | `true`, `false` | With `step_concurrently`, span one ocean/sea ice step across several coupling steps instead of blocking on it within one. The atmosphere then sees an ocean one slow step older unless `prime_slow_surfaces` is also set |
+| `--overlap_slow_surfaces` | Bool | `false` | `true`, `false` | With `step_concurrently`, span one ocean/sea ice step across several coupling steps instead of blocking on it within one. The atmosphere then sees an ocean one slow step older unless `prime_slow_surfaces` is also set. Pays best when `dt_ocean`/`dt_seaice` are a few multiples of `dt_cpl`; if they equal `dt_cpl` it overlaps the coupler's exchange and communication but saves no more computation than `step_concurrently` alone. See [SimCoordinator](@ref) |
 | `--prime_slow_surfaces` | Bool | `false` | `true`, `false` | With `overlap_slow_surfaces`, advance the ocean/sea ice one step during initialization so the overlapped step runs ahead of the coupler. Removes the extra lag in the ocean state the atmosphere sees, in exchange for forcing the ocean with the previous window's fluxes |
 
 #### Time information

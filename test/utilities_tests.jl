@@ -1,14 +1,28 @@
 #=
     Unit tests for ClimaCoupler Utilities module
 =#
-import Test: @testset, @test
+import Test: @testset, @test, @test_throws
 import ClimaComms
 ClimaComms.@import_required_backends
 import ClimaCoupler: Utilities
 import ClimaCore as CC
+import Dates
 
 # Initialize MPI context, in case
 ClimaComms.init(ClimaComms.context())
+
+@testset "parse_date / format_start_date" begin
+    @test Utilities.parse_date("20000506") == Dates.DateTime(2000, 5, 6)
+    @test Utilities.parse_date("20000506-0000") == Dates.DateTime(2000, 5, 6, 0, 0)
+    @test Utilities.parse_date("20191231-1200") == Dates.DateTime(2019, 12, 31, 12, 0)
+    @test Utilities.parse_date(Dates.DateTime(2019, 12, 31, 12)) ==
+          Dates.DateTime(2019, 12, 31, 12)
+    @test_throws ErrorException Utilities.parse_date("20000506-00000")
+    @test_throws ErrorException Utilities.parse_date("")
+
+    @test Utilities.format_start_date(Dates.DateTime(2019, 12, 31)) == "20191231"
+    @test Utilities.format_start_date(Dates.DateTime(2019, 12, 31, 12)) == "20191231-1200"
+end
 
 for FT in (Float32, Float64)
     @testset "test comms_ctx" begin

@@ -4,6 +4,12 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Support non-00Z `start_date` for subseasonal / WeatherQuest ICs.
+`start_date` now accepts `YYYYMMDD-HHMM` (in addition to `YYYYMMDD`), matching
+ClimaAtmos. Subseasonal ERA5 land/SST/SIC/albedo/bucket paths use that HHMM
+instead of always `_0000`, so 12Z (and other) initializations find the correct
+WeatherQuest files.
+
 #### Route rain through sea-ice.
 The ocean now receives `P_liq + (1 - ℵ) P_snow`; rain drains through the ice
 instead of ponding on it (and being lost) while snow can still accumulate on

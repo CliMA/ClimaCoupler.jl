@@ -188,9 +188,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         start_date,
         Δt_cpl,
         component_dt_dict,
-        share_surface_space,
-        nh_poly_coupler,
-        h_elem_coupler,
         saveat,
         checkpoint_dt,
         walltime_dt,
@@ -269,19 +266,14 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     ### Boundary Space
     We use a boundary space at the surface for coupling operations (computing fluxes, regridding, etc).
     For column mode, this is a 1D PointSpace with lat/long coordinates.
-    For global mode, this is a 2D CubedSphereSpace or the atmosphere's horizontal space
-    (if `share_surface_space` is true).
+    For global mode, this is the atmosphere's horizontal surface space.
     =#
     boundary_space = Utilities.create_boundary_space(
         FT,
         domain_type,
         atmos_sim,
-        share_surface_space,
         comms_ctx;
         column_latlon,
-        nh_poly_coupler,
-        h_elem_coupler,
-        coupled_param_dict,
     )
 
     surface_elevation = Interfacer.get_field(boundary_space, atmos_sim, Val(:height_sfc))
@@ -312,8 +304,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     (; sst_path, sic_path, land_ic_path, albedo_path, bucket_initial_condition) =
         era5_filepaths
 
-    shared_surface_space =
-        (share_surface_space || domain_type == "column") ? boundary_space : nothing
     land_sim = Interfacer.LandSimulation(
         FT,
         land_model;
@@ -322,7 +312,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         start_date,
         output_dir = dir_paths.land_output_dir,
         area_fraction = land_fraction,
-        shared_surface_space,
+        surface_space = boundary_space,
         atmos_h,
         initial_T,
         use_land_diagnostics,

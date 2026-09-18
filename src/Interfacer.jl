@@ -614,9 +614,7 @@ NVTX.@annotate function remap(
 
     # Check if the source and target spaces are compatible
     spaces_are_compatible =
-        source_space == target_space ||
-        CC.Spaces.issubspace(source_space, target_space) ||
-        CC.Spaces.issubspace(target_space, source_space)
+        source_space == target_space || _same_horizontal_grid(source_space, target_space)
 
     # If the spaces are the same or one is a subspace of the other, we can just copy the
     # source field to the target space. Note this is a dangerous operation because it accesses
@@ -659,9 +657,7 @@ NVTX.@annotate function remap!(target_field::CC.Fields.Field, source_field::CC.F
 
     # Check if the source and target spaces are compatible
     spaces_are_compatible =
-        source_space == target_space ||
-        CC.Spaces.issubspace(source_space, target_space) ||
-        CC.Spaces.issubspace(target_space, source_space)
+        source_space == target_space || _same_horizontal_grid(source_space, target_space)
 
     # TODO: Handle remapping of Vectors correctly
     if hasproperty(source_field, :components)
@@ -787,6 +783,21 @@ Return the `ClimaCore.Field` over which the exchange fields are defined.
 """
 function boundary_space(sim::CoupledSimulation)
     return axes(sim.fields)
+end
+
+"""
+    _same_horizontal_grid(space1, space2)
+
+Whether two horizontal spaces are backed by the same horizontal grid, and so hold their
+data in the same layout and node order. True for the atmosphere's surface level and the
+coupler boundary space, which is that level's horizontal space. Replaces
+`Spaces.issubspace`, which ClimaCore 1.0 no longer defines for two spectral element spaces.
+"""
+function _same_horizontal_grid(space1, space2)
+    space1 isa CC.Spaces.AbstractSpectralElementSpace || return false
+    space2 isa CC.Spaces.AbstractSpectralElementSpace || return false
+    return CC.Spaces.horizontal_grid(CC.Spaces.grid(space1)) ===
+           CC.Spaces.horizontal_grid(CC.Spaces.grid(space2))
 end
 
 """

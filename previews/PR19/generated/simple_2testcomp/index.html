@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Vertical Column Heat Diffusion · CouplerMachine</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="CouplerMachine logo"/></a><div class="docs-package-name"><span class="docs-autofit">CouplerMachine</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Examples</span><ul><li class="is-active"><a class="tocitem" href>Vertical Column Heat Diffusion</a><ul class="internal"><li><a class="tocitem" href="#Setup"><span>Setup</span></a></li><li><a class="tocitem" href="#Equations"><span>Equations</span></a></li><li class="toplevel"><a class="tocitem" href="#Import-packages"><span>Import packages</span></a></li><li class="toplevel"><a class="tocitem" href="#Set-simulation-parameters"><span>Set simulation parameters</span></a></li><li class="toplevel"><a class="tocitem" href="#Set-up-coupled-model"><span>Set up coupled model</span></a></li><li class="toplevel"><a class="tocitem" href="#Define-pre_step-and-post_step-functions"><span>Define <code>pre_step</code> and <code>post_step</code> functions</span></a></li><li class="toplevel"><a class="tocitem" href="#Specify-balance-law"><span>Specify balance law</span></a></li><li class="toplevel"><a class="tocitem" href="#Run-simulation"><span>Run simulation</span></a></li></ul></li><li><a class="tocitem" href="../run_script_v2/">Advection-diffusion on a Sphere</a></li></ul></li><li><span class="tocitem">Coupler Interface</span><ul><li><a class="tocitem" href="../../couplerstate/">Coupler State</a></li><li><a class="tocitem" href="../../timestepping/">Coupled Timestepping</a></li><li><a class="tocitem" href="../../coupledmodel/">Coupled Model Components</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Vertical Column Heat Diffusion</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Vertical Column Heat Diffusion</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/CliMA/CouplerMachine/blob/master/experiments/ClimateMachine/DesignTests/simple_2testcomp.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Diffusion-Equation-in-a-Vertical-Column"><a class="docs-heading-anchor" href="#Diffusion-Equation-in-a-Vertical-Column">Diffusion Equation in a Vertical Column</a><a id="Diffusion-Equation-in-a-Vertical-Column-1"></a><a class="docs-heading-anchor-permalink" href="#Diffusion-Equation-in-a-Vertical-Column" title="Permalink"></a></h1><h2 id="Setup"><a class="docs-heading-anchor" href="#Setup">Setup</a><a id="Setup-1"></a><a class="docs-heading-anchor-permalink" href="#Setup" title="Permalink"></a></h2><ul><li>A vertical diffusive column split over two Cartesian components (atmos &amp; ocean columns)</li><li>Boundary conditions used to set diffusive flux in other components have different vertical discretizations and timesteps</li><li>The coupler maps fields between the two components</li></ul><h2 id="Equations"><a class="docs-heading-anchor" href="#Equations">Equations</a><a id="Equations-1"></a><a class="docs-heading-anchor-permalink" href="#Equations" title="Permalink"></a></h2><p>The RHS evaluation follows:</p><p class="math-container">\[\frac{\partial \theta}{\partial t} = - \nabla \cdot [\kappa(\phi_{init}) \nabla \phi]\]</p><p>where</p><ul><li><span>$\theta$</span> is the tracer (e.g. potential temperature)</li><li><span>$\kappa$</span> is the diffusivity tensor</li></ul><h1 id="Import-packages"><a class="docs-heading-anchor" href="#Import-packages">Import packages</a><a id="Import-packages-1"></a><a class="docs-heading-anchor-permalink" href="#Import-packages" title="Permalink"></a></h1><pre><code class="language-">using ClimateMachine
+using MPI
+using Statistics
+
+# To couple
+using CouplerMachine
+using Unitful, Dates
+
+# To create meshes &amp; grids
+using ClimateMachine.Ocean.Domains
+using ClimateMachine.Grids
+import ClimateMachine.DGMethods.NumericalFluxes: NumericalFluxSecondOrder
+
+# To setup some callbacks
+using ClimateMachine.GenericCallbacks
+
+# To invoke timestepper
+using ClimateMachine.ODESolvers
+using ClimateMachine.ODESolvers: solve!
+using ClimateMachine.MPIStateArrays: weightedsum
+
+ClimateMachine.init()
+const FT = Float64;
+
+if !(:CplTestingBL in names(Main))
+    include(&quot;CplTestingBL.jl&quot;) # allows re-run of script without restarting julia
+end
+using .CplTestingBL</code></pre><h1 id="Set-simulation-parameters"><a class="docs-heading-anchor" href="#Set-simulation-parameters">Set simulation parameters</a><a id="Set-simulation-parameters-1"></a><a class="docs-heading-anchor-permalink" href="#Set-simulation-parameters" title="Permalink"></a></h1><pre><code class="language-">couple_dt = 3600.0 # timestep at which coupled components sync
+nstepsA = 10 # atmos steps per coupled timestep
+nstepsO = 5 # ocean steps per coupled timestep
+
+#  Haney like relaxation time scale and a length scale (Haney, 1971).
+#  Air-sea exchange vigor is governed by length/time-scale.
+const τ_airsea = FT(60 * 86400)
+const L_airsea = FT(500)
+const λ_airsea = FT(L_airsea / τ_airsea)
+function coupling_lambda()
+    return (λ_airsea)
+end;
+
+#  Background atmos and ocean diffusivities
+const κᵃʰ = FT(1e4) * 0.0
+const κᵃᶻ = FT(1e-1)
+const κᵒʰ = FT(1e3) * 0.0
+const κᵒᶻ = FT(1e-4)</code></pre><h1 id="Set-up-coupled-model"><a class="docs-heading-anchor" href="#Set-up-coupled-model">Set up coupled model</a><a id="Set-up-coupled-model-1"></a><a class="docs-heading-anchor-permalink" href="#Set-up-coupled-model" title="Permalink"></a></h1><p>Define component models and initialize the coupler</p><pre><code class="language-julia">function main(::Type{FT}) where {FT}
+    # Domain
+    Np = 4
+    ΩA = RectangularDomain(
+        Ne = (10, 10, 5),
+        Np = Np,
+        x = (0, 1e6),
+        y = (0, 1e6),
+        z = (0, 1e5),
+        periodicity = (true, true, false),
+    )
+    ΩO = RectangularDomain(
+        Ne = (10, 10, 4),
+        Np = Np,
+        x = (0, 1e6),
+        y = (0, 1e6),
+        z = (-4e3, 0),
+        periodicity = (true, true, false),
+    )
+
+    # Grid
+    btags = ((0,0),(0,0),(1,2))
+    gridA = DiscontinuousSpectralElementGrid(ΩA; boundary_tags = btags)
+    gridO = DiscontinuousSpectralElementGrid(ΩO; boundary_tags = btags)
+
+    # Numerics-specific options
+    numerics = (NFsecondorder = CplTestingBL.PenaltyNumFluxDiffusive(),)
+
+    # Callbacks (TODO)
+    callbacks = ()
+
+    # Collect spatial info, timestepping, balance law and DGmodel for the two components
+
+    # 1. Atmos component
+    mA = CplModel(;
+        grid = gridA,
+        equations = CplTestBL(
+            bl_propA,
+            (CoupledPrimaryBoundary(), ExteriorBoundary()),
+        ),
+        nsteps = nstepsA,
+        dt = couple_dt / nstepsA,
+        numerics...,
+    )
+
+    # 2. Ocean component
+    mO = CplModel(;
+        grid = gridO,
+        equations = CplTestBL(
+            bl_propO,
+            (ExteriorBoundary(), CoupledSecondaryBoundary()),
+        ),
+        nsteps = nstepsO,
+        dt = couple_dt / nstepsO,
+        numerics...,
+    )</code></pre><p>Create the coupler object for holding import/export fields and performs mappings and instantiate the coupled timestepper:</p><pre><code class="language-julia">    coupler = CplState()
+    coupler_register!(coupler, :Ocean_SST, deepcopy(mO.state.θ[mO.boundary]), mO.grid, DateTime(0), u&quot;°C&quot;)
+    coupler_register!(coupler, :Atmos_MeanAirSeaθFlux, deepcopy(mA.state.F_accum[mA.boundary]), mA.grid, DateTime(0), u&quot;°C&quot;)
+
+    compA = (pre_step = preatmos, component_model = mA, post_step = postatmos)
+    compO = (pre_step = preocean, component_model = mO, post_step = postocean)
+    component_list = (atmosphere = compA, ocean = compO)
+    cpl_solver = CplSolver(
+        component_list = component_list,
+        coupler = coupler,
+        coupling_dt = couple_dt,
+        t0 = 0.0,
+    )
+
+    return cpl_solver, callbacks
+end
+
+function run(cpl_solver, numberofsteps, cbvector)
+    solve!(
+        nothing,
+        cpl_solver;
+        numberofsteps = numberofsteps,
+        callbacks = cbvector,
+    )
+end</code></pre><pre class="documenter-example-output">run (generic function with 1 method)</pre><h1 id="Define-pre_step-and-post_step-functions"><a class="docs-heading-anchor" href="#Define-pre_step-and-post_step-functions">Define <code>pre_step</code> and <code>post_step</code> functions</a><a id="Define-pre_step-and-post_step-functions-1"></a><a class="docs-heading-anchor-permalink" href="#Define-pre_step-and-post_step-functions" title="Permalink"></a></h1><p>Each component model must define <code>pre_step</code> and <code>post_step</code> functions. In the <code>pre_step</code>, a component imports necessary boundary state and flux data from the coupler. In the <code>post_step</code>, a component exports boundary data to the coupler to be later received by other components.</p><pre><code class="language-julia">function get_components(csolver)
+    mA = csolver.component_list.atmosphere.component_model
+    mO = csolver.component_list.ocean.component_model
+    return mA, mO
+end
+
+function preatmos(csolver)
+    mA, mO = get_components(csolver)
+
+    # Set boundary SST used in atmos to SST of ocean surface at start of coupling cycle.
+    mA.discretization.state_auxiliary.θ_secondary[mA.boundary] .=
+        coupler_get(csolver.coupler, :Ocean_SST, mA.grid, DateTime(0), u&quot;°C&quot;)
+    # Set atmos boundary flux accumulator to 0.
+    mA.state.F_accum .= 0
+
+    @info(
+        &quot;preatmos&quot;,
+        time = csolver.t,
+        total_θ_atmos = weightedsum(mA.state, 1),
+        total_θ_ocean = weightedsum(mO.state, 1),
+        total_θ = weightedsum(mA.state, 1) + weightedsum(mO.state, 1),
+        atmos_θ_surface_max = maximum(mA.state.θ[mA.boundary]),
+        ocean_θ_surface_max = maximum(mO.state.θ[mO.boundary]),
+    )
+end
+
+function postatmos(csolver)
+    mA, mO = get_components(csolver)
+
+    # Pass atmos exports to &quot;coupler&quot; namespace
+    # 1. Save mean θ flux at the Atmos boundary during the coupling period
+    coupler_put!(csolver.coupler, :Atmos_MeanAirSeaθFlux, mA.state.F_accum[mA.boundary] ./ csolver.dt,
+        mA.grid, DateTime(0), u&quot;°C&quot;)
+
+    @info(
+        &quot;postatmos&quot;,
+        time = time = csolver.t + csolver.dt,
+        total_θ_atmos = weightedsum(mA.state, 1),
+        total_θ_ocean = weightedsum(mO.state, 1),
+        total_F_accum = mean(mA.state.F_accum[mA.boundary]) * 1e6 * 1e6,
+        total_θ =
+            weightedsum(mA.state, 1) +
+            weightedsum(mO.state, 1) +
+            mean(mA.state.F_accum[mA.boundary]) * 1e6 * 1e6,
+        F_accum_max = maximum(mA.state.F_accum[mA.boundary]),
+        F_avg_max = maximum(mA.state.F_accum[mA.boundary] ./ csolver.dt),
+        atmos_θ_surface_max = maximum(mA.state.θ[mA.boundary]),
+        ocean_θ_surface_max = maximum(mO.state.θ[mO.boundary]),
+    )
+end
+
+function preocean(csolver)
+    mA, mO = get_components(csolver)
+
+    # Set mean air-sea theta flux
+    mO.discretization.state_auxiliary.F_prescribed[mO.boundary] .=
+        coupler_get(csolver.coupler, :Atmos_MeanAirSeaθFlux, mO.grid, DateTime(0), u&quot;°C&quot;)
+    # Set ocean boundary flux accumulator to 0. (this isn&#39;t used)
+    mO.state.F_accum .= 0
+
+    @info(
+        &quot;preocean&quot;,
+        time = csolver.t,
+        F_prescribed_max =
+            maximum(mO.discretization.state_auxiliary.F_prescribed[mO.boundary]),
+        F_prescribed_min =
+            maximum(mO.discretization.state_auxiliary.F_prescribed[mO.boundary]),
+        ocean_θ_surface_max = maximum(mO.state.θ[mO.boundary]),
+        ocean_θ_surface_min = maximum(mO.state.θ[mO.boundary]),
+    )
+end
+
+function postocean(csolver)
+    mA, mO = get_components(csolver)
+    @info(
+        &quot;postocean&quot;,
+        time = csolver.t + csolver.dt,
+        ocean_θ_surface_max = maximum(mO.state.θ[mO.boundary]),
+        ocean_θ_surface_min = maximum(mO.state.θ[mO.boundary]),
+    )
+
+    # Pass ocean exports to &quot;coupler&quot; namespace
+    #  1. Ocean SST (value of θ at z=0)
+    coupler_put!(csolver.coupler, :Ocean_SST, mO.state.θ[mO.boundary], mO.grid, DateTime(0), u&quot;°C&quot;)
+end</code></pre><pre class="documenter-example-output">postocean (generic function with 1 method)</pre><h1 id="Specify-balance-law"><a class="docs-heading-anchor" href="#Specify-balance-law">Specify balance law</a><a id="Specify-balance-law-1"></a><a class="docs-heading-anchor-permalink" href="#Specify-balance-law" title="Permalink"></a></h1><pre><code class="language-"># Set atmosphere initial state function
+function atmos_init_theta(xc, yc, zc, npt, el)
+    return 30.0
+end
+# Set atmosphere shadow boundary flux function
+function atmos_theta_shadow_boundary_flux(θᵃ, θᵒ, npt, el, xc, yc, zc)
+    if zc == 0.0
+        tflux = (1.0 / τ_airsea) * (θᵃ - θᵒ)
+    else
+        tflux = 0.0
+    end
+    return tflux
+end
+# Set atmsophere diffusion coeffs
+function atmos_calc_kappa_diff(_...)
+    return κᵃʰ, κᵃʰ, κᵃᶻ
+end
+# Set atmos source!
+function atmos_source_theta(θᵃ, npt, el, xc, yc, zc, θᵒ)
+    tsource = 0.0
+    if zc == 0.0
+        # tsource = -(1. / τ_airsea)*( θᵃ-θᵒ )
+    end
+    return tsource
+end
+# Set penalty term tau (for debugging)
+function atmos_get_penalty_tau(_...)
+    return FT(3.0 * 0.0)
+end
+# Create atmos component
+bl_propA = CplTestingBL.prop_defaults()
+
+bl_propA = (;bl_propA..., init_theta = atmos_init_theta,
+            theta_shadow_boundary_flux = atmos_theta_shadow_boundary_flux)
+bl_propA = (bl_propA..., init_theta = atmos_init_theta)
+bl_propA =
+    (bl_propA..., theta_shadow_boundary_flux = atmos_theta_shadow_boundary_flux)
+bl_propA = (bl_propA..., calc_kappa_diff = atmos_calc_kappa_diff)
+bl_propA = (bl_propA..., source_theta = atmos_source_theta)
+bl_propA = (bl_propA..., get_penalty_tau = atmos_get_penalty_tau)
+bl_propA = (bl_propA..., coupling_lambda = coupling_lambda)
+
+# Set initial temperature profile
+function ocean_init_theta(xc, yc, zc, npt, el)
+    return 20.0
+end
+# Set boundary source imported from atmos
+function ocean_source_theta(θ, npt, el, xc, yc, zc, air_sea_flux_import)
+    sval = 0.0
+    if zc == 0.0
+        # sval=air_sea_flux_import
+    end
+    return sval
+end
+# Set ocean diffusion coeffs
+function ocean_calc_kappa_diff(_...)
+    # return κᵒʰ,κᵒʰ,κᵒᶻ*FT(100.)
+    return κᵒʰ, κᵒʰ, κᵒᶻ # m^2 s^-1
+end
+# Set penalty term tau (for debugging)
+function ocean_get_penalty_tau(_...)
+    return FT(0.15 * 0.0)
+end
+# Create ocean component
+bl_propO = CplTestingBL.prop_defaults()
+bl_propO = (bl_propO..., init_theta = ocean_init_theta)
+bl_propO = (bl_propO..., source_theta = ocean_source_theta)
+bl_propO = (bl_propO..., calc_kappa_diff = ocean_calc_kappa_diff)
+bl_propO = (bl_propO..., get_penalty_tau = ocean_get_penalty_tau)
+bl_propO = (bl_propO..., coupling_lambda = coupling_lambda)</code></pre><h1 id="Run-simulation"><a class="docs-heading-anchor" href="#Run-simulation">Run simulation</a><a id="Run-simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Run-simulation" title="Permalink"></a></h1><pre><code class="language-">simulation, cbvector = main(Float64);
+nsteps = 10
+println(&quot;Initialized. Running...&quot;)
+run(simulation, nsteps, cbvector)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../run_script_v2/">Advection-diffusion on a Sphere »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 14 September 2021 22:59">Tuesday 14 September 2021</span>. Using Julia version 1.5.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

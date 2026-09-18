@@ -34,10 +34,10 @@ end
         start_date::Dates.DateTime,
         output_dir::String,
         area_fraction,
-        nelements::Tuple{Int, Int} = (101, 15),
+        surface_space,
+        nelements_vert::Int = 15,
         depth::FT = FT(15),
         dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
-        shared_surface_space = nothing,
         surface_elevation = nothing,
         land_spun_up_ic::Bool = true,
         atmos_h,
@@ -73,10 +73,10 @@ function ClimaLandSimulation(
     start_date::Dates.DateTime,
     output_dir::String,
     area_fraction,
-    nelements::Tuple{Int, Int} = (101, 15),
+    surface_space,
+    nelements_vert::Int = 15,
     depth::FT = FT(15),
     dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
-    shared_surface_space = nothing,
     surface_elevation = nothing,
     land_spun_up_ic::Bool = true,
     atmos_h,
@@ -98,26 +98,18 @@ function ClimaLandSimulation(
 
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
-    if isnothing(shared_surface_space)
-        domain = make_land_domain(depth, toml_dict; nelements, dz_tuple)
-    else
-        domain = make_land_domain(
-            shared_surface_space,
-            depth;
-            nelements_vert = nelements[2],
-            dz_tuple,
-        )
-    end
+    domain = make_land_domain(surface_space, depth; nelements_vert, dz_tuple)
+    # In global mode this is the space we were handed; in column mode ClimaLand
+    # builds its own `PointSpace` for the column, so take it from the domain.
     surface_space = domain.space.surface
     subsurface_space = domain.space.subsurface
 
-    # Interpolate atmosphere height field to surface space of land model,
-    #  since that's where we compute fluxes for this land model
-    # Likewise initialize the initial temperature field to the surface space
-    # of the land model.
+    # Move the atmosphere height and initial temperature onto the land surface
+    # space, where we compute fluxes for this land model. In global mode the
+    # spaces match, so this is just a rewrap.
     atmos_h = Interfacer.remap(surface_space, atmos_h)
     initial_T = Interfacer.remap(surface_space, initial_T)
-    # If provided, interpolate surface elevation field to surface space; otherwise use zero elevation
+    # If provided, move surface elevation to the surface space; otherwise use zero elevation
     if isnothing(surface_elevation)
         surface_elevation = CC.Fields.zeros(surface_space)
     else

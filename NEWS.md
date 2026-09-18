@@ -22,10 +22,10 @@ the ice.
 When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange
 grid — the polygons where the cubed-sphere spectral elements intersect the
 ocean's `TripolarGrid` cells (via ConservativeRegridding's operator API) —
-and uses it to 
+and uses it to
 (1) derive land/ocean/ice area fractions from the ocean's
 bathymetric wet mask (DSS'd nodal coverage ratio), so fractions and flux
-weights are consistent with where the ocean actually has wet cells 
+weights are consistent with where the ocean actually has wet cells
 (2) compute ocean and sea-ice turbulent fluxes per polygon, with per-polygon
 sea-ice-concentration weighting, conservative aggregation to both grids, and
 GPU-resident, allocation-free per-step application. Controlled by the new
@@ -53,9 +53,9 @@ v0.2.3
 #### Add `OrSchedule`, `PowerOfTwoSchedule`, `cs.step`, and a `walltime_debug` flag.
 Callback schedules now receive `(; t, step)` instead of just `(; t)`, so any
 `ClimaDiagnostics` schedule can be used as a coupler callback. `step` is a new
-`CoupledSimulation` field that counts the coupling steps of the current run, 
-restarting from 1 after a restart. The new `walltime_debug` config flag (default 
-`false`) also reports the walltime on the steps that are a power of two, in 
+`CoupledSimulation` field that counts the coupling steps of the current run,
+restarting from 1 after a restart. The new `walltime_debug` config flag (default
+`false`) also reports the walltime on the steps that are a power of two, in
 addition to every `walltime_dt`.
 
 #### Remove ClimaOcean dependency PR[#2039](https://github.com/CliMA/ClimaCoupler.jl/pull/2039), PR[#2059](https://github.com/CliMA/ClimaCoupler.jl/pull/2059)

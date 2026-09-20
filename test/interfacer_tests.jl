@@ -316,14 +316,7 @@ end
     )
     field = CC.Fields.coordinate_field(source_space).lat
 
-    # Remapping onto the same space is a copy. The ClimaCore DataLayout underlying
-    # the remapped field may use Array instead of SubArray, so compare the parents.
-    @test parent(Interfacer.remap(source_space, field)) == parent(field)
-    remapped = CC.Fields.zeros(source_space)
-    Interfacer.remap!(remapped, field)
-    @test parent(remapped) == parent(field)
-
-    # Remapping between distinct spectral element spaces is an error
+    # Remap field to target space
     target_space = CC.CommonSpaces.CubedSphereSpace(
         FT;
         radius = FT(6.371e6), # in meters
@@ -331,8 +324,14 @@ end
         h_elem = 6,
         context,
     )
-    @test_throws ErrorException Interfacer.remap(target_space, field)
-    @test_throws ErrorException Interfacer.remap!(CC.Fields.zeros(target_space), field)
+    field_target_space = Interfacer.remap(target_space, field)
+
+    # remap back to source space
+    field_source_space = Interfacer.remap(source_space, field_target_space)
+
+    # The ClimaCore DataLayout underlying the remapped field uses
+    # Array instead of SubArray, so we can't compare the fields directly without Copy
+    @test field_source_space ≈ copy(field)
 end
 
 @testset "Floating Point time-stepping" begin

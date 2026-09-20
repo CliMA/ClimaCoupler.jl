@@ -4,15 +4,6 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
-#### Remove land and coupler space flexibility.
-The `h_elem_coupler`, `nh_poly_coupler`, and `share_surface_space` configuration
-options have been removed. The coupler boundary space is now always the
-atmosphere's horizontal surface space (or, in single-column mode, a `PointSpace`),
-and the land model is always built on it. This was done because a conservative
-SE -> SE regridder has not been written yet, and the interpolation implementation
-was slow. `Interfacer.remap!` now errors when asked to remap between two distinct
-spectral-element spaces.
-
 #### Route rain through sea-ice.
 The ocean now receives `P_liq + (1 - ℵ) P_snow`; rain drains through the ice
 instead of ponding on it (and being lost) while snow can still accumulate on

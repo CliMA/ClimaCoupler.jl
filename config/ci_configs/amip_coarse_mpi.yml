@@ -5,6 +5,7 @@ h_elem: 4
 mode_name: "amip"
 rad: "allskywithclear"
 microphysics_model: "0M"
+share_surface_space: false
 t_end: "1days"
 time_varying_trace_gases: ["CO2"]
 vert_diff: VerticalDiffusion

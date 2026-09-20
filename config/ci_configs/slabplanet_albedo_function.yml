@@ -8,6 +8,7 @@ h_elem: 4
 mode_name: "slabplanet"
 rad: "gray"
 microphysics_model: "0M"
+share_surface_space: false
 t_end: "1days"
 use_itime: false
 vert_diff: VerticalDiffusion

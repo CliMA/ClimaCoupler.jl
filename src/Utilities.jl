@@ -344,31 +344,49 @@ function _column_boundary_space(::Type{FT}, latlon, comms_ctx) where {FT}
 end
 
 """
-    create_boundary_space(::Type{FT}, domain_type, atmos_sim, comms_ctx; column_latlon = nothing)
+    create_boundary_space(::Type{FT}, domain_type, atmos_sim, share_surface_space, comms_ctx; kwargs...)
 
 Construct the 2D boundary space used for coupler field exchange.
 
-The boundary space is typically the atmosphere's surface space. If 
-`domain_type == "column"`, we use a `PointSpace` with lat/long coordinates.
+For `domain_type == "column"`, returns a `PointSpace` with lat/long coordinates.
+For global simulations, returns either the atmosphere's horizontal surface space
+(when `share_surface_space` is true) or an independent `CubedSphereSpace`.
 
 # Arguments
 - `FT`: floating-point type
 - `domain_type`: `"global"` or `"column"`
-- `atmos_sim`: atmosphere simulation providing the surface space
+- `atmos_sim`: atmosphere simulation (used when sharing surface space)
+- `share_surface_space`: whether to reuse the atmosphere's horizontal space
 - `comms_ctx`: ClimaComms context
 - `column_latlon`: `(lat, lon)` tuple, required when `domain_type == "column"`
+- `nh_poly`: polynomial order, required when not sharing surface space
+- `h_elem`: number of horizontal elements, required when not sharing surface space
+- `coupled_param_dict`: parameter dictionary, required when not sharing surface space
 """
 function create_boundary_space(
     ::Type{FT},
     domain_type,
     atmos_sim,
+    share_surface_space,
     comms_ctx;
     column_latlon = nothing,
+    nh_poly_coupler = nothing,
+    h_elem_coupler = nothing,
+    coupled_param_dict = nothing,
 ) where {FT}
     if domain_type == "column"
         return _column_boundary_space(FT, column_latlon, comms_ctx)
-    else
+    elseif share_surface_space
         return CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
+    else
+        n_quad_points = nh_poly_coupler + 1
+        radius = coupled_param_dict["planet_radius"]
+        return CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius,
+            n_quad_points,
+            h_elem = h_elem_coupler,
+        )
     end
 end
 

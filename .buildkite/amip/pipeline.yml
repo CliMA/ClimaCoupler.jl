@@ -8,6 +8,17 @@ env:
   GKSwstype: 100
   SLURM_KILL_BAD_EXIT: 1
   CONFIG_PATH: "config/amip_configs"
+  # By default, this pipeline uses the versions of the upstream packages
+  # recorded in the AMIP environment (experiments/AMIP/Manifest.toml).
+  # Set UPSTREAM_PACKAGES to override them. Each entry is one of:
+  #   `Package`          -> use the main branch
+  #   `Package@version`  -> pin a release
+  #   `Package#rev`      -> pin a branch or commit
+  # If you are starting a new build using the web API, you can set the
+  # UPSTREAM_PACKAGES environment variable. For example, if you pass
+  # `UPSTREAM_PACKAGES="ClimaAtmos SurfaceFluxes@1.1.0"`, then the main branch
+  # of ClimaAtmos and SurfaceFluxes v1.1.0 will be used.
+  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaCore@0.16.1 ClimaLand@1.12.1}"
 
 timeout_in_minutes: 2880
 
@@ -20,6 +31,28 @@ steps:
 
       - echo "--- Instantiate AMIP env"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      # Optionally override the versions of upstream packages,
+      # see the UPSTREAM_PACKAGES environment variable
+      - |
+        julia --project=experiments/AMIP/ -e '
+          using Pkg
+          entries = split(get(ENV, "UPSTREAM_PACKAGES", ""))
+          if isempty(entries)
+              @info "UPSTREAM_PACKAGES is empty; using the versions in the AMIP Manifest"
+          else
+              Pkg.add(map(entries) do entry
+                  if occursin("@", entry)
+                      name, version = String.(split(entry, "@"))
+                      Pkg.PackageSpec(; name, version)
+                  elseif occursin("#", entry)
+                      name, rev = String.(split(entry, "#"))
+                      Pkg.PackageSpec(; name, rev)
+                  else
+                      Pkg.PackageSpec(; name = String(entry), rev = "main")
+                  end
+              end)
+              Pkg.resolve()
+          end'
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
 

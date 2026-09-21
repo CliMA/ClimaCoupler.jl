@@ -127,8 +127,8 @@ specific timesteps should be specified, rather than only `dt`.
 
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
-| `--h_elem` | Int | `16` | Any positive integer | Number of horizontal elements to use for the boundary space |
-| `--share_surface_space` | Bool | `true` | `true`, `false` | Whether to share the surface space between surface models, atmosphere, and boundary |
+| `--h_elem` | Int | `16` | Any positive integer | Number of horizontal elements to use for the atmosphere horizontal space, which is also the coupler boundary space |
+| `--nh_poly` | Int | `3` | Any non-negative integer | Polynomial order to use for the atmosphere horizontal space, which is also the coupler boundary space |
 
 #### Restart information
 

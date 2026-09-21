@@ -551,6 +551,38 @@ function _dss_and_normalize!(field, cov, buffer, cutoff, z)
     return nothing
 end
 
+# FLUX CLAMP HACK
+# `_dss_and_normalize!` forms `Σ_k B_kn F_k / Σ_k B_kn` with the L2 projection
+# weights `B_kn = ∫_poly ϕ_i ϕ_j dA`. Those weights can be negative, so summing 
+# over only the wet subset (and not *all* polygons) can lead to cancelations in 
+# the denominator. The functions below clamp each nodal flux back into the range 
+# of the polygon values that fed it. The real fix would be to give the scatter a 
+# non-negative partition of unity so it is bounded by construction.
+function _nodal_flux_bounds!(scratch, eg, buffer, poly_values, weight)
+    (; lo, hi, cnt) = scratch
+    poly_extrema_at_nodes!(
+        se_nodal_vec(lo),
+        se_nodal_vec(hi),
+        se_nodal_vec(cnt),
+        eg,
+        poly_values,
+        weight,
+    )
+    scalar_weighted_dss!(lo, buffer)
+    scalar_weighted_dss!(hi, buffer)
+    scalar_weighted_dss!(cnt, buffer)
+    FT = CC.Spaces.undertype(axes(lo))
+    @. lo = ifelse(cnt > 0, lo / max(cnt, eps(FT)), zero(FT))
+    @. hi = ifelse(cnt > 0, hi / max(cnt, eps(FT)), zero(FT))
+    return nothing
+end
+function _clamp_to_poly_range!(field, scratch, eg, buffer, poly_values, weight, cov, cutoff)
+    _nodal_flux_bounds!(scratch, eg, buffer, poly_values, weight)
+    (; lo, hi) = scratch
+    @. field = ifelse(cov > cutoff, clamp(field, lo, hi), field)
+    return nothing
+end
+
 """
     scatter_poly_fluxes_to_boundary!(remapping, eg::ExchangeGrid,
                                      fs::ExchangeFluxState, weight;
@@ -600,6 +632,15 @@ NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
     _dss_and_normalize!(fx.F_turb_moisture, cov, buf, cutoff, z)
     _dss_and_normalize!(fx.F_turb_ρτxz, cov, buf, cutoff, z)
     _dss_and_normalize!(fx.F_turb_ρτyz, cov, buf, cutoff, z)
+
+    # FLUX CLAMP HACK
+    ls = remapping.limiter_scratch
+    w = weight
+    _clamp_to_poly_range!(fx.F_sh, ls, eg, buf, fs.F_sh, w, cov, cutoff)
+    _clamp_to_poly_range!(fx.F_lh, ls, eg, buf, fs.F_lh, w, cov, cutoff)
+    _clamp_to_poly_range!(fx.F_turb_moisture, ls, eg, buf, fs.F_moisture, w, cov, cutoff)
+    _clamp_to_poly_range!(fx.F_turb_ρτxz, ls, eg, buf, fs.F_τu, w, cov, cutoff)
+    _clamp_to_poly_range!(fx.F_turb_ρτyz, ls, eg, buf, fs.F_τv, w, cov, cutoff)
 
     parent(remapping.temp_uv_vec.components.data.:1) .= parent(fx.F_turb_ρτxz)
     parent(remapping.temp_uv_vec.components.data.:2) .= parent(fx.F_turb_ρτyz)

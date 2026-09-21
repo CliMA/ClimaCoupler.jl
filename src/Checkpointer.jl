@@ -561,8 +561,8 @@ end
 
 """
     restore!(
-        v1::Union{CC.DataLayouts.AbstractData, AbstractArray},
-        v2::Union{CC.DataLayouts.AbstractData, AbstractArray},
+        v1::Union{CC.DataLayouts.DataLayout, AbstractArray},
+        v2::Union{CC.DataLayouts.DataLayout, AbstractArray},
         comms_ctx;
         name = "",
         ignore = Set(),
@@ -573,8 +573,8 @@ device of the new data (v1). Then we copy the original data to
 the new object.
 """
 function restore!(
-    v1::Union{CC.DataLayouts.AbstractData, AbstractArray},
-    v2::Union{CC.DataLayouts.AbstractData, AbstractArray},
+    v1::Union{CC.DataLayouts.DataLayout, AbstractArray},
+    v2::Union{CC.DataLayouts.DataLayout, AbstractArray},
     comms_ctx;
     name = "",
     ignore = Set(),
@@ -785,7 +785,7 @@ Returns `true` if the object should be saved and `false` otherwise.
 
 This function is used by `CacheIterator`.
 """
-is_leaf(::Union{CC.DataLayouts.AbstractData, AbstractArray}) = true # Needed for saving data
+is_leaf(::Union{CC.DataLayouts.DataLayout, AbstractArray}) = true # Needed for saving data
 
 # Needed for error handling
 is_leaf(

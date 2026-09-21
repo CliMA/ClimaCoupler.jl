@@ -20,7 +20,7 @@ env:
   # no longer defines `Spaces.issubspace` for pairs of spectral-element spaces under
   # ClimaCore v1, which `Interfacer.remap!` still relies on to exchange atmosphere
   # surface fields. Unpin once the coupler no longer depends on that method.
-  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore ClimaTimeSteppers Thermodynamics ClimaLand@1.12.2 SurfaceFluxes RRTMGP CloudMicrophysics}"
+  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore@0.16.2 ClimaTimeSteppers@0.10.7 Thermodynamics ClimaLand@1.12.1 SurfaceFluxes RRTMGP CloudMicrophysics}"
 
 timeout_in_minutes: 900
 

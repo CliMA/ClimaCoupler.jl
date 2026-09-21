@@ -292,6 +292,38 @@ function _csr_matvec!(dst, ptr, col, w, src)
     return dst
 end
 
+# FLUX CLAMP HACK
+# lo[r], hi[r] = min/max of src over the entries of CSR row r whose polygon
+# carries positive `w`; cnt[r] = 1 if the row has any such entry, else 0 (and
+# then lo = hi = 0). Zero-weight polygons are skipped because they do not
+# influence the weighted average being bounded — including them would drag the
+# range toward their (unused) values.
+@kernel function _csr_extrema_kernel!(lo, hi, cnt, ptr, col, src, w)
+    r = @index(Global)
+    @inbounds begin
+        z = zero(eltype(lo))
+        l = z
+        h = z
+        found = false
+        for p in ptr[r]:(ptr[r + 1] - 1)
+            k = col[p]
+            w[k] > 0 || continue
+            v = src[k]
+            if found
+                l = min(l, v)
+                h = max(h, v)
+            else
+                l = v
+                h = v
+                found = true
+            end
+        end
+        lo[r] = found ? l : z
+        hi[r] = found ? h : z
+        cnt[r] = found ? one(eltype(cnt)) : zero(eltype(cnt))
+    end
+end
+
 """
     gather_nodes_to_polys!(poly_values, eg::ExchangeGrid, nodal_values)
 
@@ -336,6 +368,24 @@ receiving field. For a per-unit-wet-area result use
 """
 scatter_polys_to_nodes!(nodal_values, eg::ExchangeGrid, poly_values) =
     _csr_matvec!(nodal_values, eg.snode_ptr, eg.spoly, eg.sweight, poly_values)
+
+# FLUX CLAMP HACK
+function poly_extrema_at_nodes!(lo, hi, cnt, eg::ExchangeGrid, poly_values, weight)
+    backend = KernelAbstractions.get_backend(lo)
+    launch_kernel!(
+        _csr_extrema_kernel!,
+        backend,
+        eg.n_nodes,
+        lo,
+        hi,
+        cnt,
+        eg.snode_ptr,
+        eg.spoly,
+        poly_values,
+        weight,
+    )
+    return nothing
+end
 
 @kernel function _csr_matvec_normalized_kernel!(dst, ptr, col, w, src, cov, cutoff)
     r = @index(Global)

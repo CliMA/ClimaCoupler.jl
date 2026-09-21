@@ -1,6 +1,6 @@
 agents:
   queue: clima
-  slurm_time: 14:00:00
+  slurm_time: 15:00:00
   modules: climacommon/2025_05_15
 
 env:
@@ -16,9 +16,13 @@ env:
   # UPSTREAM_PACKAGES environment variable. For example, if you pass
   # `UPSTREAM_PACKAGES="ClimaAtmos SurfaceFluxes@1.1.0", then the main branch
   # of ClimaAtmos and SurfaceFluxes v1.1.0 will be used.
-  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore ClimaTimeSteppers Thermodynamics ClimaLand SurfaceFluxes RRTMGP CloudMicrophysics}"
+  # ClimaLand is pinned to its latest release: ClimaLand main (after CliMA/ClimaLand.jl#1882)
+  # no longer defines `Spaces.issubspace` for pairs of spectral-element spaces under
+  # ClimaCore v1, which `Interfacer.remap!` still relies on to exchange atmosphere
+  # surface fields. Unpin once the coupler no longer depends on that method.
+  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore ClimaTimeSteppers Thermodynamics ClimaLand@1.12.2 SurfaceFluxes RRTMGP CloudMicrophysics}"
 
-timeout_in_minutes: 840
+timeout_in_minutes: 900
 
 steps:
   - label: "init :GPU:"
@@ -67,7 +71,7 @@ steps:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_progedmf_land.yml --job_id amip_coarse_progedmf_land"
         artifact_paths: "output/amip_coarse_progedmf_land/artifacts/*"
-        timeout_in_minutes: 840
+        timeout_in_minutes: 900
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -82,7 +86,7 @@ steps:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_progedmf_1m_land.yml --job_id amip_coarse_progedmf_1m_land"
         artifact_paths: "output/amip_coarse_progedmf_1m_land/artifacts/*"
-        timeout_in_minutes: 840
+        timeout_in_minutes: 900
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

@@ -401,9 +401,9 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaInterpolations", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "Flux", "ForwardDiff", "Insolation", "Interpolations", "JLD2", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SparseMatrixColorings", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "3a205ae65b7b93e2b521859ab138cc3253242e39"
+git-tree-sha1 = "e6a90e84ff20a36f89ce2322be9a2f360c5f0075"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.42.10"
+version = "0.42.11"
 
     [deps.ClimaAtmos.extensions]
     ClimaAtmosMusica = "Musica"
@@ -435,9 +435,9 @@ weakdeps = ["CUDA", "MPI"]
 
 [[deps.ClimaCore]]
 deps = ["Adapt", "BandedMatrices", "BlockArrays", "ClimaComms", "ClimaInterpolations", "CubedSphere", "DataStructures", "ForwardDiff", "GaussQuadrature", "GilbertCurves", "HDF5", "InteractiveUtils", "IntervalSets", "KrylovKit", "LLVM", "LazyBroadcast", "LinearAlgebra", "MultiBroadcastFusion", "NVTX", "PkgVersion", "Random", "RootSolvers", "SparseArrays", "StaticArrays", "Statistics", "UnrolledUtilities"]
-git-tree-sha1 = "6f92c3413f74cca965a74ccb1944db5f33aacadb"
+git-tree-sha1 = "9f85bf48ac7fca17e41f49cce619643a40052115"
 uuid = "d414da3d-4745-48bb-8d80-42e94e092884"
-version = "0.16.1"
+version = "1.0.0"
 weakdeps = ["CUDA", "GPUCompiler", "Krylov", "Makie", "RecipesBase"]
 
     [deps.ClimaCore.extensions]
@@ -475,9 +475,9 @@ version = "0.2.3"
 
 [[deps.ClimaDiagnostics]]
 deps = ["Accessors", "ClimaComms", "ClimaCore", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "NCDatasets", "NVTX", "OrderedCollections"]
-git-tree-sha1 = "1005e58a2f96b10c909ec942ea4dd88f4c9e7d4f"
+git-tree-sha1 = "15e521fc314e7059b4304c9777aa9bebeff4f46b"
 uuid = "1ecacbb8-0713-4841-9a07-eb5aa8a2d53f"
-version = "0.3.9"
+version = "0.3.11"
 
 [[deps.ClimaInterpolations]]
 deps = ["Adapt", "DocStringExtensions"]
@@ -491,9 +491,9 @@ weakdeps = ["CUDA"]
 
 [[deps.ClimaLand]]
 deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "NCDatasets", "NVTX", "RootSolvers", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "02cc3acdc1da734c82d107b29a37777088321772"
+git-tree-sha1 = "f012999a554fc521280d58fbcd1eaa1b49a8e8af"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
-version = "1.12.1"
+version = "1.12.2"
 
     [deps.ClimaLand.extensions]
     ConstrainedNeuralModelExt = ["Adapt", "Flux", "JLD2", "InteractiveUtils"]
@@ -517,15 +517,15 @@ version = "1.12.1"
 
 [[deps.ClimaParams]]
 deps = ["Dates", "TOML"]
-git-tree-sha1 = "679d4f2530f4a7444015d0b41dd0dd6abbf3b812"
+git-tree-sha1 = "36647cbd2d8543cf874c208182264040a1e66dc7"
 uuid = "5c42b081-d73a-476f-9059-fd94b934656c"
-version = "1.1.9"
+version = "1.1.11"
 
 [[deps.ClimaTimeSteppers]]
 deps = ["ClimaComms", "Krylov", "LinearAlgebra", "LinearOperators", "NVTX", "NullBroadcasts", "StaticArrays"]
-git-tree-sha1 = "62f40548365d804d05ac3fd7fd1fc71dce544edb"
+git-tree-sha1 = "ca0ef4055926f4cc65cd8449ae7ddf706715455b"
 uuid = "595c0a79-7f3d-439a-bc5a-b232dc3bde79"
-version = "0.10.7"
+version = "1.0.1"
 weakdeps = ["BenchmarkTools", "CUDA", "ClimaCore", "OrderedCollections", "PrettyTables"]
 
     [deps.ClimaTimeSteppers.extensions]
@@ -534,9 +534,9 @@ weakdeps = ["BenchmarkTools", "CUDA", "ClimaCore", "OrderedCollections", "Pretty
 
 [[deps.ClimaUtilities]]
 deps = ["Artifacts", "ClimaComms", "Dates"]
-git-tree-sha1 = "8abaaa338bcca7d139060df4991afcd71d355b80"
+git-tree-sha1 = "52678b6d037c41cf4346785c0efc17bbcc76227e"
 uuid = "b3f4f4ca-9299-4f7f-bd9b-81e1242a7513"
-version = "0.1.32"
+version = "0.1.33"
 
     [deps.ClimaUtilities.extensions]
     ClimaUtilitiesClimaCoreExt = "ClimaCore"
@@ -555,9 +555,9 @@ version = "0.1.32"
 
 [[deps.CloudMicrophysics]]
 deps = ["ClimaParams", "DocStringExtensions", "FastGaussQuadrature", "ForwardDiff", "InteractiveUtils", "LazyArtifacts", "LogExpFunctions", "RootSolvers", "SpecialFunctions", "StaticArrays", "Thermodynamics", "UnrolledUtilities"]
-git-tree-sha1 = "e656b966bd89b4fad653e10aa4d6208ac887c235"
+git-tree-sha1 = "5da94e7b6e1d2ee3e6931e278bcce5b50ab7927a"
 uuid = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
-version = "0.39.0"
+version = "0.40.0"
 
     [deps.CloudMicrophysics.extensions]
     EmulatorModelsExt = ["DataFrames", "MLJ"]

@@ -90,15 +90,10 @@ single-step window trades a coupling step of lag for overlapped communication
 rather than for overlapped computation. Configurations that give the ocean and
 sea ice a timestep several coupling steps long get both.
 
-The cost is that the atmosphere sees an ocean one slow step older than it
-otherwise would. `prime_slow_surfaces` removes that by advancing the slow group
-one step during initialization, so each overlapped step integrates the window
-that is about to happen rather than the one that just did and lands in time to
-be used on schedule. The lag does not vanish; it moves to the ocean's forcing,
-which is integrated from the previous window's accumulated fluxes. That is the
-side better able to absorb it, since a component whose timestep spans several
-coupling steps already integrates under forcing held constant across a whole
-window.
+The lag does not vanish under priming; it moves to the ocean's forcing, which is
+integrated from the previous window's accumulated fluxes. That is the side
+better able to absorb it, since a component whose timestep spans several
+coupling steps already integrates under forcing held constant across a window.
 
 Under priming the slow components' own diagnostics are written on their own
 clocks, so those files carry times that lead coupler time by up to one slow

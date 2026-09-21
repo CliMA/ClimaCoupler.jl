@@ -24,11 +24,9 @@ configuration options change that.
 
 `step_concurrently` splits them into two groups that advance at the same time:
 land then atmosphere in one task, sea ice then ocean in another. The groupings
-are not arbitrary. Land and atmosphere are implicitly coupled, so they have to
-run in sequence. Sea ice and ocean have to run in sequence for a different
-reason: the sea ice model is constructed holding views into the ocean's surface
-velocity and salinity fields, so stepping them in parallel would let the ice
-read state the ocean is writing. Group membership is decided by type, through
+are not arbitrary. Land and atmosphere are implicitly coupled, and ocean and
+sea ice must step together to properly pass the frazil heat flux.
+Group membership is decided by type, through
 `Interfacer.is_overlapped`.
 
 This is only worth enabling on a GPU, where each component occupies a single
@@ -49,6 +47,36 @@ that step is in flight the coupler must not read or write ice or ocean state, so
 still needs a blended surface temperature and albedo every coupling step, so
 `combine_surfaces!` sums the fast and slow surfaces separately and reuses the
 slow sum for the rest of the window — land keeps contributing live values.
+
+`prime_slow_surfaces` shifts that schedule one window earlier, by taking a slow
+step during initialization. The cadence of all four cases, for `k = 3`:
+
+```
+k = dt_ocean / dt_cpl = 3.  A = atmosphere + land,  Oₙ = the nth ocean/sea ice
+step.  Each column is one coupling step; ──▶ marks a step spanning several.
+
+                        │  1  │  2  │  3  │  4  │  5  │  6  │  per window
+                        ├─────┼─────┼─────┼─────┼─────┼─────┤
+  sequential            │  A  │  A  │ A O₁│  A  │  A  │ A O₂│  3A + O
+                        ├─────┼─────┼─────┼─────┼─────┼─────┤
+  step_concurrently     │  A  │  A  │  A  │  A  │  A  │  A  │  2A + max(A,O)
+                        │     │     │  O₁ │     │     │  O₂ │
+                        ├─────┼─────┼─────┼─────┼─────┼─────┤
+  overlap_slow_surfaces │  A  │  A  │  A  │  A  │  A  │  A  │  max(3A, O)
+                        │ O₁──────────▶   │ O₂──────────▶   │
+                        │ atmos uses O₀   │ atmos uses O₁   │  one window old
+                        ├─────┼─────┼─────┼─────┼─────┼─────┤
+  + prime_slow_surfaces │  A  │  A  │  A  │  A  │  A  │  A  │  max(3A, O)
+               O₁──────▶│ O₂──────────▶   │ O₃──────────▶   │
+                        │ atmos uses O₁   │ atmos uses O₂   │  current
+                        └─────┴─────┴─────┴─────┴─────┴─────┘
+               ↑ extra step taken during initialization
+```
+
+The first two leave the same answers: the join happens inside the coupling step,
+so the atmosphere sees ocean state of the same age either way. The third does
+not — the atmosphere sees an ocean one window older. The fourth restores the
+timing at the cost of integrating the ocean under the previous window's forcing.
 
 How much this buys depends on how many coupling steps one slow step spans. Where
 the slow timestep equals `dt_cpl`, so that one slow step spans a single coupling

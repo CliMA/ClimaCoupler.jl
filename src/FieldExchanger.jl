@@ -67,10 +67,9 @@ function update_surface_fractions!(
     cs::Interfacer.CoupledSimulation;
     slow_frozen::Bool = false,
 )
-    # Area fractions are derived from the sea ice concentration and the ocean
-    # wet mask, so they cannot be recomputed while those models are stepping.
-    # They are also unchanged over the window, since neither model advances the
-    # coupler's view of its state until the step is joined.
+    # Area fractions derive from sea ice concentration and the ocean wet mask,
+    # so they cannot be recomputed while those models are stepping -- and do not
+    # change over the window anyway.
     slow_frozen && return nothing
 
     # An ocean model may provide its own authoritative surface fractions
@@ -359,10 +358,8 @@ function Interfacer.step!(
     # Step the land simulation first
     Interfacer.step!(land_sim, t)
 
-    # Update the atmosphere with the fluxes across all surface models. An explicit-flux
-    # land model does not precompute fluxes the way an `AbstractImplicitFluxSimulation`
-    # does, but the atmosphere still must not be stepped before this update -- the serial
-    # branch of `step_model_sims!` always performs it.
+    # The atmosphere must not be stepped before this update, as in the serial
+    # branch of `step_model_sims!`.
     FluxCalculator.update_turbulent_fluxes!(atmos_sim, coupler_fields)
 
     # Step the atmosphere model
@@ -437,36 +434,18 @@ function step_model_sims!(
             end
         end
 
-        # Group 2: sea ice and ocean. These must NOT be separate tasks. The sea
-        # ice model is built holding views into the ocean's live surface fields
-        # -- `ocean_surface_velocities` and `ocean_surface_salinity` return
-        # `view`s of `ocean.model.velocities.u/v` and `ocean.model.tracers.S`,
-        # which are captured in the ice model's `SemiImplicitStress` and
-        # `IceWaterThermalEquilibrium`. Stepping them in parallel lets the ice
-        # read ocean velocity and salinity while the ocean is writing them.
-        # Step the ice first, matching the ordering of the sequential branch
-        # below, so the ice sees the ocean state from before the ocean steps.
+        # Group 2: sea ice and ocean.
         ice_ocean_group = () -> step_slow_sims!(model_sims, t)
 
+        # A slow step already in flight: advance only the fast group.
         if skip_slow
-            # An asynchronous ice/ocean step is already in flight (or is being
-            # launched separately); advance only the fast group here.
             land_atmos_group()
             return nothing
         end
 
-        if get(ENV, "COUPLER_SEQUENTIAL_GROUPS", "0") in ("1", "true", "TRUE", "yes")
-            # Diagnostic mode: identical grouping and ordering to the concurrent
-            # path, but with no parallelism between the two groups. Used to
-            # isolate whether a discrepancy comes from cross-group concurrency or
-            # from the regrouping itself.
-            land_atmos_group()
-            ice_ocean_group()
-        else
-            @sync begin
-                Threads.@spawn land_atmos_group()
-                Threads.@spawn ice_ocean_group()
-            end
+        @sync begin
+            Threads.@spawn land_atmos_group()
+            Threads.@spawn ice_ocean_group()
         end
     else
         # Step all surface models (the ordering doesn't matter here)
@@ -512,9 +491,7 @@ end
 Advance the overlapped group (sea ice, then ocean) to time `t`.
 
 This is the body handed to the asynchronous task when `overlap_slow_surfaces` is
-set. The ordering matches the group in `step_model_sims!`: the sea ice holds
-views into the ocean's surface velocity and salinity, so it must step before the
-ocean rather than beside it.
+set. The ordering matches the group in `step_model_sims!`.
 """
 function step_slow_sims!(model_sims, t; gather_progress::Bool = false)
     for sim in model_sims
@@ -523,11 +500,9 @@ function step_slow_sims!(model_sims, t; gather_progress::Bool = false)
     for sim in model_sims
         sim isa Interfacer.AbstractOceanSimulation && Interfacer.step!(sim, t)
     end
-    # Gather the progress scalars here, where this task still owns the state.
-    # Reducing over these fields from the coupling loop would race with the
-    # writes above; the reports fall due mid-window, so they read this instead.
-    # Only the overlapped path needs them; the per-step concurrent path reports
-    # from live state after joining, so it skips these extra reductions.
+    # Gather progress scalars here, where this task still owns the state:
+    # reducing over these fields from the coupling loop would race with the
+    # writes above. Only the overlapped path needs this.
     gather_progress || return nothing
     names = Symbol[]
     snapshots = Any[]
@@ -554,18 +529,14 @@ whenever the slow timestep equals the coupling timestep.
 function slow_launch_target(cs::Interfacer.CoupledSimulation)
     t_now = cs.t[]
     if cs.prime_slow_surfaces
-        # Primed, the slow group is already level with the coupler at a window
-        # boundary and is about to run one window ahead, so the target is simply
-        # one slow step on. `will_step` cannot be used here: it compares against
-        # the component clock, which priming has moved.
+        # Primed: the group runs one window ahead, so the target is one slow
+        # step on. `will_step` would compare against a clock priming has moved.
         return t_now + slow_window_steps(cs) * cs.Δt_cpl
     end
     for sim in cs.model_sims
         Interfacer.is_overlapped(sim) || continue
-        # Pass the coupler time through unconverted. Under `use_itime` the
-        # component clocks hold `DateTime`s and `will_step` dispatches on
-        # `ITime`; coercing to Float64 here selects the Float64 method, which
-        # then computes `Float64 - DateTime`.
+        # Pass coupler time through unconverted: under `use_itime`, coercing to
+        # Float64 selects a method that then computes `Float64 - DateTime`.
         Interfacer.will_step(sim, t_now) && return t_now
     end
     return t_now + cs.Δt_cpl
@@ -585,10 +556,9 @@ function launch_slow_sims!(cs::Interfacer.CoupledSimulation)
     @assert isnothing(cs.slow_task[]) "a slow-surface step is already in flight"
     model_sims = cs.model_sims
     target = slow_launch_target(cs)
-    # The target is recorded alongside the task because the ocean's own clock is
-    # being written by that task; scheduling decisions must not read it. The task
-    # gets the native time (ITime or Float64) so `step!` dispatches correctly;
-    # the recorded copy is in seconds, purely for the scheduling comparison.
+    # Record the target alongside the task: the ocean's clock is being written
+    # by it, so scheduling must not read that. The task gets native time so
+    # `step!` dispatches; the recorded copy is seconds, for comparison only.
     cs.slow_task[] = (;
         task = Threads.@spawn(step_slow_sims!(model_sims, target; gather_progress = true)),
         target = Float64(float(target)),

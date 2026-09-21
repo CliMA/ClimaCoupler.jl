@@ -142,9 +142,8 @@ end
 
 Whether the overlapped group's step boundary falls on this coupling step.
 
-Priming moves the component clocks away from coupler time, so the two schedules
-ask different questions: without priming, whether the components are due to step;
-with it, whether the coupler has reached the recorded window boundary.
+Priming moves the component clocks off coupler time, so the two cases ask
+different questions.
 """
 slow_step_due(cs::Interfacer.CoupledSimulation) =
     cs.prime_slow_surfaces ? at_slow_boundary(cs) : slow_surfaces_due(cs)
@@ -153,10 +152,7 @@ slow_step_due(cs::Interfacer.CoupledSimulation) =
     join_slow_if_due!(cs) -> frozen
 
 Join an overlapped ice/ocean step if this coupling step needs its result, and
-report whether one is still in flight afterwards.
-
-Joining at the top of the step means the rest of it sees settled ice and ocean
-state and behaves as it would without overlap. `frozen` is what every
+report whether one is still in flight afterwards. `frozen` is what every
 slow-surface-touching call in `step!` keys off.
 """
 function join_slow_if_due!(cs::Interfacer.CoupledSimulation)
@@ -167,11 +163,9 @@ end
 """
     skip_slow_stepping(cs, frozen)
 
-Whether `step_model_sims!` should leave the slow group alone.
-
-Under overlap they are advanced only by the asynchronous task, never in the loop:
-when the slow timestep equals the coupling timestep they would otherwise be
-stepped both synchronously and again by the task.
+Whether `step_model_sims!` should leave the slow group alone. Under overlap the
+task advances them, never the loop: at `k == 1` they would otherwise be stepped
+twice.
 """
 skip_slow_stepping(cs::Interfacer.CoupledSimulation, frozen::Bool) =
     frozen || cs.overlap_slow_surfaces
@@ -180,10 +174,8 @@ skip_slow_stepping(cs::Interfacer.CoupledSimulation, frozen::Bool) =
     launch_slow_if_due!(cs, frozen) -> launched
 
 Launch the next overlapped ice/ocean step if this coupling step is a boundary,
-and advance the recorded boundary when priming.
-
-Called after the slow group's forcing is fully assembled, so the step it starts
-integrates with complete inputs.
+and advance the recorded boundary when priming. Called once the slow group's
+forcing is fully assembled.
 """
 function launch_slow_if_due!(cs::Interfacer.CoupledSimulation, frozen::Bool)
     (cs.overlap_slow_surfaces && !frozen && slow_step_due(cs)) || return false
@@ -198,12 +190,9 @@ end
 """
     at_slow_boundary(cs)
 
-Whether the coupler has just reached a slow-step boundary.
-
-Used only when priming. The window is counted in coupling steps rather than
-derived from a component clock, because priming deliberately moves those clocks
-away from coupler time. Integer step counting also sidesteps comparing times as
-floats, which is the reason `ITime` exists.
+Whether the coupler has just reached a slow-step boundary. Used only when
+priming, which moves the component clocks off coupler time, so the window is
+counted in coupling steps rather than read from a clock.
 """
 function at_slow_boundary(cs::Interfacer.CoupledSimulation)
     nb = cs.slow_next_boundary[]
@@ -362,11 +351,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     Random.seed!(random_seed)
     @info "Random seed set to $(random_seed)"
 
-    # Concurrent component stepping only pays off on a GPU, where each component
-    # occupies a single Julia thread and submits to its own CUDA stream. On a CPU
-    # device every component fans out over all threads through KernelAbstractions,
-    # so the components oversubscribe each other and nothing is gained. Neither
-    # case is incorrect, so warn rather than error.
+    # Only worth doing on a GPU; on CPU the groups oversubscribe each other
+    # through KernelAbstractions. Not incorrect, so warn rather than error.
     if step_concurrently
         if !(comms_ctx.device isa ClimaComms.CUDADevice)
             @warn "`step_concurrently` is set, but the device is \
@@ -614,11 +600,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
             let sim_name = sim_name
                 cs -> begin
                     sim = cs.model_sims[sim_name]
-                    # `progress` takes extrema and maxima over the model's own
-                    # fields. For an overlapped sim those fields are being
-                    # written by its in-flight step, so report from the snapshot
-                    # the stepping task gathered when it last finished, rather
-                    # than reducing over state that is moving underneath us.
+                    # An overlapped sim's fields are being written by its
+                    # in-flight step, so report from the task's last snapshot.
                     if Interfacer.is_overlapped(sim) &&
                        FieldExchanger.slow_step_in_flight(cs)
                         snapshot = FieldExchanger.slow_progress_snapshot(cs, sim_name)
@@ -702,44 +685,24 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
             force = true,
         )
 
-        # Priming: take the slow group's first step here, synchronously, so it
-        # ends up one window ahead of the coupler. Thereafter each overlapped
-        # step integrates the window that is about to happen rather than the one
-        # that just did, and its result is ready when the atmosphere needs it --
-        # removing the extra lag in the ocean state the atmosphere sees. The
-        # forcing it uses is the previous window's, which the slow components
-        # can absorb: their timestep is several coupling steps long precisely
-        # because their physics is slow, so they already integrate under forcing
-        # held constant across a whole window.
+        # Take the slow group's first step synchronously so it ends up one
+        # window ahead of the coupler. See the SimCoordinator docs.
         if overlap_slow_surfaces && prime_slow_surfaces
             k = FieldExchanger.slow_window_steps(cs)
             FieldExchanger.step_slow_sims!(cs.model_sims, cs.t[] + k * cs.Δt_cpl)
             @info "Primed slow surfaces one step ($k coupling steps) ahead of the coupler"
         end
     end
-    # Seed the overlapped-group schedule from where the slow components actually
-    # are. This must come after both the restart restore and any priming step.
-    #
-    # It cannot be a count of coupling steps: `cs.step[]` starts again at zero on
-    # a restart while the component clocks do not, and `checkpoint_sims` joins an
-    # in-flight step before saving, so a checkpoint taken mid-window leaves the
-    # slow group an arbitrary amount ahead rather than a whole window.
+    # Seed the schedule from where the slow components actually are; must come
+    # after the restart restore and any priming step. It cannot be a count of
+    # coupling steps, because `cs.step[]` restarts at zero while the component
+    # clocks do not, and a checkpoint can be taken mid-window.
     if overlap_slow_surfaces && prime_slow_surfaces
         cs.slow_next_boundary[] = FieldExchanger.slow_step_boundary(cs)
-        @info """Priming is on: the ocean and sea ice run ahead of coupler time.
-                 Next overlapped launch at coupler time $(cs.slow_next_boundary[]).
-
-                 Their own diagnostics are written by their own output writers on
-                 their own clocks, so those files carry times that lead coupler
-                 time by up to one slow step. That is the honest label: the state
-                 in them really is the state at that model time, forced through
-                 one window earlier. Coupler diagnostics are on coupler time and
-                 hold the surface state the atmosphere actually saw, which priming
-                 keeps aligned with a non-overlapped run.
-
-                 Comparing a primed run against a non-primed one by output index
-                 therefore compares different model times for the slow components;
-                 compare by time, or expect an offset of one slow step."""
+        @info """Priming is on: ocean and sea ice run ahead of coupler time, so \
+                 their own diagnostics carry times leading it by up to one slow \
+                 step. Compare such runs by time, not by output index. Next \
+                 overlapped launch at coupler time $(cs.slow_next_boundary[])."""
     end
 
     Utilities.show_memory_usage()

@@ -24,11 +24,9 @@ configuration options change that.
 
 `step_concurrently` splits them into two groups that advance at the same time:
 land then atmosphere in one task, sea ice then ocean in another. The groupings
-are not arbitrary. Land and atmosphere are implicitly coupled, so they have to
-run in sequence. Sea ice and ocean have to run in sequence for a different
-reason: the sea ice model is constructed holding views into the ocean's surface
-velocity and salinity fields, so stepping them in parallel would let the ice
-read state the ocean is writing. Group membership is decided by type, through
+are not arbitrary. Land and atmosphere are implicitly coupled, and ocean and
+sea ice must step together to properly pass the frazil heat flux. 
+Group membership is decided by type, through
 `Interfacer.is_overlapped`.
 
 This is only worth enabling on a GPU, where each component occupies a single

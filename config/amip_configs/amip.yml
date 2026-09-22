@@ -17,8 +17,8 @@ mode_name: "amip"
 netcdf_output_at_levels: true
 output_default_diagnostics: true
 radiation_reset_rng_seed: true
-restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-amip/331/climacoupler-amip/output/amip/checkpoints"
-restart_t: 7776000
+# restart_dir: "/scratch/clima/slurm-buildkite/climacoupler-amip/331/climacoupler-amip/output/amip/checkpoints"
+# restart_t: 7776000
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "732days"

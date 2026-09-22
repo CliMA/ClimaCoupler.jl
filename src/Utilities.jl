@@ -8,6 +8,7 @@ module Utilities
 
 import ClimaComms
 import ClimaCore as CC
+import Dates
 import Logging
 import ClimaUtilities.OutputPathGenerator: generate_output_path
 
@@ -16,6 +17,8 @@ export get_device,
     show_memory_usage,
     setup_output_dirs,
     time_to_seconds,
+    parse_date,
+    format_start_date,
     integral,
     create_boundary_space,
     diagnostics_global_attribs
@@ -213,6 +216,42 @@ function time_to_seconds(s::String)
         return parse(Float64, first(split(s, match))) * factor[match]
     end
     error("Uncaught case in computing time from given string.")
+end
+
+"""
+    parse_date(date_str)
+
+Parse a date string into a `Dates.DateTime`. Supported formats match ClimaAtmos:
+
+  - `yyyymmdd` (interpreted as 00:00 UTC)
+  - `yyyymmdd-HHMM`
+"""
+function parse_date(date_str::AbstractString)
+    date_format_mapping = Dict(
+        r"^\d{8}$" => Dates.dateformat"yyyymmdd",
+        r"^\d{8}-\d{4}$" => Dates.dateformat"yyyymmdd-HHMM",
+    )
+    for (pattern, format) in date_format_mapping
+        !isnothing(match(pattern, date_str)) && return Dates.DateTime(date_str, format)
+    end
+    error(
+        "Date string $date_str does not match any of the allowed formats: yyyymmdd or yyyymmdd-HHMM",
+    )
+end
+parse_date(dt::Dates.DateTime) = dt
+
+"""
+    format_start_date(dt)
+
+Format a `Dates.DateTime` for coupler/`start_date` config strings.
+Uses `yyyymmdd` at midnight and `yyyymmdd-HHMM` otherwise, matching [`parse_date`](@ref).
+"""
+function format_start_date(dt::Dates.DateTime)
+    if Dates.hour(dt) == 0 && Dates.minute(dt) == 0
+        return Dates.format(dt, Dates.dateformat"yyyymmdd")
+    else
+        return Dates.format(dt, Dates.dateformat"yyyymmdd-HHMM")
+    end
 end
 
 """

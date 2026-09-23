@@ -24,6 +24,15 @@ include(
         "preprocessing.jl",
     ),
 )
+include(
+    joinpath(
+        pkgdir(ClimaCoupler),
+        "experiments",
+        "calibration",
+        "amip",
+        "noise_model.jl",
+    ),
+)
 
 """
     make_scalar_covariance_observation_vector(
@@ -58,6 +67,57 @@ function make_scalar_covariance_observation_vector(
         ObservationRecipe.ScalarCovariance(; scalar, use_latitude_weights, min_cosd_lat)
 
     # Each date range becomes one sample (one column of the sample collection)
+    sample_collection = SampleBuilder.build_samples_by_times(vars, sample_date_ranges; FT)
+    @info "Built samples" sample_collection
+
+    obs_vec = map(1:SampleBuilder.num_samples(sample_collection)) do i
+        ObservationRecipe.observation(covar_estimator, sample_collection, i)
+    end
+    return obs_vec
+end
+
+"""
+    make_svdplusd_observation_vector(
+        vars,
+        sample_date_ranges;
+        beta = 0.05^2,
+        rank = 2,
+        sigma2 = 1e-6,
+        use_latitude_weights = true,
+        min_cosd_lat = 0.1,
+        FT = Float32,
+    )
+
+Make a vector of `EKP.Observation`s with an `SVDplusD` covariance matrix, one for each
+sample corresponding to the dates in `sample_date_ranges`.
+
+The covariance is the `Gamma` of `noise_model.jl`. Every date range contributes one
+sample, so the covariance is the interannual spread of the observation across those dates
+and each sample in turn is the observation. Give it enough date ranges to estimate that
+spread: `rank` modes need appreciably more than `rank` samples, and identical date ranges
+produce a singular covariance.
+
+`beta` accepts one value for all variables or one per variable, in the order of `vars`.
+"""
+function make_svdplusd_observation_vector(
+    vars,
+    sample_date_ranges;
+    beta = 0.05^2,
+    rank = 2,
+    sigma2 = 1e-6,
+    use_latitude_weights = true,
+    min_cosd_lat = 0.1,
+    FT = Float32,
+)
+    @info "Using SVDplusD covariance matrix with" beta rank sigma2 use_latitude_weights min_cosd_lat
+    covar_estimator = noise_covariance_estimator(;
+        beta,
+        rank,
+        sigma2,
+        use_latitude_weights,
+        min_cosd_lat,
+    )
+
     sample_collection = SampleBuilder.build_samples_by_times(vars, sample_date_ranges; FT)
     @info "Built samples" sample_collection
 

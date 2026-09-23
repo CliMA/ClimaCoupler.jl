@@ -44,6 +44,24 @@ function apply_lat_window(var, lat_left, lat_right)
 end
 
 """
+    zonal_average(var)
+
+Average `var` over longitude, ignoring `NaN`s. A variable with no longitude dimension is
+returned unchanged.
+
+Native lon/lat points are strongly correlated, so treating them as independent
+observations over-informs the inverse and collapses the ensemble. Apply this identically
+to the observations (`generate_observations.jl`) and to the simulation
+(`observation_map.jl`): a mismatch does not error, it silently compares one field against
+a different one.
+"""
+function zonal_average(var)
+    ClimaAnalysis.has_longitude(var) || error("Variable $(ClimaAnalysis.short_name(var)) has no longitude")
+    @info "Zonal (longitude) averaging $(ClimaAnalysis.short_name(var))"
+    return ClimaAnalysis.average_lon(var; ignore_nan = true)
+end
+
+"""
     get_lonlat_regridder(config_file)
 
 Create a regridder for `OutputVar`s for regridding to the simulation grid.

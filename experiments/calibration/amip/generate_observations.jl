@@ -166,6 +166,9 @@ if abspath(PROGRAM_FILE) == @__FILE__
     lat_right = 90
     vars = apply_lat_window.(vars, lat_left, lat_right)
 
+    # Keep this in step with the zonal average in the other file.
+    vars = zonal_average.(vars)
+
     # Normalize data
     normalization_stats = Dict()
     compute_normalization!.(Ref(normalization_stats), vars)

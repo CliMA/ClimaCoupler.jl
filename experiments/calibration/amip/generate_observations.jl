@@ -169,6 +169,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Keep this in step with the zonal average in the other file.
     vars = zonal_average.(vars)
 
+    # Give every sample the same NaN mask, or `build_samples_by_times` rejects a product
+    # whose coverage varies by year.
+    vars = ClimaAnalysis.Var.propagate_nans.(vars; dims = ("time",))
+
     # Normalize data
     normalization_stats = Dict()
     compute_normalization!.(Ref(normalization_stats), vars)

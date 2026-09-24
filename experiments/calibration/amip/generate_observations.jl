@@ -32,6 +32,7 @@ include(
     make_svdplusd_observation_vector(
         vars,
         sample_date_ranges;
+        covariance_date_ranges = sample_date_ranges,
         beta = 0.05^2,
         rank = 2,
         sigma2 = 1e-6,
@@ -43,17 +44,19 @@ include(
 Make a vector of `EKP.Observation`s with an `SVDplusD` covariance matrix, one for each
 sample corresponding to the dates in `sample_date_ranges`.
 
-The covariance is the `Gamma` of `noise_model.jl`. Every date range contributes one
-sample, so the covariance is the interannual spread of the observation across those dates
-and each sample in turn is the observation. Give it enough date ranges to estimate that
-spread: `rank` modes need appreciably more than `rank` samples, and identical date ranges
-produce a singular covariance.
+The covariance is the `Gamma` of `noise_model.jl`, estimated from one sample per date
+range in `covariance_date_ranges`, so it is the interannual spread of the observation
+across those dates. Give it enough date ranges to estimate that spread: `rank` modes need
+appreciably more than `rank` samples, and identical date ranges produce a singular
+covariance. The calibration targets in `sample_date_ranges` may repeat, and may be a
+subset of the covariance dates, since the model only needs initial conditions for those.
 
 `beta` accepts one value for all variables or one per variable, in the order of `vars`.
 """
 function make_svdplusd_observation_vector(
     vars,
     sample_date_ranges;
+    covariance_date_ranges = sample_date_ranges,
     beta = 0.05^2,
     rank = 2,
     sigma2 = 1e-6,
@@ -65,11 +68,30 @@ function make_svdplusd_observation_vector(
     covar_estimator =
         noise_covariance_estimator(; beta, rank, sigma2, use_latitude_weights, min_cosd_lat)
 
-    sample_collection = SampleBuilder.build_samples_by_times(vars, sample_date_ranges; FT)
-    @info "Built samples" sample_collection
+    covariance_samples =
+        SampleBuilder.build_samples_by_times(vars, covariance_date_ranges; FT)
+    @info "Built covariance samples" covariance_samples
+    covar = ObservationRecipe.covariance(covar_estimator, covariance_samples)
 
-    obs_vec = map(1:SampleBuilder.num_samples(sample_collection)) do i
-        ObservationRecipe.observation(covar_estimator, sample_collection, i)
+    target_samples = SampleBuilder.build_samples_by_times(vars, sample_date_ranges; FT)
+    @info "Built target samples" target_samples
+    size(covar, 1) == size(SampleBuilder.get_samples(target_samples), 1) || error(
+        "The covariance ($(size(covar, 1))) and the targets ($(size(SampleBuilder.get_samples(target_samples), 1))) have different lengths",
+    )
+
+    # The same assembly as ObservationRecipe.observation, with the covariance supplied.
+    obs_vec = map(1:SampleBuilder.num_samples(target_samples)) do i
+        sample = collect(view(SampleBuilder.get_samples(target_samples), :, i))
+        metadata = collect(view(SampleBuilder.get_metadata(target_samples), :, i))
+        name = join(ClimaAnalysis.short_name.(metadata), ";")
+        EKP.Observation(
+            Dict(
+                "samples" => sample,
+                "covariances" => covar,
+                "names" => name,
+                "metadata" => metadata,
+            ),
+        )
     end
     return obs_vec
 end
@@ -132,6 +154,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     observation_vec = make_svdplusd_observation_vector(
         vars,
         sample_date_ranges;
+        covariance_date_ranges,
         beta = 0.05^2,
         rank = 2,
         sigma2 = 1e-6,

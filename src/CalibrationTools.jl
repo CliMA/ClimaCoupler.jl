@@ -864,20 +864,23 @@ samples for area and is a different decision from dropping empty ones.
 function drop_empty_times(var; max_nan_frac = 0.99)
     ClimaAnalysis.has_time(var) || return var
     time_name = ClimaAnalysis.time_name(var)
-    times = collect(var.dims[time_name])
-    nan_frac(t) =
-        let slice = ClimaAnalysis.slice(var; (; Symbol(time_name) => t)...)
-            count(isnan, slice.data) / length(slice.data)
-        end
-    keep = filter(t -> nan_frac(t) <= max_nan_frac, times)
-    length(keep) == length(times) && return var
+    n_times = length(var.dims[time_name])
+    keep = filter(1:n_times) do index
+        slice = ClimaAnalysis.view_select(
+            var;
+            by = ClimaAnalysis.Index(),
+            (; Symbol(time_name) => index)...,
+        )
+        count(isnan, slice.data) / length(slice.data) <= max_nan_frac
+    end
+    length(keep) == n_times && return var
     isempty(keep) && error(
         "Every time of $(ClimaAnalysis.short_name(var)) is more than $(100max_nan_frac)% NaN",
     )
-    @info "Dropping $(length(times) - length(keep)) empty time(s) from $(ClimaAnalysis.short_name(var))"
+    @info "Dropping $(n_times - length(keep)) empty time(s) from $(ClimaAnalysis.short_name(var))"
     return ClimaAnalysis.select(
         var;
-        by = ClimaAnalysis.MatchValue(),
+        by = ClimaAnalysis.Index(),
         (; Symbol(time_name) => keep)...,
     )
 end

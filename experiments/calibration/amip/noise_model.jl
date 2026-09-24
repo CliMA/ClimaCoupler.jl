@@ -7,22 +7,24 @@
 #            O(10) samples, so the rest is not kept as low-rank structure but folded into
 #   D_y      the per-point sample variance MINUS the variance the retained modes already
 #            explain. Without this subtraction the diagonal of `C_y + D` counts the
-#            retained modes twice. This is the only piece ClimaCalibrate does not provide.
+#            retained modes twice.
 #   D_mean   the square of the per-point sample mean, from `ModelErrorScaleDiagonal`.
 #            `beta` sets how much of the model-data difference is treated as irreducible
 #            model error, and is a VARIANCE scale: beta = 0.05^2 is a 5% model error.
-#   s^2      the per-variable median of the positive sample variances, so the absolute
+#            The mean is squared, not the mean of the squares, so the interannual spread
+#            enters Gamma only through C_y and D_y and is not counted again here.
+#   s^2      the per-variable median of the sample variances, so the absolute
 #            floor sigma2 * s^2 is scale aware. This term is there to keep the covariance
 #            well conditioned, not to express a belief about uncertainty.
 #
 # Latitude weighting is applied to the samples before both the SVD and the diagonal, so
 # that C_y and D_y are computed from the same matrix and the subtraction in D_y is valid.
 #
-# Everything here is a lazy description. ClimaCalibrate computes the matrix from the
+# Everything here is a lazy computation. ClimaCalibrate computes the matrix from the
 # (weighted) SampleCollection when the observation is built.
 
-import Statistics
-import LinearAlgebra: Diagonal, svd
+import LinearAlgebra: Diagonal
+import EnsembleKalmanProcesses as EKP
 import ClimaCalibrate: SampleBuilder
 import ClimaCalibrate.ObservationRecipe as ObservationRecipe
 
@@ -57,18 +59,17 @@ function ObservationRecipe.compute_diagonal(
             "Give the observation more than one date range.",
         ),
     )
-    # Columns of a scaled, centred sample matrix, so that sum(abs2) over columns is the
-    # 1/(N-1) sample variance and the SVD of this matrix has the covariance eigenvalues
-    # as its squared singular values.
-    centred = (samples .- Statistics.mean(samples, dims = 2)) ./ sqrt(FT(n_samples - 1))
-    total = vec(sum(abs2, centred, dims = 2))
-    rank = min(term.rank, n_samples - 1)
-    explained = if rank == 0
-        zero(total)
-    else
-        factorization = svd(centred)
-        vec(sum(abs2, factorization.U[:, 1:rank] .* factorization.S[1:rank]', dims = 2))
-    end
+    total = ObservationRecipe.compute_diagonal(
+        ObservationRecipe.VarianceDiagonal(),
+        sample_collection,
+    ).diag
+    iszero(term.rank) && return Diagonal(total)
+    # `tsvd_cov_from_samples` is the same truncated SVD that `SVDplusDCovariance` uses, so
+    # the modes subtracted here are the modes the low-rank part keeps. It returns the
+    # eigendecomposition of the sample covariance, whose diagonal is
+    # `sum_k U[:, k] .^ 2 * S[k]`.
+    low_rank = EKP.tsvd_cov_from_samples(samples, term.rank; quiet = true)
+    explained = vec((low_rank.U .^ 2) * low_rank.S)
     # max() guards round-off only; the subtraction is exact in theory.
     return Diagonal(convert(Vector{FT}, max.(total .- explained, zero(FT))))
 end

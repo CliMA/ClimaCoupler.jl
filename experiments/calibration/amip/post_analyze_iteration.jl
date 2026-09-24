@@ -125,8 +125,9 @@ Analyze each iteration is completed by
 - plotting the bias,
 - computing the ensemble spread.
 
-Every plot is guarded: a calibration is expensive and should not be lost to a plotting
-error.
+Every plot is guarded so that one failing plot does not take the others with it.
+ClimaCalibrate already catches a failure of this function, so the calibration continues
+either way.
 """
 function ClimaCalibrate.analyze_iteration(
     interface::CouplerModelInterface,
@@ -149,10 +150,7 @@ function ClimaCalibrate.analyze_iteration(
         () -> plot_constrained_params_and_errors(output_dir, ekp, prior),
         "Parameter and error plotting",
     )
-    guard(
-        () -> plot_g_ensemble(plot_output_path, ekp, iteration),
-        "G ensemble plotting",
-    )
+    guard(() -> plot_g_ensemble(plot_output_path, ekp, iteration), "G ensemble plotting")
     guard(() -> report_residual(plot_output_path, ekp, iteration), "Residual diagnostics")
 
     (; config) = interface
@@ -208,18 +206,9 @@ function plot_g_ensemble(output_dir, ekp, iteration)
         color = :black,
         alpha = 0.2,
     )
-    g_mean = ClimaCalibrate.Visualization.plot_g_mean!(
-        ax,
-        ekp;
-        iter = iteration,
-        color = :black,
-    )
-    obs = ClimaCalibrate.Visualization.plot_obs!(
-        ax,
-        ekp;
-        iter = iteration,
-        color = :blue,
-    )
+    g_mean =
+        ClimaCalibrate.Visualization.plot_g_mean!(ax, ekp; iter = iteration, color = :black)
+    obs = ClimaCalibrate.Visualization.plot_obs!(ax, ekp; iter = iteration, color = :blue)
     CairoMakie.Legend(fig[1, 2], [g, g_mean, obs], ["members", "mean", "observation"])
     CairoMakie.save(joinpath(output_dir, "g_ensemble.png"), fig)
     return nothing
@@ -240,16 +229,12 @@ split says which observation or which part of the observation map to look at.
 function report_residual(output_dir, ekp, iteration; n_eigenvectors = 3)
     result = ClimaCalibrate.analyze_residual(ekp, iteration; n_eigenvectors)
     # `result.metadata` is one ClimaAnalysis Metadata per variable, in the same order as
-    # the per-variable vectors below. `ObservationRecipe.short_names` takes an
-    # `EKP.Observation`, not metadata, so it is the wrong accessor here.
+    # the per-variable vectors below.
     names = String[ClimaAnalysis.short_name(m) for m in result.metadata]
     @info "Residual diagnostics, iteration $iteration" structured_energy =
         result.structured_energy
-    for (name, energy, norm) in zip(
-        names,
-        result.structured_energy_by_variable,
-        result.residual_norm_by_variable,
-    )
+    for (name, energy, norm) in
+        zip(names, result.structured_energy_by_variable, result.residual_norm_by_variable)
         @info "  $name" structured_energy = energy residual_norm = norm
     end
 

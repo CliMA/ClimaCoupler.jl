@@ -56,7 +56,8 @@ to the observations (`generate_observations.jl`) and to the simulation
 a different one.
 """
 function zonal_average(var)
-    ClimaAnalysis.has_longitude(var) || error("Variable $(ClimaAnalysis.short_name(var)) has no longitude")
+    ClimaAnalysis.has_longitude(var) ||
+        error("Variable $(ClimaAnalysis.short_name(var)) has no longitude")
     @info "Zonal (longitude) averaging $(ClimaAnalysis.short_name(var))"
     return ClimaAnalysis.average_lon(var; ignore_nan = true)
 end

@@ -25,13 +25,7 @@ include(
     ),
 )
 include(
-    joinpath(
-        pkgdir(ClimaCoupler),
-        "experiments",
-        "calibration",
-        "amip",
-        "noise_model.jl",
-    ),
+    joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "amip", "noise_model.jl"),
 )
 
 """
@@ -110,13 +104,8 @@ function make_svdplusd_observation_vector(
     FT = Float32,
 )
     @info "Using SVDplusD covariance matrix with" beta rank sigma2 use_latitude_weights min_cosd_lat
-    covar_estimator = noise_covariance_estimator(;
-        beta,
-        rank,
-        sigma2,
-        use_latitude_weights,
-        min_cosd_lat,
-    )
+    covar_estimator =
+        noise_covariance_estimator(; beta, rank, sigma2, use_latitude_weights, min_cosd_lat)
 
     sample_collection = SampleBuilder.build_samples_by_times(vars, sample_date_ranges; FT)
     @info "Built samples" sample_collection
@@ -171,7 +160,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     # Give every sample the same NaN mask, or `build_samples_by_times` rejects a product
     # whose coverage varies by year.
-    vars = ClimaAnalysis.Var.propagate_nans.(vars; dims = ("time",))
+    vars = ClimaAnalysis.propagate_nans.(vars; dims = ("time",))
 
     # Normalize data
     normalization_stats = Dict()

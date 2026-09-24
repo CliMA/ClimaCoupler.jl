@@ -29,48 +29,6 @@ include(
 )
 
 """
-    make_scalar_covariance_observation_vector(
-        vars,
-        sample_date_ranges;
-        scalar = 1.0,
-        use_latitude_weights = true,
-        min_cosd_lat = 0.1,
-        FT = Float32,
-    )
-
-Make a vector of `EKP.Observation`s with a scalar covariance matrix, one for
-each sample corresponding to the dates in `sample_date_ranges`.
-
-The `OutputVar`s in `vars` are windowed by the date ranges in
-`sample_date_ranges` to build the samples, and each sample in turn is used as
-the observation. The matrix of samples has element type `FT`.
-"""
-function make_scalar_covariance_observation_vector(
-    vars,
-    sample_date_ranges;
-    scalar = 1.0,
-    use_latitude_weights = true,
-    min_cosd_lat = 0.1,
-    FT = Float32,
-)
-    @info "Using scalar covariance matrix with"
-    @info "Scalar: $scalar"
-    @info "Latitude weighting: $use_latitude_weights"
-    @info "Min cosd lat: $min_cosd_lat"
-    covar_estimator =
-        ObservationRecipe.ScalarCovariance(; scalar, use_latitude_weights, min_cosd_lat)
-
-    # Each date range becomes one sample (one column of the sample collection)
-    sample_collection = SampleBuilder.build_samples_by_times(vars, sample_date_ranges; FT)
-    @info "Built samples" sample_collection
-
-    obs_vec = map(1:SampleBuilder.num_samples(sample_collection)) do i
-        ObservationRecipe.observation(covar_estimator, sample_collection, i)
-    end
-    return obs_vec
-end
-
-"""
     make_svdplusd_observation_vector(
         vars,
         sample_date_ranges;
@@ -171,10 +129,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     # Create observation vector
     (; sample_date_ranges) = CALIBRATE_CONFIG
-    observation_vec = make_scalar_covariance_observation_vector(
+    observation_vec = make_svdplusd_observation_vector(
         vars,
         sample_date_ranges;
-        scalar = 1.0,
+        beta = 0.05^2,
+        rank = 2,
+        sigma2 = 1e-6,
         use_latitude_weights = true,
         min_cosd_lat = 0.1,
     )

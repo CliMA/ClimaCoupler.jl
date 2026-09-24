@@ -17,9 +17,14 @@ config_file = joinpath(
     "amip_calibration_pipeline_test.yml",
 )
 
-# Calibrate only on Jan 1 2010
+# Calibrate on October 2010, the October with initial conditions in the
+# wxquest_initial_conditions artifact. The noise covariance is the interannual
+# spread of the observations, so it is estimated over ten Octobers; identical
+# dates would give it no spread at all.
 sample_date_ranges =
     [(Dates.DateTime(2010, 10, 1), Dates.DateTime(2010, 10, 1)) for _ in 1:6]
+covariance_date_ranges =
+    [(Dates.DateTime(year, 10, 1), Dates.DateTime(year, 10, 1)) for year in 2001:2010]
 
 # On Derecho, it is preferable to save the calibration output to the scratch
 # directory (e.g. "/glade/derecho/scratch")

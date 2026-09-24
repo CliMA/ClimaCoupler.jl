@@ -24,45 +24,76 @@ include(
         "preprocessing.jl",
     ),
 )
+include(
+    joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "amip", "noise_model.jl"),
+)
 
 """
-    make_scalar_covariance_observation_vector(
+    make_svdplusd_observation_vector(
         vars,
         sample_date_ranges;
-        scalar = 1.0,
+        covariance_date_ranges = sample_date_ranges,
+        beta = 0.05^2,
+        rank = 2,
+        sigma2 = 1e-6,
         use_latitude_weights = true,
         min_cosd_lat = 0.1,
         FT = Float32,
     )
 
-Make a vector of `EKP.Observation`s with a scalar covariance matrix, one for
-each sample corresponding to the dates in `sample_date_ranges`.
+Make a vector of `EKP.Observation`s with an `SVDplusD` covariance matrix, one for each
+sample corresponding to the dates in `sample_date_ranges`.
 
-The `OutputVar`s in `vars` are windowed by the date ranges in
-`sample_date_ranges` to build the samples, and each sample in turn is used as
-the observation. The matrix of samples has element type `FT`.
+The covariance is the `Gamma` of `noise_model.jl`, estimated from one sample per date
+range in `covariance_date_ranges`, so it is the interannual spread of the observation
+across those dates. Give it enough date ranges to estimate that spread: `rank` modes need
+appreciably more than `rank` samples, and identical date ranges produce a singular
+covariance. The calibration targets in `sample_date_ranges` may repeat, and may be a
+subset of the covariance dates, since the model only needs initial conditions for those.
+
+`beta` accepts one value for all variables or one per variable, in the order of `vars`.
 """
-function make_scalar_covariance_observation_vector(
+function make_svdplusd_observation_vector(
     vars,
     sample_date_ranges;
-    scalar = 1.0,
+    covariance_date_ranges = sample_date_ranges,
+    beta = 0.05^2,
+    rank = 2,
+    sigma2 = 1e-6,
     use_latitude_weights = true,
     min_cosd_lat = 0.1,
     FT = Float32,
 )
-    @info "Using scalar covariance matrix with"
-    @info "Scalar: $scalar"
-    @info "Latitude weighting: $use_latitude_weights"
-    @info "Min cosd lat: $min_cosd_lat"
+    @info "Using SVDplusD covariance matrix with" beta rank sigma2 use_latitude_weights min_cosd_lat
     covar_estimator =
-        ObservationRecipe.ScalarCovariance(; scalar, use_latitude_weights, min_cosd_lat)
+        noise_covariance_estimator(; beta, rank, sigma2, use_latitude_weights, min_cosd_lat)
 
-    # Each date range becomes one sample (one column of the sample collection)
-    sample_collection = SampleBuilder.build_samples_by_times(vars, sample_date_ranges; FT)
-    @info "Built samples" sample_collection
+    covariance_samples =
+        SampleBuilder.build_samples_by_times(vars, covariance_date_ranges; FT)
+    @info "Built covariance samples" covariance_samples
+    covar = ObservationRecipe.covariance(covar_estimator, covariance_samples)
 
-    obs_vec = map(1:SampleBuilder.num_samples(sample_collection)) do i
-        ObservationRecipe.observation(covar_estimator, sample_collection, i)
+    target_samples = SampleBuilder.build_samples_by_times(vars, sample_date_ranges; FT)
+    @info "Built target samples" target_samples
+    n_cov = size(SampleBuilder.get_samples(covariance_samples), 1)
+    n_target = size(SampleBuilder.get_samples(target_samples), 1)
+    n_cov == n_target || error(
+        "The covariance samples ($n_cov values) and the targets ($n_target values) have different lengths",
+    )
+
+    # The same assembly as ObservationRecipe.observation, with the covariance supplied.
+    obs_vec = map(1:SampleBuilder.num_samples(target_samples)) do i
+        sample = collect(view(SampleBuilder.get_samples(target_samples), :, i))
+        metadata = collect(view(SampleBuilder.get_metadata(target_samples), :, i))
+        name = join(ClimaAnalysis.short_name.(metadata), ";")
+        EKP.Observation(
+            Dict(
+                "samples" => sample,
+                "covariances" => covar,
+                "names" => name,
+                "metadata" => metadata,
+            ),
+        )
     end
     return obs_vec
 end
@@ -106,6 +137,13 @@ if abspath(PROGRAM_FILE) == @__FILE__
     lat_right = 90
     vars = apply_lat_window.(vars, lat_left, lat_right)
 
+    # Keep this in step with the zonal average in the other file.
+    vars = zonal_average.(vars)
+
+    # Give every sample the same NaN mask, or `build_samples_by_times` rejects a product
+    # whose coverage varies by year.
+    vars = ClimaAnalysis.propagate_nans.(vars; dims = ("time",))
+
     # Normalize data
     normalization_stats = Dict()
     compute_normalization!.(Ref(normalization_stats), vars)
@@ -115,10 +153,13 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     # Create observation vector
     (; sample_date_ranges) = CALIBRATE_CONFIG
-    observation_vec = make_scalar_covariance_observation_vector(
+    observation_vec = make_svdplusd_observation_vector(
         vars,
         sample_date_ranges;
-        scalar = 1.0,
+        covariance_date_ranges,
+        beta = 0.05^2,
+        rank = 2,
+        sigma2 = 1e-6,
         use_latitude_weights = true,
         min_cosd_lat = 0.1,
     )

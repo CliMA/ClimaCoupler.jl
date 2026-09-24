@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.9"
+julia_version = "1.11.3"
 manifest_format = "2.0"
-project_hash = "966c3fdf7143b853c9851203f120e712c8da7b5c"
+project_hash = "8d3d15353825bea7155c031097186323567112d1"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -99,6 +99,12 @@ version = "1.2.0"
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
 version = "1.1.2"
+
+[[deps.ArnoldiMethod]]
+deps = ["LinearAlgebra", "Random", "StaticArrays"]
+git-tree-sha1 = "d57bd3762d308bded22c3b82d033bff85f6195c6"
+uuid = "ec485272-7323-5ecc-a04f-4719b315124d"
+version = "0.4.0"
 
 [[deps.Arpack]]
 deps = ["Arpack_jll", "Libdl", "LinearAlgebra", "Logging"]
@@ -398,9 +404,9 @@ version = "3.2.0"
 
 [[deps.ClimaAnalysis]]
 deps = ["Artifacts", "Dates", "Interpolations", "NCDatasets", "NaNStatistics", "OrderedCollections", "Reexport", "Statistics", "Unitful"]
-git-tree-sha1 = "111ecb3fdc40344be32e5c2453392dfc18861e2f"
+git-tree-sha1 = "eb6f8f854a785f037862f21083f96c2f88b946ef"
 uuid = "29b5916a-a76c-4e73-9657-3c8fd22e65e6"
-version = "0.5.23"
+version = "0.5.24"
 weakdeps = ["GeoMakie", "Makie"]
 
     [deps.ClimaAnalysis.extensions]
@@ -420,21 +426,15 @@ version = "0.42.10"
     Musica = "d3d182ee-e566-4962-9279-3a9916be1802"
 
 [[deps.ClimaCalibrate]]
-deps = ["Dates", "Distributed", "Distributions", "EnsembleKalmanProcesses", "JLD2", "Logging", "Random", "TOML", "YAML"]
-git-tree-sha1 = "614be4383a0caa9214fd47e28c086cc4e8d536b9"
+deps = ["ArnoldiMethod", "Distributed", "EnsembleKalmanProcesses", "JLD2", "LinearAlgebra", "LinearMaps", "Logging", "OrderedCollections", "Reexport", "Statistics", "TOML"]
+git-tree-sha1 = "2d343589879d6fd58b9e9a0a3b01a4c4277ab22a"
 uuid = "4347a170-ebd6-470c-89d3-5c705c0cacc2"
-version = "0.2.2"
+version = "0.6.0"
+weakdeps = ["ClimaAnalysis", "Makie", "NaNStatistics"]
 
     [deps.ClimaCalibrate.extensions]
-    CESExt = "CalibrateEmulateSample"
-    ClimaAnalysisExt = ["ClimaAnalysis", "NaNStatistics", "Statistics", "LinearAlgebra"]
-
-    [deps.ClimaCalibrate.weakdeps]
-    CalibrateEmulateSample = "95e48a1f-0bec-4818-9538-3db4340308e3"
-    ClimaAnalysis = "29b5916a-a76c-4e73-9657-3c8fd22e65e6"
-    LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-    NaNStatistics = "b946abbf-3ea7-4610-9019-9858bfdeaf2d"
-    Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+    ClimaCalibrateClimaAnalysisExt = ["ClimaAnalysis", "NaNStatistics"]
+    ClimaCalibrateMakieExt = ["Makie"]
 
 [[deps.ClimaComms]]
 deps = ["Adapt", "Logging", "LoggingExtras"]
@@ -1807,6 +1807,18 @@ deps = ["Libdl", "OpenBLAS_jll", "libblastrampoline_jll"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 version = "1.11.0"
 
+[[deps.LinearMaps]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "7f6be2e4cdaaf558623d93113d6ddade7b916209"
+uuid = "7a12625a-238d-50fd-b39a-03d52299707e"
+version = "3.11.4"
+weakdeps = ["ChainRulesCore", "SparseArrays", "Statistics"]
+
+    [deps.LinearMaps.extensions]
+    LinearMapsChainRulesCoreExt = "ChainRulesCore"
+    LinearMapsSparseArraysExt = "SparseArrays"
+    LinearMapsStatisticsExt = "Statistics"
+
 [[deps.LinearOperators]]
 deps = ["FastClosures", "LinearAlgebra", "Printf", "SparseArrays", "TimerOutputs"]
 git-tree-sha1 = "4170853dfdb5ac1374ffb5fcf79c24ba5f0bb8e3"
@@ -2291,7 +2303,7 @@ version = "2.5.5+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.5+0"
+version = "0.8.1+2"
 
 [[deps.OpenMPI_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Hwloc_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML", "Zlib_jll"]

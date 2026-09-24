@@ -75,8 +75,10 @@ function make_svdplusd_observation_vector(
 
     target_samples = SampleBuilder.build_samples_by_times(vars, sample_date_ranges; FT)
     @info "Built target samples" target_samples
-    size(covar, 1) == size(SampleBuilder.get_samples(target_samples), 1) || error(
-        "The covariance ($(size(covar, 1))) and the targets ($(size(SampleBuilder.get_samples(target_samples), 1))) have different lengths",
+    n_cov = size(SampleBuilder.get_samples(covariance_samples), 1)
+    n_target = size(SampleBuilder.get_samples(target_samples), 1)
+    n_cov == n_target || error(
+        "The covariance samples ($n_cov values) and the targets ($n_target values) have different lengths",
     )
 
     # The same assembly as ObservationRecipe.observation, with the covariance supplied.

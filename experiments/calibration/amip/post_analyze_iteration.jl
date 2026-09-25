@@ -99,7 +99,8 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
                 )
             end
         catch e
-            @error "bias plot error: $(ClimaAnalysis.short_name(sim_var_t))"
+            @error "bias plot error: $(ClimaAnalysis.short_name(sim_var_t))" exception =
+                (e, catch_backtrace())
         end
     end
 

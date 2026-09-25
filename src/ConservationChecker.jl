@@ -26,7 +26,7 @@ mutable struct EnergyConservationCheck <: AbstractConservationCheck
         for sim in sums
             all_sims = merge(all_sims, [Base.nameof(typeof(sim)) => []])
         end
-        all_sims = (all_sims..., toa_net_source = [], total = [])
+        all_sims = (; all_sims..., toa_net_source = [], total = [])
         return new(all_sims)
     end
 end
@@ -44,7 +44,7 @@ mutable struct WaterConservationCheck <: AbstractConservationCheck
         for sim in sums
             all_sims = merge(all_sims, [Base.nameof(typeof(sim)) => []])
         end
-        all_sims = (all_sims..., total = [])
+        all_sims = (; all_sims..., total = [])
         return new(all_sims)
     end
 end

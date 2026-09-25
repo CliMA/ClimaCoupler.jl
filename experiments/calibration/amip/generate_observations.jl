@@ -123,7 +123,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     vars = map(short_names) do short_name
         source_data_loader = CalibrationTools.find_source_loader(data_loader, short_name)
         @info "Retrieving $(short_name) from $(typeof(source_data_loader))"
-        var = get(source_data_loader, short_name)
+        get(source_data_loader, short_name)
     end
 
     # For now, we apply the preprocessing to all the variables if possible

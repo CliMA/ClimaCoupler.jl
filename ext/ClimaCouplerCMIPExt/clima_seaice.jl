@@ -78,7 +78,6 @@ function ClimaSeaIceSimulation(
 ) where {FT}
     # Initialize the sea ice with the same grid as the ocean
     grid = ocean.ocean.model.grid
-    arch = OC.Architectures.architecture(grid)
 
     advection = ocean.ocean.model.advection.T
 
@@ -451,7 +450,7 @@ function compute_ice_top_heat_flux!(
 end
 
 function _update_ice_turbulent_fluxes_boundary!(sim::ClimaSeaIceSimulation, fields)
-    (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz, F_turb_moisture) = fields
+    (; F_lh, F_sh, F_turb_ρτxz, F_turb_ρτyz) = fields
     grid = sim.ice.model.grid
 
     # We only need to provide momentum fluxes if the sea ice model has dynamics

@@ -179,7 +179,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     comms_ctx = Utilities.get_comms_context(config_dict)
 
     (;
-        job_id,
         sim_mode,
         random_seed,
         FT,

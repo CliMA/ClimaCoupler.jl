@@ -31,7 +31,7 @@ steps:
       - "echo $$JULIA_DEPOT_PATH"
 
       - echo "--- Instantiate AMIP env"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "JULIA_PKG_PRECOMPILE_AUTO=0 julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       # For this pipeline, use the main branches of certain upstream packages
       # see UPSTREAM_PACKAGES environment variable
       - |

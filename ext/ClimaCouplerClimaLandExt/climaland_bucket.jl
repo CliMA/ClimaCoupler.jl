@@ -105,7 +105,7 @@ function BucketSimulation(
         )
     elseif albedo_type == "function" # Use prescribed function of lat/lon for surface albedo
         function α_bareground(coordinate_point)
-            (; lat, long) = coordinate_point
+            (; lat) = coordinate_point
             return typeof(lat)(0.38)
         end
         α_snow = toml_dict["alpha_snow"] # snow albedo
@@ -356,7 +356,7 @@ function FluxCalculator.compute_surface_fluxes!(
     thermo_params,
     accumulator = nothing,
 )
-    Y, p, t, model = sim.integrator.u, sim.integrator.p, sim.integrator.t, sim.model
+    Y, p, model = sim.integrator.u, sim.integrator.p, sim.model
 
     # For fast buckets, write directly to the cache. For slow buckets, use `flux_buffer`
     # to hold the intermediate fluxes while we accumulate them.

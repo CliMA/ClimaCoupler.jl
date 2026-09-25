@@ -70,7 +70,7 @@ Create a regridder for `OutputVar`s for regridding to the simulation grid.
 function get_lonlat_regridder(config_file)
     config_dict = ClimaCoupler.Input.get_coupler_config_dict(config_file)
     if !isnothing(get(config_dict, "netcdf_interpolation_num_points", nothing))
-        (nlon, nlat, nlev) = tuple(config_dict["netcdf_interpolation_num_points"]...)
+        (nlon, nlat, _) = tuple(config_dict["netcdf_interpolation_num_points"]...)
     else
         # Compute from h_elem (spectral element grid)
         h_elem = get(config_dict, "h_elem", 12)

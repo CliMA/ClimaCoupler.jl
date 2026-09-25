@@ -559,6 +559,42 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
 end
 
 """
+    FluxCalculator.compute_sslt_emission!(csf, ocean_sim, atmos_sim::ClimaAtmosSimulation, fluxes)
+
+Compute sea salt emission mass flux using ocean `area_fraction` and MOST solution, 
+writing to Atmos cache via`ClimaAtmos.set_sslt_surface_fluxes!`. Called from [`compute_surface_fluxes!`](@ref).
+Requires Atmos to carry prognostic sea salt.
+"""
+function FluxCalculator.compute_sslt_emission!(
+    csf,
+    ocean_sim::Union{Interfacer.AbstractOceanSimulation, Models.PrescribedOceanSimulation},
+    atmos_sim::ClimaAtmosSimulation,
+    fluxes,
+)
+    FT = eltype(atmos_sim.integrator.u)
+    p = atmos_sim.integrator.p
+    hasproperty(p.tracers, :sslt_sfc_fluxes) || return nothing
+    sfp = FluxCalculator.get_surface_params(atmos_sim)
+    area_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
+
+    u₁₀ = csf.scalar_temp3
+    @. u₁₀ = CA.wind_at_height(FT(10), fluxes.ustar, fluxes.L_MO, sfp)
+
+    u₁₀_atmos = p.scratch.ᶠtemp_field_level
+    ocean_fraction_atmos = p.scratch.ᶠtemp_field_level_2
+    Interfacer.remap!(u₁₀_atmos, u₁₀)
+    Interfacer.remap!(ocean_fraction_atmos, area_fraction)
+    
+    CA.set_sslt_surface_fluxes!(
+        atmos_sim.integrator.u,
+        p,
+        u₁₀_atmos,
+        ocean_fraction_atmos,
+    )
+    return nothing
+end
+
+"""
 Extend Interfacer.add_coupler_fields! to add the fields required for ClimaAtmosSimulation.
 
 The fields added are:

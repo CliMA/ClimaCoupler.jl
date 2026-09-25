@@ -1,0 +1,50 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_wx_progedmf_SSA.yml"
+coupler_toml: ["toml/amip_progedmf.toml"]
+strict_params: false
+mode_name: "subseasonal"
+era5_initial_condition_dir: "/net/sampo/data1/wxquest_data/initial_conditions/initial_conditions_v1_dev"
+initial_condition: "WeatherModel"
+checkpoint_dt: "1000days"
+dt: "40secs"
+dt_cpl: "40secs"
+dt_seaice: "40secs"
+divergence_damping_factor: 20.0
+energy_check: false
+h_elem: 30
+z_max: 70000.0
+z_elem: 70
+land_fraction_source: "era5"
+binary_area_fraction: false
+
+### integrated land ###
+land_model: "integrated"
+lai_source: "modis_monthly_climatology"
+
+### bucket land ###
+# land_model: "bucket"
+# bucket_albedo_type: "map_temporal"
+
+land_spun_up_ic: false
+land_temperature_anomaly: "nothing"
+use_land_diagnostics: true
+radiation_reset_rng_seed: true
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+topo_smoothing: true
+topography: "Earth"
+t_end: "14days"
+netcdf_output_at_levels: true
+use_coupler_diagnostics: true
+extra_atmos_diagnostics:
+  - short_name: [zg, orog, tas, ta, thetaa, mslp, pr, ua, va, ts, rhoa, pfull, hur, hus, clw, cli, clivi, clwvi, cl, arup, tke, hfss, hfls, evspsbl, hussfc, rsds, rlds, rlus, rsus, rld, wa, waup]
+    period: 24hours
+    reduction_time: average
+  - short_name: [
+      rhoa, hur,
+      loadss,
+      mmrss, mmrsslt01, mmrsslt02, mmrsslt03, mmrsslt04, mmrsslt05
+    ]
+    period: 1hours
+    reduction_time: average

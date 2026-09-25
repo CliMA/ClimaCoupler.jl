@@ -440,9 +440,7 @@ function FluxCalculator.compute_surface_fluxes!(
     thermo_params,
     accumulator = nothing,
 )
-    boundary_space = axes(csf)
-    FT = CC.Spaces.undertype(boundary_space)
-    Y, p, t, model = sim.integrator.u, sim.integrator.p, sim.integrator.t, sim.model
+    p = sim.integrator.p
 
     # The fluxes for each land component have already been updated in the land model cache
     # by the call to `CL.turbulent_fluxes!` in the land model's `step!` function.

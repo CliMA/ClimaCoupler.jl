@@ -59,9 +59,7 @@ Args:
 (NB: Radiation surface fluxes are calculated by the atmosphere.)
 """
 function turbulent_fluxes!(csf, model_sims, thermo_params, flux_accumulators = (;))
-    boundary_space = axes(csf)
     atmos_sim = model_sims.atmos_sim
-    FT = CC.Spaces.undertype(boundary_space)
 
     # Reset the coupler fields will compute. We need to do this because we will compute
     # area-weighted averages

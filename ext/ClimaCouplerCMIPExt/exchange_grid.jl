@@ -150,7 +150,7 @@ function build_exchange_grid(boundary_space, grid_oc)
     keep = trues(length(area))
     if grid_oc isa OC.ImmersedBoundaryGrid
         grid_with_mask_cpu = OC.on_architecture(OC.CPU(), grid_oc)
-        Nx_oc, Ny_oc, Nz_oc = size(grid_with_mask_cpu)
+        Nx_oc, _, Nz_oc = size(grid_with_mask_cpu)
         for k in eachindex(keep)
             c = oc_of_poly[k]
             i, j = mod1(c, Nx_oc), (c - 1) ÷ Nx_oc + 1

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Land Model · ClimaCoupler.jl</title><script data-outdated-warner src="../../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../../assets/documenter.js"></script><script src="../../../siteinfo.js"></script><script src="../../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../../"><img src="../../../assets/logo.svg" alt="ClimaCoupler.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../../">ClimaCoupler.jl</a></span></div><form class="docs-search" action="../../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../../">Home</a></li><li><span class="tocitem">Examples</span><ul><li><input class="collapse-toggle" id="menuitem-2-1" type="checkbox" checked/><label class="tocitem" for="menuitem-2-1"><span class="docs-label">Sea Breeze</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../atmos_rhs/">Atmospheric Model</a></li><li class="is-active"><a class="tocitem" href>Land Model</a><ul class="internal"><li><a class="tocitem" href="#Slab-Land-ODE"><span>Slab Land ODE</span></a></li><li><a class="tocitem" href="#Model-Code"><span>Model Code</span></a></li><li><a class="tocitem" href="#Coupled-Land-Wrappers"><span>Coupled Land Wrappers</span></a></li></ul></li><li><a class="tocitem" href="../ocean_rhs/">Ocean Model</a></li><li><a class="tocitem" href="../run/">Coupled Sea Breeze</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-2-2" type="checkbox"/><label class="tocitem" for="menuitem-2-2"><span class="docs-label">AMIP</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../amip/coupler_driver_modular/">AMIP Driver</a></li></ul></li></ul></li><li><span class="tocitem">Coupler Interface</span><ul><li><a class="tocitem" href="../../../couplerstate/">Coupler State</a></li><li><a class="tocitem" href="../../../timestepping/">Coupled Simulations &amp; Timestepping</a></li><li><a class="tocitem" href="../../../regridder/">Regridder</a></li><li><a class="tocitem" href="../../../conservation/">Conservation Checks</a></li><li><a class="tocitem" href="../../../utilities/">Utilities</a></li><li><a class="tocitem" href="../../../bcreader/">BCReader</a></li><li><a class="tocitem" href="../../../testhelper/">TestHelper</a></li><li><a class="tocitem" href="../../../timemanager/">TimeManager</a></li></ul></li><li><span class="tocitem">Performance</span><ul><li><a class="tocitem" href="../../../performance/">Performance Analysis Tools</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li><a class="is-disabled">Sea Breeze</a></li><li class="is-active"><a href>Land Model</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Land Model</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/CliMA/ClimaCoupler.jl/blob/main/docs/src/generated/sea_breeze/land_rhs.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Land-Model"><a class="docs-heading-anchor" href="#Land-Model">Land Model</a><a id="Land-Model-1"></a><a class="docs-heading-anchor-permalink" href="#Land-Model" title="Permalink"></a></h1><h2 id="Slab-Land-ODE"><a class="docs-heading-anchor" href="#Slab-Land-ODE">Slab Land ODE</a><a id="Slab-Land-ODE-1"></a><a class="docs-heading-anchor-permalink" href="#Slab-Land-ODE" title="Permalink"></a></h2><p>For our land component, we solve a simple slab land ODE:</p><p class="math-container">\[\rho_l c_l H_l \partial_t T_{lnd} = - F_{integ} / \Delta t_{coupler}\]</p><ul><li>where <span>$\rho_l = 1500$</span> kg m <span>$^{-3}$</span>, <span>$c_l=800$</span> J K <span>$^{-1}$</span> kg <span>$^{-1}$</span>, <span>$H_l=1$</span> m are the density, specific heat and depth of the land slab,</li><li>and <span>$F_{integ}$</span> is the integrated surface fluxes in time.</li></ul><h2 id="Model-Code"><a class="docs-heading-anchor" href="#Model-Code">Model Code</a><a id="Model-Code-1"></a><a class="docs-heading-anchor-permalink" href="#Model-Code" title="Permalink"></a></h2><pre><code class="language-julia hljs">function lnd_rhs!(du, u, (parameters, F_accumulated), t)
+    &quot;&quot;&quot;
+    Slab layer equation
+        d(T_lnd)/dt = - (F_accumulated + G) / (h_lnd * ρ_lnd * c_lnd)
+        where
+            F_accumulated = F_integrated / Δt_coupler
+    &quot;&quot;&quot;
+    @unpack lnd_h, lnd_ρ, lnd_c = parameters
+    @unpack T_sfc = du
+
+    @. T_sfc = (-F_accumulated) / (lnd_h * lnd_ρ * lnd_c)
+end
+
+# set up domain
+function hspace_1D(xlim = (-π, π), npoly = 0, helem = 10)
+    FT = Float64
+
+    domain = Domains.IntervalDomain(Geometry.XPoint{FT}(xlim[1]) .. Geometry.XPoint{FT}(xlim[2]), periodic = true)
+    mesh = Meshes.IntervalMesh(domain; nelems = helem)
+    topology = Topologies.IntervalTopology(mesh)
+
+    # Finite Volume Approximation: Gauss-Lobatto with 1pt per element
+    quad = Spaces.Quadratures.GL{npoly + 1}()
+    space = Spaces.SpectralElementSpace1D(topology, quad)
+
+    return space
+end
+
+# init simulation
+function lnd_init(; xmin = -1000, xmax = 1000, helem = 20, npoly = 0)
+
+    # construct domain spaces - get only surface layer (NB: z should be zero, not z = first central height)
+    space = hspace_1D((xmin, xmax), npoly, helem)
+    coords = Fields.coordinate_field(space)
+    domain = space
+
+    # initial condition
+    T_sfc = map(coords) do coord
+        T_sfc = 273.0
+    end
+
+    # prognostic variable
+    Y = Fields.FieldVector(T_sfc = T_sfc)
+
+    return Y, domain
+end</code></pre><h2 id="Coupled-Land-Wrappers"><a class="docs-heading-anchor" href="#Coupled-Land-Wrappers">Coupled Land Wrappers</a><a id="Coupled-Land-Wrappers-1"></a><a class="docs-heading-anchor-permalink" href="#Coupled-Land-Wrappers" title="Permalink"></a></h2><pre><code class="language-julia hljs"># Land Simulation - later to live in ClimaLSM
+struct LandSimulation &lt;: ClimaCoupler.AbstractLandSimulation
+    integrator::Any
+end
+
+function LandSimulation(Y_init, t_start, dt, t_end, timestepper, p, saveat, callbacks = CallbackSet())
+    lnd_prob = ODEProblem(lnd_rhs!, Y_init, (t_start, t_end), p)
+    lnd_integ = init(lnd_prob, timestepper, dt = dt, saveat = saveat, callback = callbacks)
+    return LandSimulation(lnd_integ)
+end
+
+function ClimaCoupler.coupler_push!(coupler::ClimaCoupler.CouplerState, land::LandSimulation)
+    coupler_put!(coupler, :T_sfc_land, land.integrator.u.T_sfc, land)
+end
+
+function ClimaCoupler.coupler_pull!(land::LandSimulation, coupler::ClimaCoupler.CouplerState)
+    coupler_get!(land.integrator.p.F_sfc, coupler, :F_sfc, land)
+    land.integrator.p.F_sfc ./= coupler.Δt_coupled
+end</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../atmos_rhs/">« Atmospheric Model</a><a class="docs-footer-nextpage" href="../ocean_rhs/">Ocean Model »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.25 on <span class="colophon-date" title="Monday 7 August 2023 02:08">Monday 7 August 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

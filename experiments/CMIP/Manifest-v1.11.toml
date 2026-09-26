@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.3"
+julia_version = "1.11.9"
 manifest_format = "2.0"
 project_hash = "8d3d15353825bea7155c031097186323567112d1"
 
@@ -415,9 +415,9 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaInterpolations", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "Flux", "ForwardDiff", "Insolation", "Interpolations", "JLD2", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SparseMatrixColorings", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "3a205ae65b7b93e2b521859ab138cc3253242e39"
+git-tree-sha1 = "5b795a8e8110ed3d39fef1e7be58e170449160ae"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.42.10"
+version = "0.42.12"
 
     [deps.ClimaAtmos.extensions]
     ClimaAtmosMusica = "Musica"
@@ -518,9 +518,9 @@ version = "1.12.1"
 
 [[deps.ClimaParams]]
 deps = ["Dates", "TOML"]
-git-tree-sha1 = "679d4f2530f4a7444015d0b41dd0dd6abbf3b812"
+git-tree-sha1 = "7756173a8770d565176b669d18316db09434a47a"
 uuid = "5c42b081-d73a-476f-9059-fd94b934656c"
-version = "1.1.9"
+version = "1.1.15"
 
 [[deps.ClimaSeaIce]]
 deps = ["Adapt", "JLD2", "KernelAbstractions", "Oceananigans", "RootSolvers", "SeawaterPolynomials"]
@@ -562,9 +562,9 @@ version = "0.1.32"
 
 [[deps.CloudMicrophysics]]
 deps = ["ClimaParams", "DocStringExtensions", "FastGaussQuadrature", "ForwardDiff", "InteractiveUtils", "LazyArtifacts", "LogExpFunctions", "RootSolvers", "SpecialFunctions", "StaticArrays", "Thermodynamics", "UnrolledUtilities"]
-git-tree-sha1 = "e656b966bd89b4fad653e10aa4d6208ac887c235"
+git-tree-sha1 = "0b907b6318ba19ede761efc6e202ebbe0a714774"
 uuid = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
-version = "0.39.0"
+version = "0.41.0"
 
     [deps.CloudMicrophysics.extensions]
     EmulatorModelsExt = ["DataFrames", "MLJ"]
@@ -2303,7 +2303,7 @@ version = "2.5.5+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+2"
+version = "0.8.5+0"
 
 [[deps.OpenMPI_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Hwloc_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML", "Zlib_jll"]
@@ -2558,9 +2558,9 @@ version = "1.11.0"
 
 [[deps.RRTMGP]]
 deps = ["Adapt", "Artifacts", "ClimaComms", "PrecompileTools", "Random", "Serialization"]
-git-tree-sha1 = "2a52a72c7a392a9c73a17fb03ea3fd914b976d1b"
+git-tree-sha1 = "baab3eb6be2ea5408d60c2e97294d56ba20e59bd"
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
-version = "1.0.0"
+version = "1.0.1"
 weakdeps = ["CUDA", "ClimaParams", "NCDatasets"]
 
     [deps.RRTMGP.extensions]

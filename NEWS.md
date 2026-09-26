@@ -24,6 +24,34 @@ The ocean now receives `P_liq + (1 - ℵ) P_snow`; rain drains through the ice
 instead of ponding on it (and being lost) while snow can still accumulate on
 the ice.
 
+#### Concurrent and overlapped component stepping. PR [#1723](https://github.com/CliMA/ClimaCoupler.jl/pull/1723)
+`step_concurrently` advances the component models as two concurrent groups —
+land then atmosphere in one task, sea ice then ocean in another. The ice and
+ocean must share a task: the sea ice model holds views into the ocean's surface
+velocity and salinity, so stepping them in parallel races on ocean state. Group
+membership is decided by type, via `Interfacer.is_overlapped`. Only worthwhile on
+a GPU; on a CPU device the components fan out over all threads through
+KernelAbstractions and oversubscribe each other, and the coupler now warns when
+asked to do this, or when only one Julia thread is available.
+
+`overlap_slow_surfaces` spans one ocean/sea ice step across several coupling
+steps rather than blocking on it within one, so a whole window of atmosphere and
+land work is hidden rather than a single step. While that step is in flight the
+coupler leaves ice and ocean state alone; the atmosphere still gets a live
+blended surface state because `combine_surfaces!` sums the fast and slow
+surfaces separately and reuses the slow sum for the window.
+
+`prime_slow_surfaces` advances the slow group one step during initialization so
+the overlapped step runs ahead of the coupler. This removes the extra lag in the
+ocean state the atmosphere sees, moving it instead to the ocean's forcing, which
+is taken from the previous window's accumulated fluxes — the side better able to
+absorb it, since a component whose timestep spans several coupling steps already
+integrates under forcing held constant across a window. Note that the slow
+components' own diagnostics are then written on their own clocks and lead coupler
+time by up to one slow step.
+
+All three default to `false`.
+
 #### Exchange (intersection) grid for CMIP surface fractions and fluxes. PR [#2051](https://github.com/CliMA/ClimaCoupler.jl/pull/2051)
 When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange
 grid — the polygons where the cubed-sphere spectral elements intersect the

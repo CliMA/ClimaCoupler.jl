@@ -27,9 +27,24 @@ export turbulent_fluxes!,
     push_ready_accumulators!,
     reset!
 
-function turbulent_fluxes!(cs::Interfacer.CoupledSimulation)
+function turbulent_fluxes!(
+    cs::Interfacer.CoupledSimulation;
+    slow_frozen::Bool = false,
+    force_slow_push::Bool = false,
+)
     turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params, cs.flux_accumulators)
-    push_ready_accumulators!(cs.model_sims, cs.flux_accumulators, cs.t[] + cs.Δt_cpl)
+    if force_slow_push
+        # Priming runs the slow group ahead of the coupler, so `will_step` no
+        # longer marks the moment their forcing is due -- the window boundary
+        # does, and the caller has determined we are on one.
+        push_ready_accumulators!(cs.model_sims, cs.flux_accumulators, cs.t[]; force = true)
+        return nothing
+    end
+    # Accumulating is coupler-side and safe; pushing writes surface boundary
+    # conditions and reads the ocean clock, so it must not run while a slow step
+    # is in flight. The push falls due on a sync step anyway.
+    slow_frozen ||
+        push_ready_accumulators!(cs.model_sims, cs.flux_accumulators, cs.t[] + cs.Δt_cpl)
     return nothing
 end
 

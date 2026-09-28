@@ -602,6 +602,8 @@ NVTX.@annotate function Interfacer.step!(sim::OceananigansSimulation, t::ITime)
     return nothing
 end
 
+Interfacer.is_overlapped(::OceananigansSimulation) = true
+
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.area_fraction
 
 # TODO: Better values for these, read from ClimaParams

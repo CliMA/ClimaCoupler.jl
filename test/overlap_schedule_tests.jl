@@ -26,6 +26,10 @@ mutable struct StubIce <: Interfacer.AbstractSeaIceSimulation
 end
 const Stub = Union{StubOcean, StubIce}
 
+# Overlapping is opted into per concrete type, so stubs must say so too --
+# prescribed and slab surfaces deliberately do not.
+Interfacer.is_overlapped(::Stub) = true
+
 Interfacer.sim_dt(s::Stub) = s.dt
 Interfacer.will_step(s::Stub, t::Float64) = (Float64(t) - s.clock) >= s.dt
 # `t::Float64` is required: Interfacer defines step!(::AbstractComponentSimulation,
@@ -63,6 +67,8 @@ mutable struct StubIceIT <: Interfacer.AbstractSeaIceSimulation
     nsteps::Int
 end
 const StubIT = Union{StubOceanIT, StubIceIT}
+
+Interfacer.is_overlapped(::StubIT) = true
 
 Interfacer.sim_dt(s::StubIT) = Float64(Dates.value(s.dt))
 Interfacer.will_step(s::StubIT, t::ITime) = (date(t) - s.clock) >= s.dt

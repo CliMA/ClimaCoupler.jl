@@ -32,7 +32,13 @@ function turbulent_fluxes!(
     slow_frozen::Bool = false,
     force_slow_push::Bool = false,
 )
-    turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params, cs.flux_accumulators)
+    turbulent_fluxes!(
+        cs.fields,
+        cs.model_sims,
+        cs.thermo_params,
+        cs.flux_accumulators;
+        slow_frozen,
+    )
     if force_slow_push
         # Priming runs the slow group ahead of the coupler, so `will_step` no
         # longer marks the moment their forcing is due -- the window boundary
@@ -73,24 +79,57 @@ Args:
 
 (NB: Radiation surface fluxes are calculated by the atmosphere.)
 """
-function turbulent_fluxes!(csf, model_sims, thermo_params, flux_accumulators = (;))
+const TURB_FLUX_NAMES = (:F_turb_ρτxz, :F_turb_ρτyz, :F_lh, :F_sh, :F_turb_moisture)
+const SLOW_TURB_FLUX_NAMES =
+    (:slow_F_turb_ρτxz, :slow_F_turb_ρτyz, :slow_F_lh, :slow_F_sh, :slow_F_turb_moisture)
+
+function turbulent_fluxes!(
+    csf,
+    model_sims,
+    thermo_params,
+    flux_accumulators = (;);
+    slow_frozen::Bool = false,
+)
     boundary_space = axes(csf)
     atmos_sim = model_sims.atmos_sim
     FT = CC.Spaces.undertype(boundary_space)
 
     # Reset the coupler fields will compute. We need to do this because we will compute
     # area-weighted averages
-    for p in (:F_turb_ρτxz, :F_turb_ρτyz, :F_lh, :F_sh, :F_turb_moisture)
+    for p in TURB_FLUX_NAMES
         fill!(getproperty(csf, p), 0)
     end
+    have_cache = all(n -> n in propertynames(csf), SLOW_TURB_FLUX_NAMES)
 
-    # Compute the surface fluxes for each surface model and add them to `csf`.
+    # Overlapped surfaces go first, into the freshly zeroed fields, so their share
+    # can be parked before the fast surfaces are added on top. While their step is
+    # in flight that share is restored instead of recomputed: computing it reads
+    # surface state the task is writing, and for a surface with no accumulator
+    # (one whose timestep equals Δt_cpl) it would also write fluxes back into a
+    # model mid-step.
+    if slow_frozen
+        have_cache && for (p, q) in zip(TURB_FLUX_NAMES, SLOW_TURB_FLUX_NAMES)
+            getproperty(csf, p) .= getproperty(csf, q)
+        end
+    else
+        for (name, sim) in pairs(model_sims)
+            sim isa Interfacer.AbstractImplicitFluxSimulation && continue
+            Interfacer.is_overlapped(sim) || continue
+            accumulator = get(flux_accumulators, name, nothing)
+            compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params, accumulator)
+        end
+        have_cache && for (p, q) in zip(TURB_FLUX_NAMES, SLOW_TURB_FLUX_NAMES)
+            getproperty(csf, q) .= getproperty(csf, p)
+        end
+    end
+
+    # Then the rest. `accumulator` is `nothing` for fast surfaces (and for atmos,
+    # which is also iterated but whose `compute_surface_fluxes!` is a no-op).
     for (name, sim) in pairs(model_sims)
         # If the simulation is an implicit flux simulation, the fluxes are computed in the
         # component model's `step!` function, so we don't need to compute them here.
         sim isa Interfacer.AbstractImplicitFluxSimulation && continue
-        # `accumulator` is `nothing` for fast surfaces (and for atmos, which is
-        # also iterated but whose `compute_surface_fluxes!` is a no-op).
+        Interfacer.is_overlapped(sim) && continue
         accumulator = get(flux_accumulators, name, nothing)
         compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params, accumulator)
     end

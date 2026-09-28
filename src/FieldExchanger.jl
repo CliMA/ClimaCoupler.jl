@@ -695,13 +695,10 @@ function combine_surfaces!(
 
             # Zero out the contribution from this surface if the area fraction is zero.
             # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs
-            contribution =
-                area_fraction .* ifelse.(area_fraction .≈ 0, zero(FT), surface_field)
-            if !isnothing(slow_sum) && Interfacer.is_overlapped(sim)
-                slow_sum .+= contribution
-            else
-                combined_field .+= contribution
-            end
+            target =
+                (!isnothing(slow_sum) && Interfacer.is_overlapped(sim)) ? slow_sum :
+                combined_field
+            target .+= area_fraction .* ifelse.(area_fraction .≈ 0, zero(FT), surface_field)
         end
     end
     isnothing(slow_sum) || (combined_field .+= slow_sum)

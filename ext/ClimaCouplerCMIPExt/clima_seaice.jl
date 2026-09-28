@@ -224,6 +224,8 @@ NVTX.@annotate function Interfacer.step!(sim::ClimaSeaIceSimulation, t::ITime)
     return nothing
 end
 
+Interfacer.is_overlapped(::ClimaSeaIceSimulation) = true
+
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:area_fraction}) = sim.area_fraction
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:ice_concentration}) =
     sim.ice.model.ice_concentration

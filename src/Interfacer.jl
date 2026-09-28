@@ -207,8 +207,20 @@ values.
 `:slow_LW_up` holds the area- and emissivity-weighted sum of `T^4`, which is the
 quantity `combine_surfaces!` accumulates before converting back to a temperature.
 """
-overlap_cache_fields() =
-    [:slow_emissivity, :slow_LW_up, :slow_direct_albedo, :slow_diffuse_albedo]
+overlap_cache_fields() = [
+    :slow_emissivity,
+    :slow_LW_up,
+    :slow_direct_albedo,
+    :slow_diffuse_albedo,
+    # The slow surfaces' share of the turbulent fluxes, parked for the same
+    # reason: computing it reads their surface state, which the in-flight step
+    # is writing.
+    :slow_F_turb_ρτxz,
+    :slow_F_turb_ρτyz,
+    :slow_F_lh,
+    :slow_F_sh,
+    :slow_F_turb_moisture,
+]
 
 """
     init_coupler_fields(FT, coupler_field_names, boundary_space)
@@ -257,19 +269,16 @@ abstract type AbstractOceanSimulation <: AbstractSurfaceSimulation end
     is_overlapped(sim)
 
 Whether `sim` belongs to the group that is stepped asynchronously across several
-coupling steps when `overlap_slow_surfaces` is set.
+coupling steps when `overlap_slow_surfaces` is set. Ocean and sea ice step
+together in that group, to properly pass the frazil heat flux.
 
-The ocean and sea ice form that group. They are the slow surfaces relative to the
-coupling timestep, and the sea ice holds views into the ocean's surface velocity
-and salinity, so the two must advance as a unit rather than in parallel.
-
-Membership is decided by type rather than by the key a model happens to be stored
-under in `model_sims`, so adding an ocean or sea ice model needs no bookkeeping
-and a mistyped key cannot silently exclude a model from the group.
+Defaults to `false`, and is opted into by concrete type rather than by abstract
+supertype: prescribed and slab surfaces are cheap, so overlapping them would buy
+nothing and still cost a coupling step of lag. Deciding by type rather than by
+the key a model is stored under in `model_sims` means a mistyped key cannot
+silently drop a model from the group.
 """
 is_overlapped(::AbstractComponentSimulation) = false
-is_overlapped(::AbstractOceanSimulation) = true
-is_overlapped(::AbstractSeaIceSimulation) = true
 
 """
     AbstractImplicitFluxSimulation

@@ -51,28 +51,39 @@ function run!(
     cs::Interfacer.CoupledSimulation;
     precompile::Bool = cs.tspan[end] > 2 * cs.Δt_cpl + cs.tspan[begin],
 )
-    ## Precompilation of Coupling Loop
-    # Here we run the entire coupled simulation for two timesteps to precompile several
-    # functions for more accurate timing of the overall simulation.
-    precompile && (step!(cs); step!(cs))
-
-    ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
-    GC.gc()
-
-    ## Solving and Timing the Full Simulation
-
-    # This is where the full coupling loop is called for the full timespan of the simulation.
-    # We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU and use this
-    # value to calculate the simulated years per day (SYPD) of the simulation.
     @info "Starting coupling loop"
     t_timed_start = cs.t[] # get t just before timing (equal to cs.tspan[begin] if `precompile` is false)
-    walltime = ClimaComms.@elapsed ClimaComms.device(cs) begin
-        while cs.t[] < cs.tspan[end]
-            step!(cs)
+    local walltime
+    try
+        ## Precompilation of Coupling Loop
+        # Here we run the entire coupled simulation for two timesteps to precompile several
+        # functions for more accurate timing of the overall simulation.
+        precompile && (step!(cs); step!(cs))
+
+        ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
+        GC.gc()
+
+        ## Solving and Timing the Full Simulation
+
+        # This is where the full coupling loop is called for the full timespan of the simulation.
+        # We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU and use this
+        # value to calculate the simulated years per day (SYPD) of the simulation.
+        walltime = ClimaComms.@elapsed ClimaComms.device(cs) begin
+            while cs.t[] < cs.tspan[end]
+                step!(cs)
+            end
+        end
+    finally
+        # Nothing may outlive the coupling loop with ice/ocean state in flight,
+        # including a loop that threw. Failures joining are reported rather than
+        # raised, so they cannot mask whatever ended the run.
+        try
+            FieldExchanger.wait_slow_sims!(cs)
+        catch e
+            @error "slow-surface step failed during teardown" exception =
+                (e, catch_backtrace())
         end
     end
-    # Nothing may outlive the coupling loop with ice/ocean state in flight.
-    FieldExchanger.wait_slow_sims!(cs)
 
     @info "Simulation took $(walltime) seconds"
 

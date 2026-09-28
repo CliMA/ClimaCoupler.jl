@@ -3,12 +3,21 @@ ClimaCoupler.jl Release Notes
 
 `main`
 -------
-
 #### Support non-00Z `start_date` for subseasonal / WeatherQuest ICs.
 `start_date` now accepts `YYYYMMDD-HHMM` (in addition to `YYYYMMDD`), matching
 ClimaAtmos. Subseasonal ERA5 land/SST/SIC/albedo/bucket paths use that HHMM
 instead of always `_0000`, so 12Z (and other) initializations find the correct
-WeatherQuest files.
+WeatherQuest files. Batch/sweep submit scripts preserve the time in generated
+configs and output directory tags.
+
+#### Pass area-weighted surface roughness to the atmosphere for the 2 m `tas` diagnostic.
+`import_combined_surface_fields!` now area-weights each surface model's
+`:roughness_buoyancy` into the coupler field of the same name, and
+`update_sim!(atmos_sim, csf)` pushes it to the atmosphere (stored in
+`sfc_conditions.z0b`). This lets ClimaAtmos diagnose the 2 m air temperature
+(`tas`) with Monin-Obukhov similarity theory using the true surface roughness in
+coupled runs (`surface_setup: "PrescribedSurface"`), instead of falling back to
+the lowest model level or a constant default roughness.
 
 #### Remove land and coupler space flexibility.
 The `h_elem_coupler`, `nh_poly_coupler`, and `share_surface_space` configuration

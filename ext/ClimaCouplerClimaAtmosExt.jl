@@ -375,6 +375,18 @@ function Interfacer.update_field!(
 )
     Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.T_sfc, field)
 end
+function Interfacer.update_field!(
+    sim::ClimaAtmosSimulation,
+    ::Val{:roughness_buoyancy},
+    field,
+)
+    # Store the area-weighted thermal roughness length in the atmosphere surface
+    # conditions so the 2 m temperature diagnostic (`tas`) reconstructs the
+    # near-surface Monin-Obukhov profile with the true surface roughness rather
+    # than a constant default. Only used diagnostically; the surface fluxes
+    # themselves are still computed by the coupler.
+    Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.z0b, field)
+end
 function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_humidity}, csf)
     # NOTE: This update_field! takes as argument the entire coupler fields struct, instead
     # of a single field. This is unlike most of other functions, so we may want to revisit it.
@@ -564,12 +576,14 @@ Extend Interfacer.add_coupler_fields! to add the fields required for ClimaAtmosS
 The fields added are:
 - `:surface_direct_albedo` (for radiation)
 - `:surface_diffuse_albedo` (for radiation)
+- `:roughness_buoyancy` (area-weighted thermal roughness, for the 2 m `tas` diagnostic)
 """
 function Interfacer.add_coupler_fields!(
     coupler_field_names,
     atmos_sim::ClimaAtmosSimulation,
 )
-    atmos_coupler_fields = [:surface_direct_albedo, :surface_diffuse_albedo]
+    atmos_coupler_fields =
+        [:surface_direct_albedo, :surface_diffuse_albedo, :roughness_buoyancy]
     push!(coupler_field_names, atmos_coupler_fields...)
 end
 

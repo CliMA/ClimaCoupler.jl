@@ -90,9 +90,7 @@ function turbulent_fluxes!(
     flux_accumulators = (;);
     slow_frozen::Bool = false,
 )
-    boundary_space = axes(csf)
     atmos_sim = model_sims.atmos_sim
-    FT = CC.Spaces.undertype(boundary_space)
 
     # Reset the coupler fields will compute. We need to do this because we will compute
     # area-weighted averages

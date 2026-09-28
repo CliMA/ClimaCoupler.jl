@@ -423,3 +423,89 @@ report_restart(;
     ocean_ahead_to = 3600.0,
     nsteps = 10,
 )
+
+# ---------------------------------------------------------------------------
+# While a slow step is in flight, the coupler must not compute turbulent fluxes
+# for the overlapped surfaces: doing so reads surface state the task is writing,
+# and for a surface with no accumulator it writes fluxes back into the model.
+# Their share is parked at the last sync and restored instead.
+#
+# `csf` here is a NamedTuple of plain vectors: `turbulent_fluxes!` only needs
+# `propertynames`, `getproperty`, `fill!` and broadcast, so a full ClimaCore
+# space is unnecessary and would obscure what is being checked.
+
+const FluxCalculator = ClimaCoupler.FluxCalculator
+
+mutable struct CountingAtmos <: Interfacer.AbstractAtmosSimulation end
+
+mutable struct CountingSurface <: Interfacer.AbstractSurfaceSimulation
+    overlapped::Bool
+    contribution::Float64
+    ncalls::Int
+end
+CountingSurface(o, c) = CountingSurface(o, c, 0)
+Interfacer.is_overlapped(s::CountingSurface) = s.overlapped
+
+function FluxCalculator.compute_surface_fluxes!(
+    csf,
+    sim::CountingSurface,
+    ::Interfacer.AbstractAtmosSimulation,
+    thermo_params,
+    accumulator = nothing,
+)
+    sim.ncalls += 1
+    csf.F_sh .+= sim.contribution
+    return nothing
+end
+
+@testset "overlapped surfaces are skipped while frozen" begin
+    names = (
+        :F_turb_ρτxz,
+        :F_turb_ρτyz,
+        :F_lh,
+        :F_sh,
+        :F_turb_moisture,
+        :slow_F_turb_ρτxz,
+        :slow_F_turb_ρτyz,
+        :slow_F_lh,
+        :slow_F_sh,
+        :slow_F_turb_moisture,
+    )
+    csf = NamedTuple{names}(Tuple(zeros(3) for _ in names))
+
+    ocean = CountingSurface(true, 2.0)     # overlapped
+    land = CountingSurface(false, 5.0)     # fast
+    sims = (; atmos_sim = CountingAtmos(), ocean_sim = ocean, land_sim = land)
+
+    # Sync step: both surfaces contribute, and the overlapped share is parked.
+    FluxCalculator.turbulent_fluxes!(csf, sims, nothing; slow_frozen = false)
+    @test ocean.ncalls == 1
+    @test land.ncalls == 1
+    @test all(csf.F_sh .== 7.0)
+    @test all(csf.slow_F_sh .== 2.0)
+
+    # Frozen step: the overlapped surface must not be touched, and its parked
+    # share must still reach the total.
+    FluxCalculator.turbulent_fluxes!(csf, sims, nothing; slow_frozen = true)
+    @test ocean.ncalls == 1          # not called again
+    @test land.ncalls == 2           # fast surfaces still computed live
+    @test all(csf.F_sh .== 7.0)      # parked slow share restored, not dropped
+    @test all(csf.slow_F_sh .== 2.0) # cache untouched while frozen
+
+    # Back in sync: the overlapped surface is read again and the cache refreshed.
+    ocean.contribution = 3.0
+    FluxCalculator.turbulent_fluxes!(csf, sims, nothing; slow_frozen = false)
+    @test ocean.ncalls == 2
+    @test all(csf.F_sh .== 8.0)
+    @test all(csf.slow_F_sh .== 3.0)
+end
+
+@testset "is_overlapped is opt-in by concrete type" begin
+    # Prescribed and slab surfaces must not be dragged into the overlapped group:
+    # they are cheap, so they would pay a coupling step of lag for nothing.
+    @test !Interfacer.is_overlapped(CountingSurface(false, 0.0))
+    @test Interfacer.is_overlapped(CountingSurface(true, 0.0))
+    @test !Interfacer.is_overlapped(
+        ClimaCoupler.Interfacer.SurfaceStub((; area_fraction = nothing)),
+    )
+end

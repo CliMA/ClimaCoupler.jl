@@ -80,6 +80,36 @@ python scripts/submit_wxquest_batch.py --env nightly --yes   # main branches (de
 python scripts/submit_wxquest_batch.py --env amip --yes      # Manifest.toml pins
 ```
 
+### Submit — many short forecasts in one job (ML training data)
+
+`submit_wxquest_ml_batch.py` submits a pool of small, independent PBS workers
+(default 3 workers x 3 nodes) that share one work queue. Each worker runs
+`experiments/AMIP/run_simulations_sequential.jl`: it compiles once, then claims
+the next unfinished date, runs it, and repeats until nothing is left. Workers
+start whenever the scheduler frees nodes for one of them, so a busy machine only
+delays part of the pool. By default every date with a complete IC set in
+`--ic-dir` is run.
+
+```bash
+python scripts/submit_wxquest_ml_batch.py --dry-run                     # plan + queue state
+python scripts/submit_wxquest_ml_batch.py --dates-file dates.txt --yes  # submit pool
+python scripts/submit_wxquest_ml_batch.py --workers 6 --nodes 2 --yes   # smaller, more workers
+python scripts/submit_wxquest_ml_batch.py --dates-file dates.txt --yes  # later: top up / resume
+```
+
+- Use `--dates-file` for 12Z dates (`YYYYMMDD-HHMM`); argparse treats a
+  leading `-` in `--dates` values as an option.
+- Finished runs write `artifacts/run_complete.txt` and are never rerun.
+- Claims live in `generated/ml_batch_<name>/claims/<config>/` (owner job ID in
+  `owner.txt`). Rerunning the command releases claims whose job is no longer
+  queued or running, then submits workers for what is left.
+- A failed run writes `failed.txt` into its claim and is not retried unless
+  `--retry-failed` is passed. A worker stops after 2 failures in a row.
+- Workers stop claiming dates that would not finish before their walltime.
+- Environment setup is serialized with `flock` so simultaneous workers don't
+  race on the Manifest.
+- Generated files: `generated/ml_batch_<name>/{configs,lists,claims,pbs,logs}/`.
+
 ### Monitor
 
 ```bash
@@ -120,6 +150,7 @@ julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl \
 | File | Purpose |
 |------|---------|
 | `submit_wxquest_batch.py` | Generate per-date configs + PBS scripts and `qsub` them |
+| `submit_wxquest_ml_batch.py` | Pool of PBS workers sharing a date queue; each compiles once and runs many dates |
 | `setup_amip_env.sh` | Set up `experiments/AMIP` Julia env (used by PBS jobs and interactively) |
 
 ## Environment profiles
@@ -128,7 +159,7 @@ Both profiles use `climacommon/2025_02_25`. The difference is Julia package reso
 
 | `--env` | Packages |
 |---------|----------|
-| `nightly` (default) | `instantiate` + main on same set as Buildkite nightly: ClimaAtmos, ClimaCore, ClimaCoreMakie, ClimaTimeSteppers, Thermodynamics, ClimaLand, SurfaceFluxes, RRTMGP |
+| `nightly` (default) | `instantiate` + main on the Buildkite nightly set (ClimaAtmos, Thermodynamics, SurfaceFluxes, RRTMGP, CloudMicrophysics), with ClimaCore 0.16.2, ClimaTimeSteppers 0.10.7, and ClimaLand 1.12.1 pinned (ClimaLand main breaks `Interfacer.remap!`; its releases need ClimaCore < 1) |
 | `amip` | `instantiate` + `resolve` only — pins from `experiments/AMIP/Manifest.toml` |
 
 ## What each job does

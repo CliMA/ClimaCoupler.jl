@@ -1,13 +1,12 @@
-# Under development — not run in CI yet. Currently used for WeatherBench / ProgEDMF
-# experiments on Derecho (NCAR); paths below assume that machine.
+# 10-day WeatherBench / ProgEDMF with online ML tendency correction.
+# Same Atmos checkout as the control; only difference is ml_correction*.
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 strict_params: false
 mode_name: "subseasonal"
 
-# derecho machine data paths
 era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_0p25deg_dev/no_hz_stretch"
-coupler_output_dir: "/glade/derecho/scratch/cchristo/coupler_runs_v2/weatherbench"
+coupler_output_dir: "/glade/derecho/scratch/cchristo/coupler_runs_v2/weatherbench_10d_mlcorr_strong"
 initial_condition: "WeatherModel"
 era5_ic_full_pressure: true
 checkpoint_dt: "1000days"
@@ -22,28 +21,20 @@ hyperdiffusion_prandtl_number: 1.0
 divergence_damping_factor: 20.0
 topography_damping_factor: 1.15
 
-### Microphysics: 1M ###
-# 1M requires shorter timesteps (empirically ~20secs) and stronger vorticity
-# hyperdiffusion than the 0M base.
-microphysics_model: "1M"
-atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
-coupler_toml: ["toml/amip_progedmf_1m.toml"]
-dt: "20secs"
-dt_cpl: "20secs"
-vorticity_hyperdiffusion_coefficient: 0.16
+microphysics_model: "0M"
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
+coupler_toml: ["toml/amip_progedmf.toml"]
+dt: "40secs"
+dt_cpl: "40secs"
+vorticity_hyperdiffusion_coefficient: 0.15
 
 orographic_gravity_wave: "raw_topo_online"
 
 land_fraction_source: "era5"
 binary_area_fraction: false
 
-### integrated land ###
 land_model: "integrated"
 lai_source: "modis_monthly_climatology"
-
-### bucket land ###
-# land_model: "bucket"
-# bucket_albedo_type: "map_temporal"
 
 land_spun_up_ic: false
 land_temperature_anomaly: "nothing"
@@ -58,16 +49,24 @@ t_end: "10days"
 netcdf_output_at_levels: true
 output_default_diagnostics: false
 use_coupler_diagnostics: true
+
+# Online ML tendency correction. Off unless this path is set.
+# Gain / variables: edit here for the next experiment (see EXPERIMENTS.md).
+ml_correction: "/glade/derecho/scratch/cchristo/climaweatherml/tendency_corr/runs/col_w3h_ctx/col_w3h_ctx_julia.nc"
+ml_correction_variables: "tq"
+ml_correction_gain: 0.75
+ml_correction_t_cap: 1.5
+# Full strength down to 50 hPa, cosine taper to 0 at 20 hPa (still below the
+# 40 km sponge). Defaults were 100 → 50 hPa.
+ml_correction_p_full: 5000.0
+ml_correction_p_zero: 2000.0
+# q already has ±q_cap (default 2e-4 kg/kg/h after gain) and a drying limiter
+# that cannot remove more than local q_tot in one refresh. Default q_cap is
+# enough until tq + higher gain shows clipping or negative q.
+# defaults: ml_correction_dt 1hours, q_cap 2.0e-4
+
 extra_atmos_diagnostics:
-  # Diagnostic set notes vs older single-file weatherbench_progedmf.yml:
-  # - daily inst: this list also includes `wa` (old tip did not)
-  # - daily avg: this list includes `mslp` (old tip did not); old tip also had
-  #   `swp` — add to the avg short_name list below if needed
   ### daily inst (surface + model-level)
   - short_name: [tas, mslp, ta, hus, zg, ua, va, wa, pfull, clw, cli, cl, clt, pr]
     period: 1days
     reduction_time: inst
-  ### daily average (surface + model-level)
-  - short_name: [zg, orog, tas, mslp, pr, lwp, iwp, clt, ta, hus, ua, va, wa, clw, cli, cl, pfull, waup, arup, tke] # +swp (old tip)
-    period: 1days
-    reduction_time: average

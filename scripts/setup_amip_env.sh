@@ -20,8 +20,9 @@ julia --project="$AMIP_PATH" -e 'using Pkg; Pkg.instantiate(;verbose=true)'
 
 if [[ "$MODE" == "nightly" ]]; then
     # Match .buildkite/nightly/pipeline.yml UPSTREAM_PACKAGES default.
+    # `Name@version` pins a release; otherwise track main.
     echo "--- nightly: tracking main on Buildkite nightly upstream packages"
-    NIGHTLY_PKGS=(ClimaAtmos ClimaCore ClimaCoreMakie ClimaTimeSteppers Thermodynamics ClimaLand SurfaceFluxes RRTMGP)
+    NIGHTLY_PKGS=(ClimaAtmos ClimaCore ClimaTimeSteppers Thermodynamics ClimaLand SurfaceFluxes RRTMGP CloudMicrophysics)
 
     if [[ -n "${CLIMAATMOS_PATH:-}" ]]; then
         if [[ ! -d "$CLIMAATMOS_PATH" ]]; then
@@ -38,7 +39,14 @@ if [[ "$MODE" == "nightly" ]]; then
         NIGHTLY_PKGS=("${filtered[@]}")
     fi
 
-    pkgs_julia=$(printf 'Pkg.PackageSpec(; name="%s", rev="main"), ' "${NIGHTLY_PKGS[@]}")
+    pkgs_julia=""
+    for entry in "${NIGHTLY_PKGS[@]}"; do
+        if [[ "$entry" == *@* ]]; then
+            pkgs_julia+="Pkg.PackageSpec(; name=\"${entry%@*}\", version=\"${entry#*@}\"), "
+        else
+            pkgs_julia+="Pkg.PackageSpec(; name=\"$entry\", rev=\"main\"), "
+        fi
+    done
     julia --project="$AMIP_PATH" -e "using Pkg; Pkg.add([${pkgs_julia}])"
 
     if [[ -n "${CLIMAATMOS_PATH:-}" ]]; then

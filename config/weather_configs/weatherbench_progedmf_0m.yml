@@ -6,14 +6,17 @@ strict_params: false
 mode_name: "subseasonal"
 
 # derecho machine data paths
-era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_0p25deg_dev/no_hz"
-coupler_output_dir: "/glade/derecho/scratch/cchristo/coupler_runs_v2/weatherbench"
+era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_0p25deg_dev/no_hz_stretch"
+# coupler_output_dir: "/glade/derecho/scratch/cchristo/coupler_runs_v2/weatherbench"
+# coupler_output_dir: "/glade/derecho/scratch/cchristo/coupler_runs_v2/weatherbench_ic_ml"
+coupler_output_dir: "/glade/derecho/scratch/cchristo/coupler_runs_v2/weatherbench_ic_ml_pcoord"
 initial_condition: "WeatherModel"
 era5_ic_full_pressure: true
 checkpoint_dt: "1000days"
 dt_seaice: "50secs"
 energy_check: false
 h_elem: 30
+# h_elem: 60
 dz_bottom: 30.0
 z_elem: 130
 z_max: 70000.0
@@ -26,9 +29,11 @@ topography_damping_factor: 1.15
 microphysics_model: "0M"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
 coupler_toml: ["toml/amip_progedmf.toml"]
-dt: "50secs"
-dt_cpl: "50secs"
-vorticity_hyperdiffusion_coefficient: 0.12
+dt: "40secs"
+dt_cpl: "40secs"
+vorticity_hyperdiffusion_coefficient: 0.15
+
+orographic_gravity_wave: "raw_topo_online"
 
 land_fraction_source: "era5"
 binary_area_fraction: false
@@ -50,19 +55,25 @@ surface_setup: "PrescribedSurface"
 atmos_progress_interval: "1days"
 topo_smoothing: false
 topography: "Earth"
-t_end: "10days"
+# t_end: "10days"
+# t_end: "12hours"
+t_end: "19hours"
 netcdf_output_at_levels: true
 output_default_diagnostics: false
 use_coupler_diagnostics: true
 extra_atmos_diagnostics:
-  ### daily inst (surface + model-level)
-  - short_name: [tas, mslp, ta, hus, zg, ua, va, wa, pfull, clw, cli, cl, clt, pr]
-    period: 1days
-    reduction_time: inst
-  ### daily average (surface + model-level)
-  - short_name: [zg, orog, tas, mslp, pr, lwp, iwp, clt, ta, hus, ua, va, wa, clw, cli, cl, pfull, waup, arup, tke]
-    period: 1days
-    reduction_time: average
+  # Diagnostic set notes vs older single-file weatherbench_progedmf.yml:
+  # - daily inst: this list also includes `wa` (old tip did not)
+  # - daily avg: this list includes `mslp` (old tip did not); old tip also had
+  #   `swp` — add to the avg short_name list below if needed
+  # ### daily inst (surface + model-level)
+  # - short_name: [tas, mslp, ta, hus, zg, ua, va, wa, pfull, clw, cli, cl, clt, pr]
+  #   period: 1days
+  #   reduction_time: inst
+  # ### daily average (surface + model-level)
+  # - short_name: [zg, orog, tas, mslp, pr, lwp, iwp, clt, ta, hus, ua, va, wa, clw, cli, cl, pfull, waup, arup, tke] # +swp (old tip)
+  #   period: 1days
+  #   reduction_time: average
 
   ### hourly inst (surface + model-level)
   # - short_name: [ts, tas, mslp, pr, prra, clt, prw, lwp, iwp, clwvi, rsdt, rsut, rlut, rsutcs, rlutcs]
@@ -71,6 +82,14 @@ extra_atmos_diagnostics:
   # - short_name: [ta, ua, va, wa, husv, hus, cl, clw, cli, zg, orog, pfull, rhoa]
   #   reduction_time: inst
   #   period: 1hours
+
+  - short_name: [orog]
+    reduction_time: inst
+    period: 1hours
+  - short_name: [ta, ua, va, wa, husv, hus, cl, clw, cli, zg, pfull, rhoa]
+    reduction_time: inst
+    period: 1hours
+    pressure_coordinates: true
 
   ### daily average on pressure levels (3D fields)
   # - short_name: [ta, hus, ua, va, zg, clw, cli, cl, pfull]

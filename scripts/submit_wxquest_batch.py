@@ -37,10 +37,18 @@ EXPECTED_IC_PREFIXES = [
 
 def parse_start_date(raw: str) -> dt.datetime:
     raw = raw.strip()
-    formats = ["%Y%m%d-%H%M", "%Y%m%d%H%M", "%Y%m%d%H", "%Y%m%d"]
-    for fmt in formats:
+    # Length-gated formats: Python strptime does not require zero-padded %m/%d/%H/%M,
+    # so "%Y%m%d%H%M" would otherwise greedily misparse "20141231" as 2014-01-02 03:01.
+    candidates: list[tuple[str, str]] = [("%Y%m%d-%H%M", raw)]
+    if len(raw) == 8:
+        candidates.append(("%Y%m%d", raw))
+    elif len(raw) == 10:
+        candidates.append(("%Y%m%d%H", raw))
+    elif len(raw) == 12:
+        candidates.append(("%Y%m%d%H%M", raw))
+    for fmt, text in candidates:
         try:
-            return dt.datetime.strptime(raw, fmt)
+            return dt.datetime.strptime(text, fmt)
         except ValueError:
             continue
     raise ValueError(
@@ -120,6 +128,9 @@ def make_pbs_script(
     nodes: int,
     gpus_per_node: int,
     climaatmos_path: Optional[str] = None,
+    driver: str = "experiments/AMIP/run_simulation.jl",
+    config_flag: str = "--config_file",
+    driver_args: str = "",
 ) -> str:
     nranks = nodes * gpus_per_node
     setup_script = workspace / "scripts/setup_amip_env.sh"
@@ -140,10 +151,11 @@ def make_pbs_script(
         #PBS -l walltime={walltime}
         #PBS -l select={select}
         
+        export JOB_START_EPOCH=$(date +%s)
         cd {workspace}
         
         AMIP_PATH='experiments/AMIP/'
-        DRIVER='experiments/AMIP/run_simulation.jl'
+        DRIVER='{driver}'
         CONFIG_FILE='{config_path}'
         ENV_MODE='{env_mode}'
         
@@ -172,9 +184,13 @@ def make_pbs_script(
         mkdir -p ${{TMPDIR}}
         
         export AMIP_PATH
-        {climaatmos_export}source {setup_script} "$ENV_MODE"
+        {climaatmos_export}# Jobs sharing this workspace may start together; setup rewrites the Manifest.
+        # Precompile workloads call ClimaComms.context(), which fails under
+        # CLIMACOMMS_CONTEXT=MPI before MPI.jl is loaded.
+        env -u CLIMACOMMS_CONTEXT -u CLIMACOMMS_DEVICE \\
+            flock {workspace}/experiments/AMIP/.setup_env.lock bash {setup_script} "$ENV_MODE" || exit 1
         
-        CMDRN="julia --project=$AMIP_PATH $DRIVER --config_file $CONFIG_FILE"
+        CMDRN="julia --project=$AMIP_PATH $DRIVER {config_flag} $CONFIG_FILE {driver_args}"
         "$MPITRAMPOLINE_MPIEXEC" -np {nranks} -ppn {gpus_per_node} set_gpu_rank "$CMDRN"
         """
     ).strip() + "\n"

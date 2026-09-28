@@ -7,6 +7,19 @@ value = 40000.0
 [ogw_smoothing_scale_fraction]
 value = 1.0
 
+[ogw_tofd_coefficient]
+value = 1.0
+type = "float"
+
+[gravitational_acceleration]
+value = 9.80665
+
+[gas_constant_dry_air]
+value = 287.06
+
+[sgs_variance_horizontal_scale_factor]
+value = 1.0
+
 [EDMF_max_surface_area]
 value = 0.1
 

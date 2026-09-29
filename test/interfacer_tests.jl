@@ -48,27 +48,18 @@ for FT in (Float32, Float64)
 
         fields = ones(boundary_space_)
 
-        cs = Interfacer.CoupledSimulation{FT}(
-            nothing, # dates
-            fields,
-            nothing, # conservation_checks
-            (Int(0), Int(1000)), # tspan
-            Int(200), # Δt_cpl
-            Ref(Int(0)), # t
-            Ref(0), # step
-            Ref(-1), # prev_checkpoint_t
-            (;), # model_sims
-            (;), # callbacks
-            (;), # dir_paths
-            nothing, # thermo_params
-            nothing, # diags_handler
-            true, # save_cache
-            false, # step_concurrently
-            false, # overlap_slow_surfaces
-            false, # prime_fast_group
-            Ref{Any}(nothing), # slow_task
-            Ref{Any}(nothing), # slow_progress
-            (;), # flux_accumulators
+        cs = Interfacer.CoupledSimulation{FT}(;
+            start_date = nothing,
+            fields = fields,
+            conservation_checks = nothing,
+            tspan = (Int(0), Int(1000)),
+            Δt_cpl = Int(200),
+            t = Ref(Int(0)),
+            step = Ref(0),
+            prev_checkpoint_t = Ref(-1),
+            model_sims = (;),
+            callbacks = (;),
+            save_cache = true,
         )
         @test CC.Spaces.undertype(Interfacer.boundary_space(cs)) == FT
     end

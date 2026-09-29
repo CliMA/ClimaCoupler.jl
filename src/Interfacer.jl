@@ -107,6 +107,61 @@ end
 
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args)...}(args...)
 
+"""
+    CoupledSimulation{FT}(; start_date, fields, ..., flux_accumulators)
+
+Keyword constructor. Preferred over the positional form: the struct has nineteen
+fields, several of them `Ref`s or `Bool`s that are indistinguishable by type, so
+inserting or removing one silently shifts every argument after it rather than
+raising. Everything a simulation can do without has a default, which keeps
+callers that do not care about concurrency from having to name those fields.
+"""
+function CoupledSimulation{FT}(;
+    start_date,
+    fields,
+    conservation_checks,
+    tspan,
+    Δt_cpl,
+    t,
+    step,
+    prev_checkpoint_t,
+    model_sims,
+    callbacks = (),
+    dir_paths = (;),
+    thermo_params = nothing,
+    diags_handler = nothing,
+    save_cache = false,
+    step_concurrently = false,
+    overlap_slow_surfaces = false,
+    prime_fast_group = false,
+    slow_task = Ref{Any}(nothing),
+    slow_progress = Ref{Any}(nothing),
+    flux_accumulators = (;),
+) where {FT}
+    return CoupledSimulation{FT}(
+        start_date,
+        fields,
+        conservation_checks,
+        tspan,
+        Δt_cpl,
+        t,
+        step,
+        prev_checkpoint_t,
+        model_sims,
+        callbacks,
+        dir_paths,
+        thermo_params,
+        diags_handler,
+        save_cache,
+        step_concurrently,
+        overlap_slow_surfaces,
+        prime_fast_group,
+        slow_task,
+        slow_progress,
+        flux_accumulators,
+    )
+end
+
 function Base.show(io::IO, sim::CoupledSimulation)
     device_type = nameof(typeof(ClimaComms.device(sim)))
     return print(

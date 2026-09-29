@@ -73,25 +73,32 @@ coverage_mask_path(output_dir) = joinpath(output_dir, "coverage_masks.jld2")
 """
     coverage_mask(var, date_ranges)
 
-Where `var` has observational data at every date in `date_ranges`, as a ClimaAnalysis
-longitude-latitude mask. Call the result on an `OutputVar` to set its uncovered points to
-`NaN`. Returns `nothing` for a product that covers every point, so a global product
-carries no mask at all.
+Where `var` has observational data at every date in `date_ranges`, as a
+ClimaAnalysis longitude-latitude mask. Call the result on an `OutputVar` to set
+its uncovered points to `NaN`. Returns `nothing` for a product that covers every
+point, so a global product carries no mask at all.
 
-Both sides of the calibration need this. A satellite retrieval is not global, MAC `lwp` is
-ocean only, and `zonal_average` ignores `NaN`, so the observed zonal mean is an average
-over covered points. Masking the simulation with the same object before its own zonal mean
-makes the two averages cover the same points. Without it the simulation averages every
-longitude, and the difference partly measures each band's land fraction rather than the
-model's cloud. Applying it to the observation as well gives every date one fixed coverage,
-so the interannual spread the covariance is estimated from is climate rather than
-year-to-year coverage wobble.
+Use this whenever an observation does not cover every point, and apply it to the
+observation and to the simulation alike before any spatial reduction. A
+reduction such as `zonal_average` ignores `NaN`, so an observation reduces over
+its covered points while an unmasked simulation reduces over all of them, and
+the two results are different quantities even though they have the same shape.
+Applying the mask to the observation as well gives every date one fixed
+coverage, so the interannual spread the covariance is estimated from is climate
+rather than year-to-year coverage wobble.
 
-Restricted to `date_ranges` on purpose. A record spanning decades, unioned over every
-slice, drops any point that is missing in any single month.
+This function was written to support MAC `lwp`. It is an ocean-only retrieval,
+missing over land at about half of the grid points, so its zonal mean is an
+ocean average while an unmasked simulation averages ocean and land together.
+Modelled liquid water path over land is much lower than over ocean, so the
+difference between them partly measures each band's land fraction rather than
+the model's cloud.
 
-Longitude and latitude only. A masked product with another dimension, such as a cloud
-fraction on levels, errors here rather than guessing how to collapse it.
+Restricted to `date_ranges` on purpose. A record spanning decades, unioned over
+every slice, drops any point that is missing in any single month.
+
+Longitude and latitude only. A masked product with another dimension, such as a
+cloud fraction on levels, errors here rather than guessing how to collapse it.
 """
 function coverage_mask(var, date_ranges)
     tname = ClimaAnalysis.time_name(var)
@@ -173,9 +180,7 @@ deviation for `var`, over the finite data only.
 """
 function compute_mean_and_stddev(var::ClimaAnalysis.OutputVar)
     finite_data = filter(isfinite, var.data)
-    isempty(finite_data) && error(
-        "$(ClimaAnalysis.short_name(var)) has no finite data",
-    )
+    isempty(finite_data) && error("$(ClimaAnalysis.short_name(var)) has no finite data")
     mean_of_var = Statistics.mean(finite_data)
     std_of_var = Statistics.std(finite_data)
     std_of_var ≈ 0.0 && error("Standard deviation is zero; check your data")

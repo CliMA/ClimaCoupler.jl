@@ -19,7 +19,7 @@ include(model_interface_filepath)
 
 # Choose which calibration config to use
 config_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "amip", "config")
-default_config_path = joinpath(config_dir, "pressure_levels.jl")
+default_config_path = joinpath(config_dir, "zonal_cloud.jl")
 
 test_calibration_config_path = joinpath(config_dir, "pipeline_test.jl")
 const TEST_CALIBRATION = haskey(ENV, "TEST_CALIBRATION")

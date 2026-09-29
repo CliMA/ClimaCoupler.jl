@@ -17,7 +17,7 @@ covariance_date_ranges =
 
 # On Derecho, it is preferable to save the calibration output to the scratch
 # directory (e.g. "/glade/derecho/scratch")
-output_dir = joinpath(pkgdir(ClimaCoupler), "amip_calibration_pressure_levels")
+output_dir = joinpath(pkgdir(ClimaCoupler), "amip_calibration_zonal_cloud")
 
 const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     config_file,

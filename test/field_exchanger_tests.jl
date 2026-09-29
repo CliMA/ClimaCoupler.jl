@@ -225,22 +225,26 @@ for FT in (Float32, Float64)
             Interfacer.default_coupler_fields(),
             test_space,
         )
-        cs = Interfacer.CoupledSimulation{FT}(;
-            start_date = nothing,
-            fields = coupler_fields,
-            conservation_checks = nothing,
-            tspan = (Int(0), Int(1000)),
-            Δt_cpl = Int(200),
-            t = Ref(Int(0)),
-            step = Ref(0),
-            prev_checkpoint_t = Ref(-1),
-            model_sims = (;
+        cs = Interfacer.CoupledSimulation{FT}(
+            nothing, # dates
+            coupler_fields, # fields
+            nothing, # conservation_checks
+            (Int(0), Int(1000)), # tspan
+            Int(200), # Δt_cpl
+            Ref(Int(0)), # t
+            Ref(0), # step
+            Ref(-1), # prev_checkpoint_t
+            (;
                 ice_sim = DummyStub((; area_fraction = ice_d)),
                 ocean_sim = Interfacer.SurfaceStub((; area_fraction = ocean_d)),
                 land_sim = DummyStub((; area_fraction = land_fraction)),
-            ),
-            callbacks = (;),
-            save_cache = true,
+            ), # model_sims
+            (;), # callbacks
+            (;), # dir_paths
+            nothing, # thermo_params
+            nothing, # diags_handler
+            true, # save_cache
+            (;), # flux_accumulators
         )
 
         FieldExchanger.update_surface_fractions!(cs)
@@ -273,18 +277,22 @@ for FT in (Float32, Float64)
         ))
         # No land or ice sims: the legacy update would set the ocean fraction
         # to 1 everywhere; the aligning ocean sim must take precedence.
-        cs = Interfacer.CoupledSimulation{FT}(;
-            start_date = nothing,
-            fields = coupler_fields,
-            conservation_checks = nothing,
-            tspan = (Int(0), Int(1000)),
-            Δt_cpl = Int(200),
-            t = Ref(Int(0)),
-            step = Ref(0),
-            prev_checkpoint_t = Ref(-1),
-            model_sims = (; ocean_sim),
-            callbacks = (;),
-            save_cache = true,
+        cs = Interfacer.CoupledSimulation{FT}(
+            nothing, # dates
+            coupler_fields, # fields
+            nothing, # conservation_checks
+            (Int(0), Int(1000)), # tspan
+            Int(200), # Δt_cpl
+            Ref(Int(0)), # t
+            Ref(0), # step
+            Ref(-1), # prev_checkpoint_t
+            (; ocean_sim), # model_sims
+            (;), # callbacks
+            (;), # dir_paths
+            nothing, # thermo_params
+            nothing, # diags_handler
+            true, # save_cache
+            (;), # flux_accumulators
         )
 
         FieldExchanger.update_surface_fractions!(cs)
@@ -578,19 +586,22 @@ for FT in (Float32, Float64)
         thermo_params = TDP.ThermodynamicsParameters(FT)
 
         # construct the CoupledSimulation object
-        cs = Interfacer.CoupledSimulation{FT}(;
-            start_date = nothing,
-            fields = coupler_fields,
-            conservation_checks = nothing,
-            tspan = nothing,
-            Δt_cpl = nothing,
-            t = nothing,
-            step = Ref(0),
-            prev_checkpoint_t = Ref(-1),
-            model_sims = model_sims,
-            callbacks = (;),
-            thermo_params = thermo_params,
-            save_cache = true,
+        cs = Interfacer.CoupledSimulation{FT}(
+            nothing, # start_date
+            coupler_fields,
+            nothing, # conservation_checks
+            nothing, # tspan
+            nothing, # dt
+            nothing, # t
+            Ref(0), # step
+            Ref(-1), # prev_checkpoint_t
+            model_sims,
+            (;), # callbacks
+            (;), # dir_paths
+            thermo_params, # thermo_params
+            nothing, # diags_handler
+            true, # save_cache
+            (;), # flux_accumulators
         )
 
         # perform the exchange

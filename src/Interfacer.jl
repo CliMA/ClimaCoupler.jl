@@ -108,15 +108,15 @@ end
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args)...}(args...)
 
 """
-    CoupledSimulation{FT}(; start_date, fields, ..., flux_accumulators)
+    CoupledSimulation{FT}(start_date, ..., flux_accumulators; step_concurrently, ...)
 
-Keyword constructor. Preferred over the positional form: the struct has nineteen
-fields, several of them `Ref`s or `Bool`s that are indistinguishable by type, so
-inserting or removing one silently shifts every argument after it rather than
-raising. Everything a simulation can do without has a default, which keeps
-callers that do not care about concurrency from having to name those fields.
+The fields this constructor takes positionally are the long-standing ones. The
+five that concurrent stepping added are keyword-only and default to off, so a
+caller that does not use it neither names them nor has to keep them in the right
+order -- several are `Bool`s and `Ref`s that no amount of type checking would
+tell apart if they were transposed.
 """
-function CoupledSimulation{FT}(;
+function CoupledSimulation{FT}(
     start_date,
     fields,
     conservation_checks,
@@ -126,17 +126,17 @@ function CoupledSimulation{FT}(;
     step,
     prev_checkpoint_t,
     model_sims,
-    callbacks = (),
-    dir_paths = (;),
-    thermo_params = nothing,
-    diags_handler = nothing,
-    save_cache = false,
+    callbacks,
+    dir_paths,
+    thermo_params,
+    diags_handler,
+    save_cache,
+    flux_accumulators;
     step_concurrently = false,
     overlap_slow_surfaces = false,
     prime_fast_group = false,
     slow_task = Ref{Any}(nothing),
     slow_progress = Ref{Any}(nothing),
-    flux_accumulators = (;),
 ) where {FT}
     return CoupledSimulation{FT}(
         start_date,

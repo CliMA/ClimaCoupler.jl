@@ -72,18 +72,22 @@ for FT in (Float32, Float64)
         @. cf.P_liq = -100
 
         # init
-        cs = Interfacer.CoupledSimulation{FT}(;
-            start_date = nothing,
-            fields = cf,
-            conservation_checks = cc,
-            tspan = (Int(0), Int(1000)),
-            Δt_cpl = Int(200),
-            t = Ref(Int(0)),
-            step = Ref(0),
-            prev_checkpoint_t = Ref(-1),
-            model_sims = model_sims,
-            callbacks = (;),
-            save_cache = true,
+        cs = Interfacer.CoupledSimulation{FT}(
+            nothing, # dates
+            cf, # fields
+            cc, # conservation_checks
+            (Int(0), Int(1000)), # tspan
+            Int(200), # Δt_cpl
+            Ref(Int(0)), # t
+            Ref(0), # step
+            Ref(-1), # prev_checkpoint_t
+            model_sims, # model_sims
+            (;), # callbacks
+            (;), # dir_paths
+            nothing, # thermo_params
+            nothing, # diags_handler
+            true, # save_cache
+            (;), # flux_accumulators
         )
 
         # set non-zero radiation and precipitation
@@ -173,18 +177,22 @@ for FT in (Float32, Float64)
         @. cf.P_liq = -100
 
         # init
-        cs = Interfacer.CoupledSimulation{FT}(;
-            start_date = nothing,
-            fields = cf,
-            conservation_checks = cc,
-            tspan = (Int(0), Int(1000)),
-            Δt_cpl = Int(200),
-            t = Ref(Int(0)),
-            step = Ref(0),
-            prev_checkpoint_t = Ref(-1),
-            model_sims = model_sims,
-            callbacks = (;),
-            save_cache = true,
+        cs = Interfacer.CoupledSimulation{FT}(
+            nothing, # dates
+            cf, # fields
+            cc, # conservation_checks
+            (Int(0), Int(1000)), # tspan
+            Int(200), # Δt_cpl
+            Ref(Int(0)), # t
+            Ref(0), # step
+            Ref(-1), # prev_checkpoint_t
+            model_sims, # model_sims
+            (;), # callbacks
+            (;), # dir_paths
+            nothing, # thermo_params
+            nothing, # diags_handler
+            true, # save_cache
+            (;), # flux_accumulators
         )
 
         tot_energy, tot_water = ConservationChecker.check_conservation!(cs)

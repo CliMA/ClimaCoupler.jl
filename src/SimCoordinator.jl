@@ -601,14 +601,14 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
 
     ## Build the CoupledSimulation struct
     prev_checkpoint_t = Ref(-1)
-    cs = Interfacer.CoupledSimulation{FT}(;
+    cs = Interfacer.CoupledSimulation{FT}(
         start_date,
-        fields = coupler_fields,
+        coupler_fields,
         conservation_checks,
-        tspan = [tspan[1], tspan[2]],
+        [tspan[1], tspan[2]],
         Δt_cpl,
-        t = Ref(tspan[1]),
-        step = Ref(0),
+        Ref(tspan[1]),
+        Ref(0),
         prev_checkpoint_t,
         model_sims,
         callbacks,
@@ -616,10 +616,10 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         thermo_params,
         diags_handler,
         save_cache,
-        step_concurrently,
-        overlap_slow_surfaces,
-        prime_fast_group,
-        flux_accumulators,
+        flux_accumulators;
+        step_concurrently = step_concurrently,
+        overlap_slow_surfaces = overlap_slow_surfaces,
+        prime_fast_group = prime_fast_group,
     )
 
     ## Restart component model states if specified

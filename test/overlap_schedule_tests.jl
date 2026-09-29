@@ -87,16 +87,22 @@ function build_cs_itime(; dt_cpl, dt_slow, overlap)
     ice = StubIceIT(epoch, Dates.Second(Int(dt_slow)), epoch, 0)
     Δt = ITime(Int64(dt_cpl), period = Dates.Second(1), epoch = epoch)
     t0 = ITime(Int64(0), period = Dates.Second(1), epoch = epoch)
-    cs = Interfacer.CoupledSimulation{Float64}(;
-        start_date = epoch,
-        fields = nothing,
-        conservation_checks = nothing,
-        tspan = (t0, t0),
-        Δt_cpl = Δt,
-        t = Ref(t0),
-        step = Ref(0),
-        prev_checkpoint_t = Ref(-1),
-        model_sims = (; ice_sim = ice, ocean_sim = ocean),
+    cs = Interfacer.CoupledSimulation{Float64}(
+        epoch,
+        nothing,
+        nothing,
+        (t0, t0),
+        Δt,
+        Ref(t0),
+        Ref(0),
+        Ref(-1),
+        (; ice_sim = ice, ocean_sim = ocean),
+        (),
+        (;),
+        nothing,
+        nothing,
+        false,
+        (;);
         step_concurrently = true,
         overlap_slow_surfaces = overlap,
     )
@@ -106,16 +112,22 @@ end
 function build_cs(; dt_cpl, dt_slow, overlap)
     ocean = StubOcean(0.0, dt_slow, 0)
     ice = StubIce(0.0, dt_slow, 0)
-    cs = Interfacer.CoupledSimulation{Float64}(;
-        start_date = nothing,
-        fields = nothing,
-        conservation_checks = nothing,
-        tspan = (0.0, Inf),
-        Δt_cpl = dt_cpl,
-        t = Ref(0.0),
-        step = Ref(0),
-        prev_checkpoint_t = Ref(-1),
-        model_sims = (; ice_sim = ice, ocean_sim = ocean),
+    cs = Interfacer.CoupledSimulation{Float64}(
+        nothing,                       # start_date
+        nothing,                       # fields
+        nothing,                       # conservation_checks
+        (0.0, Inf),                    # tspan
+        dt_cpl,                        # Δt_cpl
+        Ref(0.0),                      # t
+        Ref(0),                        # step
+        Ref(-1),                       # prev_checkpoint_t
+        (; ice_sim = ice, ocean_sim = ocean),
+        (),                            # callbacks
+        (;),                           # dir_paths
+        nothing,                       # thermo_params
+        nothing,                       # diags_handler
+        false,                         # save_cache
+        (;),                           # flux_accumulators;
         step_concurrently = true,
         overlap_slow_surfaces = overlap,
     )

@@ -168,19 +168,22 @@ within-noise pairs to place each option against.
 `step_concurrently` is indistinguishable from sequential stepping, as expected:
 it changes when the groups run, not what they read.
 
-`overlap_slow_surfaces` separates cleanly from the noise on the ocean and sea
-ice surface fractions, at about four times the largest difference the baselines
-produce among themselves, with no overlap between the two sets at all. That much
-is close to definitional, since `update_surface_fractions!` stands down for the
-slow components while a slow step is in flight, so the fractions are held across
-the window by construction. It also carries a smaller but systematic signal into
-surface temperature and the fluxes tied to it — upward longwave and sensible
-heat — at between 1.05 and 1.4 times the noise. The turbulent energy flux stayed
-within the noise range.
+`overlap_slow_surfaces` is not. Of the 103 fields that vary between identical
+runs at all, 37 sit outside the noise on every comparison. The largest is the
+ocean and sea ice surface fraction, at about four times the widest difference
+the baselines produce among themselves and with no overlap between the two sets;
+that much is close to definitional, since `update_surface_fractions!` stands
+down for the slow components while a step is in flight, so the fractions are
+held across the window by construction. But it reaches well beyond that
+bookkeeping: surface temperature at about 1.6 times the noise, upward longwave
+at 1.3, sensible heat at 1.2, and the turbulent energy flux the atmosphere
+actually feels at 5.2–5.4 against a noise range of 4.5–4.9. The lag is a
+physical change to the coupled solution, not an artefact of how the surface is
+recorded.
 
-`prime_slow_surfaces` did not reduce either effect, and was marginally larger on
-both. That is consistent with the mechanism rather than surprising: priming
-changes *when* the slow group steps, not whether the surface fractions are
+`prime_slow_surfaces` does not reduce any of it, and is marginally larger on
+most. That is consistent with the mechanism rather than surprising: priming
+changes *when* the slow group steps, not whether the surface fields are
 refreshed inside a window, so it cannot address the part of the lag that comes
 from holding them.
 

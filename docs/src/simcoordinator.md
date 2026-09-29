@@ -48,7 +48,7 @@ still needs a blended surface temperature and albedo every coupling step, so
 `combine_surfaces!` sums the fast and slow surfaces separately and reuses the
 slow sum for the rest of the window — land keeps contributing live values.
 
-The cadence of the three cases, for `k = 3`:
+The cadence of the four cases, for `k = 3`:
 
 ```
 k = dt_ocean / dt_cpl = 3.  A = atmosphere + land,  Oₙ = the nth ocean/sea ice
@@ -64,12 +64,29 @@ step.  Each column is one coupling step; ──▶ marks a step spanning several
   overlap_slow_surfaces │  A  │  A  │  A  │  A  │  A  │  A  │  max(3A, O)
                         │ O₁──────────▶   │ O₂──────────▶   │
                         │ atmos uses O₀   │ atmos uses O₁   │  one window old
+                        ├─────┼─────┼─────┼─────┼─────┼─────┤
+  + prime_fast_group    │  A  │  A  │  A  │  A  │  A  │  A  │  max(3A, O)
+              A A ─────▶│                 │ O₁──────────▶   │
+                        │                 │ atmos uses O₀   │
                         └─────┴─────┴─────┴─────┴─────┴─────┘
+              ↑ k-1 fast steps taken at initialization, so O₁ launches
+                carrying the forcing accumulated over the window it integrates
 ```
 
 The first two leave the same answers: the join happens inside the coupling step,
 so the atmosphere sees ocean state of the same age either way. The third does
 not — the atmosphere sees an ocean one window older.
+
+The fourth addresses a different half of that. Under plain overlapping the slow
+step is launched before the window it integrates has finished contributing
+fluxes, so its forcing is not what the sequential path would have given it.
+`prime_fast_group` runs the fast group `k-1` coupling steps ahead during
+initialization, so the accumulated forcing is complete when the slow step
+launches. It does not shorten the lag the atmosphere sees, and it leaves the two
+groups' model times permanently offset by `k-1` coupling steps — their
+diagnostics are written on their own clocks, so compare such runs by time rather
+than by output index. That offset is inherent to advancing one group relative to
+the other, not incidental.
 
 How much this buys depends on how many coupling steps one slow step spans. Where
 the slow timestep equals `dt_cpl`, so that one slow step spans a single coupling

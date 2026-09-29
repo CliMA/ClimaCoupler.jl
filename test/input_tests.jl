@@ -4,6 +4,7 @@
 using Test
 import ArgParse
 import Dates
+import ClimaComms
 import ClimaCoupler: Input, Utilities, Interfacer
 import ClimaCoupler
 import YAML
@@ -474,7 +475,7 @@ end
             touch(joinpath(dir, "$(prefix)_$(stamp).nc"))
         end
         start = Dates.DateTime(2019, 12, 31, 12)
-        paths = Input.get_era5_filepaths(Interfacer.SubseasonalMode, dir, start, "")
+        paths = Input.get_era5_filepaths(dir, start, "", ClimaComms.context())
         @test paths.sst_path == joinpath(dir, "sst_processed_$(stamp).nc")
         @test paths.sic_path == joinpath(dir, "sic_processed_$(stamp).nc")
         @test paths.land_ic_path == joinpath(dir, "era5_land_processed_$(stamp).nc")
@@ -494,10 +495,10 @@ end
             touch(joinpath(dir, "$(prefix)_$(stamp00).nc"))
         end
         paths00 = Input.get_era5_filepaths(
-            Interfacer.SubseasonalMode,
             dir,
             Dates.DateTime(2020, 1, 1),
             "",
+            ClimaComms.context(),
         )
         @test endswith(paths00.sst_path, "sst_processed_$(stamp00).nc")
     end

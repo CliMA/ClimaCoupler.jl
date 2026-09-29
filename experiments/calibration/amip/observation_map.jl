@@ -43,6 +43,9 @@ function preprocess_sim_vars(vars)
     lat_right = 90
     vars = apply_lat_window.(vars, lat_left, lat_right)
 
+    # Keep this in step with the zonal average in the other file.
+    vars = zonal_average.(vars)
+
     if isfile(NORMALIZATION_STATS_FP)
         # Note: This should not be used with SVDplusDCovariance matrix
         normalization_stats = JLD2.load_object(NORMALIZATION_STATS_FP)

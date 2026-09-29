@@ -92,7 +92,6 @@ Initialize the slab ocean prognostic variable (temperature), including an
 anomaly in the tropics by default.
 """
 function slab_ocean_space_init(space, params)
-    FT = CC.Spaces.undertype(space)
     coords = CC.Fields.coordinate_field(space)
 
     # initial condition

@@ -67,17 +67,35 @@ value = 300
 [rain_autoconversion_timescale]
 value = 1200
 
+[rain_autoconversion_timescale_stratiform]
+value = 1200
+
 [snow_autoconversion_timescale]
 value = 1360
 
 [cloud_liquid_water_specific_humidity_autoconversion_threshold]
-value = 2e-4
+value = 1.25e-4
+
+[cloud_liquid_water_specific_humidity_autoconversion_threshold_stratiform]
+value = 1.25e-4
 
 [cloud_ice_specific_humidity_autoconversion_threshold]
 value = 5e-6
 
+[cloud_ice_sedimentation_number_concentration]
+value = 3.0e4
+
 [cloud_fraction_steepness_scale]
-value = 0.55
+value = 1.5
 
 [cloud_fraction_eps_rel]
 value = 0.05
+
+[ice_cloud_effective_radius]
+value = 30.0e-6
+
+[sgs_ice_uniform_fraction]
+value = 1.0
+
+[sgs_liquid_uniform_fraction]
+value = 0.0

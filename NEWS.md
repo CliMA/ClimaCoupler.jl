@@ -4,6 +4,12 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Support non-00Z `start_date` for subseasonal / WeatherQuest ICs.
+`start_date` now accepts `YYYYMMDD-HHMM` (in addition to `YYYYMMDD`), matching
+ClimaAtmos. Subseasonal ERA5 land/SST/SIC/albedo/bucket paths use that HHMM
+instead of always `_0000`, so 12Z (and other) initializations find the correct
+WeatherQuest files.
+
 #### Remove land and coupler space flexibility.
 The `h_elem_coupler`, `nh_poly_coupler`, and `share_surface_space` configuration
 options have been removed. The coupler boundary space is now always the

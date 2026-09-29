@@ -42,7 +42,6 @@ export update_sim!,
     slow_progress_snapshot,
     slow_sim_dt,
     slow_window_steps,
-    slow_step_boundary,
     launch_slow_sims!,
     wait_slow_sims!,
     slow_step_in_flight,
@@ -528,11 +527,6 @@ whenever the slow timestep equals the coupling timestep.
 """
 function slow_launch_target(cs::Interfacer.CoupledSimulation)
     t_now = cs.t[]
-    if cs.prime_slow_surfaces
-        # Primed: the group runs one window ahead, so the target is one slow
-        # step on. `will_step` would compare against a clock priming has moved.
-        return t_now + slow_window_steps(cs) * cs.Δt_cpl
-    end
     for sim in cs.model_sims
         Interfacer.is_overlapped(sim) || continue
         # Pass coupler time through unconverted: under `use_itime`, coercing to
@@ -592,34 +586,6 @@ end
 slow_step_target(cs::Interfacer.CoupledSimulation) =
     isnothing(cs.slow_task[]) ? nothing : cs.slow_task[].target
 
-"""
-    slow_step_boundary(cs)
-
-The coupler time at which the overlapped group's next step should be launched,
-i.e. where its own clock currently sits.
-
-Found by asking `will_step` when the group would next step and subtracting one
-slow step, rather than reading a component clock directly. `will_step` already
-knows how to compare coupler time against each component's clock, which under
-`use_itime` is a `DateTime` with a different origin than the coupler's seconds
-counter -- a conversion that is easy to get wrong.
-
-Only valid when no slow step is in flight, so it is called at construction.
-"""
-function slow_step_boundary(cs::Interfacer.CoupledSimulation)
-    k = slow_window_steps(cs)
-    t = cs.t[]
-    for _ in 0:(2k + 2)
-        stepping = any(
-            sim -> Interfacer.is_overlapped(sim) && Interfacer.will_step(sim, t),
-            values(cs.model_sims),
-        )
-        stepping && return t - k * cs.Δt_cpl
-        t = t + cs.Δt_cpl
-    end
-    # No overlapped sims, or none that will step: never fire.
-    return nothing
-end
 
 """
     slow_window_steps(cs)

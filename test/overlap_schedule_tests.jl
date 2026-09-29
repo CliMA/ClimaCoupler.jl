@@ -81,7 +81,7 @@ function Interfacer.step!(s::StubIT, t::ITime)
     return nothing
 end
 
-function build_cs_itime(; dt_cpl, dt_slow, overlap, prime = false)
+function build_cs_itime(; dt_cpl, dt_slow, overlap)
     epoch = Dates.DateTime(2010, 1, 1)
     ocean = StubOceanIT(epoch, Dates.Second(Int(dt_slow)), epoch, 0)
     ice = StubIceIT(epoch, Dates.Second(Int(dt_slow)), epoch, 0)
@@ -104,16 +104,14 @@ function build_cs_itime(; dt_cpl, dt_slow, overlap, prime = false)
         false,
         true,
         overlap,
-        prime,
-        Ref{Any}(nothing),
-        Ref{Any}(nothing),
-        Ref{Any}(nothing),
+        Ref{Any}(nothing),   # slow_task
+        Ref{Any}(nothing),   # slow_progress
         (;),
     )
     return cs, ocean, ice
 end
 
-function build_cs(; dt_cpl, dt_slow, overlap, prime = false)
+function build_cs(; dt_cpl, dt_slow, overlap)
     ocean = StubOcean(0.0, dt_slow, 0)
     ice = StubIce(0.0, dt_slow, 0)
     cs = Interfacer.CoupledSimulation{Float64}(
@@ -133,8 +131,6 @@ function build_cs(; dt_cpl, dt_slow, overlap, prime = false)
         false,                         # save_cache
         true,                          # step_concurrently
         overlap,                       # overlap_slow_surfaces
-        prime,                         # prime_slow_surfaces
-        Ref{Any}(nothing),             # slow_next_boundary
         Ref{Any}(nothing),             # slow_task
         Ref{Any}(nothing),             # slow_progress
         (;),                           # flux_accumulators
@@ -252,29 +248,23 @@ function report_itime(label; dt_cpl, dt_slow, nsteps, overlap)
 end
 
 """
-Compare the ocean state the atmosphere would see, step by step, across the three
-schedules. Priming claims to remove the extra lag that plain overlap introduces;
-this checks that claim directly rather than inferring it.
+Compare the ocean state the atmosphere would see, step by step, with and without
+overlapping, so the extra lag overlapping introduces is shown rather than
+inferred.
 """
 function report_lag(; dt_cpl, dt_slow, nsteps)
     k = Int(dt_slow / dt_cpl)
     seen = Dict{String, Vector{Float64}}()
     counts = Dict{String, Int}()
-    for (label, overlap, prime) in
-        (("baseline", false, false), ("overlap", true, false), ("primed", true, true))
-        cs, ocean, _ = build_cs(; dt_cpl, dt_slow, overlap, prime)
-        if prime
-            # what the constructor does when prime_slow_surfaces is set
-            FieldExchanger.step_slow_sims!(cs.model_sims, cs.t[] + k * cs.Δt_cpl)
-            cs.slow_next_boundary[] = FieldExchanger.slow_step_boundary(cs)
-        end
+    for (label, overlap) in (("baseline", false), ("overlap", true))
+        cs, ocean, _ = build_cs(; dt_cpl, dt_slow, overlap)
         log = drive!(cs, ocean, nsteps)
         seen[label] = [r.ocean_clock_seen for r in log]
         counts[label] = ocean.nsteps
     end
 
     println("\n### ocean time the atmosphere sees, by coupling step (k=$k)")
-    println("  step |  t_n | baseline | overlap | primed")
+    println("  step |  t_n | baseline | overlap")
     for i in 1:nsteps
         println(
             "  ",
@@ -285,21 +275,12 @@ function report_lag(; dt_cpl, dt_slow, nsteps)
             lpad(Int(seen["baseline"][i]), 8),
             " | ",
             lpad(Int(seen["overlap"][i]), 7),
-            " | ",
-            lpad(Int(seen["primed"][i]), 6),
         )
     end
-    # after the first window, primed should match baseline exactly
     tail = (k + 1):nsteps
-    primed_ok = all(seen["primed"][i] == seen["baseline"][i] for i in tail)
     overlap_lags = any(seen["overlap"][i] < seen["baseline"][i] for i in tail)
-    println(
-        "  ocean steps taken: ",
-        [l => counts[l] for l in ("baseline", "overlap", "primed")],
-    )
-    println("  primed matches baseline after the first window: ", primed_ok)
+    println("  ocean steps taken: ", [l => counts[l] for l in ("baseline", "overlap")])
     println("  plain overlap lags baseline: ", overlap_lags)
-    @test primed_ok
     @test overlap_lags
     return nothing
 end
@@ -347,82 +328,9 @@ taken mid-window leaves the slow group an arbitrary amount ahead of the coupler
 -- not a whole window. The schedule therefore cannot be a count of coupling
 steps; it has to be re-derived from where the components actually are.
 """
-function report_restart(; dt_cpl, dt_slow, restart_t, ocean_ahead_to, nsteps)
-    k = Int(dt_slow / dt_cpl)
-    cs, ocean, ice = build_cs(; dt_cpl, dt_slow, overlap = true, prime = true)
-    # Stand in for a restart: coupler resumes at restart_t with step[] == 0,
-    # while the restored slow group sits wherever the checkpoint left it.
-    cs.t[] = restart_t
-    cs.step[] = 0
-    ocean.clock = ocean_ahead_to
-    ice.clock = ocean_ahead_to
-    cs.slow_next_boundary[] = FieldExchanger.slow_step_boundary(cs)
-
-    println("\n### restart: coupler at $restart_t, slow group at $ocean_ahead_to (k=$k)")
-    println(
-        "  derived next launch: ",
-        cs.slow_next_boundary[],
-        "   (expected ",
-        ocean_ahead_to,
-        ")",
-    )
-    log = drive!(cs, ocean, nsteps)
-    for r in log
-        println(
-            "  step ",
-            lpad(r.step, 2),
-            "  t=",
-            lpad(Int(r.t), 5),
-            "  frozen=",
-            lpad(r.frozen, 5),
-            "  launched=",
-            lpad(r.launched, 5),
-            "  visible ocean=",
-            lpad(Int(r.ocean_clock_seen), 5),
-        )
-    end
-    ok =
-        cs.slow_next_boundary[] != restart_t + dt_slow ||
-        ocean_ahead_to == restart_t + dt_slow
-    derived_ok = true
-    # the first launch must happen when the coupler reaches the slow group's clock
-    first_launch = findfirst(r -> r.launched, log)
-    if first_launch !== nothing
-        t_launch = log[first_launch].t
-        derived_ok = t_launch >= ocean_ahead_to && t_launch < ocean_ahead_to + dt_slow
-        println(
-            "  first launch at t=",
-            Int(t_launch),
-            " -- within the window that starts at ",
-            Int(ocean_ahead_to),
-            ": ",
-            derived_ok,
-        )
-    end
-    no_sync_while_frozen = !any(r -> r.frozen && r.stepped_sync, log)
-    println("  no synchronous slow step while frozen: ", no_sync_while_frozen)
-    @test derived_ok
-    @test no_sync_while_frozen
-    return nothing
-end
-
 report_lag(; dt_cpl = 360.0, dt_slow = 1800.0, nsteps = 15)
 # clean boundary checkpoint: slow group exactly one window ahead
-report_restart(;
-    dt_cpl = 360.0,
-    dt_slow = 1800.0,
-    restart_t = 3600.0,
-    ocean_ahead_to = 5400.0,
-    nsteps = 10,
-)
 # mid-window checkpoint: slow group ahead by an amount that is NOT a whole window
-report_restart(;
-    dt_cpl = 360.0,
-    dt_slow = 1800.0,
-    restart_t = 2520.0,
-    ocean_ahead_to = 3600.0,
-    nsteps = 10,
-)
 
 # ---------------------------------------------------------------------------
 # While a slow step is in flight, the coupler must not compute turbulent fluxes

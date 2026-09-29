@@ -48,8 +48,7 @@ still needs a blended surface temperature and albedo every coupling step, so
 `combine_surfaces!` sums the fast and slow surfaces separately and reuses the
 slow sum for the rest of the window — land keeps contributing live values.
 
-`prime_slow_surfaces` shifts that schedule one window earlier, by taking a slow
-step during initialization. The cadence of all four cases, for `k = 3`:
+The cadence of the three cases, for `k = 3`:
 
 ```
 k = dt_ocean / dt_cpl = 3.  A = atmosphere + land,  Oₙ = the nth ocean/sea ice
@@ -65,18 +64,12 @@ step.  Each column is one coupling step; ──▶ marks a step spanning several
   overlap_slow_surfaces │  A  │  A  │  A  │  A  │  A  │  A  │  max(3A, O)
                         │ O₁──────────▶   │ O₂──────────▶   │
                         │ atmos uses O₀   │ atmos uses O₁   │  one window old
-                        ├─────┼─────┼─────┼─────┼─────┼─────┤
-  + prime_slow_surfaces │  A  │  A  │  A  │  A  │  A  │  A  │  max(3A, O)
-               O₁──────▶│ O₂──────────▶   │ O₃──────────▶   │
-                        │ atmos uses O₁   │ atmos uses O₂   │  current
                         └─────┴─────┴─────┴─────┴─────┴─────┘
-               ↑ extra step taken during initialization
 ```
 
 The first two leave the same answers: the join happens inside the coupling step,
 so the atmosphere sees ocean state of the same age either way. The third does
-not — the atmosphere sees an ocean one window older. The fourth restores the
-timing at the cost of integrating the ocean under the previous window's forcing.
+not — the atmosphere sees an ocean one window older.
 
 How much this buys depends on how many coupling steps one slow step spans. Where
 the slow timestep equals `dt_cpl`, so that one slow step spans a single coupling
@@ -89,16 +82,6 @@ behind it, whereas an overlapped slow step is still in flight across it. So a
 single-step window trades a coupling step of lag for overlapped communication
 rather than for overlapped computation. Configurations that give the ocean and
 sea ice a timestep several coupling steps long get both.
-
-The lag does not vanish under priming; it moves to the ocean's forcing, which is
-integrated from the previous window's accumulated fluxes. That is the side
-better able to absorb it, since a component whose timestep spans several
-coupling steps already integrates under forcing held constant across a window.
-
-Under priming the slow components' own diagnostics are written on their own
-clocks, so those files carry times that lead coupler time by up to one slow
-step. Coupler diagnostics remain on coupler time and hold the surface state the
-atmosphere actually saw.
 
 ## Choosing between the concurrency options
 
@@ -180,12 +163,6 @@ at 1.3, sensible heat at 1.2, and the turbulent energy flux the atmosphere
 actually feels at 5.2–5.4 against a noise range of 4.5–4.9. The lag is a
 physical change to the coupled solution, not an artefact of how the surface is
 recorded.
-
-`prime_slow_surfaces` does not reduce any of it, and is marginally larger on
-most. That is consistent with the mechanism rather than surprising: priming
-changes *when* the slow group steps, not whether the surface fields are
-refreshed inside a window, so it cannot address the part of the lag that comes
-from holding them.
 
 None of this is a stability result. Three days is simply the longest window over
 which these differences can be separated from other known behaviour; it says

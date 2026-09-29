@@ -69,7 +69,6 @@ end
         "dt" => "400secs",
         "step_concurrently" => false,
         "overlap_slow_surfaces" => false,
-        "prime_slow_surfaces" => false,
         "nh_poly" => 2,
         "h_elem" => 8,
         "checkpoint_dt" => "90days",

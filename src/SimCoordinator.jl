@@ -127,11 +127,7 @@ function step!(cs::Interfacer.CoupledSimulation)
     FieldExchanger.exchange!(cs; slow_frozen = frozen)
 
     # Calculate turbulent fluxes in the coupler and update the model simulations with them
-    FluxCalculator.turbulent_fluxes!(
-        cs;
-        slow_frozen = frozen,
-        force_slow_push = cs.prime_slow_surfaces && !frozen && at_slow_boundary(cs),
-    )
+    FluxCalculator.turbulent_fluxes!(cs; slow_frozen = frozen)
 
     # Compute any ocean-sea ice fluxes
     frozen || FluxCalculator.ocean_seaice_fluxes!(cs)
@@ -149,17 +145,6 @@ function step!(cs::Interfacer.CoupledSimulation)
 end
 
 """
-    slow_step_due(cs)
-
-Whether the overlapped group's step boundary falls on this coupling step.
-
-Priming moves the component clocks off coupler time, so the two cases ask
-different questions.
-"""
-slow_step_due(cs::Interfacer.CoupledSimulation) =
-    cs.prime_slow_surfaces ? at_slow_boundary(cs) : slow_surfaces_due(cs)
-
-"""
     join_slow_if_due!(cs) -> frozen
 
 Join an overlapped ice/ocean step if this coupling step needs its result, and
@@ -167,7 +152,7 @@ report whether one is still in flight afterwards. `frozen` is what every
 slow-surface-touching call in `step!` keys off.
 """
 function join_slow_if_due!(cs::Interfacer.CoupledSimulation)
-    cs.overlap_slow_surfaces && slow_step_due(cs) && FieldExchanger.wait_slow_sims!(cs)
+    cs.overlap_slow_surfaces && slow_surfaces_due(cs) && FieldExchanger.wait_slow_sims!(cs)
     return FieldExchanger.slow_step_in_flight(cs)
 end
 
@@ -184,31 +169,13 @@ skip_slow_stepping(cs::Interfacer.CoupledSimulation, frozen::Bool) =
 """
     launch_slow_if_due!(cs, frozen) -> launched
 
-Launch the next overlapped ice/ocean step if this coupling step is a boundary,
-and advance the recorded boundary when priming. Called once the slow group's
-forcing is fully assembled.
+Launch the next overlapped ice/ocean step if this coupling step is a boundary.
+Called once the slow group's forcing is fully assembled.
 """
 function launch_slow_if_due!(cs::Interfacer.CoupledSimulation, frozen::Bool)
-    (cs.overlap_slow_surfaces && !frozen && slow_step_due(cs)) || return false
+    (cs.overlap_slow_surfaces && !frozen && slow_surfaces_due(cs)) || return false
     FieldExchanger.launch_slow_sims!(cs)
-    if cs.prime_slow_surfaces
-        cs.slow_next_boundary[] =
-            cs.slow_next_boundary[] + FieldExchanger.slow_window_steps(cs) * cs.Δt_cpl
-    end
     return true
-end
-
-"""
-    at_slow_boundary(cs)
-
-Whether the coupler has just reached a slow-step boundary. Used only when
-priming, which moves the component clocks off coupler time, so the window is
-counted in coupling steps rather than read from a clock.
-"""
-function at_slow_boundary(cs::Interfacer.CoupledSimulation)
-    nb = cs.slow_next_boundary[]
-    isnothing(nb) && return false
-    return Float64(float(cs.t[])) >= Float64(float(nb))
 end
 
 """
@@ -301,7 +268,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         component_dt_dict,
         step_concurrently,
         overlap_slow_surfaces,
-        prime_slow_surfaces,
         saveat,
         checkpoint_dt,
         walltime_dt,
@@ -651,10 +617,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         save_cache,
         step_concurrently,
         overlap_slow_surfaces,
-        prime_slow_surfaces,
-        Ref{Any}(nothing),
-        Ref{Any}(nothing),
-        Ref{Any}(nothing),
+        Ref{Any}(nothing),   # slow_task
+        Ref{Any}(nothing),   # slow_progress
         flux_accumulators,
     )
 
@@ -685,27 +649,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
             cs.t[];
             force = true,
         )
-
-        # Take the slow group's first step synchronously so it ends up one
-        # window ahead of the coupler. See the SimCoordinator docs.
-        if overlap_slow_surfaces && prime_slow_surfaces
-            k = FieldExchanger.slow_window_steps(cs)
-            FieldExchanger.step_slow_sims!(cs.model_sims, cs.t[] + k * cs.Δt_cpl)
-            @info "Primed slow surfaces one step ($k coupling steps) ahead of the coupler"
-        end
     end
-    # Seed the schedule from where the slow components actually are; must come
-    # after the restart restore and any priming step. It cannot be a count of
-    # coupling steps, because `cs.step[]` restarts at zero while the component
-    # clocks do not, and a checkpoint can be taken mid-window.
-    if overlap_slow_surfaces && prime_slow_surfaces
-        cs.slow_next_boundary[] = FieldExchanger.slow_step_boundary(cs)
-        @info """Priming is on: ocean and sea ice run ahead of coupler time, so \
-                 their own diagnostics carry times leading it by up to one slow \
-                 step. Compare such runs by time, not by output index. Next \
-                 overlapped launch at coupler time $(cs.slow_next_boundary[])."""
-    end
-
     Utilities.show_memory_usage()
     return cs
 end

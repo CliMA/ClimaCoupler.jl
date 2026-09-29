@@ -41,14 +41,12 @@ coupler leaves ice and ocean state alone; the atmosphere still gets a live
 blended surface state because `combine_surfaces!` sums the fast and slow
 surfaces separately and reuses the slow sum for the window.
 
-`prime_slow_surfaces` advances the slow group one step during initialization so
-the overlapped step runs ahead of the coupler. This removes the extra lag in the
-ocean state the atmosphere sees, moving it instead to the ocean's forcing, which
-is taken from the previous window's accumulated fluxes — the side better able to
-absorb it, since a component whose timestep spans several coupling steps already
-integrates under forcing held constant across a window. Note that the slow
-components' own diagnostics are then written on their own clocks and lead coupler
-time by up to one slow step.
+`prime_fast_group` advances the atmosphere and land group `k-1` coupling steps
+during initialization, where `k = dt_ocean/dt_cpl`, so an overlapped slow step is
+launched carrying the forcing accumulated over the window it integrates, as it
+would sequentially. It does not shorten the lag the atmosphere sees, and it
+leaves the two groups' model times offset by `k-1` coupling steps, so their
+diagnostics should be compared by time rather than by output index.
 
 All three default to `false`.
 

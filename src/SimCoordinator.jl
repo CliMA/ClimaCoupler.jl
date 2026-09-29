@@ -654,7 +654,10 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     # integrate, as it would sequentially. The two groups' model times are
     # offset by k-1 coupling steps from here on; that is inherent to the scheme,
     # not incidental.
-    if overlap_slow_surfaces && prime_fast_group
+    # Not on a restart: the checkpoint already holds a fast group that is ahead,
+    # so priming again would add a second offset, and a third on the next
+    # restart.
+    if overlap_slow_surfaces && prime_fast_group && !should_restart
         k = FieldExchanger.slow_window_steps(cs)
         for _ in 1:(k - 1)
             step!(cs; suppress_slow_launch = true)

@@ -63,6 +63,74 @@ function zonal_average(var)
 end
 
 """
+    coverage_mask_path(output_dir)
+
+Path of the saved observational coverage masks. Written by `generate_observations.jl` and
+read by `observation_map.jl`.
+"""
+coverage_mask_path(output_dir) = joinpath(output_dir, "coverage_masks.jld2")
+
+"""
+    coverage_mask(var, date_ranges)
+
+Where `var` has observational data at every date in `date_ranges`, as a ClimaAnalysis
+longitude-latitude mask. Call the result on an `OutputVar` to set its uncovered points to
+`NaN`. Returns `nothing` for a product that covers every point, so a global product
+carries no mask at all.
+
+Both sides of the calibration need this. A satellite retrieval is not global, MAC `lwp` is
+ocean only, and `zonal_average` ignores `NaN`, so the observed zonal mean is an average
+over covered points. Masking the simulation with the same object before its own zonal mean
+makes the two averages cover the same points. Without it the simulation averages every
+longitude, and the difference partly measures each band's land fraction rather than the
+model's cloud. Applying it to the observation as well gives every date one fixed coverage,
+so the interannual spread the covariance is estimated from is climate rather than
+year-to-year coverage wobble.
+
+Restricted to `date_ranges` on purpose. A record spanning decades, unioned over every
+slice, drops any point that is missing in any single month.
+
+Longitude and latitude only. A masked product with another dimension, such as a cloud
+fraction on levels, errors here rather than guessing how to collapse it.
+"""
+function coverage_mask(var, date_ranges)
+    tname = ClimaAnalysis.time_name(var)
+    keep = findall(
+        date -> any(range -> first(range) <= date <= last(range), date_ranges),
+        ClimaAnalysis.dates(var),
+    )
+    isempty(keep) && error(
+        "None of the date ranges $(date_ranges) are in $(ClimaAnalysis.short_name(var)); check them against the observational data.",
+    )
+
+    # One coverage for every date in use: missing at any of them is missing at all of them.
+    in_use = ClimaAnalysis.select(var; by = ClimaAnalysis.Index(), time = keep)
+    ClimaAnalysis.propagate_nans!(in_use)
+    uncovered = isnan.(Array(selectdim(in_use.data, in_use.dim2index[tname], 1)))
+    any(uncovered) || return nothing
+
+    dims = empty(var.dims)
+    dim_attributes = empty(var.dim_attributes)
+    for name in filter(!=(tname), collect(keys(var.dims)))
+        dims[name] = var.dims[name]
+        haskey(var.dim_attributes, name) &&
+            (dim_attributes[name] = var.dim_attributes[name])
+    end
+    @info "Coverage mask for $(ClimaAnalysis.short_name(var))" missing_fraction =
+        round(count(uncovered) / length(uncovered); digits = 3)
+    return ClimaAnalysis.generate_lonlat_mask(
+        ClimaAnalysis.OutputVar(
+            deepcopy(var.attributes),
+            dims,
+            dim_attributes,
+            Float64.(.!uncovered),
+        ),
+        NaN,
+        1,
+    )
+end
+
+"""
     get_lonlat_regridder(config_file)
 
 Create a regridder for `OutputVar`s for regridding to the simulation grid.
@@ -101,11 +169,15 @@ end
     compute_mean_and_stddev(normalization_stas, var::ClimaAnalysis.OutputVar)
 
 Generate normalization statistics by computing a single mean and standard
-deviation for `var`.
+deviation for `var`, over the finite data only.
 """
 function compute_mean_and_stddev(var::ClimaAnalysis.OutputVar)
-    mean_of_var = Statistics.mean(var.data)
-    std_of_var = Statistics.std(var.data)
+    finite_data = filter(isfinite, var.data)
+    isempty(finite_data) && error(
+        "$(ClimaAnalysis.short_name(var)) has no finite data",
+    )
+    mean_of_var = Statistics.mean(finite_data)
+    std_of_var = Statistics.std(finite_data)
     std_of_var ≈ 0.0 && error("Standard deviation is zero; check your data")
     return (mean_of_var, std_of_var)
 end

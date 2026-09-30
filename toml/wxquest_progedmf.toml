@@ -90,19 +90,11 @@ type = "float"
 value = 1200
 type = "float"
 
-[rain_autoconversion_timescale_stratiform]
-value = 1200
-type = "float"
-
 [snow_autoconversion_timescale]
 value = 1360
 type = "float"
 
 [cloud_liquid_water_specific_humidity_autoconversion_threshold]
-value = 1.25e-4
-type = "float"
-
-[cloud_liquid_water_specific_humidity_autoconversion_threshold_stratiform]
 value = 1.25e-4
 type = "float"
 

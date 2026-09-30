@@ -52,6 +52,7 @@ abstract type AbstractSimulation{FT} end
 
 """
     CoupledSimulation
+
 Stores information needed to run a simulation with the coupler.
 """
 struct CoupledSimulation{
@@ -62,9 +63,10 @@ struct CoupledSimulation{
     TS,
     DTI,
     TT,
+    ST,
     CTT,
     NTMS <: NamedTuple,
-    CALLBACKS,
+    C,
     NTP <: NamedTuple,
     TP,
     DH,
@@ -77,9 +79,10 @@ struct CoupledSimulation{
     tspan::TS
     Δt_cpl::DTI
     t::TT
+    step::ST
     prev_checkpoint_t::CTT
     model_sims::NTMS
-    callbacks::CALLBACKS
+    callbacks::C
     dir_paths::NTP
     thermo_params::TP
     diags_handler::DH
@@ -530,15 +533,16 @@ abstract type AMIPMode <: AbstractSimulationMode end
 An abstract type representing the subseasonal simulation mode. This mode is similar to AMIP
 but uses different data sources and initialization pathways tailored for subseasonal runs.
 
-Inputs are ERA5-derived netcdfs with initial conditions produced by `https://github.com/CliMA/WeatherQuest`. Given `start_date` (YYYYMMDD)
-and directory `era5_initial_condition_dir`, filenames containing the initial conditions are inferred as:
-- `sst_processed_YYYYMMDD_0000.nc` (variable `SST`)
-- `sic_processed_YYYYMMDD_0000.nc` (variable `SEAICE`)
-- Land IC (integrated land): `era5_land_processed_YYYYMMDD_0000.nc`, with fields
+Inputs are ERA5-derived netcdfs with initial conditions produced by `https://github.com/CliMA/WeatherQuest`. Given `start_date` (`YYYYMMDD` or `YYYYMMDD-HHMM`)
+and directory `era5_initial_condition_dir`, filenames containing the initial conditions are inferred as
+(with `HHMM` taken from `start_date`, defaulting to `0000` for date-only strings):
+- `sst_processed_YYYYMMDD_HHMM.nc` (variable `SST`)
+- `sic_processed_YYYYMMDD_HHMM.nc` (variable `SEAICE`)
+- Land IC (integrated land): `era5_land_processed_YYYYMMDD_HHMM.nc`, with fields
   - `skt` (K), `tsn` (K),`swe` (m), `swvl` (m^3/m^3), `si` (m^3/m^3), `sie` (J/m^3), `stl` (K)
-- Land IC (bucket land): `era5_bucket_processed_YYYYMMDD_0000.nc`, with fields
+- Land IC (bucket land): `era5_bucket_processed_YYYYMMDD_HHMM.nc`, with fields
   - `W` (m), `Ws` (m), `S` (m), `T` (K), `tsn` (K), `skt` (K); dims `(lat, lon)`
-- Albedo (optional, when `bucket_albedo_type: "era5"`): `albedo_processed_YYYYMMDD_0000.nc`, with fields
+- Albedo (optional, when `bucket_albedo_type: "era5"`): `albedo_processed_YYYYMMDD_HHMM.nc`, with fields
   - `sw_alb_clr` (clear-sky surface albedo, fraction 0-1); dims `(time, lat, lon)`
 and are used to initialize the coupler components.
 
@@ -550,7 +554,7 @@ abstract type SubseasonalMode <: AbstractSimulationMode end
 
 An abstract type representing the CMIP simulation mode. CMIP is currently the most complex
 configuration of the CoupledSimulation object. It runs a ClimaAtmos.jl atmosphere model,
-ClimaLand.jl bucket land model, a ClimaOcean ocean model, and a simple thermal sea ice model.
+ClimaLand.jl bucket land model, an Oceananigans ocean model, and a simple thermal sea ice model.
 """
 abstract type CMIPMode <: AbstractSimulationMode end
 
@@ -641,16 +645,18 @@ end
 Remap the given `source_field` onto the `target_field`. This is the core non-allocating
 implementation.
 
-Non-ClimaCore fields should provide a method to this function.
+All ClimaCore components share the atmosphere's surface space, so this is a copy in
+every case except single-column mode, where the coupler boundary space is a
+`PointSpace` and the atmosphere surface space is a small `SpectralElementSpace2D`.
+A remap between two distinct spectral-element spaces is an error.
 
-Note that this method has a lot of allocations and is not efficient.
+Non-ClimaCore fields should provide a method to this function.
 """
 function remap! end
 
 NVTX.@annotate function remap!(target_field::CC.Fields.Field, source_field::CC.Fields.Field)
     source_space = axes(source_field)
     target_space = axes(target_field)
-    comms_ctx = ClimaComms.context(source_space)
 
     # Check if the source and target spaces are compatible
     spaces_are_compatible =
@@ -685,45 +691,11 @@ NVTX.@annotate function remap!(target_field::CC.Fields.Field, source_field::CC.F
         return nothing
     end
 
-    # Get vector of LatLongPoints for the target space to get the hcoords
-    # Copy target coordinates to CPU if they are on GPU
-    coords = CC.to_cpu(CC.Fields.coordinate_field(target_space))
-    if !(hasproperty(coords, :lat) && hasproperty(coords, :long))
-        error(
-            "Cannot remap between incompatible spaces: target space " *
-            "$(typeof(target_space)) does not have lat/long coordinates.",
-        )
-    end
-    lats = CC.Fields.field2array(coords.lat)
-    lons = CC.Fields.field2array(coords.long)
-    hcoords = CC.Geometry.LatLongPoint.(lats, lons)
-
-    # Remap the field, using MPI if applicable
-    if comms_ctx isa ClimaComms.SingletonCommsContext
-        # Remap source field to target space as an array
-        remapped_array = CC.Remapping.interpolate(source_field, hcoords, [])
-
-        # Write directly to target field's underlying array to avoid temporary field allocation
-        CC.Fields.field2array(target_field) .= remapped_array
-    else
-        # Gather then broadcast the global hcoords and offsets
-        offset = [length(hcoords)]
-        all_hcoords = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, hcoords))
-        all_offsets = ClimaComms.bcast(comms_ctx, ClimaComms.gather(comms_ctx, offset))
-
-        # Interpolate on root and broadcast to all processes
-        remapper = CC.Remapping.Remapper(source_space; target_hcoords = all_hcoords)
-        remapped_array =
-            ClimaComms.bcast(comms_ctx, CC.Remapping.interpolate(remapper, source_field))
-
-        my_ending_offset = sum(all_offsets[1:ClimaComms.mypid(comms_ctx)])
-        my_starting_offset = my_ending_offset - offset[]
-
-        # Write directly to target field's underlying array to avoid temporary field allocation
-        CC.Fields.field2array(target_field) .=
-            remapped_array[(1 + my_starting_offset):my_ending_offset]
-    end
-    return nothing
+    error(
+        "Cannot remap between distinct spectral-element spaces: source space " *
+        "$(typeof(source_space)) and target space $(typeof(target_space)). " *
+        "All components must share the atmosphere surface space.",
+    )
 end
 
 function remap!(target_field::CC.Fields.Field, source::Number)

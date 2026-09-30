@@ -49,21 +49,10 @@ import ClimaCoupler: FluxCalculator
     err_lwd = @. ifelse(land_fraction ≈ 0, zero(err_lwd), err_lwd)
     @test maximum(abs.(err_lwd)) < 1e-10
 
-    atmos_albedo = @static if pkgversion(CA.RRTMGP) ≥ v"0.22"
-        CC.Fields.array2field(
-            CA.RRTMGP.direct_sw_surface_albedo(
-                atmos_sim.integrator.p.radiation.rrtmgp_solver,
-            ),
-            boundary_space,
-        )
-    else
-        # TODO: remove once NumericalEarth allows RRTMGP 0.22
-        # fallback: registered Atmos 0.41.3 / rrtmgp_model fields
-        CC.Fields.array2field(
-            atmos_sim.integrator.p.radiation.rrtmgp_model.direct_sw_surface_albedo,
-            boundary_space,
-        )
-    end
+    atmos_albedo = CC.Fields.array2field(
+        CA.RRTMGP.direct_sw_surface_albedo(atmos_sim.integrator.p.radiation.rrtmgp_solver),
+        boundary_space,
+    )
 
 
     land_albedo =
@@ -81,18 +70,10 @@ import ClimaCoupler: FluxCalculator
     err_temp = @. ifelse(land_fraction ≈ 0, zero(err_temp), err_temp)
     @test maximum(abs.(err_temp)) < 1e-6
 
-    atmos_emissivity = @static if pkgversion(CA.RRTMGP) ≥ v"0.22"
-        CC.Fields.array2field(
-            CA.RRTMGP.surface_emissivity(atmos_sim.integrator.p.radiation.rrtmgp_solver),
-            boundary_space,
-        )
-    else
-        # TODO: remove once NumericalEarth allows RRTMGP 0.22
-        CC.Fields.array2field(
-            atmos_sim.integrator.p.radiation.rrtmgp_model.surface_emissivity,
-            boundary_space,
-        )
-    end
+    atmos_emissivity = CC.Fields.array2field(
+        CA.RRTMGP.surface_emissivity(atmos_sim.integrator.p.radiation.rrtmgp_solver),
+        boundary_space,
+    )
 
     land_emissivity = Interfacer.get_field(boundary_space, land_sim, Val(:emissivity))
     err_emissivity = @. atmos_emissivity - land_emissivity

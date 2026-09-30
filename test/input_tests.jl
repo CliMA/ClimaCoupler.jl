@@ -67,11 +67,8 @@ end
         "start_date" => "20000101",
         "dt_cpl" => "400secs",
         "dt" => "400secs",
-        "share_surface_space" => true,
         "nh_poly" => 2,
         "h_elem" => 8,
-        "h_elem_coupler" => 16,
-        "nh_poly_coupler" => 2,
         "checkpoint_dt" => "90days",
         "atmos_progress_interval" => "1days",
         "detect_restart_files" => false,
@@ -92,8 +89,7 @@ end
         "rmse_check" => false,
         "coupler_output_dir" => "test_output",
         "land_model" => "bucket",
-        "land_temperature_anomaly" => "aquaplanet",
-        "land_spun_up_ic" => false,
+        "land_spun_up_ic" => true,
         "lai_source" => "modis_monthly",
         "bucket_albedo_type" => "map_static",
         "bucket_initial_condition" => "",
@@ -106,6 +102,7 @@ end
         "seaice_diagnostic_mode" => "average",
         "seaice_progress_interval" => "never",
         "simple_ocean" => false,
+        "use_intersection_grid" => true,
         "ocean_grid" => "one_deg_tripolar",
         "sst_adjustment" => 2.0,
         "ice_model" => "prescribed",
@@ -152,6 +149,28 @@ end
     @test args.component_dt_dict isa Dict
     @test haskey(args.component_dt_dict, "dt_atmos")
     @test !haskey(args.component_dt_dict, "dt")
+
+    # If unspecified, walltime_dt defaults to a tenth of the simulation length, but
+    # never shorter than one coupling step. Here a tenth of 800secs is 80secs, which is
+    # below dt_cpl (400secs), so it is set to dt_cpl.
+    @test args.walltime_dt == "400.0secs"
+    # ... for a longer simulation, the tenth-of-length rule applies (8000secs / 10)
+    config_dict["t_end"] = "8000secs"
+    @test Input.get_coupler_args(config_dict).walltime_dt == "800.0secs"
+    # ... capped at 30 days
+    config_dict["t_end"] = "3650days"
+    @test Input.get_coupler_args(config_dict).walltime_dt == "2.592e6secs"
+    config_dict["t_end"] = "800secs" # undo
+    # If specified, walltime_dt is passed through unchanged
+    config_dict["walltime_dt"] = "never"
+    @test Input.get_coupler_args(config_dict).walltime_dt == "never"
+    delete!(config_dict, "walltime_dt") # undo
+
+    # walltime_debug is off by default and passed through when set
+    @test args.walltime_debug == false
+    config_dict["walltime_debug"] = true
+    @test Input.get_coupler_args(config_dict).walltime_debug == true
+    delete!(config_dict, "walltime_debug") # undo
 end
 
 @testset "get_diag_period" begin
@@ -440,4 +459,46 @@ end
         domain_type = "column",
         scm_surface_type = "invalid_surface",
     )
+end
+
+@testset "get_era5_filepaths uses HHMM from start_date" begin
+    mktempdir() do dir
+        stamp = "20191231_1200"
+        for prefix in (
+            "sst_processed",
+            "sic_processed",
+            "era5_land_processed",
+            "albedo_processed",
+            "era5_bucket_processed",
+        )
+            touch(joinpath(dir, "$(prefix)_$(stamp).nc"))
+        end
+        start = Dates.DateTime(2019, 12, 31, 12)
+        paths = Input.get_era5_filepaths(Interfacer.SubseasonalMode, dir, start, "")
+        @test paths.sst_path == joinpath(dir, "sst_processed_$(stamp).nc")
+        @test paths.sic_path == joinpath(dir, "sic_processed_$(stamp).nc")
+        @test paths.land_ic_path == joinpath(dir, "era5_land_processed_$(stamp).nc")
+        @test paths.albedo_path == joinpath(dir, "albedo_processed_$(stamp).nc")
+        @test paths.bucket_initial_condition ==
+              joinpath(dir, "era5_bucket_processed_$(stamp).nc")
+
+        # Date-only start_date still resolves to _0000
+        stamp00 = "20200101_0000"
+        for prefix in (
+            "sst_processed",
+            "sic_processed",
+            "era5_land_processed",
+            "albedo_processed",
+            "era5_bucket_processed",
+        )
+            touch(joinpath(dir, "$(prefix)_$(stamp00).nc"))
+        end
+        paths00 = Input.get_era5_filepaths(
+            Interfacer.SubseasonalMode,
+            dir,
+            Dates.DateTime(2020, 1, 1),
+            "",
+        )
+        @test endswith(paths00.sst_path, "sst_processed_$(stamp00).nc")
+    end
 end

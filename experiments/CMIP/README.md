@@ -2,7 +2,7 @@
 
 This directory contains the Julia environment and driver scripts for running
 CMIP simulations, which require the full dependency stack including Oceananigans,
-ClimaOcean, ClimaSeaIce, and KernelAbstractions.
+ClimaSeaIce, KernelAbstractions, ConservativeRegridding, and Adapt.
 
 This environment is a superset of `experiments/AMIP/` and can also run AMIP or
 slabplanet configurations, though the AMIP environment is preferred for those

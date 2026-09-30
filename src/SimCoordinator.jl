@@ -17,7 +17,7 @@ module SimCoordinator
 
 import ClimaComms
 import ClimaDiagnostics as CD
-import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
+import ClimaUtilities.TimeManager: ITime
 import ClimaCore as CC
 import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
@@ -59,14 +59,13 @@ function run!(
     ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
     GC.gc()
 
-    #=
     ## Solving and Timing the Full Simulation
 
-    This is where the full coupling loop, `solve_coupler!` is called for the full timespan of the simulation.
-    We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU, and use this
-    value to calculate the simulated years per day (SYPD) of the simulation.
-    =#
+    # This is where the full coupling loop is called for the full timespan of the simulation.
+    # We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU and use this
+    # value to calculate the simulated years per day (SYPD) of the simulation.
     @info "Starting coupling loop"
+    t_timed_start = cs.t[] # get t just before timing (equal to cs.tspan[begin] if `precompile` is false)
     walltime = ClimaComms.@elapsed ClimaComms.device(cs) begin
         while cs.t[] < cs.tspan[end]
             step!(cs)
@@ -74,11 +73,7 @@ function run!(
     end
     @info "Simulation took $(walltime) seconds"
 
-    sypd = simulated_years_per_day(cs, walltime)
-    walltime_per_step = walltime_per_coupling_step(cs, walltime)
-    @info "SYPD: $sypd"
-    @info "Walltime per coupling step: $(walltime_per_step)"
-    save_sypd_walltime_to_disk(cs, walltime)
+    save_sypd_walltime_to_disk(cs, walltime, t_timed_start)
 
     # Close all diagnostics file writers
     isnothing(cs.diags_handler) ||
@@ -98,8 +93,9 @@ calculates fluxes using the selected turbulent fluxes option. Note, one coupling
 require multiple steps in some of the component models.
 """
 function step!(cs::Interfacer.CoupledSimulation)
-    # Update the current time
+    # Update the current time and step number
     cs.t[] += cs.Δt_cpl
+    cs.step[] += 1
 
     # Compute global energy and water conservation checks
     # (only for slabplanet if tracking conservation is enabled)
@@ -129,37 +125,18 @@ function step!(cs::Interfacer.CoupledSimulation)
 end
 
 """
-    simulated_years_per_day(cs, walltime)
+    save_sypd_walltime_to_disk(cs, walltime, t_timed_start = cs.tspan[begin])
 
-Compute the simulated years per walltime day for the given coupled simulation `cs`, assuming
-that the simulation took `walltime`.
+Save the computed `sypd`, `walltime_per_coupling_step`, and memory usage to text files 
+in the `artifacts` directory. `t_timed_start` is the simulated time (in seconds) at which 
+the timed portion of the run began (see the `precompile` flag in [run!](@ref)). 
 """
-function simulated_years_per_day(cs, walltime)
-    simulated_seconds_per_second = float(cs.tspan[end] - cs.tspan[begin]) / walltime
-    return simulated_seconds_per_second / 365.25
-end
-
-"""
-    walltime_per_coupling_step(cs, walltime)
-
-Compute the average walltime needed to take one step for the given coupled simulation `cs`,
-assuming that the simulation took `walltime`. The result is in seconds.
-"""
-function walltime_per_coupling_step(cs, walltime)
-    n_coupling_steps = (cs.tspan[end] - cs.tspan[begin]) / cs.Δt_cpl
-    return walltime / n_coupling_steps
-end
-
-"""
-    save_sypd_walltime_to_disk(cs, walltime)
-
-Save the computed `sypd`, `walltime_per_coupling_step`,
-and memory usage to text files in the `artifacts` directory.
-"""
-function save_sypd_walltime_to_disk(cs, walltime)
+function save_sypd_walltime_to_disk(cs, walltime, t_timed_start = cs.tspan[begin])
     if ClimaComms.iamroot(ClimaComms.context(cs))
-        sypd = simulated_years_per_day(cs, walltime)
-        walltime_per_step = walltime_per_coupling_step(cs, walltime)
+        sypd = TimeManager.simulated_years_per_day(t_timed_start, cs.tspan[end], walltime)
+        walltime_per_step = walltime / ((cs.tspan[end] - t_timed_start) / cs.Δt_cpl)
+        @info "SYPD: $sypd"
+        @info "Walltime per coupling step: $(walltime_per_step)"
 
         open(joinpath(cs.dir_paths.artifacts_dir, "sypd.txt"), "w") do sypd_filename
             println(sypd_filename, "$sypd")
@@ -202,7 +179,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     comms_ctx = Utilities.get_comms_context(config_dict)
 
     (;
-        job_id,
         sim_mode,
         random_seed,
         FT,
@@ -211,11 +187,10 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         start_date,
         Δt_cpl,
         component_dt_dict,
-        share_surface_space,
-        nh_poly_coupler,
-        h_elem_coupler,
         saveat,
         checkpoint_dt,
+        walltime_dt,
+        walltime_debug,
         atmos_progress_interval,
         detect_restart_files,
         restart_dir,
@@ -228,7 +203,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         land_progress_interval,
         evolving_ocean,
         land_model,
-        land_temperature_anomaly,
         land_spun_up_ic,
         lai_source,
         bucket_albedo_type,
@@ -242,6 +216,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         ocean_model,
         simple_ocean,
         ocean_grid,
+        use_intersection_grid,
         sst_adjustment,
         ocean_progress_interval,
         ocean_diagnostic_interval,
@@ -290,19 +265,14 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     ### Boundary Space
     We use a boundary space at the surface for coupling operations (computing fluxes, regridding, etc).
     For column mode, this is a 1D PointSpace with lat/long coordinates.
-    For global mode, this is a 2D CubedSphereSpace or the atmosphere's horizontal space
-    (if `share_surface_space` is true).
+    For global mode, this is the atmosphere's horizontal surface space.
     =#
     boundary_space = Utilities.create_boundary_space(
         FT,
         domain_type,
         atmos_sim,
-        share_surface_space,
         comms_ctx;
         column_latlon,
-        nh_poly_coupler,
-        h_elem_coupler,
-        coupled_param_dict,
     )
 
     surface_elevation = Interfacer.get_field(boundary_space, atmos_sim, Val(:height_sfc))
@@ -310,6 +280,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         Interfacer.get_field(boundary_space, atmos_sim, Val(:height_int))
     atmos_h =
         Interfacer.get_atmos_height_delta(atmos_bottom_center_height, surface_elevation)
+    initial_T = CC.Fields.zeros(boundary_space)
+    initial_T .= Interfacer.get_field(boundary_space, atmos_sim, Val(:air_temperature))
 
     land_fraction = Input.get_land_fraction(
         boundary_space,
@@ -331,8 +303,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     (; sst_path, sic_path, land_ic_path, albedo_path, bucket_initial_condition) =
         era5_filepaths
 
-    shared_surface_space =
-        (share_surface_space || domain_type == "column") ? boundary_space : nothing
     land_sim = Interfacer.LandSimulation(
         FT,
         land_model;
@@ -341,10 +311,9 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         start_date,
         output_dir = dir_paths.land_output_dir,
         area_fraction = land_fraction,
-        shared_surface_space,
-        surface_elevation,
+        surface_space = boundary_space,
         atmos_h,
-        land_temperature_anomaly,
+        initial_T,
         use_land_diagnostics,
         land_diagnostics_period,
         land_diagnostics_reduction,
@@ -355,6 +324,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         land_spun_up_ic,
         land_ic_path,
         lai_source,
+        dt_drivers = ITime(Utilities.time_to_seconds(config_dict["dt_rad"])),
     )
 
     ocean_sim = Interfacer.OceanSimulation(
@@ -370,6 +340,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         output_dir = dir_paths.ocean_output_dir,
         simple_ocean,
         ocean_grid,
+        use_intersection_grid,
         sst_path,
         sst_adjustment,
         saveat,
@@ -466,16 +437,21 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     # TODO: Move callbacks code somewhere else (maybe in TimeManager?) so that it doesn't clutter up the constructor
 
     # checkpoint
+    # Schedules are seeded with t_start so that a restarted simulation stays on
+    # the same calendar boundaries as the original run (see calendar_dt_schedule).
     schedule_checkpoint =
-        EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date)
+        TimeManager.calendar_dt_schedule(checkpoint_dt, start_date, t_start)
     checkpoint_cb =
         TimeManager.Callback(schedule_checkpoint, sim -> Checkpointer.checkpoint_sims(sim))
 
     # walltime reporting
-    if config_dict["atmos_log_progress"]
+    schedule_walltime =
+        TimeManager.walltime_schedule(walltime_dt, walltime_debug, start_date, t_start)
+    if isnothing(schedule_walltime)
         callbacks = (checkpoint_cb,)
     else
-        walltime_cb = TimeManager.capped_geometric_walltime_cb(t_start, t_end, Δt_cpl)
+        walltime_cb =
+            TimeManager.Callback(schedule_walltime, TimeManager.WalltimeReporter())
         callbacks = (checkpoint_cb, walltime_cb)
     end
 
@@ -488,8 +464,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     )
     for (sim_name, interval) in pairs(progress_intervals)
         (haskey(model_sims, sim_name) && interval != "never") || continue
-        schedule_progress =
-            EveryCalendarDtSchedule(TimeManager.time_to_period(interval); start_date)
+        schedule_progress = TimeManager.calendar_dt_schedule(interval, start_date, t_start)
         progress_cb = TimeManager.Callback(
             schedule_progress,
             let sim_name = sim_name
@@ -524,6 +499,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         [tspan[1], tspan[2]],
         Δt_cpl,
         Ref(tspan[1]),
+        Ref(0),
         prev_checkpoint_t,
         model_sims,
         callbacks,

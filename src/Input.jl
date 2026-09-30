@@ -94,7 +94,7 @@ function argparse_settings()
         arg_type = String
         default = "0secs"
         "--start_date"
-        help = "Start date of the simulation, in format \"YYYYMMDD\" [\"20100101\" (default)]"
+        help = "Start date of the simulation, in format \"YYYYMMDD\" or \"YYYYMMDD-HHMM\" [\"20100101\" (default)]"
         arg_type = String
         default = "20000101"
         "--dt_cpl"
@@ -121,27 +121,23 @@ function argparse_settings()
         help = "Time interval for checkpointing [\"90days\" (default)]"
         arg_type = String
         default = "90days"
+        "--walltime_dt"
+        help = "Time interval for walltime reporting [nothing (default): a tenth of the simulation length, at most 1 day and at least one coupling step; allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
+        arg_type = String
+        default = nothing
+        "--walltime_debug"
+        help = "Boolean flag indicating whether to also report the walltime on every coupling step whose number is a power of two (1, 2, 4, 8, ...), in addition to the `walltime_dt` interval [`false` (default), `true`]"
+        arg_type = Bool
+        default = false
         # Space information
         "--h_elem"
         help = "Number of horizontal elements to use for the atmosphere horizontal space [16 (default)]"
         arg_type = Int
         default = 16
-        "--h_elem_coupler"
-        help = "Number of horizontal elements to use for the boundary space when `share_surface_space` is false [16 (default)]"
-        arg_type = Int
-        default = 32
         "--nh_poly"
         help = "Polynomial order to use for the atmosphere horizontal space [3 (default)]"
         arg_type = Int
         default = 3
-        "--nh_poly_coupler"
-        help = "Polynomial order to use for the boundary space when `share_surface_space` is false [3 (default)]"
-        arg_type = Int
-        default = 2
-        "--share_surface_space"
-        help = "Boolean flag indicating whether to share the surface space between the surface models, atmosphere, and boundary [`true` (default), `false`]"
-        arg_type = Bool
-        default = true
         # Restart information
         "--detect_restart_files"
         help = "Boolean flag indicating whether to automatically use restart files if available [`false` (default), `true`]"
@@ -208,10 +204,6 @@ function argparse_settings()
         help = "An optional YAML file used to overwrite the default model parameters."
         arg_type = String
         default = nothing
-        "--atmos_log_progress"
-        help = "Use the ClimaAtmos walltime logging callback instead of the default ClimaCoupler one [`false` (default), `true`]"
-        arg_type = Bool
-        default = false
         "--atmos_progress_interval"
         help = "Time interval for printing atmosphere progress information [\"never\" (default); allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
         arg_type = String
@@ -224,15 +216,11 @@ function argparse_settings()
         help = "List of dictionaries containing information about additional atmosphere diagnostics to output [nothing (default)]"
         arg_type = Vector{Dict{Any, Any}}
         default = Dict{Any, Any}[]
-        ### ClimaLand specific
+        # ClimaLand specific
         "--land_model"
         help = "Land model to use. [`bucket` (default), `integrated`, `nothing`]"
         arg_type = String
         default = "bucket"
-        "--land_temperature_anomaly"
-        help = "Type of temperature anomaly for land model. [`amip`, `aquaplanet` (default), `nothing`]"
-        arg_type = String
-        default = "aquaplanet"
         "--use_land_diagnostics"
         help = "Boolean flag indicating whether to compute and output land model diagnostics [`true` (default), `false`]"
         arg_type = Bool
@@ -283,6 +271,10 @@ function argparse_settings()
         help = "Horizontal grid for Oceananigans ocean model. [`one_deg_tripolar` (default), `orca`]"
         arg_type = String
         default = "one_deg_tripolar"
+        "--use_intersection_grid"
+        help = "Boolean flag indicating whether to use the atmosphere-ocean intersection (exchange) grid for surface fractions and ocean/sea-ice fluxes with Oceananigans. Automatically disabled for unsupported setups (column mode, distributed runs). [`true` (default), `false`]"
+        arg_type = Bool
+        default = true
         "--sst_adjustment"
         help = "Adjustment to add to prescribed SST after conversion to Kelvin (default: 0.0)"
         arg_type = Float64
@@ -506,7 +498,7 @@ function get_coupler_args(config_dict::Dict)
     # Time information
     t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))
     t_start = Float64(Utilities.time_to_seconds(config_dict["t_start"]))
-    start_date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
+    start_date = Utilities.parse_date(config_dict["start_date"])
     Δt_cpl = Float64(Utilities.time_to_seconds(config_dict["dt_cpl"]))
 
     if use_itime
@@ -535,13 +527,18 @@ function get_coupler_args(config_dict::Dict)
     # Save solution to integrator.sol at the beginning and end
     saveat = [t_start, t_end]
 
-    # Space information
-    share_surface_space = config_dict["share_surface_space"]
-    nh_poly_coupler = config_dict["nh_poly_coupler"]
-    h_elem_coupler = config_dict["h_elem_coupler"]
-
     # Checkpointing information
     checkpoint_dt = config_dict["checkpoint_dt"]
+
+    # Walltime reporting information
+    walltime_dt = get(config_dict, "walltime_dt", nothing)
+    if isnothing(walltime_dt)
+        # default to a tenth of the simulation length (capped at 30 days, but never
+        # shorter than one coupling step)
+        walltime_dt_secs = max(min(float(t_end - t_start) / 10, 2592000.0), float(Δt_cpl))
+        walltime_dt = "$(walltime_dt_secs)secs"
+    end
+    walltime_debug = get(config_dict, "walltime_debug", false)
 
     # Atmos progress reporting information
     atmos_progress_interval = config_dict["atmos_progress_interval"]
@@ -577,7 +574,6 @@ function get_coupler_args(config_dict::Dict)
 
     # ClimaLand-specific information
     land_model = Val(Symbol(config_dict["land_model"]))
-    land_temperature_anomaly = lowercase(config_dict["land_temperature_anomaly"])
     use_land_diagnostics = config_dict["use_land_diagnostics"]
     land_spun_up_ic = config_dict["land_spun_up_ic"]
     lai_source = config_dict["lai_source"]
@@ -603,6 +599,7 @@ function get_coupler_args(config_dict::Dict)
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
     simple_ocean = config_dict["simple_ocean"]
     ocean_grid = Symbol(lowercase(config_dict["ocean_grid"]))
+    use_intersection_grid = config_dict["use_intersection_grid"]
     sst_adjustment = FT(config_dict["sst_adjustment"])
     ocean_progress_interval = config_dict["ocean_progress_interval"]
     ocean_diagnostic_interval = config_dict["ocean_diagnostic_interval"]
@@ -660,11 +657,10 @@ function get_coupler_args(config_dict::Dict)
         start_date,
         Δt_cpl,
         component_dt_dict,
-        share_surface_space,
-        nh_poly_coupler,
-        h_elem_coupler,
         saveat,
         checkpoint_dt,
+        walltime_dt,
+        walltime_debug,
         atmos_progress_interval,
         detect_restart_files,
         restart_dir,
@@ -680,7 +676,6 @@ function get_coupler_args(config_dict::Dict)
         rmse_check,
         output_dir_root,
         land_model,
-        land_temperature_anomaly,
         land_spun_up_ic,
         lai_source,
         use_land_diagnostics,
@@ -693,6 +688,7 @@ function get_coupler_args(config_dict::Dict)
         ocean_model,
         simple_ocean,
         ocean_grid,
+        use_intersection_grid,
         sst_adjustment,
         ocean_progress_interval,
         ocean_diagnostic_interval,
@@ -1073,7 +1069,8 @@ end
     get_era5_filepaths(::Type{<:Interfacer.SubseasonalMode}, era5_initial_condition_dir, start_date, bucket_initial_condition)
 
 Build ERA5-based file paths for subseasonal mode simulations.
-Filenames are inferred from the start_date.
+Filenames are inferred from the start_date, including hour/minute for non-00Z
+initializations (e.g. `sst_processed_20191231_1200.nc`).
 
 If `era5_initial_condition_dir` is `nothing`, the `wxquest_initial_conditions`
 ClimaArtifact is used as a fallback.
@@ -1100,34 +1097,32 @@ function get_era5_filepaths(
 )
     era5_initial_condition_dir = resolve_era5_dir(era5_initial_condition_dir)
     datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
+    timestr = Dates.format(start_date, Dates.dateformat"HHMM")
+    stamp = "$(datestr)_$(timestr)"
 
-    # Verify that the required files exist for this date
-    sst_path = joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc")
+    # Verify that the required files exist for this date/time
+    sst_path = joinpath(era5_initial_condition_dir, "sst_processed_$(stamp).nc")
     isfile(sst_path) || error(
-        "ERA5 initial condition files for date $datestr not found in " *
+        "ERA5 initial condition files for date/time $stamp not found in " *
         "$era5_initial_condition_dir. Check that start_date matches an " *
-        "available date in the initial condition directory.",
+        "available initialization in the initial condition directory " *
+        "(expected e.g. sst_processed_$(stamp).nc).",
     )
 
     # Use ERA5-derived bucket IC if user didn't specify one
     isempty(bucket_initial_condition) && (
-        bucket_initial_condition = joinpath(
-            era5_initial_condition_dir,
-            "era5_bucket_processed_$(datestr)_0000.nc",
-        )
+        bucket_initial_condition =
+            joinpath(era5_initial_condition_dir, "era5_bucket_processed_$(stamp).nc")
     )
 
     return (;
         sst_path,
-        sic_path = joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc"),
+        sic_path = joinpath(era5_initial_condition_dir, "sic_processed_$(stamp).nc"),
         land_ic_path = joinpath(
             era5_initial_condition_dir,
-            "era5_land_processed_$(datestr)_0000.nc",
+            "era5_land_processed_$(stamp).nc",
         ),
-        albedo_path = joinpath(
-            era5_initial_condition_dir,
-            "albedo_processed_$(datestr)_0000.nc",
-        ),
+        albedo_path = joinpath(era5_initial_condition_dir, "albedo_processed_$(stamp).nc"),
         bucket_initial_condition,
     )
 end

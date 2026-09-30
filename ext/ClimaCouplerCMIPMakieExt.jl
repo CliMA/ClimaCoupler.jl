@@ -13,7 +13,6 @@ using ClimaCoupler
 import ClimaCoupler: Plotting
 
 using CairoMakie
-using ClimaCoreMakie
 using GeoMakie
 using Makie
 using Printf

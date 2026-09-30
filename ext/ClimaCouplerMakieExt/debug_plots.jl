@@ -1,7 +1,6 @@
 import Printf
 import ClimaCore as CC
 import Makie
-import ClimaCoreMakie
 import CairoMakie
 import ClimaCoupler: Interfacer, ConservationChecker, Plotting
 import StaticArrays
@@ -354,7 +353,7 @@ function _debug_plot_heatmap!(ax, fig, cpu_field, i, j)
         return nothing
     else
         colorrange = (field_valid_min, field_valid_max)
-        hm = ClimaCoreMakie.fieldheatmap!(ax, cpu_field, colorrange = colorrange)
+        hm = CC.Visualize.fieldheatmap!(ax, cpu_field, colorrange = colorrange)
         Makie.Colorbar(fig[i, j * 2], hm)
     end
     return nothing

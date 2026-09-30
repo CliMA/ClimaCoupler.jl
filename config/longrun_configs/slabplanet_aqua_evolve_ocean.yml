@@ -18,3 +18,4 @@ start_date: "20100101"
 surface_setup: "PrescribedSurface"
 t_end: "5days"
 use_land_diagnostics: false
+walltime_debug: true

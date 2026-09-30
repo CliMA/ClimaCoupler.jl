@@ -8,6 +8,7 @@ functions from Julia's [Dates](https://docs.julialang.org/en/v1/stdlib/Dates/) m
 
 ```@docs
 TimeManager.maybe_trigger_callback
+TimeManager.WalltimeReporter
 ```
 
 ## ITime

@@ -93,10 +93,10 @@ extensions — the equivalent of what `code_loading.jl` does:
 using ClimaCoupler
 
 # Trigger the Makie plotting extension
-using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, NCDatasets, Poppler_jll
+using Makie, GeoMakie, CairoMakie, NCDatasets, Poppler_jll
 
 # Trigger the CMIP extension (only needed for CMIP simulations)
-import Oceananigans, ClimaOcean, ClimaSeaIce, KernelAbstractions
+import Oceananigans, ClimaSeaIce, KernelAbstractions, ConservativeRegridding, Adapt
 
 # Trigger the ClimaLand extension
 import ClimaLand

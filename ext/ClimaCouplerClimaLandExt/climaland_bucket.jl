@@ -51,13 +51,12 @@ function BucketSimulation(
     start_date::Dates.DateTime,
     output_dir::String,
     area_fraction,
-    nelements::Tuple{Int, Int} = (50, 10),
+    surface_space,
+    nelements_vert::Int = 10,
     depth::FT = FT(3.5),
     dz_tuple::Tuple{FT, FT} = FT.((1, 0.05)),
-    shared_surface_space = nothing,
-    surface_elevation = nothing,
     atmos_h,
-    land_temperature_anomaly::String = "amip",
+    initial_T,
     use_land_diagnostics::Bool = true,
     land_diagnostics_period::Symbol = :monthly,
     land_diagnostics_reduction::Symbol = :average,
@@ -66,6 +65,7 @@ function BucketSimulation(
     era5_albedo_file_path::Union{Nothing, String} = nothing,
     coupled_param_dict = CP.create_toml_dict(FT),
     gustiness::FT = FT(1),
+    dt_drivers::ITime = ITime(3600),
     extra_kwargs...,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Get default land parameters from ClimaLand.LandParameters
@@ -75,24 +75,10 @@ function BucketSimulation(
 
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
-    if isnothing(shared_surface_space)
-        domain = make_land_domain(depth, toml_dict; nelements, dz_tuple)
-    else
-        domain = make_land_domain(
-            shared_surface_space,
-            depth;
-            nelements_vert = nelements[2],
-            dz_tuple,
-        )
-    end
+    domain = make_land_domain(surface_space, depth; nelements_vert, dz_tuple)
+    # In global mode this is the space we were handed; in column mode ClimaLand
+    # builds its own `PointSpace` for the column, so take it from the domain.
     surface_space = domain.space.surface
-
-    # If provided, interpolate surface elevation field to surface space; otherwise use zero elevation
-    if isnothing(surface_elevation)
-        surface_elevation = CC.Fields.zeros(surface_space)
-    else
-        surface_elevation = Interfacer.remap(surface_space, surface_elevation)
-    end
 
     if albedo_type == "map_static" # Read in albedo from static data file (default type)
         # By default, this uses a file containing bareground albedo without a time component. Snow albedo is specified separately.
@@ -106,7 +92,7 @@ function BucketSimulation(
             varname = "sw_alb_clr",
         )
     elseif albedo_type == "era5" # Read in albedo from ERA5 processed file
-        # File path is inferred from start_date following the naming convention: albedo_processed_YYYYMMDD_0000.nc
+        # File path is inferred from start_date following the naming convention: albedo_processed_YYYYMMDD_HHMM.nc
         (isnothing(era5_albedo_file_path) || isempty(era5_albedo_file_path)) &&
             error("era5 albedo type requires era5_albedo_file_path to be specified")
         @info "Using ERA5 albedo from" era5_albedo_file_path
@@ -119,7 +105,7 @@ function BucketSimulation(
         )
     elseif albedo_type == "function" # Use prescribed function of lat/lon for surface albedo
         function α_bareground(coordinate_point)
-            (; lat, long) = coordinate_point
+            (; lat) = coordinate_point
             return typeof(lat)(0.38)
         end
         α_snow = toml_dict["alpha_snow"] # snow albedo
@@ -135,9 +121,11 @@ function BucketSimulation(
     τc = FT(float(dt))
     params = CL.Bucket.BucketModelParameters(toml_dict; albedo, τc)
 
-    # Interpolate atmosphere height field to surface space of land model,
-    #  since that's where we compute fluxes for this land model
+    # Move the atmosphere height and initial temperature onto the bucket surface
+    # space, where we compute fluxes for this land model. In global mode the
+    # spaces match, so this is just a rewrap.
     atmos_h = Interfacer.remap(surface_space, atmos_h)
+    initial_T = Interfacer.remap(surface_space, initial_T)
 
     args = (
         params,
@@ -146,27 +134,6 @@ function BucketSimulation(
         domain,
     )
     model = CL.Bucket.BucketModel{FT, typeof.(args)...}(args...)
-
-    if land_temperature_anomaly != "nothing"
-        T_functions =
-            Dict("aquaplanet" => temp_anomaly_aquaplanet, "amip" => temp_anomaly_amip)
-        haskey(T_functions, land_temperature_anomaly) ||
-            error("land temp anomaly function $land_temperature_anomaly not supported")
-        temp_anomaly = T_functions[land_temperature_anomaly]
-
-        # Set temperature IC including anomaly, based on atmospheric setup
-        # Bucket surface temperature is in `p.bucket.T_sfc` (ClimaLand.jl)
-        lapse_rate = FT(6.5e-3)
-        T_base = FT(271)
-        coords = CL.Domains.coordinates(model)
-        T_sfc_0 = T_base .+ temp_anomaly.(coords.subsurface)
-        # `surface_elevation` is a ClimaCore.Fields.Field(`half` level)
-        orog_adjusted_T_data =
-            CC.Fields.field_values(T_sfc_0) .-
-            lapse_rate .* CC.Fields.field_values(surface_elevation)
-        orog_adjusted_T_surface =
-            CC.Fields.Field(CC.Fields.level(orog_adjusted_T_data, 1), surface_space)
-    end
 
     # Overwrite initial conditions with interpolated values from a netcdf file if provided.
     # We expect the file to contain the following variables:
@@ -185,7 +152,7 @@ function BucketSimulation(
                 p,
                 t,
                 model,
-                orog_adjusted_T_surface,
+                initial_T,
                 CL.Simulations.make_set_initial_state_from_atmos_and_parameters(model),
             )
     end
@@ -231,6 +198,7 @@ function BucketSimulation(
         user_callbacks = (),
         diagnostics,
         timestepper,
+        updateat = dt_drivers,
     )
 
     # Scratch buffer for `turbulent_fluxes_at_a_point` output when the bucket is a slow
@@ -249,6 +217,8 @@ end
 
 # extensions required by Interfacer
 Interfacer.get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
+Interfacer.update_field!(sim::BucketSimulation, ::Val{:area_fraction}, field) =
+    sim.area_fraction .= field
 Interfacer.get_field(sim::BucketSimulation, ::Val{:emissivity}) =
     CL.surface_emissivity(sim.model, sim.integrator.u, sim.integrator.p)
 Interfacer.get_field(sim::BucketSimulation, ::Val{:roughness_buoyancy}) =
@@ -361,8 +331,8 @@ end
 
 This function computes surface fluxes between the bucket simulation and the atmosphere.
 
-The bucket computes its turbulent fluxes on its own surface space rather than in coupler space,
-so we cannot use the generic coupler-space `FluxCalculator.update_flux_fields!`. Instead:
+The bucket computes its turbulent fluxes into its own cache fields rather than into the
+coupler fields, so we cannot use the generic `FluxCalculator.update_flux_fields!`. Instead:
 
 1. Compute the turbulent fluxes at each coupler step via `turbulent_fluxes_at_a_point` directly
    into `bucket_dest`. For fast buckets (`dt_land <= dt_cpl`), `bucket_dest = p.bucket.turbulent_fluxes`.
@@ -386,7 +356,7 @@ function FluxCalculator.compute_surface_fluxes!(
     thermo_params,
     accumulator = nothing,
 )
-    Y, p, t, model = sim.integrator.u, sim.integrator.p, sim.integrator.t, sim.model
+    Y, p, model = sim.integrator.u, sim.integrator.p, sim.model
 
     # For fast buckets, write directly to the cache. For slow buckets, use `flux_buffer`
     # to hold the intermediate fluxes while we accumulate them.

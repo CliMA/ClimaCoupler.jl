@@ -8,6 +8,7 @@ module Utilities
 
 import ClimaComms
 import ClimaCore as CC
+import Dates
 import Logging
 import ClimaUtilities.OutputPathGenerator: generate_output_path
 
@@ -16,6 +17,8 @@ export get_device,
     show_memory_usage,
     setup_output_dirs,
     time_to_seconds,
+    parse_date,
+    format_start_date,
     integral,
     create_boundary_space,
     diagnostics_global_attribs
@@ -216,6 +219,42 @@ function time_to_seconds(s::String)
 end
 
 """
+    parse_date(date_str)
+
+Parse a date string into a `Dates.DateTime`. Supported formats match ClimaAtmos:
+
+  - `yyyymmdd` (interpreted as 00:00 UTC)
+  - `yyyymmdd-HHMM`
+"""
+function parse_date(date_str::AbstractString)
+    date_format_mapping = Dict(
+        r"^\d{8}$" => Dates.dateformat"yyyymmdd",
+        r"^\d{8}-\d{4}$" => Dates.dateformat"yyyymmdd-HHMM",
+    )
+    for (pattern, format) in date_format_mapping
+        !isnothing(match(pattern, date_str)) && return Dates.DateTime(date_str, format)
+    end
+    error(
+        "Date string $date_str does not match any of the allowed formats: yyyymmdd or yyyymmdd-HHMM",
+    )
+end
+parse_date(dt::Dates.DateTime) = dt
+
+"""
+    format_start_date(dt)
+
+Format a `Dates.DateTime` for coupler/`start_date` config strings.
+Uses `yyyymmdd` at midnight and `yyyymmdd-HHMM` otherwise, matching [`parse_date`](@ref).
+"""
+function format_start_date(dt::Dates.DateTime)
+    if Dates.hour(dt) == 0 && Dates.minute(dt) == 0
+        return Dates.format(dt, Dates.dateformat"yyyymmdd")
+    else
+        return Dates.format(dt, Dates.dateformat"yyyymmdd-HHMM")
+    end
+end
+
+"""
     diagnostics_global_attribs(start_date)
 
 Build a dictionary of global (file-level) attributes to attach to the diagnostic
@@ -344,49 +383,31 @@ function _column_boundary_space(::Type{FT}, latlon, comms_ctx) where {FT}
 end
 
 """
-    create_boundary_space(::Type{FT}, domain_type, atmos_sim, share_surface_space, comms_ctx; kwargs...)
+    create_boundary_space(::Type{FT}, domain_type, atmos_sim, comms_ctx; column_latlon = nothing)
 
 Construct the 2D boundary space used for coupler field exchange.
 
-For `domain_type == "column"`, returns a `PointSpace` with lat/long coordinates.
-For global simulations, returns either the atmosphere's horizontal surface space
-(when `share_surface_space` is true) or an independent `CubedSphereSpace`.
+The boundary space is typically the atmosphere's surface space. If 
+`domain_type == "column"`, we use a `PointSpace` with lat/long coordinates.
 
 # Arguments
 - `FT`: floating-point type
 - `domain_type`: `"global"` or `"column"`
-- `atmos_sim`: atmosphere simulation (used when sharing surface space)
-- `share_surface_space`: whether to reuse the atmosphere's horizontal space
+- `atmos_sim`: atmosphere simulation providing the surface space
 - `comms_ctx`: ClimaComms context
 - `column_latlon`: `(lat, lon)` tuple, required when `domain_type == "column"`
-- `nh_poly`: polynomial order, required when not sharing surface space
-- `h_elem`: number of horizontal elements, required when not sharing surface space
-- `coupled_param_dict`: parameter dictionary, required when not sharing surface space
 """
 function create_boundary_space(
     ::Type{FT},
     domain_type,
     atmos_sim,
-    share_surface_space,
     comms_ctx;
     column_latlon = nothing,
-    nh_poly_coupler = nothing,
-    h_elem_coupler = nothing,
-    coupled_param_dict = nothing,
 ) where {FT}
     if domain_type == "column"
         return _column_boundary_space(FT, column_latlon, comms_ctx)
-    elseif share_surface_space
-        return CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
     else
-        n_quad_points = nh_poly_coupler + 1
-        radius = coupled_param_dict["planet_radius"]
-        return CC.CommonSpaces.CubedSphereSpace(
-            FT;
-            radius,
-            n_quad_points,
-            h_elem = h_elem_coupler,
-        )
+        return CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
     end
 end
 

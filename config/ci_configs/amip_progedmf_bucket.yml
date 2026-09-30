@@ -20,6 +20,7 @@ t_end: "60secs"
 topo_smoothing: true
 topography: "Earth"
 viscous_sponge: true
+walltime_debug: true
 z_elem: 63
 z_max: 60000.0
 check_nan_every: 1

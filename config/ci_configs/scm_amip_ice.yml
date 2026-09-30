@@ -11,6 +11,7 @@ rad: "gray"
 microphysics_model: "0M"
 surface_setup: "PrescribedSurface"
 vert_diff: "DecayWithHeightDiffusion"
+walltime_debug: true
 z_elem: 30
 z_max: 30000.0
 z_stretch: false

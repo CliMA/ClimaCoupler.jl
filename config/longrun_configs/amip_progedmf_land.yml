@@ -22,3 +22,4 @@ surface_setup: "PrescribedSurface"
 t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
+walltime_debug: true

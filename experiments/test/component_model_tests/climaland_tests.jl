@@ -36,7 +36,8 @@ FT = Float32
     )
     area_fraction = CC.Fields.ones(boundary_space)
     atmos_h = CC.Fields.zeros(boundary_space) .+ 2
-
+    coord = CC.Fields.coordinate_field(boundary_space)
+    initial_T = CC.Fields.zeros(boundary_space) .+ 276.85 .+ 40 .* cosd.(coord.lat) .^ 4
     # Construct simulation object
     land_sim = Interfacer.LandSimulation(
         FT,
@@ -46,7 +47,9 @@ FT = Float32
         start_date,
         output_dir,
         area_fraction,
+        surface_space = boundary_space,
         atmos_h,
+        initial_T,
     )
 
     # Try taking a timestep
@@ -104,6 +107,7 @@ end
     boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space)
     area_fraction = CC.Fields.ones(boundary_space)
     atmos_h = CC.Fields.zeros(boundary_space) .+ 2
+    initial_T = Interfacer.get_field(boundary_space, atmos_sim, Val(:air_temperature))
     land_sim = Interfacer.LandSimulation(
         FT,
         Val(:integrated);
@@ -112,7 +116,9 @@ end
         start_date,
         output_dir,
         area_fraction,
+        surface_space = boundary_space,
         atmos_h,
+        initial_T,
     )
     model_sims = (; land_sim = land_sim, atmos_sim = atmos_sim)
 
@@ -127,7 +133,8 @@ end
         nothing, # conservation_checks
         tspan,
         dt,
-        tspan[1],
+        Ref(tspan[1]),
+        Ref(0), # step
         Ref(-1), # prev_checkpoint_t
         model_sims,
         (;), # callbacks
@@ -146,16 +153,11 @@ end
     FieldExchanger.import_static_fields!(coupler_fields, model_sims)
     FieldExchanger.exchange!(cs)
 
-    # Update land cache variables with the updated drivers in the cache after the exchange
-    update_aux! = CL.make_update_aux(land_sim.model)
-    update_aux!(land_sim.integrator.p, land_sim.integrator.u, land_sim.integrator.t)
-
-    update_boundary_fluxes! = CL.make_update_boundary_fluxes(land_sim.model)
-    update_boundary_fluxes!(
-        land_sim.integrator.p,
-        land_sim.integrator.u,
-        land_sim.integrator.t,
-    )
+    # Initialize land cache after drivers are exchanged. This sets
+    # `p.snow.T_sfc` (used as the SurfaceFluxes ≥1.2 initial guess for the snow
+    # skin-temperature Newton update) and updates aux / boundary-flux cache
+    # variables.
+    Interfacer.set_cache!(land_sim, coupler_fields)
 
     # Compute the turbulent fluxes for each sub-component
     CL.turbulent_fluxes!(

@@ -1,8 +1,8 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
-atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
 checkpoint_dt: "1months"
-coupler_toml: ["toml/amip_progedmf.toml"]
+coupler_toml: ["toml/amip_progedmf_1m.toml"]
 dt: "120secs"
 dt_cpl: "120secs"
 energy_check: false
@@ -19,6 +19,6 @@ output_default_diagnostics: true
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-t_end: "1098days"
+t_end: "732days"
 topo_smoothing: true
 topography: "Earth"

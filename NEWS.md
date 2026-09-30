@@ -12,11 +12,100 @@ selectable with `ice_model: "eisenman"`. The turbulent flux derivative
 `∂F_turb/∂T_sfc` (whose coupler-side finite-difference machinery was removed
 with the model) is dropped from the surface Newton solve, which now treats
 the turbulent flux explicitly and retains only the radiative derivative.
+#### Support non-00Z `start_date` for subseasonal / WeatherQuest ICs.
+`start_date` now accepts `YYYYMMDD-HHMM` (in addition to `YYYYMMDD`), matching
+ClimaAtmos. Subseasonal ERA5 land/SST/SIC/albedo/bucket paths use that HHMM
+instead of always `_0000`, so 12Z (and other) initializations find the correct
+WeatherQuest files.
+
+#### Remove land and coupler space flexibility.
+The `h_elem_coupler`, `nh_poly_coupler`, and `share_surface_space` configuration
+options have been removed. The coupler boundary space is now always the
+atmosphere's horizontal surface space (or, in single-column mode, a `PointSpace`),
+and the land model is always built on it. This was done because a conservative
+SE -> SE regridder has not been written yet, and the interpolation implementation
+was slow. `Interfacer.remap!` now errors when asked to remap between two distinct
+spectral-element spaces.
+
+#### Route rain through sea-ice.
+The ocean now receives `P_liq + (1 - ℵ) P_snow`; rain drains through the ice
+instead of ponding on it (and being lost) while snow can still accumulate on
+the ice.
+
+#### Exchange (intersection) grid for CMIP surface fractions and fluxes. PR [#2051](https://github.com/CliMA/ClimaCoupler.jl/pull/2051)
+When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange
+grid — the polygons where the cubed-sphere spectral elements intersect the
+ocean's `TripolarGrid` cells (via ConservativeRegridding's operator API) —
+and uses it to
+(1) derive land/ocean/ice area fractions from the ocean's
+bathymetric wet mask (DSS'd nodal coverage ratio), so fractions and flux
+weights are consistent with where the ocean actually has wet cells
+(2) compute ocean and sea-ice turbulent fluxes per polygon, with per-polygon
+sea-ice-concentration weighting, conservative aggregation to both grids, and
+GPU-resident, allocation-free per-step application. Controlled by the new
+`use_intersection_grid` configuration option (default `true`; automatically
+disabled for column and distributed setups).
+
+The ice skin-temperature Newton solve now linearizes turbulent fluxes as well
+as longwave emission, limits each iteration to a ±5 K update, and falls back
+to the previous guess if the update is NaN.
+
+This PR also addresses a boundary condition bug in the
+sea-ice component, using the diagnosed skin temperature to compute the radiative emission term.(Previously the incorrect energy balance would result in rapid ice melt).
+
+#### Update to use ClimaCore v0.16
+The compat entries now require ClimaCore 0.16, ClimaAtmos 0.42.9, ClimaLand
+1.12.1, ClimaDiagnostics 0.3.9, and ClimaUtilities 0.1.32.
+
+ClimaCore 0.16 has a Makie extension, so ClimaCoreMakie is no longer a
+dependency of ClimaCoupler or of the AMIP/CMIP experiment environments. All
+calls are now though `ClimaCore.Visualize`.
+
+v0.2.3
+-------
+
+#### Add `OrSchedule`, `PowerOfTwoSchedule`, `cs.step`, and a `walltime_debug` flag.
+Callback schedules now receive `(; t, step)` instead of just `(; t)`, so any
+`ClimaDiagnostics` schedule can be used as a coupler callback. `step` is a new
+`CoupledSimulation` field that counts the coupling steps of the current run,
+restarting from 1 after a restart. The new `walltime_debug` config flag (default
+`false`) also reports the walltime on the steps that are a power of two, in
+addition to every `walltime_dt`.
+
+#### Remove ClimaOcean dependency PR[#2039](https://github.com/CliMA/ClimaCoupler.jl/pull/2039), PR[#2059](https://github.com/CliMA/ClimaCoupler.jl/pull/2059)
+The ocean and sea-ice setup previously provided by ClimaOcean (ocean/sea-ice
+simulation construction, closures, sea-ice/ocean flux computations, ORCA grid
+support, and ocean initial-condition data handling) now lives directly in
+ClimaCoupler's CMIP extension. `ClimaOcean` has been dropped from the
+dependencies and extension list of both `ClimaCoupler` and the CMIP experiment
+environment; CMIP runs now depend only on `Oceananigans` and `ClimaSeaIce`.
+Ocean initial-condition data are loaded from ClimaCoupler artifacts, and the
+simulation start date is more flexible.
 
 #### Adapt to the redesigned RRTMGP 0.22 / ClimaAtmos 0.42 radiation API.
 The atmosphere radiation cache now holds an `RRTMGP.RRTMGPSolver`; coupler flux and albedo
 accesses go through `RRTMGP` getters (e.g. `RRTMGP.sw_flux_dn`, `RRTMGP.surface_emissivity`),
 and the radiation method is queried via `RRTMGP.radiation_method`.
+
+#### Use artifacts for EN4 temperature/salinity initial conditions PR[#2034](https://github.com/CliMA/ClimaCoupler.jl/pull/2034)
+The EN4 initial-condition data used by the ocean and sea-ice models are now
+provided as an artifact instead of being downloaded at run time.
+
+#### Add per-component progress callbacks PR[#2021](https://github.com/CliMA/ClimaCoupler.jl/pull/2021)
+New config arguments `--atmos_progress_interval`, `--land_progress_interval`,
+`--seaice_progress_interval`, and `--ocean_progress_interval` control how often
+each component prints progress information. All default to `"never"`.
+This is a breaking config change for `ocean_progress_interval`, which used to be
+an integer iteration count and is now a time-interval string (e.g. `"10days"`).
+
+#### Add `--ocean_grid` config argument PR[#2001](https://github.com/CliMA/ClimaCoupler.jl/pull/2001)
+Selects the horizontal grid of the Oceananigans ocean model, either
+`one_deg_tripolar` (default) or the higher-resolution `orca` grid, which is now
+used in the CMIP longrun configurations.
+
+#### Add a snow model to the sea-ice model PR[#1998](https://github.com/CliMA/ClimaCoupler.jl/pull/1998)
+
+#### Walltime reporter revamped PR[#2026](https://github.com/CliMA/ClimaCoupler.jl/pull/2026)
 
 v0.2.2
 -------

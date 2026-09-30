@@ -106,7 +106,7 @@ Note: the `mode_name` determines which Julia environment to use. Use `experiment
 | `--use_itime` | Bool | `true` | `true`, `false` | Whether to use ClimaUtilities ITime (integer time) or Float64 |
 | `--t_end` | String | `"800secs"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | End time of the simulation, relative to the start date |
 | `--t_start` | String | `"0secs"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Start time of the simulation, relative to the start date |
-| `--start_date` | String | `"20000101"` | `"YYYYMMDD"` format | Start date of the simulation |
+| `--start_date` | String | `"20000101"` | `"YYYYMMDD"` or `"YYYYMMDD-HHMM"` | Start date (and optional UTC time) of the simulation |
 | `--dt_cpl` | String | `"400secs"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Coupling time step |
 | `--dt` | String | `"400secs"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Component model time step (used if individual component dt's not specified) |
 | `--dt_atmos` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Atmos simulation time step (alternative to `dt`) |
@@ -114,6 +114,8 @@ Note: the `mode_name` determines which Julia environment to use. Use `experiment
 | `--dt_ocean` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Ocean simulation time step (alternative to `dt`) |
 | `--dt_seaice` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Sea ice simulation time step (alternative to `dt`) |
 | `--checkpoint_dt` | String | `"90days"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Time interval for checkpointing |
+| `--walltime_dt` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for walltime reporting. Defaults to a tenth of the simulation length, at most 30 days. Set to `"never"` to disable. |
+| `--walltime_debug` | Bool | `false` | `true`, `false` | Also report the walltime on every coupling step whose number is a power of two (1, 2, 4, 8, ...), in addition to the `walltime_dt` interval. If `walltime_dt` is `"never"`, this is the only reporting. |
 
 Note: If any component model-specific timestep is specified, _all_ component-model
 specific timesteps should be specified, rather than only `dt`.
@@ -122,8 +124,8 @@ specific timesteps should be specified, rather than only `dt`.
 
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
-| `--h_elem` | Int | `16` | Any positive integer | Number of horizontal elements to use for the boundary space |
-| `--share_surface_space` | Bool | `true` | `true`, `false` | Whether to share the surface space between surface models, atmosphere, and boundary |
+| `--h_elem` | Int | `16` | Any positive integer | Number of horizontal elements to use for the atmosphere horizontal space, which is also the coupler boundary space |
+| `--nh_poly` | Int | `3` | Any non-negative integer | Polynomial order to use for the atmosphere horizontal space, which is also the coupler boundary space |
 
 #### Restart information
 
@@ -160,7 +162,6 @@ specific timesteps should be specified, rather than only `dt`.
 |----------|------|---------|---------------|-------------|
 | `--surface_setup` | String | `"PrescribedSurface"` | `PrescribedSurface`, `DefaultMoninObukhov` | Triggers ClimaAtmos into coupled mode |
 | `--atmos_config_file` | String | `nothing` | Any valid file path | Optional YAML file used to overwrite default model parameters |
-| `--atmos_log_progress` | Bool | `false` | `true`, `false` | Use ClimaAtmos walltime logging callback instead of default ClimaCoupler one |
 | `--atmos_progress_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for printing atmosphere progress information. Set to `"never"` to disable. |
 | `--albedo_model` | String | `"CouplerAlbedo"` | `ConstantAlbedo`, `RegressionFunctionAlbedo`, `CouplerAlbedo` | Type of albedo model |
 | `--extra_atmos_diagnostics` | Vector{Dict{Any, Any}} | `[]` | List of dictionaries | List of dictionaries containing information about additional atmosphere diagnostics to output |
@@ -170,7 +171,6 @@ specific timesteps should be specified, rather than only `dt`.
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
 | `--land_model` | String | `"bucket"` | `bucket`, `integrated` | Land model to use |
-| `--land_temperature_anomaly` | String | `"aquaplanet"` | `amip`, `aquaplanet`, `nothing` | Type of temperature anomaly for land model |
 | `--use_land_diagnostics` | Bool | `true` | `true`, `false` | Whether to compute and output land model diagnostics |
 | `--land_progress_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for printing land progress information. Set to `"never"` to disable. |
 | `--land_diagnostics_period` | String | `"1months"` | `"30mins"`, `"1hours"`, `"1days"`, `"10days"`, `"1months"` | Time interval between land diagnostic outputs. ClimaLand's diagnostics API only accepts a fixed set of periods, so the values listed here are the only supported options. |

@@ -25,7 +25,6 @@ The `ClimaCouplerMakieExt` extension provides the actual implementations of all 
 
 - `Makie` - The core plotting package
 - `CairoMakie` - For PDF image output and other backend plotting work
-- `ClimaCoreMakie` - For plotting ClimaCore fields
 - `GeoMakie` - For geographic/map visualizations
 - `Poppler_jll` - For saving PDFs nicely
 - `Printf` - For string manipulation
@@ -35,7 +34,7 @@ The `ClimaCouplerMakieExt` extension provides the actual implementations of all 
 The extension is automatically loaded when you `using` or `import` all of the required Makie packages:
 
 ```julia
-using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, Poppler_jll, Printf
+using Makie, GeoMakie, CairoMakie, Poppler_jll, Printf
 ```
 
 Once loaded, all plotting functions in the `Plotting` module will use the full implementations instead of the stub methods.
@@ -114,7 +113,7 @@ to support Oceananigans.jl fields when Oceananigans is used as the ocean compone
 The extension is automatically loaded when Oceananigans.jl and the required Makie packages are available:
 
 ```julia
-using Makie, GeoMakie, CairoMakie, ClimaCoreMakie, Poppler_jll, Printf
+using Makie, GeoMakie, CairoMakie, Poppler_jll, Printf
 using Oceananigans
 ```
 

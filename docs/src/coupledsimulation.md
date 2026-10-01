@@ -27,7 +27,6 @@ Here we will describe the structure and internals of `CoupledSimulation`.
 | `save_cache`          | `Bool` | Whether model caches are included when writing checkpoint files |
 | `step_concurrently`   | `Bool` | Whether to step the component models as two concurrent groups |
 | `overlap_slow_surfaces` | `Bool` | Whether one ocean/sea ice step spans several coupling steps |
-| `prime_fast_group` | `Bool` | Whether the fast group was advanced `k-1` coupling steps at initialization |
 | `slow_task`           | `Ref` | Handle on an in-flight asynchronous ice/ocean step, or `nothing` |
 | `slow_progress`       | `Ref` | Progress scalars gathered at the end of the last completed overlapped step |
 

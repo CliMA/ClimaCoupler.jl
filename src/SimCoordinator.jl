@@ -106,7 +106,7 @@ This function runs the component models sequentially, and exchanges combined fie
 calculates fluxes using the selected turbulent fluxes option. Note, one coupling step might
 require multiple steps in some of the component models.
 """
-function step!(cs::Interfacer.CoupledSimulation; suppress_slow_launch::Bool = false)
+function step!(cs::Interfacer.CoupledSimulation)
     # Update the current time and step number
     cs.t[] += cs.Δt_cpl
     cs.step[] += 1
@@ -134,7 +134,7 @@ function step!(cs::Interfacer.CoupledSimulation; suppress_slow_launch::Bool = fa
 
     # The slow surfaces' forcing is now fully assembled, so their step can be
     # launched and left to run across the coupling steps that follow.
-    suppress_slow_launch || launch_slow_if_due!(cs, frozen)
+    launch_slow_if_due!(cs, frozen)
 
     # Maybe call the callbacks
     TimeManager.callbacks!(cs)
@@ -267,7 +267,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         component_dt_dict,
         step_concurrently,
         overlap_slow_surfaces,
-        prime_fast_group,
         saveat,
         checkpoint_dt,
         walltime_dt,
@@ -618,7 +617,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         flux_accumulators;
         step_concurrently = step_concurrently,
         overlap_slow_surfaces = overlap_slow_surfaces,
-        prime_fast_group = prime_fast_group,
     )
 
     ## Restart component model states if specified
@@ -649,25 +647,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
             force = true,
         )
     end
-    # Run the fast group ahead of the slow group, so that when a slow step is
-    # launched its accumulated forcing covers the window it is about to
-    # integrate, as it would sequentially. The two groups' model times are
-    # offset by k-1 coupling steps from here on; that is inherent to the scheme,
-    # not incidental.
-    # Not on a restart: the checkpoint already holds a fast group that is ahead,
-    # so priming again would add a second offset, and a third on the next
-    # restart.
-    if overlap_slow_surfaces && prime_fast_group && !should_restart
-        k = FieldExchanger.slow_window_steps(cs)
-        for _ in 1:(k - 1)
-            step!(cs; suppress_slow_launch = true)
-        end
-        @info """Primed the fast group $(k - 1) coupling steps ahead of the slow \
-                 group; coupler time is now $(cs.t[]). The groups' diagnostics \
-                 are offset by that much, so compare runs by time, not by \
-                 output index."""
-    end
-
     Utilities.show_memory_usage()
     return cs
 end

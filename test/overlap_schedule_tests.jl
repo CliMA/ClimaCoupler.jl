@@ -143,13 +143,13 @@ to the code under test.
 The rest of `step!` (exchange, fluxes, diagnostics) needs a real
 `CoupledSimulation`, so it is not driven here; only the slow-surface schedule is.
 """
-function drive!(cs, ocean, nsteps; prime_steps::Int = 0)
+function drive!(cs, ocean, nsteps)
     log = NamedTuple[]
     # The ocean state the coupler is *permitted* to read. While a step is in
     # flight the coupler is frozen out, so reading ocean.clock directly would
     # race the task and report a value the real coupler could not have used.
     visible = ocean.clock
-    for i in 1:nsteps
+    for _ in 1:nsteps
         cs.t[] += cs.Δt_cpl
         cs.step[] += 1
 
@@ -164,9 +164,7 @@ function drive!(cs, ocean, nsteps; prime_steps::Int = 0)
         # (stepped in the loop just above) and a boundary step (just joined).
         frozen || (visible = ocean.clock)
 
-        # Mirrors `step!(cs; suppress_slow_launch = true)`: during priming the
-        # fast group advances but the slow group is not started.
-        launched = i <= prime_steps ? false : SimCoordinator.launch_slow_if_due!(cs, frozen)
+        launched = SimCoordinator.launch_slow_if_due!(cs, frozen)
         push!(
             log,
             (;
@@ -414,41 +412,4 @@ end
     @test !Interfacer.is_overlapped(
         ClimaCoupler.Interfacer.SurfaceStub((; area_fraction = nothing)),
     )
-end
-
-
-# ---------------------------------------------------------------------------
-# `prime_fast_group` runs the fast group k-1 coupling steps before the slow
-# group starts, so a slow step is launched carrying a whole window of forcing.
-# The cost is that the two groups' model times stay offset by k-1 steps.
-
-@testset "priming the fast group delays the first slow launch" begin
-    dt_cpl, dt_slow = 360.0, 1800.0
-    k = Int(dt_slow / dt_cpl)
-
-    cs_p, ocean_p, _ = build_cs(; dt_cpl, dt_slow, overlap = true)
-    log_p = drive!(cs_p, ocean_p, 2k; prime_steps = k - 1)
-
-    cs_n, ocean_n, _ = build_cs(; dt_cpl, dt_slow, overlap = true)
-    log_n = drive!(cs_n, ocean_n, 2k)
-
-    first_launch(log) = findfirst(r -> r.launched, log)
-    println("\n### fast-group priming (k=$k)")
-    println("  first slow launch, unprimed: step ", first_launch(log_n))
-    println("  first slow launch, primed:   step ", first_launch(log_p))
-    println(
-        "  ocean steps over $(2k) coupling steps: ",
-        "unprimed ",
-        ocean_n.nsteps,
-        ", primed ",
-        ocean_p.nsteps,
-    )
-
-    # Nothing is launched while the fast group is being primed.
-    @test all(!r.launched for r in log_p[1:(k - 1)])
-    # And the slow group still runs: it is delayed, not suppressed.
-    @test first_launch(log_p) !== nothing
-    @test first_launch(log_p) >= k
-    # Priming costs the slow group at most one step over the window shown.
-    @test ocean_p.nsteps >= ocean_n.nsteps - 1
 end

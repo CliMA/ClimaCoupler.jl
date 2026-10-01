@@ -75,7 +75,6 @@ struct CoupledSimulation{
     SC <: Bool,
     SCC <: Bool,
     OSS <: Bool,
-    PFG <: Bool,
     STK,
     SPG,
     NTFA <: NamedTuple,
@@ -96,8 +95,6 @@ struct CoupledSimulation{
     save_cache::SC
     step_concurrently::SCC
     overlap_slow_surfaces::OSS
-    "Advance the fast group k-1 coupling steps at initialization. See `Input`."
-    prime_fast_group::PFG
     "`(; task, target)` for an in-flight asynchronous ice/ocean step, or `nothing`. See `FieldExchanger.launch_slow_sims!`."
     slow_task::STK
     "Progress scalars gathered at the end of the last completed slow step. See `Interfacer.progress_snapshot`."
@@ -111,7 +108,7 @@ CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args).
     CoupledSimulation{FT}(start_date, ..., flux_accumulators; step_concurrently, ...)
 
 The fields this constructor takes positionally are the long-standing ones. The
-five that concurrent stepping added are keyword-only and default to off, so a
+four that concurrent stepping added are keyword-only and default to off, so a
 caller that does not use it neither names them nor has to keep them in the right
 order -- several are `Bool`s and `Ref`s that no amount of type checking would
 tell apart if they were transposed.
@@ -134,7 +131,6 @@ function CoupledSimulation{FT}(
     flux_accumulators;
     step_concurrently = false,
     overlap_slow_surfaces = false,
-    prime_fast_group = false,
     slow_task = Ref{Any}(nothing),
     slow_progress = Ref{Any}(nothing),
 ) where {FT}
@@ -155,7 +151,6 @@ function CoupledSimulation{FT}(
         save_cache,
         step_concurrently,
         overlap_slow_surfaces,
-        prime_fast_group,
         slow_task,
         slow_progress,
         flux_accumulators,

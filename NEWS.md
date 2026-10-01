@@ -41,14 +41,7 @@ coupler leaves ice and ocean state alone; the atmosphere still gets a live
 blended surface state because `combine_surfaces!` sums the fast and slow
 surfaces separately and reuses the slow sum for the window.
 
-`prime_fast_group` advances the atmosphere and land group `k-1` coupling steps
-during initialization, where `k = dt_ocean/dt_cpl`, so an overlapped slow step is
-launched carrying the forcing accumulated over the window it integrates, as it
-would sequentially. It does not shorten the lag the atmosphere sees, and it
-leaves the two groups' model times offset by `k-1` coupling steps, so their
-diagnostics should be compared by time rather than by output index.
-
-All three default to `false`.
+Both default to `false`.
 
 #### Exchange (intersection) grid for CMIP surface fractions and fluxes. PR [#2051](https://github.com/CliMA/ClimaCoupler.jl/pull/2051)
 When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange

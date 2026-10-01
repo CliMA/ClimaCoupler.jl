@@ -100,7 +100,6 @@ Note: the `mode_name` determines which Julia environment to use. Use `experiment
 | `--device` | String | `"auto"` | `auto`, `CPUSingleThreaded`, `CPUMultiThreaded`, `CUDADevice` | Device type to control running on CPU or GPU |
 | `--step_concurrently` | Bool | `false` | `true`, `false` | Step the component models concurrently, as two groups: land then atmosphere in one task, sea ice then ocean in another. Only worthwhile on a GPU; see [SimCoordinator](@ref) |
 | `--overlap_slow_surfaces` | Bool | `false` | `true`, `false` | With `step_concurrently`, span one ocean/sea ice step across several coupling steps instead of blocking on it within one. The atmosphere then sees an ocean one slow step older. Pays best when `dt_ocean`/`dt_seaice` are a few multiples of `dt_cpl`; if they equal `dt_cpl` it overlaps the coupler's exchange and communication but saves no more computation than `step_concurrently` alone. See [SimCoordinator](@ref) |
-| `--prime_fast_group` | Bool | `false` | `true`, `false` | With `overlap_slow_surfaces`, advance the atmosphere/land group `k-1` coupling steps during initialization, where `k = dt_ocean/dt_cpl`, so a slow step is launched carrying a whole window of accumulated forcing as it would sequentially. Offsets the two groups' model times by `k-1` coupling steps; see [SimCoordinator](@ref) |
 
 #### Time information
 

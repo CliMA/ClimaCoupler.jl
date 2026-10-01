@@ -128,11 +128,6 @@ a checkpoint falls due. [`Checkpointer.checkpoint_sims`](@ref) joins it before
 reading any component state, so a checkpoint never captures a half-stepped
 ocean.
 
-`prime_fast_group` interacts with checkpointing too, in the other direction.
-The offset it establishes lives in the component clocks, which a checkpoint
-saves and a restart restores, so the priming step is skipped on restart — doing
-it again would add a second offset, and another on every restart after that.
-
 The join completes whatever step was running, so a checkpoint taken part-way
 through a slow-surface window saves the slow group already advanced to the end
 of that window. The ocean and sea ice in a checkpoint are therefore generally at

@@ -71,7 +71,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
         scheduler = EKP.DataMisfitController(terminate_at = 1000000),
     )
 
-    coupler_model_interface = CouplerModelInterface(CALIBRATE_CONFIG)
+    coupler_model_interface =
+        CouplerModelInterface(CALIBRATE_CONFIG; emulate_diagnostics = TEST_CALIBRATION)
 
     (; n_iterations) = CALIBRATE_CONFIG
 

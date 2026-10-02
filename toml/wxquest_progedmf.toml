@@ -6,6 +6,9 @@ type = "float"
 value = 40000.0
 type = "float"
 
+[ogw_smoothing_scale_fraction]
+value = 1.0
+
 [alpha_rayleigh_tracer]
 value = 0.001
 type = "float"

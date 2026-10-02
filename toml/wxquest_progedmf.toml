@@ -102,8 +102,12 @@ type = "float"
 value = 5e-6
 type = "float"
 
-[cloud_ice_sedimentation_number_concentration]
-value = 3.0e4
+[cloud_ice_number_max]
+value = 1.0e5
+type = "float"
+
+[cloud_ice_number_temperature_fit_prefactor]
+value = 3000.0
 type = "float"
 
 [cloud_fraction_steepness_scale]
@@ -112,10 +116,6 @@ type = "float"
 
 [cloud_fraction_eps_rel]
 value = 0.05
-type = "float"
-
-[ice_cloud_effective_radius]
-value = 30.0e-6
 type = "float"
 
 [sgs_ice_uniform_fraction]

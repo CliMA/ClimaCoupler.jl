@@ -36,6 +36,9 @@ end
 @safetestset "FieldExchanger tests" begin
     include("field_exchanger_tests.jl")
 end
+@safetestset "Overlapped slow-surface schedule tests" begin
+    include("overlap_schedule_tests.jl")
+end
 @safetestset "FluxCalculator tests" begin
     include("flux_calculator_tests.jl")
 end

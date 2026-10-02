@@ -32,6 +32,8 @@ export CoupledSimulation,
     step!,
     sim_dt,
     will_step,
+    is_overlapped,
+    progress_snapshot,
     set_cache!,
     remap,
     remap!,
@@ -71,6 +73,10 @@ struct CoupledSimulation{
     TP,
     DH,
     SC <: Bool,
+    SCC <: Bool,
+    OSS <: Bool,
+    STK,
+    SPG,
     NTFA <: NamedTuple,
 }
     start_date::D
@@ -87,10 +93,69 @@ struct CoupledSimulation{
     thermo_params::TP
     diags_handler::DH
     save_cache::SC
+    step_concurrently::SCC
+    overlap_slow_surfaces::OSS
+    "`(; task, target)` for an in-flight asynchronous ice/ocean step, or `nothing`. See `FieldExchanger.launch_slow_sims!`."
+    slow_task::STK
+    "Progress scalars gathered at the end of the last completed slow step. See `Interfacer.progress_snapshot`."
+    slow_progress::SPG
     flux_accumulators::NTFA
 end
 
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args)...}(args...)
+
+"""
+    CoupledSimulation{FT}(start_date, ..., flux_accumulators; step_concurrently, ...)
+
+The fields this constructor takes positionally are the long-standing ones. The
+four that concurrent stepping added are keyword-only and default to off, so a
+caller that does not use it neither names them nor has to keep them in the right
+order -- several are `Bool`s and `Ref`s that no amount of type checking would
+tell apart if they were transposed.
+"""
+function CoupledSimulation{FT}(
+    start_date,
+    fields,
+    conservation_checks,
+    tspan,
+    Δt_cpl,
+    t,
+    step,
+    prev_checkpoint_t,
+    model_sims,
+    callbacks,
+    dir_paths,
+    thermo_params,
+    diags_handler,
+    save_cache,
+    flux_accumulators;
+    step_concurrently = false,
+    overlap_slow_surfaces = false,
+    slow_task = Ref{Any}(nothing),
+    slow_progress = Ref{Any}(nothing),
+) where {FT}
+    return CoupledSimulation{FT}(
+        start_date,
+        fields,
+        conservation_checks,
+        tspan,
+        Δt_cpl,
+        t,
+        step,
+        prev_checkpoint_t,
+        model_sims,
+        callbacks,
+        dir_paths,
+        thermo_params,
+        diags_handler,
+        save_cache,
+        step_concurrently,
+        overlap_slow_surfaces,
+        slow_task,
+        slow_progress,
+        flux_accumulators,
+    )
+end
 
 function Base.show(io::IO, sim::CoupledSimulation)
     device_type = nameof(typeof(ClimaComms.device(sim)))
@@ -173,6 +238,38 @@ default_coupler_fields() = [
 ]
 
 """
+    overlap_cache_fields()
+
+Coupler fields that hold the ocean/sea ice contribution to each blended surface
+quantity, carried across an overlapped slow-surface step.
+
+When `overlap_slow_surfaces` is set, the ice and ocean are stepped asynchronously
+across several coupling steps, so their state cannot be read while the step is in
+flight. `FieldExchanger.combine_surfaces!` accumulates the fast surfaces and the
+slow surfaces into separate sums; the slow sum is parked in these fields at each
+sync and reused, unchanged, for the rest of the window. Land therefore keeps
+contributing live values while the ocean and sea ice are held at their pre-step
+values.
+
+`:slow_LW_up` holds the area- and emissivity-weighted sum of `T^4`, which is the
+quantity `combine_surfaces!` accumulates before converting back to a temperature.
+"""
+overlap_cache_fields() = [
+    :slow_emissivity,
+    :slow_LW_up,
+    :slow_direct_albedo,
+    :slow_diffuse_albedo,
+    # The slow surfaces' share of the turbulent fluxes, parked for the same
+    # reason: computing it reads their surface state, which the in-flight step
+    # is writing.
+    :slow_F_turb_ρτxz,
+    :slow_F_turb_ρτyz,
+    :slow_F_lh,
+    :slow_F_sh,
+    :slow_F_turb_moisture,
+]
+
+"""
     init_coupler_fields(FT, coupler_field_names, boundary_space)
 
 Allocate a Field of NamedTuples on the provided boundary space to store
@@ -214,6 +311,21 @@ abstract type AbstractSurfaceSimulation <: AbstractComponentSimulation end
 abstract type AbstractSeaIceSimulation <: AbstractSurfaceSimulation end
 abstract type AbstractLandSimulation <: AbstractSurfaceSimulation end
 abstract type AbstractOceanSimulation <: AbstractSurfaceSimulation end
+
+"""
+    is_overlapped(sim)
+
+Whether `sim` belongs to the group that is stepped asynchronously across several
+coupling steps when `overlap_slow_surfaces` is set. Ocean and sea ice step
+together in that group, to properly pass the frazil heat flux.
+
+Defaults to `false`, and is opted into by concrete type rather than by abstract
+supertype: prescribed and slab surfaces are cheap, so overlapping them would buy
+nothing and still cost a coupling step of lag. Deciding by type rather than by
+the key a model is stored under in `model_sims` means a mistyped key cannot
+silently drop a model from the group.
+"""
+is_overlapped(::AbstractComponentSimulation) = false
 
 """
     AbstractImplicitFluxSimulation
@@ -487,6 +599,32 @@ function progress(sim::AbstractComponentSimulation, _cs)
         1
     return nothing
 end
+
+"""
+    progress_snapshot(sim)
+
+Gather the scalars `progress` reports into a `NamedTuple`, without printing.
+
+`progress` normally reduces over the model's own fields at report time. That is
+unsafe for a sim stepped asynchronously under `overlap_slow_surfaces`: the report
+falls due while the step is in flight, and reducing over fields that step is
+writing gives meaningless numbers. Splitting the reduction out lets it run inside
+the stepping task, which owns the state, with `progress(sim, cs, snapshot)`
+printing the result later.
+
+Returns `nothing` for models that have not extended it, in which case the
+snapshot path is skipped and `progress(sim, cs)` is used directly.
+"""
+progress_snapshot(::AbstractComponentSimulation) = nothing
+
+"""
+    progress(sim, cs, snapshot)
+
+Print a progress report from a previously gathered [`progress_snapshot`](@ref)
+instead of reducing over the model's fields now. Falls back to the live report
+when a model has no snapshot method.
+"""
+progress(sim::AbstractComponentSimulation, cs, ::Nothing) = progress(sim, cs)
 
 """
     close_output_writers(sim::AbstractComponentSimulation)

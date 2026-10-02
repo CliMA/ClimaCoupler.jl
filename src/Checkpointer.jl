@@ -11,6 +11,7 @@ import ClimaUtilities.Utils: sort_by_creation_time
 import ClimaUtilities.TimeManager: ITime, seconds
 import ClimaUtilities.TimeVaryingInputs: AbstractTimeVaryingInput
 import ..Interfacer
+import ..FieldExchanger
 import Dates
 import StaticArrays
 
@@ -231,6 +232,9 @@ This is a callback function that checkpoints all simulations defined in the
 current coupled simulation.
 """
 function checkpoint_sims(cs::Interfacer.CoupledSimulation)
+    # Checkpointing reads every component's state, so an overlapped ice/ocean
+    # step must be joined first. No-op unless one is in flight.
+    FieldExchanger.wait_slow_sims!(cs)
     time = Int(round(float(cs.t[])))
     day = floor(Int, time / (60 * 60 * 24))
     sec = floor(Int, time % (60 * 60 * 24))

@@ -427,9 +427,9 @@ weakdeps = ["ClimaAnalysis", "Makie", "NaNStatistics"]
 
 [[deps.ClimaComms]]
 deps = ["Adapt", "Logging", "LoggingExtras"]
-git-tree-sha1 = "99825dd76c1036c5e80c1dab91bbd2c371f34446"
+git-tree-sha1 = "786488f1cdac5d42d22db590a766b96213b14efd"
 uuid = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
-version = "0.6.11"
+version = "0.6.12"
 weakdeps = ["CUDA", "MPI"]
 
     [deps.ClimaComms.extensions]
@@ -438,13 +438,13 @@ weakdeps = ["CUDA", "MPI"]
 
 [[deps.ClimaCore]]
 deps = ["Adapt", "BandedMatrices", "BlockArrays", "ClimaComms", "ClimaInterpolations", "CubedSphere", "DataStructures", "ForwardDiff", "GaussQuadrature", "GilbertCurves", "HDF5", "InteractiveUtils", "IntervalSets", "KrylovKit", "LLVM", "LazyBroadcast", "LinearAlgebra", "MultiBroadcastFusion", "NVTX", "PkgVersion", "Random", "RootSolvers", "SparseArrays", "StaticArrays", "Statistics", "UnrolledUtilities"]
-git-tree-sha1 = "9f85bf48ac7fca17e41f49cce619643a40052115"
+git-tree-sha1 = "f4ad9b0908a3e6e0084cea4899faaa49eb107582"
 uuid = "d414da3d-4745-48bb-8d80-42e94e092884"
-version = "1.0.0"
-weakdeps = ["CUDA", "GPUCompiler", "Krylov", "Makie", "RecipesBase"]
+version = "1.0.3"
+weakdeps = ["CUDA", "Krylov", "Makie", "RecipesBase"]
 
     [deps.ClimaCore.extensions]
-    ClimaCoreCUDAExt = ["CUDA", "GPUCompiler"]
+    ClimaCoreCUDAExt = "CUDA"
     ClimaCoreMakieExt = "Makie"
     ClimaCoreRecipesBaseExt = "RecipesBase"
     KrylovExt = "Krylov"

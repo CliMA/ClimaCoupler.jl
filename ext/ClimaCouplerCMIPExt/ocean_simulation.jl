@@ -112,7 +112,7 @@ end
 vector_component_boundary_conditions(grid, loc) = OC.FieldBoundaryConditions(grid, loc)
 
 function vector_component_boundary_conditions(grid::TripolarGridOfSomeKind, loc)
-    north_bc = north_fold_boundary_condition(grid)(-1)
+    north_bc = north_fold_boundary_condition(grid, -1)
     return OC.FieldBoundaryConditions(grid, loc; north = north_bc)
 end
 

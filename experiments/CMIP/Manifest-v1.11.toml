@@ -524,9 +524,9 @@ version = "1.1.17"
 
 [[deps.ClimaSeaIce]]
 deps = ["Adapt", "JLD2", "KernelAbstractions", "Oceananigans", "RootSolvers", "SeawaterPolynomials"]
-git-tree-sha1 = "6b5a917e4d543f7245fc0ff020fb54c0fabbfd49"
+git-tree-sha1 = "220b3720187532df0ed33bc48fb262c342e31bb8"
 uuid = "6ba0ff68-24e6-4315-936c-2e99227c95a4"
-version = "0.5.9"
+version = "0.5.8"
 
 [[deps.ClimaTimeSteppers]]
 deps = ["ClimaComms", "Krylov", "LinearAlgebra", "LinearOperators", "NVTX", "NullBroadcasts", "StaticArrays"]

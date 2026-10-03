@@ -4,6 +4,14 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Reintroduce the Eisenman-Zhang sea ice model
+The Eisenman-Zhang thermodynamic 0-layer sea ice model (removed in
+[#1284](https://github.com/CliMA/ClimaCoupler.jl/pull/1284)) is reintroduced
+as `Models.EisenmanIceSimulation`, ported to the current Interfacer API and
+selectable with `ice_model: "eisenman"`. The turbulent flux derivative
+`∂F_turb/∂T_sfc` (whose coupler-side finite-difference machinery was removed
+with the model) is dropped from the surface Newton solve, which now treats
+the turbulent flux explicitly and retains only the radiative derivative.
 #### Support non-00Z `start_date` for subseasonal / WeatherQuest ICs.
 `start_date` now accepts `YYYYMMDD-HHMM` (in addition to `YYYYMMDD`), matching
 ClimaAtmos. Subseasonal ERA5 land/SST/SIC/albedo/bucket paths use that HHMM

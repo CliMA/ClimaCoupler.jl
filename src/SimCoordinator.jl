@@ -246,7 +246,8 @@ function _build_coupled_simulation(config_dict::AbstractDict)
         coupler_diagnostics_reduction,
         output_dir_root,
         parameter_files,
-        era5_filepaths,
+        era5_initial_condition_dir,
+        bucket_initial_condition,
         ocean_model,
         simple_ocean,
         ocean_grid,
@@ -327,8 +328,16 @@ function _build_coupled_simulation(config_dict::AbstractDict)
     @info(sim_mode)
     land_sim = ice_sim = ocean_sim = nothing
 
-    (; sst_path, sic_path, land_ic_path, albedo_path, bucket_initial_condition) =
-        era5_filepaths
+    sst_path = sic_path = land_ic_path = albedo_path = nothing
+    if sim_mode <: Interfacer.SubseasonalMode
+        (; sst_path, sic_path, land_ic_path, albedo_path, bucket_initial_condition) =
+            Input.get_era5_filepaths(
+                era5_initial_condition_dir,
+                start_date,
+                bucket_initial_condition,
+                comms_ctx,
+            )
+    end
 
     land_sim = @timed_log "Initialized land simulation" Interfacer.LandSimulation(
         FT,

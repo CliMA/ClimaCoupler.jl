@@ -1,0 +1,37 @@
+FLOAT_TYPE: "Float32"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
+checkpoint_dt: "1months"
+coupler_toml: ["toml/amip_progedmf_1m.toml"]
+h_elem: 24
+dt: "90secs"
+dt_cpl: "90secs"
+energy_check: false
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta, cl, clw, cli]
+    period: 1months
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 6hours
+  - short_name: [entr, detr, lmixw, lmixtke, lmixb]
+    period: 1months
+    reduction_time: average
+    compute_every: 6hours
+land_model: "integrated"
+mode_name: "amip"
+netcdf_output_at_levels: true
+output_default_diagnostics: true
+radiation_reset_rng_seed: true
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+t_end: "366days"
+topo_smoothing: true
+topography: "Earth"
+# Tapio's config
+cloud_ice_formation: "TemperatureDependentIceNumber"
+tq_correlation_model: "diagnosed"
+rain_terminal_velocity: "Fixed"
+snow_terminal_velocity: "Fixed"
+cloud_ice_terminal_velocity: "Fixed"
+cloud_liquid_rain_accretion: "KK2000Accretion"
+rain_autoconversion: "KK2000Autoconversion"

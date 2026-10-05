@@ -1,6 +1,7 @@
 agents:
-  queue: clima
-  slurm_time: 15:00:00
+  #queue: clima
+  queue: central
+  slurm_time: 24:00:00
   modules: climacommon/2025_05_15
 
 env:
@@ -19,14 +20,14 @@ env:
   # UPSTREAM_PACKAGES environment variable. For example, if you pass
   # `UPSTREAM_PACKAGES="ClimaAtmos SurfaceFluxes@1.1.0", then the main branch
   # of ClimaAtmos and SurfaceFluxes v1.1.0 will be used.
-  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore ClimaTimeSteppers Thermodynamics ClimaLand SurfaceFluxes RRTMGP CloudMicrophysics}"
+  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos#ts/swcre-30pct ClimaCore}"
   # Set DOWNSTREAM_CI to run only the flagship AMIP when testing upstream
   # changes. Any non-empty value skips the other runs and is shown as the skip
   # reason.
   # Set NEW_T_END (e.g. "96mins") to set t_end of the coarse AMIPs and CMIP.
   # Format: <integer>secs|mins|hours|days.
 
-timeout_in_minutes: 900
+timeout_in_minutes: 1440
 
 steps:
   - label: "init :GPU:"
@@ -42,7 +43,7 @@ steps:
       # For this pipeline, use the main branches of certain upstream packages
       # see UPSTREAM_PACKAGES environment variable
       - |
-        for env in AMIP CMIP; do
+        for env in AMIP; do
           echo "--- Instantiate $$env env"
           JULIA_PKG_PRECOMPILE_AUTO=0 julia --project=experiments/$$env/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'
           julia --project=experiments/$$env/ .buildkite/add_upstream_packages.jl
@@ -64,21 +65,21 @@ steps:
   - group: "Coarse AMIPs"
 
     steps:
-      - label: "Coarse current AMIP: progedmf + 0M + integrated land"
-        key: "amip_progedmf_land"
-        skip: "${DOWNSTREAM_CI:-}"
-        command:
-          - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_progedmf_land.yml --job_id amip_coarse_progedmf_land"
-        artifact_paths: "output/amip_coarse_progedmf_land/artifacts/*"
-        timeout_in_minutes: 900
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 30GB
+      # - label: "Coarse current AMIP: progedmf + 0M + integrated land"
+      #   key: "amip_progedmf_land"
+      #   skip: "${DOWNSTREAM_CI:-}"
+      #   command:
+      #     - echo "--- Run simulation"
+      #     - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_progedmf_land.yml --job_id amip_coarse_progedmf_land"
+      #   artifact_paths: "output/amip_coarse_progedmf_land/artifacts/*"
+      #   timeout_in_minutes: 900
+      #   env:
+      #     CLIMACOMMS_DEVICE: "CUDA"
+      #   agents:
+      #     slurm_gpus_per_task: 1
+      #     slurm_cpus_per_task: 4
+      #     slurm_ntasks: 1
+      #     slurm_mem: 30GB
 
       - label: "Coarse current AMIP: progedmf + 1M + integrated land"
         key: "amip_progedmf_1m_land"
@@ -87,43 +88,45 @@ steps:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_progedmf_1m_land.yml --job_id amip_coarse_progedmf_1m_land"
         artifact_paths: "output/amip_coarse_progedmf_1m_land/artifacts/*"
-        timeout_in_minutes: 900
+        timeout_in_minutes: 1440
         env:
           CLIMACOMMS_DEVICE: "CUDA"
+          CLIMACOMMS_CONTEXT: "SINGLETON"
         agents:
-          slurm_gpus_per_task: 1
+          #slurm_gpus_per_task: 1
+          slurm_gres: gpu:nvidia_l40s:1
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 30GB
 
-      - label: "Flagship AMIP GPU with prognostic EDMF + 1M + integrated land (16 helems)"
-        key: "gpu_amip_progedmf_1M_land_he16"
-        command: "srun julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $BENCHMARK_CONFIG_PATH/amip_progedmf_1m_land_he16.yml --job_id gpu_amip_progedmf_1M_land_he16"
-        artifact_paths: "output/gpu_amip_progedmf_1M_land_he16/artifacts/*"
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 16GB
+  #     - label: "Flagship AMIP GPU with prognostic EDMF + 1M + integrated land (16 helems)"
+  #       key: "gpu_amip_progedmf_1M_land_he16"
+  #       command: "srun julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $BENCHMARK_CONFIG_PATH/amip_progedmf_1m_land_he16.yml --job_id gpu_amip_progedmf_1M_land_he16"
+  #       artifact_paths: "output/gpu_amip_progedmf_1M_land_he16/artifacts/*"
+  #       env:
+  #         CLIMACOMMS_DEVICE: "CUDA"
+  #       agents:
+  #         slurm_gpus_per_task: 1
+  #         slurm_cpus_per_task: 4
+  #         slurm_ntasks: 1
+  #         slurm_mem: 16GB
 
-  - group: "CMIP"
-    skip: "${DOWNSTREAM_CI:-}"
+  # - group: "CMIP"
+  #   skip: "${DOWNSTREAM_CI:-}"
 
-    steps:
-      # Shares its config with the longrun pipeline; edits there also affect this run
-      - label: "CMIP: progedmf + 0M + integrated land"
-        key: "cmip_progedmf_land"
-        command:
-          - echo "--- Run simulation"
-          - "julia --threads=3 --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $LONGRUN_CONFIG_PATH/cmip_progedmf_land.yml --job_id cmip_progedmf_land"
-        artifact_paths: "output/cmip_progedmf_land/artifacts/*"
-        timeout_in_minutes: 900
-        env:
-          CLIMACOMMS_DEVICE: "CUDA"
-        agents:
-          slurm_gpus_per_task: 1
-          slurm_cpus_per_task: 4
-          slurm_ntasks: 1
-          slurm_mem: 32GB
+  #   steps:
+  #     # Shares its config with the longrun pipeline; edits there also affect this run
+  #     - label: "CMIP: progedmf + 0M + integrated land"
+  #       key: "cmip_progedmf_land"
+  #       command:
+  #         - echo "--- Run simulation"
+  #         - "julia --threads=3 --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $LONGRUN_CONFIG_PATH/cmip_progedmf_land.yml --job_id cmip_progedmf_land"
+  #       artifact_paths: "output/cmip_progedmf_land/artifacts/*"
+  #       timeout_in_minutes: 900
+  #       env:
+  #         CLIMACOMMS_DEVICE: "CUDA"
+  #       agents:
+  #         slurm_gpus_per_task: 1
+  #         slurm_cpus_per_task: 4
+  #         slurm_ntasks: 1
+  #         slurm_mem: 32GB

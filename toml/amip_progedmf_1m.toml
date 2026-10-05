@@ -62,10 +62,23 @@ value = 1
 value = 100
 
 [sgs_variance_horizontal_scale_factor]
-value = 1.5
+value = 1.0
+
+[sgs_variance_isentropic_depth]
+value = 1000.0
+type = "float"
 
 [sgs_variance_vertical_scale_factor]
 value = 0.5
+
+[sgs_ice_uniform_fraction]
+value = 0.0
+
+[sgs_liquid_uniform_fraction]
+value = 0.0
+
+[prescribed_cloud_droplet_number_concentration]
+value = 5e7
 
 [condensation_evaporation_timescale]
 value = 100
@@ -76,20 +89,20 @@ value = 300
 [rain_autoconversion_timescale]
 value = 1200
 
-[snow_autoconversion_timescale]
-value = 1360
-
 [cloud_liquid_water_specific_humidity_autoconversion_threshold]
-value = 1.25e-4
+value = 1e-4
 
 [cloud_liquid_water_specific_humidity_autoconversion_threshold_stratiform_scale]
-value = 3.0
+value = 2.0
 
 [rain_autoconversion_velocity_scale]
 value = 0.05
 
+[snow_autoconversion_timescale]
+value = 1360
+
 [cloud_ice_specific_humidity_autoconversion_threshold]
-value = 5e-6
+value = 7e-6
 
 [cloud_ice_number_max]
 value = 1.0e5
@@ -98,7 +111,10 @@ value = 1.0e5
 value = 3000.0
 
 [cloud_fraction_steepness_scale]
-value = 1.5
+value = 1.2
 
 [cloud_fraction_eps_rel]
 value = 0.05
+
+[cloud_liquid_snow_collision_efficiency]
+value = 0.25

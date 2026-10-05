@@ -23,7 +23,7 @@ value = 0.7
 value = 0
 
 [entr_coeff]
-value = 0.3
+value = 0.2
 
 [min_area_limiter_scale]
 value = 0.001
@@ -68,16 +68,7 @@ value = 100
 value = 300
 
 [rain_autoconversion_timescale]
-value = 600
-
-[rain_autoconversion_timescale_stratiform_scale]
-value = 4.0
-
-[cloud_liquid_water_specific_humidity_autoconversion_threshold_stratiform_scale]
-value = 1.0
-
-[rain_autoconversion_velocity_scale]
-value = 0.05
+value = 1200
 
 [snow_autoconversion_timescale]
 value = 1360
@@ -105,6 +96,3 @@ value = 1.0
 
 [sgs_liquid_uniform_fraction]
 value = 0.0
-
-[cloud_liquid_snow_collision_efficiency]
-value = 0.25

@@ -4,6 +4,13 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Log setup and first-step timings.
+`CoupledSimulation` setup now logs the wall time, allocations, and compile
+time of each phase (atmosphere, land, ocean, sea ice, coupler fields,
+diagnostics, initial exchange) through the new `Utilities.@timed_log` macro,
+and `run!` logs the two warmup coupling steps the same way instead of running
+them silently. Reported SYPD and walltime are unchanged.
+
 #### Support non-00Z `start_date` for subseasonal / WeatherQuest ICs.
 `start_date` now accepts `YYYYMMDD-HHMM` (in addition to `YYYYMMDD`), matching
 ClimaAtmos. Subseasonal ERA5 land/SST/SIC/albedo/bucket paths use that HHMM

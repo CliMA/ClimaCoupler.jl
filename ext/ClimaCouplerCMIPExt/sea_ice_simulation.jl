@@ -122,7 +122,8 @@ function sea_ice_simulation(
     sea_ice_density = 900, # kg m⁻³
     snow_density = 330, # kg m⁻³
     side_drag_coefficient = 3e-3,
-    dynamics = sea_ice_dynamics(grid, ocean),
+    #dynamics = sea_ice_dynamics(grid, ocean),
+    dynamics = nothing,
     bottom_heat_boundary_condition = nothing,
     top_heat_boundary_condition = nothing,
     timestepper = :SplitRungeKutta3,

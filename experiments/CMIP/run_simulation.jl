@@ -31,6 +31,18 @@ Slabplanet configuration, please see our documentation.
 # Load the necessary modules to run the coupled simulation
 include("code_loading.jl")
 
+# The Makie plotting stack is heavy to load and compile, so by default it is
+# deferred until after `run!` to keep the time-to-first-timestep low (see
+# docs/src/precompilation_strategies.md). Opt out via environment variables:
+#   CLIMACOUPLER_PLOTS_DURING_RUN=1  load Makie before the run (e.g. for plotting
+#                                    callbacks that fire during the coupling loop)
+#   CLIMACOUPLER_SKIP_POSTPROCESS=1  skip Makie and postprocessing entirely
+plots_during_run = get(ENV, "CLIMACOUPLER_PLOTS_DURING_RUN", "0") in ("1", "true")
+skip_postprocess = get(ENV, "CLIMACOUPLER_SKIP_POSTPROCESS", "0") in ("1", "true")
+plots_during_run &&
+    !skip_postprocess &&
+    include(joinpath(@__DIR__, "..", "load_plotting.jl"))
+
 # Get the configuration file from the command line (or manually set it here)
 config_file = Input.parse_commandline(Input.argparse_settings())["config_file"]
 
@@ -39,6 +51,12 @@ cs = CoupledSimulation(config_file)
 run!(cs)
 
 # Postprocessing
-conservation_softfail = Input.get_coupler_config_dict(config_file)["conservation_softfail"]
-rmse_check = Input.get_coupler_config_dict(config_file)["rmse_check"]
-postprocess(cs; conservation_softfail, rmse_check)
+if !skip_postprocess
+    # Load the Makie plotting stack now (unless it was already loaded above) so the
+    # simulation reaches its first step without compiling the plotting packages.
+    plots_during_run || include(joinpath(@__DIR__, "..", "load_plotting.jl"))
+    conservation_softfail =
+        Input.get_coupler_config_dict(config_file)["conservation_softfail"]
+    rmse_check = Input.get_coupler_config_dict(config_file)["rmse_check"]
+    postprocess(cs; conservation_softfail, rmse_check)
+end

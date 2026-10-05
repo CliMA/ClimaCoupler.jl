@@ -17,8 +17,11 @@ to set up and run a simulation interactively.
 
 using ClimaCoupler
 
-# Trigger ClimaCouplerMakieExt
-using CairoMakie, GeoMakie, Makie, Poppler_jll, Printf
+# The Makie plotting stack (CairoMakie, GeoMakie, ...) is intentionally NOT loaded
+# here: it is only needed for postprocessing and its load/compile time is large.
+# `run_simulation.jl` includes `../load_plotting.jl` right before `postprocess` to
+# trigger `ClimaCouplerMakieExt`/`ClimaCouplerCMIPMakieExt` once the simulation is
+# done. Include that file manually if you want plotting in an interactive session.
 
 # Trigger ClimaCouplerCMIPExt
 import Oceananigans, ClimaSeaIce, KernelAbstractions, ConservativeRegridding, Adapt

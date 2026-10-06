@@ -34,10 +34,10 @@ end
         start_date::Dates.DateTime,
         output_dir::String,
         area_fraction,
-        nelements::Tuple{Int, Int} = (101, 15),
+        surface_space,
+        nelements_vert::Int = 15,
         depth::FT = FT(15),
         dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
-        shared_surface_space = nothing,
         surface_elevation = nothing,
         land_spun_up_ic::Bool = true,
         atmos_h,
@@ -73,10 +73,10 @@ function ClimaLandSimulation(
     start_date::Dates.DateTime,
     output_dir::String,
     area_fraction,
-    nelements::Tuple{Int, Int} = (101, 15),
+    surface_space,
+    nelements_vert::Int = 15,
     depth::FT = FT(15),
     dz_tuple::Tuple{FT, FT} = FT.((3.0, 0.05)),
-    shared_surface_space = nothing,
     surface_elevation = nothing,
     land_spun_up_ic::Bool = true,
     atmos_h,
@@ -98,26 +98,23 @@ function ClimaLandSimulation(
 
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
-    if isnothing(shared_surface_space)
-        domain = make_land_domain(depth, toml_dict; nelements, dz_tuple)
-    else
-        domain = make_land_domain(
-            shared_surface_space,
-            depth;
-            nelements_vert = nelements[2],
-            dz_tuple,
-        )
-    end
+    domain = @timed_log "ClimaLand: created domain" make_land_domain(
+        surface_space,
+        depth;
+        nelements_vert,
+        dz_tuple,
+    )
+    # In global mode this is the space we were handed; in column mode ClimaLand
+    # builds its own `PointSpace` for the column, so take it from the domain.
     surface_space = domain.space.surface
     subsurface_space = domain.space.subsurface
 
-    # Interpolate atmosphere height field to surface space of land model,
-    #  since that's where we compute fluxes for this land model
-    # Likewise initialize the initial temperature field to the surface space
-    # of the land model.
+    # Move the atmosphere height and initial temperature onto the land surface
+    # space, where we compute fluxes for this land model. In global mode the
+    # spaces match, so this is just a rewrap.
     atmos_h = Interfacer.remap(surface_space, atmos_h)
     initial_T = Interfacer.remap(surface_space, initial_T)
-    # If provided, interpolate surface elevation field to surface space; otherwise use zero elevation
+    # If provided, move surface elevation to the surface space; otherwise use zero elevation
     if isnothing(surface_elevation)
         surface_elevation = CC.Fields.zeros(surface_space)
     else
@@ -141,7 +138,7 @@ function ClimaLandSimulation(
     # Set up leaf area index (LAI)
     if lai_source == "modis_monthly"
         # Full monthly MODIS LAI data
-        LAI = CL.prescribed_lai_modis(
+        LAI = @timed_log "ClimaLand: read MODIS LAI" CL.prescribed_lai_modis(
             surface_space,
             sim_start_date,
             sim_stop_date;
@@ -160,8 +157,14 @@ function ClimaLandSimulation(
     end
 
     prognostic_land_components = (:canopy, :snow, :soil, :soilco2)
-    model =
-        CL.LandModel{FT}(forcing, LAI, toml_dict, domain, dt; prognostic_land_components)
+    model = @timed_log "ClimaLand: constructed LandModel" CL.LandModel{FT}(
+        forcing,
+        LAI,
+        toml_dict,
+        domain,
+        dt;
+        prognostic_land_components,
+    )
 
     # Set up diagnostics
     if use_land_diagnostics
@@ -172,7 +175,7 @@ function ClimaLandSimulation(
             start_date,
             global_attribs,
         )
-        diagnostics = CL.default_diagnostics(
+        diagnostics = @timed_log "ClimaLand: set up diagnostics" CL.default_diagnostics(
             model,
             start_date,
             output_dir;
@@ -205,11 +208,12 @@ function ClimaLandSimulation(
         # Use artifact spun-up initial conditions
         ic_path = CL.Artifacts.soil_ic_2008_50m_path()
         @info "ClimaLand: using land IC file" ic_path
-        set_ic_land! = CL.Simulations.make_set_initial_state_from_file(
-            ic_path,
-            model;
-            enforce_constraints = true,
-        )
+        set_ic_land! =
+            @timed_log "ClimaLand: read spun-up initial condition" CL.Simulations.make_set_initial_state_from_file(
+                ic_path,
+                model;
+                enforce_constraints = true,
+            )
         surface_T = initial_T
     else
         set_ic_land! =
@@ -224,17 +228,18 @@ function ClimaLandSimulation(
         start_date = tspan[1]
         sim_stop_date = tspan[2]
     end
-    simulation = CL.Simulations.LandSimulation(
-        start_date,
-        sim_stop_date,
-        dt,
-        model;
-        outdir = output_dir,
-        set_ic!,
-        user_callbacks = (),
-        diagnostics,
-        updateat = dt_drivers,
-    )
+    simulation =
+        @timed_log "ClimaLand: initialized LandSimulation" CL.Simulations.LandSimulation(
+            start_date,
+            sim_stop_date,
+            dt,
+            model;
+            outdir = output_dir,
+            set_ic!,
+            user_callbacks = (),
+            diagnostics,
+            updateat = dt_drivers,
+        )
 
     # Initialize the surface emissivity so the atmosphere can compute radiation.
     # Otherwise, it's initialized to 0 which causes NaNs in the radiation calculation.
@@ -448,9 +453,7 @@ function FluxCalculator.compute_surface_fluxes!(
     thermo_params,
     accumulator = nothing,
 )
-    boundary_space = axes(csf)
-    FT = CC.Spaces.undertype(boundary_space)
-    Y, p, t, model = sim.integrator.u, sim.integrator.p, sim.integrator.t, sim.model
+    p = sim.integrator.p
 
     # The fluxes for each land component have already been updated in the land model cache
     # by the call to `CL.turbulent_fluxes!` in the land model's `step!` function.

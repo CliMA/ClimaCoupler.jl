@@ -51,10 +51,10 @@ function BucketSimulation(
     start_date::Dates.DateTime,
     output_dir::String,
     area_fraction,
-    nelements::Tuple{Int, Int} = (50, 10),
+    surface_space,
+    nelements_vert::Int = 10,
     depth::FT = FT(3.5),
     dz_tuple::Tuple{FT, FT} = FT.((1, 0.05)),
-    shared_surface_space = nothing,
     atmos_h,
     initial_T,
     use_land_diagnostics::Bool = true,
@@ -75,16 +75,9 @@ function BucketSimulation(
 
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.
-    if isnothing(shared_surface_space)
-        domain = make_land_domain(depth, toml_dict; nelements, dz_tuple)
-    else
-        domain = make_land_domain(
-            shared_surface_space,
-            depth;
-            nelements_vert = nelements[2],
-            dz_tuple,
-        )
-    end
+    domain = make_land_domain(surface_space, depth; nelements_vert, dz_tuple)
+    # In global mode this is the space we were handed; in column mode ClimaLand
+    # builds its own `PointSpace` for the column, so take it from the domain.
     surface_space = domain.space.surface
 
     if albedo_type == "map_static" # Read in albedo from static data file (default type)
@@ -99,7 +92,7 @@ function BucketSimulation(
             varname = "sw_alb_clr",
         )
     elseif albedo_type == "era5" # Read in albedo from ERA5 processed file
-        # File path is inferred from start_date following the naming convention: albedo_processed_YYYYMMDD_0000.nc
+        # File path is inferred from start_date following the naming convention: albedo_processed_YYYYMMDD_HHMM.nc
         (isnothing(era5_albedo_file_path) || isempty(era5_albedo_file_path)) &&
             error("era5 albedo type requires era5_albedo_file_path to be specified")
         @info "Using ERA5 albedo from" era5_albedo_file_path
@@ -112,7 +105,7 @@ function BucketSimulation(
         )
     elseif albedo_type == "function" # Use prescribed function of lat/lon for surface albedo
         function α_bareground(coordinate_point)
-            (; lat, long) = coordinate_point
+            (; lat) = coordinate_point
             return typeof(lat)(0.38)
         end
         α_snow = toml_dict["alpha_snow"] # snow albedo
@@ -128,10 +121,9 @@ function BucketSimulation(
     τc = FT(float(dt))
     params = CL.Bucket.BucketModelParameters(toml_dict; albedo, τc)
 
-    # Interpolate atmosphere height field to surface space of land model,
-    #  since that's where we compute fluxes for this land model
-    # Likewise initialize the initial temperature field to the surface space
-    # of the land model.
+    # Move the atmosphere height and initial temperature onto the bucket surface
+    # space, where we compute fluxes for this land model. In global mode the
+    # spaces match, so this is just a rewrap.
     atmos_h = Interfacer.remap(surface_space, atmos_h)
     initial_T = Interfacer.remap(surface_space, initial_T)
 
@@ -339,8 +331,8 @@ end
 
 This function computes surface fluxes between the bucket simulation and the atmosphere.
 
-The bucket computes its turbulent fluxes on its own surface space rather than in coupler space,
-so we cannot use the generic coupler-space `FluxCalculator.update_flux_fields!`. Instead:
+The bucket computes its turbulent fluxes into its own cache fields rather than into the
+coupler fields, so we cannot use the generic `FluxCalculator.update_flux_fields!`. Instead:
 
 1. Compute the turbulent fluxes at each coupler step via `turbulent_fluxes_at_a_point` directly
    into `bucket_dest`. For fast buckets (`dt_land <= dt_cpl`), `bucket_dest = p.bucket.turbulent_fluxes`.
@@ -364,7 +356,7 @@ function FluxCalculator.compute_surface_fluxes!(
     thermo_params,
     accumulator = nothing,
 )
-    Y, p, t, model = sim.integrator.u, sim.integrator.p, sim.integrator.t, sim.model
+    Y, p, model = sim.integrator.u, sim.integrator.p, sim.model
 
     # For fast buckets, write directly to the cache. For slow buckets, use `flux_buffer`
     # to hold the intermediate fluxes while we accumulate them.

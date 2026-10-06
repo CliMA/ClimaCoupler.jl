@@ -61,6 +61,28 @@ coupling step that precedes the shared ocean/sea-ice step. **`dt_ocean == dt_sea
 required** when coupling Oceananigans to ClimaSeaIce, so that shared cadence exists; every
 existing CMIP configuration already satisfies it.
 
+#### Log setup and first-step timings.
+`CoupledSimulation` setup now logs the wall time, allocations, and compile
+time of each phase (atmosphere, land, ocean, sea ice, coupler fields,
+diagnostics, initial exchange) through the new `Utilities.@timed_log` macro,
+and `run!` logs the two warmup coupling steps the same way instead of running
+them silently. Reported SYPD and walltime are unchanged.
+
+#### Support non-00Z `start_date` for subseasonal / WeatherQuest ICs.
+`start_date` now accepts `YYYYMMDD-HHMM` (in addition to `YYYYMMDD`), matching
+ClimaAtmos. Subseasonal ERA5 land/SST/SIC/albedo/bucket paths use that HHMM
+instead of always `_0000`, so 12Z (and other) initializations find the correct
+WeatherQuest files.
+
+#### Remove land and coupler space flexibility.
+The `h_elem_coupler`, `nh_poly_coupler`, and `share_surface_space` configuration
+options have been removed. The coupler boundary space is now always the
+atmosphere's horizontal surface space (or, in single-column mode, a `PointSpace`),
+and the land model is always built on it. This was done because a conservative
+SE -> SE regridder has not been written yet, and the interpolation implementation
+was slow. `Interfacer.remap!` now errors when asked to remap between two distinct
+spectral-element spaces.
+
 #### Route rain through sea-ice.
 The ocean now receives `P_liq + (1 - ℵ) P_snow`; rain drains through the ice
 instead of ponding on it (and being lost) while snow can still accumulate on
@@ -70,10 +92,10 @@ the ice.
 When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange
 grid — the polygons where the cubed-sphere spectral elements intersect the
 ocean's `TripolarGrid` cells (via ConservativeRegridding's operator API) —
-and uses it to 
+and uses it to
 (1) derive land/ocean/ice area fractions from the ocean's
 bathymetric wet mask (DSS'd nodal coverage ratio), so fractions and flux
-weights are consistent with where the ocean actually has wet cells 
+weights are consistent with where the ocean actually has wet cells
 (2) compute ocean and sea-ice turbulent fluxes per polygon, with per-polygon
 sea-ice-concentration weighting, conservative aggregation to both grids, and
 GPU-resident, allocation-free per-step application. Controlled by the new
@@ -101,9 +123,9 @@ v0.2.3
 #### Add `OrSchedule`, `PowerOfTwoSchedule`, `cs.step`, and a `walltime_debug` flag.
 Callback schedules now receive `(; t, step)` instead of just `(; t)`, so any
 `ClimaDiagnostics` schedule can be used as a coupler callback. `step` is a new
-`CoupledSimulation` field that counts the coupling steps of the current run, 
-restarting from 1 after a restart. The new `walltime_debug` config flag (default 
-`false`) also reports the walltime on the steps that are a power of two, in 
+`CoupledSimulation` field that counts the coupling steps of the current run,
+restarting from 1 after a restart. The new `walltime_debug` config flag (default
+`false`) also reports the walltime on the steps that are a power of two, in
 addition to every `walltime_dt`.
 
 #### Remove ClimaOcean dependency PR[#2039](https://github.com/CliMA/ClimaCoupler.jl/pull/2039), PR[#2059](https://github.com/CliMA/ClimaCoupler.jl/pull/2059)

@@ -2,7 +2,6 @@
 # experiments on Derecho (NCAR); paths below assume that machine.
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
-atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
 strict_params: false
 mode_name: "subseasonal"
 
@@ -12,8 +11,6 @@ coupler_output_dir: "/glade/derecho/scratch/cchristo/coupler_runs_v2/weatherbenc
 initial_condition: "WeatherModel"
 era5_ic_full_pressure: true
 checkpoint_dt: "1000days"
-dt: "50secs"
-dt_cpl: "50secs"
 dt_seaice: "50secs"
 energy_check: false
 h_elem: 30
@@ -21,21 +18,17 @@ dz_bottom: 30.0
 z_elem: 130
 z_max: 70000.0
 
-vorticity_hyperdiffusion_coefficient: 0.12
 hyperdiffusion_prandtl_number: 1.0
 divergence_damping_factor: 20.0
 topography_damping_factor: 1.15
-### Microphysics
-### 0M Microphysics ##
+
+### Microphysics: 0M ###
 microphysics_model: "0M"
+atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
 coupler_toml: ["toml/amip_progedmf.toml"]
-
-### 1M Microphysics ###
-# microphysics_model: "1M"
-# coupler_toml: ["toml/amip_progedmf_1m.toml"]
-# dt: "20secs" # 1M requires shorter timesteps, empirically ~20secs
-# dt_cpl: "20secs"
-
+dt: "50secs"
+dt_cpl: "50secs"
+vorticity_hyperdiffusion_coefficient: 0.12
 
 land_fraction_source: "era5"
 binary_area_fraction: false
@@ -62,15 +55,16 @@ netcdf_output_at_levels: true
 output_default_diagnostics: false
 use_coupler_diagnostics: true
 extra_atmos_diagnostics:
-  ### daily average (surface + model-level)
-  - short_name: [zg, orog, tas, mslp, pr, lwp, iwp, clt, ta, hus, ua, va, zg, clw, cli, cl, pfull]
-    period: 1days
-    reduction_time: average
-  - short_name: [tas, mslp, ta, hus, zg, ua, va, pfull]
+  ### daily inst (surface + model-level)
+  - short_name: [tas, mslp, ta, hus, zg, ua, va, wa, pfull, clw, cli, cl, clt, pr]
     period: 1days
     reduction_time: inst
+  ### daily average (surface + model-level)
+  - short_name: [zg, orog, tas, mslp, pr, lwp, iwp, clt, ta, hus, ua, va, wa, clw, cli, cl, pfull, waup, arup, tke]
+    period: 1days
+    reduction_time: average
 
-    ### hourly inst (surface + model-level)
+  ### hourly inst (surface + model-level)
   # - short_name: [ts, tas, mslp, pr, prra, clt, prw, lwp, iwp, clwvi, rsdt, rsut, rlut, rsutcs, rlutcs]
   #   reduction_time: inst
   #   period: 1hours
@@ -83,7 +77,7 @@ extra_atmos_diagnostics:
   #   period: 1days
   #   reduction_time: average
   #   pressure_coordinates: true
-    ### hourly inst (surface + model-level)
+  ### hourly inst (surface + model-level)
   # - short_name: [tas, uas, vas, ts, tas, mslp, pr, prra, clt, prw, lwp, iwp, clwvi, rsdt, rsut, rlut, rsutcs, rlutcs]
   #   reduction_time: inst
   #   period: 1hours

@@ -31,6 +31,7 @@ import ..FluxCalculator
 import ..TimeManager
 import ..Input
 import ..Utilities
+import ..Utilities: @timed_log
 import ..Checkpointer
 import ..SimOutput
 
@@ -53,8 +54,12 @@ function run!(
 )
     ## Precompilation of Coupling Loop
     # Here we run the entire coupled simulation for two timesteps to precompile several
-    # functions for more accurate timing of the overall simulation.
-    precompile && (step!(cs); step!(cs))
+    # functions for more accurate timing of the overall simulation. Each step is logged
+    # with its wall and compile time.
+    if precompile
+        @timed_log "First coupling step (includes compilation)" step!(cs)
+        @timed_log "Second coupling step" step!(cs)
+    end
 
     ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
     GC.gc()
@@ -175,11 +180,39 @@ function Interfacer.CoupledSimulation(
     return Interfacer.CoupledSimulation(config_dict)
 end
 
+"""
+    boundary_fields(FT, domain_type, atmos_sim, comms_ctx, column_latlon)
+
+Return the boundary space used for coupling operations and the atmosphere
+fields taken on it: the surface elevation, the height of the lowest atmosphere
+level above the surface, and the initial air temperature.
+"""
+function boundary_fields(FT, domain_type, atmos_sim, comms_ctx, column_latlon)
+    boundary_space = Utilities.create_boundary_space(
+        FT,
+        domain_type,
+        atmos_sim,
+        comms_ctx;
+        column_latlon,
+    )
+    surface_elevation = Interfacer.get_field(boundary_space, atmos_sim, Val(:height_sfc))
+    atmos_bottom_center_height =
+        Interfacer.get_field(boundary_space, atmos_sim, Val(:height_int))
+    atmos_h =
+        Interfacer.get_atmos_height_delta(atmos_bottom_center_height, surface_elevation)
+    initial_T = CC.Fields.zeros(boundary_space)
+    initial_T .= Interfacer.get_field(boundary_space, atmos_sim, Val(:air_temperature))
+    return (; boundary_space, surface_elevation, atmos_h, initial_T)
+end
+
 function Interfacer.CoupledSimulation(config_dict::AbstractDict)
+    return @timed_log "Set up CoupledSimulation" _build_coupled_simulation(config_dict)
+end
+
+function _build_coupled_simulation(config_dict::AbstractDict)
     comms_ctx = Utilities.get_comms_context(config_dict)
 
     (;
-        job_id,
         sim_mode,
         random_seed,
         FT,
@@ -188,9 +221,6 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         start_date,
         Δt_cpl,
         component_dt_dict,
-        share_surface_space,
-        nh_poly_coupler,
-        h_elem_coupler,
         saveat,
         checkpoint_dt,
         walltime_dt,
@@ -216,7 +246,8 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         coupler_diagnostics_reduction,
         output_dir_root,
         parameter_files,
-        era5_filepaths,
+        era5_initial_condition_dir,
+        bucket_initial_condition,
         ocean_model,
         simple_ocean,
         ocean_grid,
@@ -257,7 +288,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     returns a `AbstractComponentSimulation` object (see `Interfacer` docs for more details).
     =#
 
-    atmos_sim = Interfacer.AtmosSimulation(
+    atmos_sim = @timed_log "Initialized atmosphere simulation" Interfacer.AtmosSimulation(
         Val(:climaatmos);
         config_dict,
         atmos_output_dir = dir_paths.atmos_output_dir,
@@ -269,30 +300,18 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     ### Boundary Space
     We use a boundary space at the surface for coupling operations (computing fluxes, regridding, etc).
     For column mode, this is a 1D PointSpace with lat/long coordinates.
-    For global mode, this is a 2D CubedSphereSpace or the atmosphere's horizontal space
-    (if `share_surface_space` is true).
+    For global mode, this is the atmosphere's horizontal surface space.
     =#
-    boundary_space = Utilities.create_boundary_space(
-        FT,
-        domain_type,
-        atmos_sim,
-        share_surface_space,
-        comms_ctx;
-        column_latlon,
-        nh_poly_coupler,
-        h_elem_coupler,
-        coupled_param_dict,
-    )
+    (; boundary_space, surface_elevation, atmos_h, initial_T) =
+        @timed_log "Created boundary space and surface fields" boundary_fields(
+            FT,
+            domain_type,
+            atmos_sim,
+            comms_ctx,
+            column_latlon,
+        )
 
-    surface_elevation = Interfacer.get_field(boundary_space, atmos_sim, Val(:height_sfc))
-    atmos_bottom_center_height =
-        Interfacer.get_field(boundary_space, atmos_sim, Val(:height_int))
-    atmos_h =
-        Interfacer.get_atmos_height_delta(atmos_bottom_center_height, surface_elevation)
-    initial_T = CC.Fields.zeros(boundary_space)
-    initial_T .= Interfacer.get_field(boundary_space, atmos_sim, Val(:air_temperature))
-
-    land_fraction = Input.get_land_fraction(
+    land_fraction = @timed_log "Computed land fraction" Input.get_land_fraction(
         boundary_space,
         comms_ctx;
         land_fraction_source,
@@ -309,12 +328,18 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     @info(sim_mode)
     land_sim = ice_sim = ocean_sim = nothing
 
-    (; sst_path, sic_path, land_ic_path, albedo_path, bucket_initial_condition) =
-        era5_filepaths
+    sst_path = sic_path = land_ic_path = albedo_path = nothing
+    if sim_mode <: Interfacer.SubseasonalMode
+        (; sst_path, sic_path, land_ic_path, albedo_path, bucket_initial_condition) =
+            Input.get_era5_filepaths(
+                era5_initial_condition_dir,
+                start_date,
+                bucket_initial_condition,
+                comms_ctx,
+            )
+    end
 
-    shared_surface_space =
-        (share_surface_space || domain_type == "column") ? boundary_space : nothing
-    land_sim = Interfacer.LandSimulation(
+    land_sim = @timed_log "Initialized land simulation" Interfacer.LandSimulation(
         FT,
         land_model;
         dt = component_dt_dict["dt_land"],
@@ -322,7 +347,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         start_date,
         output_dir = dir_paths.land_output_dir,
         area_fraction = land_fraction,
-        shared_surface_space,
+        surface_space = boundary_space,
         atmos_h,
         initial_T,
         use_land_diagnostics,
@@ -338,7 +363,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         dt_drivers = ITime(Utilities.time_to_seconds(config_dict["dt_rad"])),
     )
 
-    ocean_sim = Interfacer.OceanSimulation(
+    ocean_sim = @timed_log "Initialized ocean simulation" Interfacer.OceanSimulation(
         FT,
         ocean_model;
         dt = component_dt_dict["dt_ocean"],
@@ -360,7 +385,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         ocean_diagnostic_mode,
     )
 
-    ice_sim = Interfacer.SeaIceSimulation(
+    ice_sim = @timed_log "Initialized sea ice simulation" Interfacer.SeaIceSimulation(
         FT,
         ice_model;
         dt = component_dt_dict["dt_seaice"],
@@ -395,7 +420,11 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
 
     energy_check && push!(coupler_field_names, :P_net)
 
-    coupler_fields = Interfacer.init_coupler_fields(FT, coupler_field_names, boundary_space)
+    coupler_fields = @timed_log "Initialized coupler fields" Interfacer.init_coupler_fields(
+        FT,
+        coupler_field_names,
+        boundary_space,
+    )
 
     # Allocate a FluxAccumulator per slow explicit surface (one whose timestep is
     # strictly greater than Δt_cpl). Other surfaces avoid this and receive turbulent
@@ -493,7 +522,7 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
     ## Coupler diagnostics
     if use_coupler_diagnostics
         @info "Using default coupler diagnostics"
-        diags_handler = SimOutput.diagnostics_setup(
+        diags_handler = @timed_log "Set up coupler diagnostics" SimOutput.diagnostics_setup(
             coupler_fields,
             dir_paths.coupler_output_dir,
             start_date,
@@ -533,26 +562,33 @@ function Interfacer.CoupledSimulation(config_dict::AbstractDict)
         isnothing(restart_dir) && (restart_dir = dir_paths.checkpoints_dir)
     end
     should_restart = !isnothing(restart_t) && !isnothing(restart_dir)
-    should_restart && Checkpointer.restart!(cs, restart_dir, restart_t, restart_cache)
+    should_restart && @timed_log "Restarted from checkpoint" Checkpointer.restart!(
+        cs,
+        restart_dir,
+        restart_t,
+        restart_cache,
+    )
 
     FieldExchanger.update_surface_fractions!(cs)
 
     if !should_restart || !restart_cache
         ## Initialize Component Model Exchange
-        FieldExchanger.import_static_fields!(cs.fields, cs.model_sims)
-        FieldExchanger.exchange!(cs)
-        FieldExchanger.set_caches!(cs)
-        FluxCalculator.turbulent_fluxes!(cs)
-        FluxCalculator.ocean_seaice_fluxes!(cs)
+        @timed_log "Performed initial exchange and flux computation" begin
+            FieldExchanger.import_static_fields!(cs.fields, cs.model_sims)
+            FieldExchanger.exchange!(cs)
+            FieldExchanger.set_caches!(cs)
+            FluxCalculator.turbulent_fluxes!(cs)
+            FluxCalculator.ocean_seaice_fluxes!(cs)
 
-        # The initial `turbulent_fluxes!` above fills the flux accumulators.
-        # Push the accumulated flux to each slow surface here.
-        FluxCalculator.push_ready_accumulators!(
-            cs.model_sims,
-            cs.flux_accumulators,
-            cs.t[];
-            force = true,
-        )
+            # The initial `turbulent_fluxes!` above fills the flux accumulators.
+            # Push the accumulated flux to each slow surface here.
+            FluxCalculator.push_ready_accumulators!(
+                cs.model_sims,
+                cs.flux_accumulators,
+                cs.t[];
+                force = true,
+            )
+        end
     end
     Utilities.show_memory_usage()
     return cs

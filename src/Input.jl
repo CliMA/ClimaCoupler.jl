@@ -8,6 +8,8 @@ module Input
 import ArgParse
 import YAML
 import Dates
+import ClimaComms
+import ClimaInitialConditions.ERA5
 import ClimaUtilities.TimeManager: ITime
 import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
@@ -94,7 +96,7 @@ function argparse_settings()
         arg_type = String
         default = "0secs"
         "--start_date"
-        help = "Start date of the simulation, in format \"YYYYMMDD\" [\"20100101\" (default)]"
+        help = "Start date of the simulation, in format \"YYYYMMDD\" or \"YYYYMMDD-HHMM\" [\"20100101\" (default)]"
         arg_type = String
         default = "20000101"
         "--dt_cpl"
@@ -134,22 +136,10 @@ function argparse_settings()
         help = "Number of horizontal elements to use for the atmosphere horizontal space [16 (default)]"
         arg_type = Int
         default = 16
-        "--h_elem_coupler"
-        help = "Number of horizontal elements to use for the boundary space when `share_surface_space` is false [32 (default)]"
-        arg_type = Int
-        default = 32
         "--nh_poly"
         help = "Polynomial order to use for the atmosphere horizontal space [3 (default)]"
         arg_type = Int
         default = 3
-        "--nh_poly_coupler"
-        help = "Polynomial order to use for the boundary space when `share_surface_space` is false [2 (default)]"
-        arg_type = Int
-        default = 2
-        "--share_surface_space"
-        help = "Boolean flag indicating whether to share the surface space between the surface models, atmosphere, and boundary [`true` (default), `false`]"
-        arg_type = Bool
-        default = true
         # Restart information
         "--detect_restart_files"
         help = "Boolean flag indicating whether to automatically use restart files if available [`false` (default), `true`]"
@@ -267,7 +257,7 @@ function argparse_settings()
         arg_type = String
         default = ""
         "--era5_initial_condition_dir"
-        help = "Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from start_date [none (default)]. Generated with `https://github.com/CliMA/WeatherQuest`"
+        help = "Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from start_date. Missing files are fetched from the Copernicus Climate Data Store by ClimaInitialConditions.jl [none (default)]"
         arg_type = String
         default = nothing
         # Ocean model specific
@@ -510,7 +500,7 @@ function get_coupler_args(config_dict::Dict)
     # Time information
     t_end = Float64(Utilities.time_to_seconds(config_dict["t_end"]))
     t_start = Float64(Utilities.time_to_seconds(config_dict["t_start"]))
-    start_date = Dates.DateTime(config_dict["start_date"], Dates.dateformat"yyyymmdd")
+    start_date = Utilities.parse_date(config_dict["start_date"])
     Δt_cpl = Float64(Utilities.time_to_seconds(config_dict["dt_cpl"]))
 
     if use_itime
@@ -538,11 +528,6 @@ function get_coupler_args(config_dict::Dict)
     end
     # Save solution to integrator.sol at the beginning and end
     saveat = [t_start, t_end]
-
-    # Space information
-    share_surface_space = config_dict["share_surface_space"]
-    nh_poly_coupler = config_dict["nh_poly_coupler"]
-    h_elem_coupler = config_dict["h_elem_coupler"]
 
     # Checkpointing information
     checkpoint_dt = config_dict["checkpoint_dt"]
@@ -603,14 +588,6 @@ function get_coupler_args(config_dict::Dict)
 
     # Initial condition setting
     era5_initial_condition_dir = config_dict["era5_initial_condition_dir"]
-
-    # Build ERA5-based file paths (only populated for subseasonal mode)
-    era5_filepaths = get_era5_filepaths(
-        sim_mode,
-        era5_initial_condition_dir,
-        start_date,
-        bucket_initial_condition,
-    )
 
     # Ocean model-specific information
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
@@ -674,9 +651,6 @@ function get_coupler_args(config_dict::Dict)
         start_date,
         Δt_cpl,
         component_dt_dict,
-        share_surface_space,
-        nh_poly_coupler,
-        h_elem_coupler,
         saveat,
         checkpoint_dt,
         walltime_dt,
@@ -704,7 +678,8 @@ function get_coupler_args(config_dict::Dict)
         land_progress_interval,
         bucket_albedo_type,
         parameter_files,
-        era5_filepaths,
+        era5_initial_condition_dir,
+        bucket_initial_condition,
         ocean_model,
         simple_ocean,
         ocean_grid,
@@ -1094,19 +1069,24 @@ function resolve_era5_dir(era5_initial_condition_dir)
 end
 
 """
-    get_era5_filepaths(::Type{<:Interfacer.SubseasonalMode}, era5_initial_condition_dir, start_date, bucket_initial_condition)
+    get_era5_filepaths(era5_initial_condition_dir, start_date, bucket_initial_condition, comms_ctx)
 
-Build ERA5-based file paths for subseasonal mode simulations.
-Filenames are inferred from the start_date.
+Return the ERA5 initial condition file paths for a subseasonal run starting at
+`start_date`, fetching the files if needed. Filenames include hour/minute, e.g.
+`sst_processed_20191231_1200.nc`.
 
-If `era5_initial_condition_dir` is `nothing`, the `wxquest_initial_conditions`
-ClimaArtifact is used as a fallback.
+If `era5_initial_condition_dir` is set and lacks the files, they are fetched from
+the Copernicus Climate Data Store into that directory by
+`ClimaInitialConditions.ERA5`. The fetch runs on the root rank only, with a barrier
+after. If `era5_initial_condition_dir` is `nothing`, the
+`wxquest_initial_conditions` ClimaArtifact is used and nothing is fetched.
+Errors if the files are still missing.
 
 # Arguments
-- `sim_mode`: The simulation mode type (must be SubseasonalMode)
 - `era5_initial_condition_dir`: Directory containing ERA5 initial condition files
 - `start_date`: The start date of the simulation (DateTime)
 - `bucket_initial_condition`: User-specified bucket IC path (empty string if not specified)
+- `comms_ctx`: The communications context
 
 # Returns
 A NamedTuple with fields:
@@ -1117,63 +1097,39 @@ A NamedTuple with fields:
 - `bucket_initial_condition`: Path to bucket IC (user-specified if provided, otherwise ERA5-derived)
 """
 function get_era5_filepaths(
-    ::Type{<:Interfacer.SubseasonalMode},
     era5_initial_condition_dir,
     start_date,
     bucket_initial_condition,
+    comms_ctx,
 )
-    era5_initial_condition_dir = resolve_era5_dir(era5_initial_condition_dir)
-    datestr = Dates.format(start_date, Dates.dateformat"yyyymmdd")
-
-    # Verify that the required files exist for this date
-    sst_path = joinpath(era5_initial_condition_dir, "sst_processed_$(datestr)_0000.nc")
-    isfile(sst_path) || error(
-        "ERA5 initial condition files for date $datestr not found in " *
-        "$era5_initial_condition_dir. Check that start_date matches an " *
-        "available date in the initial condition directory.",
+    dir = resolve_era5_dir(era5_initial_condition_dir)
+    paths = (;
+        sst_path = joinpath(dir, ERA5.sst_filename(start_date)),
+        sic_path = joinpath(dir, ERA5.sic_filename(start_date)),
+        land_ic_path = joinpath(dir, ERA5.land_filename(start_date)),
+        albedo_path = joinpath(dir, ERA5.albedo_filename(start_date)),
+        era5_bucket_path = joinpath(dir, ERA5.bucket_filename(start_date)),
+    )
+    all_present() = all(isfile, paths)
+    if !all_present() && !isnothing(era5_initial_condition_dir)
+        if ClimaComms.iamroot(comms_ctx)
+            @info "ERA5 initial conditions incomplete, fetching from CDS" dir start_date
+            ERA5.fetch_initial_conditions(start_date; dir)
+        end
+        ClimaComms.barrier(comms_ctx)
+    end
+    all_present() || error(
+        "ERA5 initial condition files missing from $dir: " *
+        "$(join(basename.(filter(!isfile, collect(paths))), ", ")). " *
+        "Check that start_date matches an available initialization, or set " *
+        "era5_initial_condition_dir to fetch them.",
     )
 
     # Use ERA5-derived bucket IC if user didn't specify one
-    isempty(bucket_initial_condition) && (
-        bucket_initial_condition = joinpath(
-            era5_initial_condition_dir,
-            "era5_bucket_processed_$(datestr)_0000.nc",
-        )
-    )
+    isempty(bucket_initial_condition) && (bucket_initial_condition = paths.era5_bucket_path)
 
-    return (;
-        sst_path,
-        sic_path = joinpath(era5_initial_condition_dir, "sic_processed_$(datestr)_0000.nc"),
-        land_ic_path = joinpath(
-            era5_initial_condition_dir,
-            "era5_land_processed_$(datestr)_0000.nc",
-        ),
-        albedo_path = joinpath(
-            era5_initial_condition_dir,
-            "albedo_processed_$(datestr)_0000.nc",
-        ),
-        bucket_initial_condition,
-    )
-end
-
-"""
-    get_era5_filepaths(::Type{<:Interfacer.AbstractSimulationMode}, era5_initial_condition_dir, start_date, bucket_initial_condition)
-
-Fallback for non-subseasonal modes. Returns nothing for file paths, passes through bucket_initial_condition.
-"""
-function get_era5_filepaths(
-    ::Type{<:Interfacer.AbstractSimulationMode},
-    era5_initial_condition_dir,
-    start_date,
-    bucket_initial_condition,
-)
-    return (
-        sst_path = nothing,
-        sic_path = nothing,
-        land_ic_path = nothing,
-        albedo_path = nothing,
-        bucket_initial_condition = bucket_initial_condition,
-    )
+    (; sst_path, sic_path, land_ic_path, albedo_path) = paths
+    return (; sst_path, sic_path, land_ic_path, albedo_path, bucket_initial_condition)
 end
 
 end # module Input

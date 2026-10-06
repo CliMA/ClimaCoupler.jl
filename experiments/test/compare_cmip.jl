@@ -224,11 +224,11 @@ function _compare(
     v2::T;
     name,
     ignore,
-) where {T <: CC.Fields.Field{<:CC.DataLayouts.AbstractData{<:Real}}}
+) where {T <: CC.Fields.Field{<:CC.DataLayouts.DataLayout{<:Real}}}
     return _compare(parent(v1), parent(v2); name, ignore)
 end
 
-function _compare(pass, v1::T, v2::T; name, ignore) where {T <: CC.DataLayouts.AbstractData}
+function _compare(pass, v1::T, v2::T; name, ignore) where {T <: CC.DataLayouts.DataLayout}
     return pass && _compare(parent(v1), parent(v2); name, ignore)
 end
 

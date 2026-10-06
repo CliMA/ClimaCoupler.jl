@@ -47,6 +47,7 @@ FT = Float32
         start_date,
         output_dir,
         area_fraction,
+        surface_space = boundary_space,
         atmos_h,
         initial_T,
     )
@@ -115,6 +116,7 @@ end
         start_date,
         output_dir,
         area_fraction,
+        surface_space = boundary_space,
         atmos_h,
         initial_T,
     )

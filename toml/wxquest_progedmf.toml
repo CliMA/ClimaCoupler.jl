@@ -6,6 +6,9 @@ type = "float"
 value = 40000.0
 type = "float"
 
+[ogw_smoothing_scale_fraction]
+value = 1.0
+
 [alpha_rayleigh_tracer]
 value = 0.001
 type = "float"
@@ -95,17 +98,33 @@ value = 1360
 type = "float"
 
 [cloud_liquid_water_specific_humidity_autoconversion_threshold]
-value = 2e-4
+value = 1.25e-4
 type = "float"
 
 [cloud_ice_specific_humidity_autoconversion_threshold]
 value = 5e-6
 type = "float"
 
+[cloud_ice_number_max]
+value = 1.0e5
+type = "float"
+
+[cloud_ice_number_temperature_fit_prefactor]
+value = 3000.0
+type = "float"
+
 [cloud_fraction_steepness_scale]
-value = 0.55
+value = 1.5
 type = "float"
 
 [cloud_fraction_eps_rel]
 value = 0.05
+type = "float"
+
+[sgs_ice_uniform_fraction]
+value = 1.0
+type = "float"
+
+[sgs_liquid_uniform_fraction]
+value = 0.0
 type = "float"

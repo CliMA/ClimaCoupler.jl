@@ -307,7 +307,7 @@ function _accumulator_to_cpu_nt(acc)
         F_turb_moisture = CC.Adapt.adapt(Array, acc.F_turb_moisture),
         F_turb_ρτxz = CC.Adapt.adapt(Array, acc.F_turb_ρτxz),
         F_turb_ρτyz = CC.Adapt.adapt(Array, acc.F_turb_ρτyz),
-        fluxes = map(field -> CC.Adapt.adapt(Array, field), acc.fluxes),
+        coupler_fields = map(field -> CC.Adapt.adapt(Array, field), acc.coupler_fields),
         n_steps = acc.n_steps[],
     )
 end
@@ -435,10 +435,10 @@ function restart_flux_accumulators!(cs, input_file)
                 parent(getproperty(live, field_name)) .=
                     ArrayType(parent(getproperty(saved, field_name)))
             end
-            for flux_name in keys(live.fluxes)
-                haskey(saved.fluxes, flux_name) ||
-                    error("Flux $(flux_name) for $(name) missing from checkpoint")
-                parent(live.fluxes[flux_name]) .= ArrayType(parent(saved.fluxes[flux_name]))
+            for field_name in keys(live.coupler_fields)
+                haskey(saved.coupler_fields, field_name) ||
+                    error("Coupler field $(field_name) for $(name) missing from checkpoint")
+                parent(live.coupler_fields[field_name]) .= ArrayType(parent(saved.coupler_fields[field_name]))
             end
             live.n_steps[] = saved.n_steps
         end

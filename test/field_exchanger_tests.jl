@@ -673,7 +673,7 @@ end
         # holds their sum.
         @test slow_sim.update_count == 2
         @test all(parent(slow_sim.received.SW_d) .≈ FT(4))
-        @test all(parent(acc.fluxes.SW_d) .≈ FT(5))
+        @test all(parent(acc.coupler_fields.SW_d) .≈ FT(5))
 
         # A surface with no accumulator is updated too, and nothing is accumulated.
         fast_sim = CouplerFieldRecordingSurface(received, 0)

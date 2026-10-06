@@ -317,13 +317,13 @@ end
 @testset "FluxAccumulator coupler flux checkpoint round-trip" begin
     boundary_space = space_checkpointer
     device = ClimaComms.device(boundary_space)
-    flux_names = (:SW_d, :LW_d, :P_liq, :P_snow)
+    field_names = (:SW_d, :LW_d, :P_liq, :P_snow)
 
-    acc = FluxCalculator.FluxAccumulator(boundary_space, flux_names)
+    acc = FluxCalculator.FluxAccumulator(boundary_space, field_names)
     acc.F_lh .= FT(1)
     acc.n_steps[] = 4
-    for (i, name) in enumerate(flux_names)
-        acc.fluxes[name] .= FT(100 * i)
+    for (i, name) in enumerate(field_names)
+        acc.coupler_fields[name] .= FT(100 * i)
     end
     original = (; ocean_sim = acc)
 
@@ -336,12 +336,12 @@ end
         ),
     )
 
-    fresh = (; ocean_sim = FluxCalculator.FluxAccumulator(boundary_space, flux_names))
+    fresh = (; ocean_sim = FluxCalculator.FluxAccumulator(boundary_space, field_names))
     cs = StubCSForFluxAcc(fresh, device)
     Checkpointer.restart_flux_accumulators!(cs, output_file)
 
     restored = cs.flux_accumulators.ocean_sim
-    for name in flux_names
-        @test parent(restored.fluxes[name]) == parent(acc.fluxes[name])
+    for name in field_names
+        @test parent(restored.coupler_fields[name]) == parent(acc.coupler_fields[name])
     end
 end

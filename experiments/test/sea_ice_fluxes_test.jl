@@ -33,7 +33,15 @@ function bare_ice_simulation()
         clock = OC.TimeSteppers.Clock(grid),
         dynamics = nothing,
     )
-    return CMIPExt.ClimaSeaIceSimulation(ice, nothing, nothing, nothing, (; σ, C_to_K), 300.0)
+    return CMIPExt.ClimaSeaIceSimulation(
+        ice,
+        nothing,
+        nothing,
+        nothing,
+        (; σ, C_to_K),
+        300.0,
+        CMIPExt.skin_accumulator(grid),
+    )
 end
 
 """
@@ -67,5 +75,43 @@ end
         for i in eachindex(ℵ)
             ℵ[i] > 0 ? (@test Qui[i] / ℵ[i] ≈ Jᵃ) : (@test Qui[i] == 0)
         end
+    end
+
+    @testset "emission and skin temperature are averaged over the coupling window" begin
+        sim = bare_ice_simulation()
+        radiative_per_ice = -150.0
+        F_lh, F_sh = fill(12.0, 4, 4), fill(30.0, 4, 4)
+        skin_temperatures = (-25.0, -20.0, -5.0)
+        ℵ = setup!(sim, first(skin_temperatures), radiative_per_ice)
+        T_sfc_C = OC.interior(CMIPExt.top_thermodynamics(sim).top_surface_temperature, :, :, 1)
+
+        for Tₛ in skin_temperatures
+            T_sfc_C .= Tₛ
+            CMIPExt.accumulate_skin_state!(sim)
+        end
+        @test sim.skin_accumulator.n_steps[] == length(skin_temperatures)
+
+        CMIPExt.compute_ice_top_heat_flux!(sim, F_lh, F_sh)
+
+        ϵ = FT(Interfacer.get_field(sim, Val(:emissivity)))
+        mean_emission = sum(σ * ϵ * (Tₛ + C_to_K)^4 for Tₛ in skin_temperatures) / 3
+        last_emission = σ * ϵ * (last(skin_temperatures) + C_to_K)^4
+        Jᵃ = mean_emission + radiative_per_ice + 12.0 + 30.0
+        mean_skin_temperature = sum(skin_temperatures) / 3
+        Qui = OC.interior(sim.ice.model.external_heat_fluxes.top, :, :, 1)
+        @test !(mean_emission ≈ last_emission)
+        for i in eachindex(ℵ)
+            if ℵ[i] > 0
+                @test Qui[i] / ℵ[i] ≈ Jᵃ
+                @test T_sfc_C[i] ≈ mean_skin_temperature
+            else
+                @test Qui[i] == 0
+                @test T_sfc_C[i] == last(skin_temperatures)
+            end
+        end
+
+        @test sim.skin_accumulator.n_steps[] == 0
+        @test all(OC.interior(sim.skin_accumulator.surface_temperature) .== 0)
+        @test all(OC.interior(sim.skin_accumulator.surface_emission) .== 0)
     end
 end

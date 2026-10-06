@@ -23,7 +23,7 @@ export turbulent_fluxes!,
     ocean_seaice_fluxes!,
     FluxAccumulator,
     accumulate!,
-    accumulate_fluxes!,
+    accumulate_coupler_fields!,
     push_and_reset!,
     push_ready_accumulators!,
     reset!
@@ -84,13 +84,17 @@ function turbulent_fluxes!(csf, model_sims, thermo_params, flux_accumulators = (
 end
 
 """
-    FluxAccumulator{F}
+    FluxAccumulator{F, D}
 
-Time-accumulator for the five turbulent flux fields between a surface model and the atmosphere,
+Time-accumulator for the fluxes between a surface model and the atmosphere,
 used for slow surfaces (having `dt > Δt_cpl`) whose fluxes are computed explicitly.
-The fields hold the running sum of per-surface (not area-weighted) turbulent fluxes
-computed at each coupling step, and `n_steps` counts the number of contributions
-added since the last reset.
+The `F_*` fields hold the running sum of per-surface (not area-weighted) turbulent fluxes
+computed at each coupling step, and `coupler_fields` holds the running sum of the coupler
+fields the surface declares in `FieldExchanger.accumulated_coupler_fields` (radiative and
+precipitation fluxes, and for some surfaces the near-surface atmospheric state).
+
+`n_steps` counts the coupling steps accumulated since the last reset. It is incremented by
+`accumulate!` only, not by `accumulate_coupler_fields!`, and is the divisor for both sums.
 
 Used by `turbulent_fluxes!` to push the time-averaged flux to a
 slow surface just before it steps. Allocated only for slow explicit
@@ -102,22 +106,22 @@ struct FluxAccumulator{F <: CC.Fields.Field, D <: NamedTuple}
     F_turb_moisture::F
     F_turb_ρτxz::F
     F_turb_ρτyz::F
-    fluxes::D
+    coupler_fields::D
     n_steps::Base.RefValue{Int}
 end
 
 """
-    FluxAccumulator(boundary_space, flux_names = ())
+    FluxAccumulator(boundary_space, field_names = ())
 
 Construct a zero-initialized `FluxAccumulator` whose fields live on the coupler
 boundary space (no regridding is needed during accumulation).
 
-`flux_names` are the coupler field names to time-average: the radiative and
-precipitation fluxes read in `update_sim!`, not the turbulent fluxes in `F_*`.
+`field_names` are the coupler field names read in `update_sim!` to time-average, not the
+turbulent fluxes in `F_*`.
 """
-function FluxAccumulator(boundary_space, flux_names = ())
-    fluxes = NamedTuple{Tuple(flux_names)}(
-        Tuple(CC.Fields.zeros(boundary_space) for _ in flux_names),
+function FluxAccumulator(boundary_space, field_names = ())
+    coupler_fields = NamedTuple{Tuple(field_names)}(
+        Tuple(CC.Fields.zeros(boundary_space) for _ in field_names),
     )
     return FluxAccumulator(
         CC.Fields.zeros(boundary_space),
@@ -125,20 +129,21 @@ function FluxAccumulator(boundary_space, flux_names = ())
         CC.Fields.zeros(boundary_space),
         CC.Fields.zeros(boundary_space),
         CC.Fields.zeros(boundary_space),
-        fluxes,
+        coupler_fields,
         Ref(0),
     )
 end
 
 """
-    accumulate_fluxes!(acc::FluxAccumulator, csf)
+    accumulate_coupler_fields!(acc::FluxAccumulator, csf)
 
-Add each declared coupler flux field in `csf` into the accumulator. Called from
+Add each declared coupler field in `csf` into the accumulator. Called from
 `FieldExchanger.update_model_sims!`, once per coupling step alongside `accumulate!`.
+`n_steps` is not incremented here: `accumulate!` counts the coupling step for both sums.
 """
-function accumulate_fluxes!(acc::FluxAccumulator, csf)
-    for name in keys(acc.fluxes)
-        acc.fluxes[name] .+= getproperty(csf, name)
+function accumulate_coupler_fields!(acc::FluxAccumulator, csf)
+    for name in keys(acc.coupler_fields)
+        acc.coupler_fields[name] .+= getproperty(csf, name)
     end
     return nothing
 end
@@ -197,8 +202,8 @@ Zero all accumulator fields and the step counter. Called by `push_and_reset!` af
 pushing the averaged fluxes to the surface.
 """
 function reset!(acc::FluxAccumulator)
-    for name in keys(acc.fluxes)
-        fill!(acc.fluxes[name], 0)
+    for name in keys(acc.coupler_fields)
+        fill!(acc.coupler_fields[name], 0)
     end
     fill!(acc.F_lh, 0)
     fill!(acc.F_sh, 0)
@@ -236,11 +241,11 @@ function push_ready_accumulators!(
         # Pushed here rather than from `push_and_reset!`, which a surface may specialize,
         # and before it so a surface that resets its flux boundary conditions in
         # `update_sim!` does not discard the turbulent push.
-        if !iszero(n) && !isempty(acc.fluxes)
-            for flux_name in keys(acc.fluxes)
-                acc.fluxes[flux_name] ./= n
+        if !iszero(n) && !isempty(acc.coupler_fields)
+            for field_name in keys(acc.coupler_fields)
+                acc.coupler_fields[field_name] ./= n
             end
-            Interfacer.update_sim!(sim, acc.fluxes)
+            Interfacer.update_sim!(sim, acc.coupler_fields)
         end
         push_and_reset!(sim, acc)
     end

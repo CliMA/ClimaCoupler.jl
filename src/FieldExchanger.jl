@@ -308,8 +308,8 @@ Iterates `update_sim!` over all component model simulations saved in `cs.model_s
 
 For a surface in `flux_accumulators`, the fields it declared in
 `accumulated_coupler_fields` are also added to the accumulator, and
-`FluxCalculator.push_and_reset!` overwrites them with the window average just before
-the surface steps.
+`FluxCalculator.push_ready_accumulators!` overwrites them with the window average just
+before the surface steps.
 
 # Arguments
 - `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
@@ -321,7 +321,7 @@ function update_model_sims!(model_sims, csf, flux_accumulators = (;))
     for (name, sim) in pairs(model_sims)
         update_sim!(sim, csf)
         accumulator = get(flux_accumulators, name, nothing)
-        isnothing(accumulator) || FluxCalculator.accumulate_fluxes!(accumulator, csf)
+        isnothing(accumulator) || FluxCalculator.accumulate_coupler_fields!(accumulator, csf)
     end
 end
 

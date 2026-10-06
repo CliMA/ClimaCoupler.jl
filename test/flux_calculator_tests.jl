@@ -520,14 +520,14 @@ FluxCalculator.push_and_reset!(
         )
         for c in (FT(2), FT(6))
             csf.SW_d .= c
-            FluxCalculator.accumulate_fluxes!(acc, csf)
+            FluxCalculator.accumulate_coupler_fields!(acc, csf)
             FluxCalculator.accumulate!(acc, zero_turbulent)
         end
 
         FluxCalculator.push_ready_accumulators!((; sim), (; sim = acc), 600.0)
         @test all(parent(sim.received.SW_d) .≈ FT(4))
         @test acc.n_steps[] == 0
-        @test all(parent(acc.fluxes.SW_d) .== 0)
+        @test all(parent(acc.coupler_fields.SW_d) .== 0)
     end
 end
 
@@ -539,9 +539,9 @@ end
             n_quad_points = 4,
             h_elem = 4,
         )
-        flux_names = (:SW_d, :LW_d, :P_liq, :P_snow)
-        acc = FluxCalculator.FluxAccumulator(boundary_space, flux_names)
-        @test all(all(parent(acc.fluxes[name]) .== 0) for name in flux_names)
+        field_names = (:SW_d, :LW_d, :P_liq, :P_snow)
+        acc = FluxCalculator.FluxAccumulator(boundary_space, field_names)
+        @test all(all(parent(acc.coupler_fields[name]) .== 0) for name in field_names)
 
         csf = Interfacer.init_coupler_fields(
             FT,
@@ -552,7 +552,7 @@ end
         for c in contributions
             csf.SW_d .= c
             csf.P_liq .= c + FT(200)
-            FluxCalculator.accumulate_fluxes!(acc, csf)
+            FluxCalculator.accumulate_coupler_fields!(acc, csf)
             FluxCalculator.accumulate!(
                 acc,
                 (;
@@ -564,7 +564,7 @@ end
                 ),
             )
         end
-        @test all(parent(acc.fluxes.SW_d) .≈ sum(contributions))
+        @test all(parent(acc.coupler_fields.SW_d) .≈ sum(contributions))
 
         received = (;
             SW_d = CC.Fields.zeros(boundary_space),
@@ -583,7 +583,7 @@ end
 
         # Both windows are closed together.
         @test acc.n_steps[] == 0
-        @test all(all(parent(acc.fluxes[name]) .== 0) for name in flux_names)
+        @test all(all(parent(acc.coupler_fields[name]) .== 0) for name in field_names)
         @test all(parent(acc.F_lh) .== 0)
     end
 end

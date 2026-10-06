@@ -4,6 +4,18 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Average the sea-ice skin emission and temperature over the coupling window
+A sea ice stepping more slowly than the coupler solves the skin balance on every coupling step, each with
+its own `Tₛ`, but was pushed a top heat flux that mixed window means of the absorbed radiation and of the
+turbulent fluxes with the emission `σϵTₛ⁴` of the last coupling step only, while ClimaSeaIce computed the
+conductive flux from that same last `Tₛ`. The balance holds on every step, so on average it holds only for
+the mean of `σϵTₛ⁴` and the mean of `Tₛ` (the conductive flux is linear in `Tₛ` while `R` and `Tᵢ` are
+frozen), and the mismatch left a Stefan residual of about 3.5 W m⁻² for each kelvin `Tₛ` drifts within
+the window. `ClimaSeaIceSimulation` now accumulates both after every skin-temperature diagnosis, and
+`compute_ice_top_heat_flux!` builds `Jᵃ` from the mean emission and writes the mean `Tₛ` to
+`top_surface_temperature` before the ice steps. A sea ice stepping every coupling step is unchanged.
+Covered by `experiments/test/sea_ice_fluxes_test.jl`.
+
 #### Weight the sea-ice top heat flux by the ice concentration
 `external_heat_fluxes.top` was handed to ClimaSeaIce as a per-ice-area flux, but ClimaSeaIce reads it
 as a grid-cell mean: `SeaIceThermodynamics/thermodynamic_time_step.jl` recovers the per-ice flux as

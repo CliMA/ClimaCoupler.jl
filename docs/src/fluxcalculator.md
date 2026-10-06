@@ -81,11 +81,12 @@ timestep does not carry the energy the atmosphere actually lost over that interv
 The same accumulator carries them, under the same step count and the same push:
 
 - Each coupling step, [`FieldExchanger.update_model_sims!`](@ref) calls `update_sim!` as
-  usual and additionally calls [`FluxCalculator.accumulate_fluxes!`](@ref) for the fields
+  usual and additionally calls [`FluxCalculator.accumulate_coupler_fields!`](@ref) for the fields
   the surface declared in [`FieldExchanger.accumulated_coupler_fields`](@ref).
-- [`FluxCalculator.push_and_reset!`](@ref) then pushes the averaged coupler fluxes
+- [`FluxCalculator.push_ready_accumulators!`](@ref) then pushes the averaged coupler fields
   through `update_sim!` before the turbulent push, overwriting the instantaneous values
-  written that step.
+  written that step. Both sums are divided by the same `n_steps`, which only
+  [`FluxCalculator.accumulate!`](@ref) increments.
 
 `update_sim!` keeps running every coupling step because a surface that computes its own
 turbulent fluxes reads the atmospheric state it writes.
@@ -113,7 +114,7 @@ Oceananigans to ClimaSeaIce so that shared cadence exists.
     FluxCalculator.get_roughness_params
     FluxCalculator.FluxAccumulator
     FluxCalculator.accumulate!
-    FluxCalculator.accumulate_fluxes!
+    FluxCalculator.accumulate_coupler_fields!
     FluxCalculator.push_and_reset!
     FluxCalculator.push_ready_accumulators!
     FluxCalculator.reset!

@@ -61,6 +61,9 @@ value = 1
 [mixing_length_Prandtl_maximum]
 value = 100
 
+[prescribed_cloud_droplet_number_concentration]
+value = 5e7
+
 [condensation_evaporation_timescale]
 value = 100
 
@@ -86,7 +89,7 @@ value = 1360
 value = 1.25e-4
 
 [cloud_ice_specific_humidity_autoconversion_threshold]
-value = 5e-6
+value = 7e-6
 
 [cloud_ice_number_max]
 value = 1.0e5
@@ -95,7 +98,7 @@ value = 1.0e5
 value = 3000.0
 
 [cloud_fraction_steepness_scale]
-value = 1
+value = 1.2
 
 [cloud_fraction_eps_rel]
 value = 0.05

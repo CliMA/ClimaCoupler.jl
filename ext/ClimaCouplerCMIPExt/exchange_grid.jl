@@ -1,79 +1,61 @@
 #=
 # Exchange (intersection) grid
 
-The polygons formed where the elements of the ClimaCore spectral-element (SE)
-boundary space overlap the finite-volume (FV) cells of an Oceananigans grid.
-Ocean and sea-ice turbulent fluxes are computed per polygon and aggregated
-conservatively to both sides, so coastlines are resolved at intersection
-resolution and the same areas define both flux weights and surface fractions
-(issue #1838). Geometry and weights are built once on the CPU in `Float64`
-(ConservativeRegridding.jl polygon clipping), cast to the simulation float
-type, and moved to the device, where every per-step operation is a sparse
-gather/scatter.
+The spectral-element (SE) boundary space is treated as a finite-volume mesh of
+*node cells*: GLL node `(i, j)` of an element owns the image on the sphere of
+the reference box `[ζ_{i-1}, ζ_i] × [ζ_{j-1}, ζ_j]`, with `ζ_0 = -1` and
+`ζ_i = ζ_{i-1} + w_i` (1D widths equal to the GLL weights). Lines of constant
+reference coordinate map to great circles under the cubed-sphere element maps,
+so node cells are spherical quadrilaterals that tile the sphere.
+
+Intersecting the node cells with the wet cells of an Oceananigans grid gives
+the exchange-grid polygons. Each polygon lies in exactly one node cell and one
+ocean cell. Turbulent fluxes are computed per polygon and returned to both
+sides by area-weighted sums; the ocean and sea-ice area fractions are the
+shares of each node cell covered by those polygons. Geometry is built once on
+the CPU in `Float64`, cast to the simulation float type, and moved to the
+device, where every per-step operation is a sparse gather/scatter.
 =#
 
 """
     ExchangeGrid{FT, VI, VF}
 
-Sparse coupling between the SE boundary space, the FV (Oceananigans) surface
-cells, and the intersection polygons that tile their overlap, stored in
-compressed-sparse-row (CSR) form for the direction each coupling is consumed
-in, so every per-step gather/scatter is a race-free segmented reduction.
+Sparse coupling between SE nodes, ocean cells, and the polygons where their
+cells overlap, stored as compressed-sparse-row (CSR) structures in the
+direction each is used.
 
-SE-side weights come from the SEM basis integrals
-``B_{kn} = ∫_{Ω_k} ϕ_n \\, dA`` over each polygon `Ω_k`
-(`ConservativeRegriddingClimaCoreExt.accumulate_principled_b`):
-
-  - gather (polygon-major): `f̄_k = Σ_n gweight[k,n] f_n` with
-    `gweight = B_{kn} / Σ_n B_{kn}` (rows sum to 1; constants preserved);
-  - scatter (node-major): `F_n = Σ_k sweight[n,k] F_k` with
-    `sweight = B_{kn} / (Jw)_n` — the per-element L2 projection, to be
-    followed by `weighted_dss!`;
-  - `node_cov[n] = Σ_{k wet} B_{kn} / (Jw)_n` — how much area near node `n`
-    lies over wet ocean (sum over wet polygons). `node_cov_total` is the
-    same sum over all polygons (wet and dry). The wet-ocean fraction is
-    `node_cov / node_cov_total` (clamped to `[0, 1]`): both coverages share
-    the same projection/geometry errors, so the ratio removes them.
-
-Flat index conventions: SE node `n = (e-1) Nq² + (j-1) Nq + i` (i fastest
-within each element, then elements — the order of
-`ConservativeRegriddingClimaCoreExt.flat_nodal_data` /
-`Fields.field2array` on ClimaCore 0.15 `(v, i, j, h)` / `VIJFH` storage);
-FV cell `c = (j-1) Nx + i` (`vec(OC.interior(field, :, :, Nz))` and the CR
-column index).
+Flat indices: SE node `n = (e - 1) Nq² + (j - 1) Nq + i` (element-local storage
+order of `Fields.field2array`); ocean cell `c = (j - 1) Nx + i`.
 
 # Fields
 - `n_poly`, `n_nodes`, `n_elem`, `n_oc`: entity counts
-- `gpoly_ptr`, `gnode`, `gweight`: polygon-major CSR of the node→polygon gather
-- `snode_ptr`, `spoly`, `sweight`: node-major CSR of the polygon→node scatter
-- `node_cov`, `node_cov_total`: nodal wet / geometric coverage
-- `elem_of_poly`, `oc_of_poly`: SE element / FV cell owning each polygon
-- `soc_ptr`, `soc_poly`: FV-cell-major CSR of the polygon→cell scatter
-- `area`: geometric polygon areas [m²]
-- `b_area`: SE-side quadrature areas `Σ_n B_{kn}` [m²]; equals `area` up to
-  quadrature error and makes SE-side conservation statements exact
-- `oc_wet_area`: retained (wet) polygon area per FV cell [m²]; zero for dry
-  (immersed) cells and tripolar fold shadow cells
+- `node_of_poly`, `elem_of_poly`, `oc_of_poly`: SE node, SE element and ocean
+  cell containing each polygon
+- `snode_ptr`, `spoly`, `sweight`: node-major CSR of the polygon → node
+  scatter; `sweight` is the share of the node cell a polygon covers
+- `node_area`: area of each node cell [m²]
+- `wet_share`: share of each node cell covered by wet ocean (before DSS)
+- `soc_ptr`, `soc_poly`: ocean-cell-major CSR of the polygon → cell scatter
+- `area`: polygon areas [m²]
+- `oc_wet_area`: polygon area per ocean cell [m²]; zero for dry cells and
+  tripolar fold shadow cells
 """
 struct ExchangeGrid{FT, VI <: AbstractVector{Int32}, VF <: AbstractVector{FT}}
     n_poly::Int
     n_nodes::Int
     n_elem::Int
     n_oc::Int
-    gpoly_ptr::VI
-    gnode::VI
-    gweight::VF
+    node_of_poly::VI
+    elem_of_poly::VI
+    oc_of_poly::VI
     snode_ptr::VI
     spoly::VI
     sweight::VF
-    node_cov::VF
-    node_cov_total::VF
-    elem_of_poly::VI
-    oc_of_poly::VI
+    node_area::VF
+    wet_share::VF
     soc_ptr::VI
     soc_poly::VI
     area::VF
-    b_area::VF
     oc_wet_area::VF
 end
 
@@ -82,7 +64,7 @@ Adapt.@adapt_structure ExchangeGrid
 function Base.show(io::IO, eg::ExchangeGrid{FT}) where {FT}
     print(
         io,
-        "ExchangeGrid{$FT}: $(eg.n_poly) polygons from $(eg.n_elem) SE elements × $(eg.n_oc) FV cells",
+        "ExchangeGrid{$FT}: $(eg.n_poly) polygons from $(eg.n_nodes) SE node cells × $(eg.n_oc) FV cells",
     )
 end
 
@@ -107,31 +89,109 @@ function _build_csr(rows::Vector{Int}, n_rows::Int)
     return cumsum!(ptr, ptr), Int32.(perm)
 end
 
+#=
+## Node cells
+=#
+
+# Unit-sphere corner of the node-cell mesh of one cube face, at corner index
+# `(I₀, J₀) ∈ 0:ne·Nq` along the face; `ζ` are the GLL subcell breakpoints.
+function _node_cell_corner(CRExt, mesh, ζ, Nq, face, I₀, J₀)
+    ie = min(I₀ ÷ Nq + 1, mesh.ne)
+    je = min(J₀ ÷ Nq + 1, mesh.ne)
+    ξ = ζ[I₀ - (ie - 1) * Nq + 1]
+    η = ζ[J₀ - (je - 1) * Nq + 1]
+    x = CC.Geometry.components(
+        CC.Meshes.coordinates(mesh, CartesianIndex(ie, je, face), (ξ, η)),
+    )
+    r = sqrt(x[1]^2 + x[2]^2 + x[3]^2)
+    return CRExt.UnitSphericalPoint(x[1] / r, x[2] / r, x[3] / r)
+end
+
+"""
+    node_cell_grids(CRExt, manifold, space)
+
+One `CellBasedGrid` per cube face whose cells are the node cells of that face,
+an `(ne Nq) × (ne Nq)` structured quadrilateral mesh.
+"""
+function node_cell_grids(CRExt, manifold, space)
+    mesh = CC.Spaces.topology(space).mesh
+    _, ws = CC.Quadratures.quadrature_points(Float64, CC.Spaces.quadrature_style(space))
+    Nq = length(ws)
+    ζ = collect([-1.0; cumsum(ws) .- 1])
+    ζ[end] = 1.0
+    M = mesh.ne * Nq
+    return [
+        CR.Trees.CellBasedGrid(
+            manifold,
+            [_node_cell_corner(CRExt, mesh, ζ, Nq, face, I₀, J₀) for I₀ in 0:M, J₀ in 0:M],
+        ) for face in 1:6
+    ]
+end
+
+"""
+    node_cell_nodes_and_areas(CRExt, manifold, topology, Nq, grids)
+
+For the node-cell meshes `grids` (from [`node_cell_grids`](@ref)), return the
+flat SE node index of every node cell, in the global cell numbering used by
+the intersection tree, and the area of every node cell indexed by SE node.
+"""
+function node_cell_nodes_and_areas(CRExt, manifold, topology, Nq, grids)
+    M = topology.mesh.ne * Nq
+    n_elem = CC.Topologies.nlocalelems(topology)
+    elem_of = Dict(CRExt.element_face_local_indices(topology, e) => e for e in 1:n_elem)
+    node_of_cell = zeros(Int, 6 * M^2)
+    node_area = zeros(Float64, n_elem * Nq^2)
+    for face in 1:6, c in 1:(M ^ 2)
+        I, J = Tuple(CR.Trees.linear_to_cartesian_idx(grids[face], c))
+        ie, i = (I - 1) ÷ Nq + 1, (I - 1) % Nq + 1
+        je, j = (J - 1) ÷ Nq + 1, (J - 1) % Nq + 1
+        n = (elem_of[(face, ie, je)] - 1) * Nq^2 + (j - 1) * Nq + i
+        node_of_cell[(face - 1) * M ^ 2 + c] = n
+        node_area[n] = CRExt.GO.area(manifold, CR.Trees.getcell(grids[face], c))
+    end
+    return node_of_cell, node_area
+end
+
+# Mask of polygons over wet (non-immersed) surface cells of `grid_oc`.
+function _wet_polygon_mask(grid_oc, oc_of_poly)
+    grid_oc isa OC.ImmersedBoundaryGrid || return trues(length(oc_of_poly))
+    grid_cpu = OC.on_architecture(OC.CPU(), grid_oc)
+    Nx, _, Nz = size(grid_cpu)
+    return [
+        !OC.ImmersedBoundaries.immersed_cell(mod1(c, Nx), (c - 1) ÷ Nx + 1, Nz, grid_cpu)
+        for c in oc_of_poly
+    ]
+end
+
 """
     build_exchange_grid(boundary_space, grid_oc)
 
 Construct an [`ExchangeGrid`](@ref) between a ClimaCore cubed-sphere
 `boundary_space` and an Oceananigans `grid_oc`, on the CPU in `Float64`:
-intersect SE elements with FV cells (fold-aware on a `TripolarGrid`, so fold
-shadow cells never produce polygons), drop polygons over dry (immersed)
-cells, then integrate the SEM basis over each polygon
-(`accumulate_principled_b`) to obtain the gather/scatter weights and nodal
-coverages. Move the result to the device with [`on_device`](@ref).
+intersect the node cells with the FV cells (fold-aware on a `TripolarGrid`,
+so fold shadow cells produce no polygons) and keep polygons over wet cells.
+Move the result to the device with [`on_device`](@ref).
 """
 function build_exchange_grid(boundary_space, grid_oc)
     CRExt = get_ConservativeRegriddingCCExt()
     @assert !isnothing(CRExt) "ConservativeRegriddingClimaCoreExt must be loaded"
-    GO = CRExt.GO
 
     boundary_space_cpu = CC.Adapt.adapt(Array, boundary_space)
     grid_oc_underlying_cpu = OC.on_architecture(OC.CPU(), underlying_grid(grid_oc))
 
     FT = CC.Spaces.undertype(boundary_space_cpu)
-    R = Float64(CC.Spaces.topology(boundary_space_cpu).mesh.domain.radius)
-    manifold = CR.Spherical(; radius = R)
+    topology = CC.Spaces.topology(boundary_space_cpu)
+    manifold = CR.Spherical(; radius = Float64(topology.mesh.domain.radius))
+    Nq = CC.Quadratures.degrees_of_freedom(CC.Spaces.quadrature_style(boundary_space_cpu))
+    n_elem = CC.Topologies.nlocalelems(topology)
+    n_nodes = n_elem * Nq^2
 
-    # 1. SE-element × FV-cell intersection polygons.
-    dst_tree = CR.Trees.treeify(manifold, boundary_space_cpu)
+    # 1. Node-cell × FV-cell intersection polygons.
+    grids = node_cell_grids(CRExt, manifold, boundary_space_cpu)
+    M = topology.mesh.ne * Nq
+    dst_tree = CR.Trees.CubedSphereToplevelTree([
+        CR.Trees.IndexOffsetQuadtreeCursor(grids[face], (face - 1) * M^2) for face in 1:6
+    ])
     src_tree = CR.Trees.treeify(manifold, grid_oc_underlying_cpu)
     intersections = CR.intersection_areas(
         manifold,
@@ -140,97 +200,34 @@ function build_exchange_grid(boundary_space, grid_oc)
         src_tree;
         intersection_operator = CR.IntersectionGridOperator(manifold),
     )
-    elem_of_poly, oc_of_poly, polys = SparseArrays.findnz(intersections)
-    n_elem, n_oc = size(intersections)
-    area = [GO.area(manifold, poly) for poly in polys]
+    cell_of_poly, oc_of_poly, polys = SparseArrays.findnz(intersections)
+    n_oc = size(intersections, 2)
 
-    # 2. Mark polygons over dry (immersed) surface cells. They are dropped
-    #    from the exchange grid but still contribute to the geometric
-    #    coverage `node_cov_total`.
-    keep = trues(length(area))
-    if grid_oc isa OC.ImmersedBoundaryGrid
-        grid_with_mask_cpu = OC.on_architecture(OC.CPU(), grid_oc)
-        Nx_oc, _, Nz_oc = size(grid_with_mask_cpu)
-        for k in eachindex(keep)
-            c = oc_of_poly[k]
-            i, j = mod1(c, Nx_oc), (c - 1) ÷ Nx_oc + 1
-            keep[k] = !OC.ImmersedBoundaries.immersed_cell(i, j, Nz_oc, grid_with_mask_cpu)
-        end
+    # 2. Keep polygons over wet cells.
+    keep = _wet_polygon_mask(grid_oc, oc_of_poly)
+    cell_of_poly, oc_of_poly, polys = cell_of_poly[keep], oc_of_poly[keep], polys[keep]
+    area = [CRExt.GO.area(manifold, poly) for poly in polys]
+    n_poly = length(polys)
+
+    # 3. Owning node and element of each polygon; node-cell areas.
+    node_of_cell, node_area =
+        node_cell_nodes_and_areas(CRExt, manifold, topology, Nq, grids)
+    node_of_poly = node_of_cell[cell_of_poly]
+    elem_of_poly = (node_of_poly .- 1) .÷ Nq^2 .+ 1
+
+    # 4. Scatter: share of its node cell each polygon covers.
+    share = area ./ node_area[node_of_poly]
+    snode_ptr, spoly = _build_csr(node_of_poly, n_nodes)
+    sweight = share[spoly]
+    wet_share = zeros(Float64, n_nodes)
+    for k in 1:n_poly
+        wet_share[node_of_poly[k]] += share[k]
     end
 
-    # 3. SEM basis integrals B_kn over each polygon. All polygons contribute
-    #    to node_cov_total; only kept (wet) polygons produce COO weights,
-    #    indexed by their position in the kept numbering.
-    qs = CC.Spaces.quadrature_style(boundary_space_cpu)
-    Nq = CC.Quadratures.degrees_of_freedom(qs)
-    triangle_quad_degree = 2 * (Nq - 1)
-    Jw = CRExt.se_node_weights(boundary_space_cpu) # Float64, flat nodal
-    n_nodes = length(Jw)
-
-    coo_poly = Int[]
-    coo_node = Int[]
-    coo_b = Float64[]
-    node_cov_total = zeros(Float64, n_nodes)
-    b_sum = zeros(Float64, count(keep))
-    kept_id = 0
-    for k in eachindex(area)
-        elem = elem_of_poly[k]
-        B = CRExt.accumulate_principled_b(
-            manifold,
-            boundary_space_cpu,
-            elem,
-            polys[k];
-            triangle_quad_degree,
-        )
-        kept = keep[k]
-        kept && (kept_id += 1)
-        node_offset = (elem - 1) * Nq^2
-        for j in 1:Nq, i in 1:Nq
-            Bij = B[i, j]
-            Bij == 0 && continue
-            n = node_offset + (j - 1) * Nq + i
-            node_cov_total[n] += Bij / Jw[n]
-            if kept
-                push!(coo_poly, kept_id)
-                push!(coo_node, n)
-                push!(coo_b, Bij)
-                b_sum[kept_id] += Bij
-            end
-        end
-    end
-    elem_of_poly, oc_of_poly, area = elem_of_poly[keep], oc_of_poly[keep], area[keep]
-
-    # Degenerate polygons (b_sum ≤ 0 can only come from quadrature round-off
-    # on slivers) cannot be normalized; drop their COO entries and zero their
-    # area so they are inert in every reduction.
-    degenerate = findall(<=(0), b_sum)
-    if !isempty(degenerate)
-        is_degenerate = falses(length(area))
-        is_degenerate[degenerate] .= true
-        coo_keep = .!is_degenerate[coo_poly]
-        coo_poly, coo_node, coo_b = coo_poly[coo_keep], coo_node[coo_keep], coo_b[coo_keep]
-        area[degenerate] .= 0
-        b_sum[degenerate] .= 0
-    end
-
-    # 4. CSR assembly for both directions.
-    n_poly = length(area)
-    gpoly_ptr, gperm = _build_csr(coo_poly, n_poly)
-    gnode = Int32.(coo_node[gperm])
-    gweight = [coo_b[p] / b_sum[coo_poly[p]] for p in gperm]
-
-    snode_ptr, sperm = _build_csr(coo_node, n_nodes)
-    spoly = Int32.(coo_poly[sperm])
-    sweight = [coo_b[p] / Jw[coo_node[p]] for p in sperm]
-
-    node_cov = zeros(Float64, n_nodes)
-    for p in eachindex(coo_node)
-        node_cov[coo_node[p]] += coo_b[p] / Jw[coo_node[p]]
-    end
-
+    # 5. FV side.
     soc_ptr, soc_poly = _build_csr(Vector{Int}(oc_of_poly), n_oc)
     oc_wet_area = zeros(Float64, n_oc)
-    for k in eachindex(area)
+    for k in 1:n_poly
         oc_wet_area[oc_of_poly[k]] += area[k]
     end
 
@@ -239,20 +236,17 @@ function build_exchange_grid(boundary_space, grid_oc)
         n_nodes,
         n_elem,
         n_oc,
-        gpoly_ptr,
-        gnode,
-        FT.(gweight),
+        Int32.(node_of_poly),
+        Int32.(elem_of_poly),
+        Int32.(oc_of_poly),
         snode_ptr,
         spoly,
         FT.(sweight),
-        FT.(node_cov),
-        FT.(node_cov_total),
-        Int32.(elem_of_poly),
-        Int32.(oc_of_poly),
+        FT.(node_area),
+        FT.(wet_share),
         soc_ptr,
         soc_poly,
         FT.(area),
-        FT.(b_sum),
         FT.(oc_wet_area),
     )
 end
@@ -292,146 +286,44 @@ function _csr_matvec!(dst, ptr, col, w, src)
     return dst
 end
 
-# FLUX CLAMP HACK
-# lo[r], hi[r] = min/max of src over the entries of CSR row r whose polygon
-# carries positive `w`; cnt[r] = 1 if the row has any such entry, else 0 (and
-# then lo = hi = 0). Zero-weight polygons are skipped because they do not
-# influence the weighted average being bounded — including them would drag the
-# range toward their (unused) values.
-@kernel function _csr_extrema_kernel!(lo, hi, cnt, ptr, col, src, w)
-    r = @index(Global)
-    @inbounds begin
-        z = zero(eltype(lo))
-        l = z
-        h = z
-        found = false
-        for p in ptr[r]:(ptr[r + 1] - 1)
-            k = col[p]
-            w[k] > 0 || continue
-            v = src[k]
-            if found
-                l = min(l, v)
-                h = max(h, v)
-            else
-                l = v
-                h = v
-                found = true
-            end
-        end
-        lo[r] = found ? l : z
-        hi[r] = found ? h : z
-        cnt[r] = found ? one(eltype(cnt)) : zero(eltype(cnt))
-    end
+# dst[k] = src[owner[k]]
+@kernel function _gather_by_owner_kernel!(dst, owner, src)
+    k = @index(Global)
+    @inbounds dst[k] = src[owner[k]]
+end
+
+function _gather_by_owner!(dst, owner, src)
+    backend = KernelAbstractions.get_backend(dst)
+    launch_kernel!(_gather_by_owner_kernel!, backend, length(dst), dst, owner, src)
+    return dst
 end
 
 """
     gather_nodes_to_polys!(poly_values, eg::ExchangeGrid, nodal_values)
 
-Average a flat SE nodal vector onto each polygon: `f̄_k = Σ_n gweight f_n`.
-Rows sum to 1, so constants are preserved exactly.
+Copy the value of the SE node whose cell contains each polygon from a flat
+nodal vector.
 """
 gather_nodes_to_polys!(poly_values, eg::ExchangeGrid, nodal_values) =
-    _csr_matvec!(poly_values, eg.gpoly_ptr, eg.gnode, eg.gweight, nodal_values)
-
-@kernel function _gather_cells_kernel!(dst, oc_of_poly, src)
-    k = @index(Global)
-    @inbounds dst[k] = src[oc_of_poly[k]]
-end
+    _gather_by_owner!(poly_values, eg.node_of_poly, nodal_values)
 
 """
     gather_cells_to_polys!(poly_values, eg::ExchangeGrid, cell_values)
 
-Copy the owning FV cell's value onto each polygon (direct indexing; each
-polygon lies inside exactly one cell).
+Copy the owning FV cell's value onto each polygon.
 """
-function gather_cells_to_polys!(poly_values, eg::ExchangeGrid, cell_values)
-    backend = KernelAbstractions.get_backend(poly_values)
-    launch_kernel!(
-        _gather_cells_kernel!,
-        backend,
-        eg.n_poly,
-        poly_values,
-        eg.oc_of_poly,
-        cell_values,
-    )
-    return poly_values
-end
+gather_cells_to_polys!(poly_values, eg::ExchangeGrid, cell_values) =
+    _gather_by_owner!(poly_values, eg.oc_of_poly, cell_values)
 
 """
     scatter_polys_to_nodes!(nodal_values, eg::ExchangeGrid, poly_values)
 
-Project per-polygon values onto SE nodes via the per-element L2 projection:
-`F_n = Σ_k sweight F_k`. The result is *coverage-weighted*: scattering a
-constant yields `constant × node_cov`. Follow with `weighted_dss!` on the
-receiving field. For a per-unit-wet-area result use
-[`scatter_polys_to_nodes_normalized!`](@ref).
+Share-weighted sum of per-polygon values into their node cells,
+`F_n = Σ_{k ∈ n} sweight_k F_k`. Scattering ones gives the covered share of
+each node cell. Follow with weighted DSS on the receiving field.
 """
 scatter_polys_to_nodes!(nodal_values, eg::ExchangeGrid, poly_values) =
     _csr_matvec!(nodal_values, eg.snode_ptr, eg.spoly, eg.sweight, poly_values)
-
-# FLUX CLAMP HACK
-function poly_extrema_at_nodes!(lo, hi, cnt, eg::ExchangeGrid, poly_values, weight)
-    backend = KernelAbstractions.get_backend(lo)
-    launch_kernel!(
-        _csr_extrema_kernel!,
-        backend,
-        eg.n_nodes,
-        lo,
-        hi,
-        cnt,
-        eg.snode_ptr,
-        eg.spoly,
-        poly_values,
-        weight,
-    )
-    return nothing
-end
-
-@kernel function _csr_matvec_normalized_kernel!(dst, ptr, col, w, src, cov, cutoff)
-    r = @index(Global)
-    @inbounds begin
-        c = cov[r]
-        if c > cutoff
-            acc = zero(eltype(dst))
-            for p in ptr[r]:(ptr[r + 1] - 1)
-                acc += w[p] * src[col[p]]
-            end
-            dst[r] = acc / c
-        else
-            dst[r] = 0
-        end
-    end
-end
-
-"""
-    scatter_polys_to_nodes_normalized!(nodal_values, eg::ExchangeGrid, poly_values,
-                                       cov_cutoff)
-
-Like [`scatter_polys_to_nodes!`](@ref) but normalized by the nodal wet
-coverage, yielding a per-unit-wet-area value: constants are reproduced exactly
-wherever `node_cov > cov_cutoff`; nodes at or below the cutoff are set to 0.
-"""
-function scatter_polys_to_nodes_normalized!(
-    nodal_values,
-    eg::ExchangeGrid,
-    poly_values,
-    cov_cutoff,
-)
-    backend = KernelAbstractions.get_backend(nodal_values)
-    launch_kernel!(
-        _csr_matvec_normalized_kernel!,
-        backend,
-        eg.n_nodes,
-        nodal_values,
-        eg.snode_ptr,
-        eg.spoly,
-        eg.sweight,
-        poly_values,
-        eg.node_cov,
-        cov_cutoff,
-    )
-    return nodal_values
-end
 
 @kernel function _scatter_cells_kernel!(dst, ptr, polys, area, wet_area, src)
     c = @index(Global)
@@ -454,9 +346,9 @@ end
     scatter_polys_to_cells!(cell_values, eg::ExchangeGrid, poly_values)
 
 Area-weighted average of per-polygon values onto each FV cell:
-`F_c = Σ_{k ∈ c} area_k F_k / oc_wet_area_c`, conserving the area integral
-exactly. Cells with zero wet area (dry, fold shadows) are set to 0; run
-[`mirror_fold_partners!`](@ref) afterwards to fill the shadow copies.
+`F_c = Σ_{k ∈ c} area_k F_k / oc_wet_area_c`. Cells with zero wet area (dry,
+fold shadows) are set to 0; run [`mirror_fold_partners!`](@ref) afterwards to
+fill the shadow copies.
 """
 function scatter_polys_to_cells!(cell_values, eg::ExchangeGrid, poly_values)
     backend = KernelAbstractions.get_backend(cell_values)
@@ -498,41 +390,4 @@ function mirror_fold_partners!(cell_values, grid)
     @assert !isnothing(CROCExt)
     CROCExt.mirror_fold_partners!(cell_values, grid)
     return cell_values
-end
-
-#=
-# Wet-ocean surface fraction
-=#
-
-"""
-    wet_ocean_fraction_field(boundary_space, eg::ExchangeGrid)
-
-Build the wet-ocean surface fraction as a `CC.Fields.Field` on
-`boundary_space` from a CPU-resident [`ExchangeGrid`](@ref): the nodal ratio
-`node_cov / node_cov_total` clamped to [0, 1], then made continuous across
-shared element-boundary nodes with `weighted_dss!` (and re-clamped, since DSS
-of a bounded field can overshoot). The complement is the land fraction; sea
-ice and open ocean partition the wet fraction itself (see
-`FieldExchanger.align_surface_fractions!`).
-"""
-function wet_ocean_fraction_field(
-    boundary_space,
-    eg::ExchangeGrid{FT, Vector{Int32}},
-) where {FT}
-    frac_nodal = similar(eg.node_cov)
-    @. frac_nodal = ifelse(
-        eg.node_cov_total > 0,
-        clamp(eg.node_cov / eg.node_cov_total, FT(0), FT(1)),
-        FT(0),
-    )
-
-    CRExt = get_ConservativeRegriddingCCExt()
-    field = CC.Fields.zeros(boundary_space)
-    device_array_type = ClimaComms.array_type(ClimaComms.device(boundary_space))
-    CRExt.vec_to_se_field!(field, Adapt.adapt(device_array_type, frac_nodal))
-
-    dss_buffer = Utilities.init_dss_buffer(field)
-    Utilities.apply_dss!(field, dss_buffer)
-    @. field = clamp(field, FT(0), FT(1))
-    return field
 end

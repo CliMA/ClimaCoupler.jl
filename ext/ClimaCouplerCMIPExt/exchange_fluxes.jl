@@ -579,6 +579,30 @@ function surface_shares!(
 end
 
 """
+    surface_share_excess_report(eg::ExchangeGrid, ocean_share, ice_share)
+
+Describe where `ocean_share + ice_share` exceeds 1: the worst node after DSS
+and the worst node of `eg.wet_share` before DSS, with their coordinates. A
+pre-DSS excess points at the polygon geometry (overlapping FV cells or node
+cells); a post-DSS-only excess points at the DSS.
+"""
+function surface_share_excess_report(eg::ExchangeGrid, ocean_share, ice_share)
+    total = Array(se_nodal_vec(ocean_share)) .+ Array(se_nodal_vec(ice_share))
+    wet = Array(eg.wet_share)
+    coords = CC.Fields.coordinate_field(axes(ocean_share))
+    lat = Array(se_nodal_vec(coords.lat))
+    lon = Array(se_nodal_vec(coords.long))
+    n_post = argmax(total)
+    n_pre = argmax(wet)
+    return """
+    ocean + ice share exceeds 1.
+      after DSS:  max $(total[n_post]) at node $n_post (lat $(lat[n_post]), lon $(lon[n_post])); \
+    $(count(>(1.001), total)) of $(length(total)) nodes above 1.001
+      before DSS: max wet_share $(wet[n_pre]) at node $n_pre (lat $(lat[n_pre]), lon $(lon[n_pre])); \
+    $(count(>(1.001), wet)) nodes above 1.001; wet_share at the worst post-DSS node is $(wet[n_post])"""
+end
+
+"""
     scatter_poly_fluxes_to_boundary!(remapping, eg::ExchangeGrid,
                                      fs::ExchangeFluxState, weight)
 

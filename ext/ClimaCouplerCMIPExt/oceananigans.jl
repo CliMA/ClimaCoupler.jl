@@ -521,6 +521,10 @@ function FieldExchanger.align_surface_fractions!(
         remapping.flux_dss_buffer,
     )
     # `max` only guards round-off: ocean + ice ≤ 1 by construction.
+    max_share = maximum(ocean_fraction .+ ice_fraction)
+    max_share <= 1 ||
+        max_share ≈ FT(1) ||
+        error(surface_share_excess_report(eg, ocean_fraction, ice_fraction))
     @. land_fraction = max(FT(1) - ocean_fraction - ice_fraction, FT(0))
 
     Interfacer.update_field!(ocean_sim, Val(:area_fraction), ocean_fraction)

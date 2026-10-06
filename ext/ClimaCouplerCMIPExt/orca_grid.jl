@@ -45,18 +45,30 @@ orca_one_grid_path() = joinpath(@clima_artifact("orca_one_grid"), "orca_one_grid
     read_orca_mesh(path = orca_one_grid_path())
 
 Read the eORCA1 metric arrays, bottom height and conformal-mapping parameters from `path`.
+
+The file stores the mesh in NEMO layout: columns `1` and `Nx` are periodic copies of columns
+`Nx - 1` and `2`, and the top row of centers is the folded copy of the row below it. An
+Oceananigans `(Periodic, RightFaceFolded)` grid stores neither, so both are dropped here: the
+interior is columns `2:Nx-1` and center rows `1:Ny-1` (y-face rows `1:Ny`, the last being the
+fold). With this choice the dropped top row is exactly the F-pivot halo
+`c[i, Ny + 1] = c[Nx + 1 - i, Ny]` that `fill_halo_regions!` regenerates.
 """
 function read_orca_mesh(path = orca_one_grid_path())
     return NCDatasets.NCDataset(path) do ds
+        Nx_nemo = Int(ds.attrib["Nx"])
+        Ny_nemo = Int(ds.attrib["Ny"])
+        columns = 2:(Nx_nemo - 1)
+        rows(::Type{OC.Center}) = 1:(Ny_nemo - 1)
+        rows(::Type{OC.Face}) = 1:Ny_nemo
         metrics = NamedTuple(
-            symbol => Array(ds[variable_name][:, :]) for
-            (symbol, variable_name, _, _) in orca_metrics
+            symbol => Array(ds[variable_name][columns, rows(LY)]) for
+            (symbol, variable_name, _, LY) in orca_metrics
         )
         (;
             metrics,
-            bottom_height = Array(ds["bottom_height"][:, :]),
-            Nx = Int(ds.attrib["Nx"]),
-            Ny = Int(ds.attrib["Ny"]),
+            bottom_height = Array(ds["bottom_height"][columns, rows(OC.Center)]),
+            Nx = length(columns),
+            Ny = length(rows(OC.Center)),
             radius = ds.attrib["radius"],
             north_poles_latitude = ds.attrib["north_poles_latitude"],
             first_pole_longitude = ds.attrib["first_pole_longitude"],

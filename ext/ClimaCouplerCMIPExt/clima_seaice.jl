@@ -95,15 +95,13 @@ function ClimaSeaIceSimulation(
     # Initialize the sea ice with the same grid as the ocean
     grid = ocean.ocean.model.grid
 
-    advection = ocean.ocean.model.advection.T
-
     ice = sea_ice_simulation(
         grid,
         ocean.ocean;
         clock = deepcopy(ocean.ocean.model.clock),
         stop_time = ocean.ocean.stop_time,
         Δt = float(dt),
-        advection,
+        advection = CSI.IncrementalRemapping(),
     )
 
     ocean_ice_flux_formulation = ThreeEquationHeatFlux(ice)

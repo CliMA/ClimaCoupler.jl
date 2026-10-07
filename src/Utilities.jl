@@ -8,6 +8,7 @@ module Utilities
 
 import ClimaComms
 import ClimaCore as CC
+import Dates
 import Logging
 import ClimaUtilities.OutputPathGenerator: generate_output_path
 
@@ -16,9 +17,12 @@ export get_device,
     show_memory_usage,
     setup_output_dirs,
     time_to_seconds,
+    parse_date,
+    format_start_date,
     integral,
     create_boundary_space,
-    diagnostics_global_attribs
+    diagnostics_global_attribs,
+    @timed_log
 
 """
     get_device(config_dict)
@@ -75,6 +79,71 @@ function get_comms_context(config_dict)
     end
 
     return comms_ctx
+end
+
+"""
+    format_duration(seconds)
+
+Return `seconds` as a short human-readable string: milliseconds below one
+second, seconds below one minute, otherwise minutes and seconds.
+"""
+function format_duration(seconds::Real)
+    seconds < 1 && return string(round(seconds * 1e3, digits = 1), " ms")
+    seconds < 60 && return string(round(seconds, digits = 2), " s")
+    minutes = floor(Int, seconds / 60)
+    return string(minutes, " min ", round(seconds - 60 * minutes, digits = 1), " s")
+end
+
+"""
+    device_sync()
+
+Wait for any work queued on the default device to finish. A no-op on CPU.
+"""
+device_sync() = ClimaComms.sync(Returns(nothing), ClimaComms.device())
+
+"""
+    @timed_log "message" expr
+
+Evaluate `expr` and return its value, logging `message` with the wall time,
+the allocated memory, and the time spent compiling during the evaluation, e.g.
+`"Initialized atmosphere simulation (41.3 s, 1.2 GiB, compile 37.9 s)"`.
+
+The device is synchronized before the clock stops, so that work queued on a
+GPU is counted against the expression that queued it rather than against a
+later one. Logging is already restricted to the root process by ClimaComms.
+
+The value is returned so the macro can wrap the right-hand side of an
+assignment: `atmos_sim = @timed_log "Initialized atmosphere" make_atmos()`.
+"""
+macro timed_log(message, ex)
+    quote
+        # Base.@timed only reports compile time on Julia 1.11 and later, so it
+        # is measured here. The counter keeps its value once tracking is off.
+        Base.cumulative_compile_timing(true)
+        local compile_before = Base.cumulative_compile_time_ns()
+        local stats = try
+            @timed begin
+                local value = $(esc(ex))
+                device_sync()
+                value
+            end
+        finally
+            Base.cumulative_compile_timing(false)
+        end
+        local compile_seconds =
+            (Base.cumulative_compile_time_ns()[1] - compile_before[1]) / 1e9
+        @info string(
+            $(esc(message)),
+            " (",
+            format_duration(stats.time),
+            ", ",
+            Base.format_bytes(stats.gcstats.allocd),
+            ", compile ",
+            format_duration(compile_seconds),
+            ")",
+        )
+        stats.value
+    end
 end
 
 """
@@ -213,6 +282,42 @@ function time_to_seconds(s::String)
         return parse(Float64, first(split(s, match))) * factor[match]
     end
     error("Uncaught case in computing time from given string.")
+end
+
+"""
+    parse_date(date_str)
+
+Parse a date string into a `Dates.DateTime`. Supported formats match ClimaAtmos:
+
+  - `yyyymmdd` (interpreted as 00:00 UTC)
+  - `yyyymmdd-HHMM`
+"""
+function parse_date(date_str::AbstractString)
+    date_format_mapping = Dict(
+        r"^\d{8}$" => Dates.dateformat"yyyymmdd",
+        r"^\d{8}-\d{4}$" => Dates.dateformat"yyyymmdd-HHMM",
+    )
+    for (pattern, format) in date_format_mapping
+        !isnothing(match(pattern, date_str)) && return Dates.DateTime(date_str, format)
+    end
+    error(
+        "Date string $date_str does not match any of the allowed formats: yyyymmdd or yyyymmdd-HHMM",
+    )
+end
+parse_date(dt::Dates.DateTime) = dt
+
+"""
+    format_start_date(dt)
+
+Format a `Dates.DateTime` for coupler/`start_date` config strings.
+Uses `yyyymmdd` at midnight and `yyyymmdd-HHMM` otherwise, matching [`parse_date`](@ref).
+"""
+function format_start_date(dt::Dates.DateTime)
+    if Dates.hour(dt) == 0 && Dates.minute(dt) == 0
+        return Dates.format(dt, Dates.dateformat"yyyymmdd")
+    else
+        return Dates.format(dt, Dates.dateformat"yyyymmdd-HHMM")
+    end
 end
 
 """

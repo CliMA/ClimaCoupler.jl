@@ -106,7 +106,7 @@ Note: the `mode_name` determines which Julia environment to use. Use `experiment
 | `--use_itime` | Bool | `true` | `true`, `false` | Whether to use ClimaUtilities ITime (integer time) or Float64 |
 | `--t_end` | String | `"800secs"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | End time of the simulation, relative to the start date |
 | `--t_start` | String | `"0secs"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Start time of the simulation, relative to the start date |
-| `--start_date` | String | `"20000101"` | `"YYYYMMDD"` format | Start date of the simulation |
+| `--start_date` | String | `"20000101"` | `"YYYYMMDD"` or `"YYYYMMDD-HHMM"` | Start date (and optional UTC time) of the simulation |
 | `--dt_cpl` | String | `"400secs"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Coupling time step |
 | `--dt` | String | `"400secs"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Component model time step (used if individual component dt's not specified) |
 | `--dt_atmos` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Atmos simulation time step (alternative to `dt`) |
@@ -179,7 +179,7 @@ specific timesteps should be specified, rather than only `dt`.
 | `--lai_source` | String | `"modis_monthly"` | `modis_monthly`, `modis_monthly_climatology` | Source for leaf area index data. `modis_monthly` uses full MODIS monthly data, `modis_monthly_climatology` uses MODIS monthly climatology with periodic calendar |
 | `--bucket_albedo_type` | String | `"map_static"` | `map_static`, `function`, `map_temporal`, `era5` | Access bucket surface albedo information from data file. Use `era5` for ERA5-derived processed albedo files (requires `era5_initial_condition_dir`) |
 | `--bucket_initial_condition` | String | `""` | Any valid file path | File path for a NetCDF file (read documentation about requirements). In subseasonal mode, automatically inferred from `era5_initial_condition_dir` if not specified |
-| `--era5_initial_condition_dir` | String | `nothing` | Any valid directory path | Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from `start_date`. Generated with `https://github.com/CliMA/WeatherQuest` |
+| `--era5_initial_condition_dir` | String | `nothing` | Any valid directory path | Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from `start_date`. Missing files are fetched from the Copernicus Climate Data Store by [ClimaInitialConditions.jl](https://github.com/CliMA/ClimaInitialConditions.jl) |
 | `--land_fraction_source` | String | `"etopo"` | `etopo`, `era5` | Source for land fraction data. `etopo` uses ETOPO-derived landsea_mask artifact (binary), `era5` uses ERA5/IFS land fraction artifact (0.0 - 1.0), which includes large inland seas and lakes. |
 | `--binary_area_fraction` | Bool | `true` | `true`, `false` | Whether to use binary (thresholded) area fractions for land and ice. When true, land fraction > eps becomes 1, and ice fraction > 0.5 becomes 1 |
 

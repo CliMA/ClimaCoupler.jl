@@ -11,6 +11,7 @@ import Dates
 import ClimaAnalysis
 import ClimaAnalysis: NCCatalog
 import ClimaCoupler
+import ClimaCoupler.Utilities
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaDiagnostics
 import ClimaUtilities.TimeManager: ITime
@@ -842,7 +843,37 @@ end
 function preprocess(::MACDataLoader, var, ::Union{Val{:iwp}, Val{:lwp}})
     var = _preprocess_var(var)
     var = ClimaAnalysis.convert_units(var, "kg m^-2", conversion_function = x -> 0.001 * x)
-    return var
+    return drop_empty_times(var)
+end
+
+"""
+    drop_empty_times(var; max_nan_frac = 0.99)
+
+Drop the times of `var` whose data is more than `max_nan_frac` `NaN`.
+
+A month with essentially no retrievals is not an observation, and it poisons anything that
+takes a mask across times: MAC `lwp` has one such month (1988-01, 99.97% `NaN`) against a
+median of 49.9% for the rest, which is just its ocean mask. Unifying the `NaN` mask over
+the record without dropping it leaves the field entirely empty.
+
+The default is not sensitive. MAC's other months span 47.2% to 56.1% `NaN`, so every
+threshold from 0.6 to 0.99 drops that one month and nothing else. Lowering it past the
+gap, to 0.55, would drop two further months that are merely below average, which trades
+samples for area and is a different decision from dropping empty ones.
+"""
+function drop_empty_times(var; max_nan_frac = 0.99)
+    ClimaAnalysis.has_time(var) || return var
+    n_times = length(ClimaAnalysis.times(var))
+    keep = filter(1:n_times) do index
+        slice = ClimaAnalysis.view_select(var; by = ClimaAnalysis.Index(), time = index)
+        count(isnan, slice.data) / length(slice.data) <= max_nan_frac
+    end
+    length(keep) == n_times && return var
+    isempty(keep) && error(
+        "Every time of $(ClimaAnalysis.short_name(var)) is more than $(100max_nan_frac)% NaN",
+    )
+    @info "Dropping $(n_times - length(keep)) empty time(s) from $(ClimaAnalysis.short_name(var))"
+    return ClimaAnalysis.select(var; by = ClimaAnalysis.Index(), time = keep)
 end
 
 """
@@ -927,12 +958,10 @@ Update "start\\_date" and "t\\_end" in `config_dict` to match `start_date` and
 `end_date`.
 
 The `start\\_date` and `end\\_date` are converted to strings and the keys
-"start_date" and "t_end" in `config_dict` are updated accordingly. Note that any
-precision beyond days (e.g. hours, seconds, etc.) are not used for setting the
-start date.
+"start_date" and "t_end" in `config_dict` are updated accordingly.
 """
 function update_timespan!(config_dict, start_date::Dates.DateTime, end_date::Dates.DateTime)
-    start_date_str = Dates.format(start_date, "yyyymmdd")
+    start_date_str = Utilities.format_start_date(start_date)
     config_dict["start_date"] = start_date_str
     sim_length = Dates.Second(end_date - start_date)
     config_dict["t_end"] = "$(sim_length.value)secs"

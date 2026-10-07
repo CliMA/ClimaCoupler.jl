@@ -43,6 +43,29 @@ function preprocess_sim_vars(vars)
     lat_right = 90
     vars = apply_lat_window.(vars, lat_left, lat_right)
 
+    # Restrict the simulation to the points the observation covers, before the zonal
+    # mean. A satellite retrieval is not global, MAC `lwp` is ocean only, and
+    # `zonal_average` ignores `NaN`, so an unmasked simulation would average every
+    # longitude against an observation that averaged only its covered ones. For `lwp`
+    # that changed the area-weighted bias by a factor of four. See `coverage_mask`.
+    coverage_fp = coverage_mask_path(CALIBRATE_CONFIG.output_dir)
+    if isfile(coverage_fp)
+        coverage_masks = JLD2.load_object(coverage_fp)
+        vars = map(vars) do var
+            mask = get(coverage_masks, ClimaAnalysis.short_name(var), nothing)
+            isnothing(mask) && return var
+            @info "Masking $(ClimaAnalysis.short_name(var)) to the observation's coverage"
+            return mask(var)
+        end
+    else
+        @warn "No coverage masks found, so the simulation zonal mean will average every \
+               longitude even where the observation has no data. Regenerate the \
+               observations to create them." coverage_fp
+    end
+
+    # Keep this in step with the zonal average in the other file.
+    vars = zonal_average.(vars)
+
     if isfile(NORMALIZATION_STATS_FP)
         # Note: This should not be used with SVDplusDCovariance matrix
         normalization_stats = JLD2.load_object(NORMALIZATION_STATS_FP)

@@ -1,14 +1,49 @@
 #=
     Unit tests for ClimaCoupler Utilities module
 =#
-import Test: @testset, @test
+import Test
+import Test: @testset, @test, @test_throws
 import ClimaComms
 ClimaComms.@import_required_backends
 import ClimaCoupler: Utilities
 import ClimaCore as CC
+import Dates
 
 # Initialize MPI context, in case
 ClimaComms.init(ClimaComms.context())
+
+@testset "format_duration / @timed_log" begin
+    @test Utilities.format_duration(0.0123) == "12.3 ms"
+    @test Utilities.format_duration(2.5) == "2.5 s"
+    @test Utilities.format_duration(125.0) == "2 min 5.0 s"
+
+    # The macro returns the value of the expression and logs a message that
+    # carries the wall time, allocations, and compile time.
+    logs, value = Test.collect_test_logs() do
+        Utilities.@timed_log "Doubled" 2 * 21
+    end
+    @test value == 42
+    @test length(logs) == 1
+    @test startswith(logs[1].message, "Doubled (")
+    @test occursin(", compile ", logs[1].message)
+
+    # Destructuring assignment through the macro
+    (; a, b) = Utilities.@timed_log "Pair" (; a = 1, b = 2)
+    @test (a, b) == (1, 2)
+end
+
+@testset "parse_date / format_start_date" begin
+    @test Utilities.parse_date("20000506") == Dates.DateTime(2000, 5, 6)
+    @test Utilities.parse_date("20000506-0000") == Dates.DateTime(2000, 5, 6, 0, 0)
+    @test Utilities.parse_date("20191231-1200") == Dates.DateTime(2019, 12, 31, 12, 0)
+    @test Utilities.parse_date(Dates.DateTime(2019, 12, 31, 12)) ==
+          Dates.DateTime(2019, 12, 31, 12)
+    @test_throws ErrorException Utilities.parse_date("20000506-00000")
+    @test_throws ErrorException Utilities.parse_date("")
+
+    @test Utilities.format_start_date(Dates.DateTime(2019, 12, 31)) == "20191231"
+    @test Utilities.format_start_date(Dates.DateTime(2019, 12, 31, 12)) == "20191231-1200"
+end
 
 for FT in (Float32, Float64)
     @testset "test comms_ctx" begin

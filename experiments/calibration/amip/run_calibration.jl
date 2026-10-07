@@ -19,7 +19,7 @@ include(model_interface_filepath)
 
 # Choose which calibration config to use
 config_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "amip", "config")
-default_config_path = joinpath(config_dir, "pressure_levels.jl")
+default_config_path = joinpath(config_dir, "zonal_cloud.jl")
 
 test_calibration_config_path = joinpath(config_dir, "pipeline_test.jl")
 const TEST_CALIBRATION = haskey(ENV, "TEST_CALIBRATION")
@@ -71,7 +71,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
         scheduler = EKP.DataMisfitController(terminate_at = 1000000),
     )
 
-    coupler_model_interface = CouplerModelInterface(CALIBRATE_CONFIG)
+    coupler_model_interface =
+        CouplerModelInterface(CALIBRATE_CONFIG; emulate_diagnostics = TEST_CALIBRATION)
 
     (; n_iterations) = CALIBRATE_CONFIG
 

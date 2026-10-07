@@ -307,6 +307,7 @@ function _accumulator_to_cpu_nt(acc)
         F_turb_moisture = CC.Adapt.adapt(Array, acc.F_turb_moisture),
         F_turb_ρτxz = CC.Adapt.adapt(Array, acc.F_turb_ρτxz),
         F_turb_ρτyz = CC.Adapt.adapt(Array, acc.F_turb_ρτyz),
+        coupler_fields = map(field -> CC.Adapt.adapt(Array, field), acc.coupler_fields),
         n_steps = acc.n_steps[],
     )
 end
@@ -418,7 +419,7 @@ end
 Overwrite the flux accumulator state in `cs` with values read from
 `input_file`. The file is the JLD2 written by `checkpoint_sims` and contains a
 NamedTuple keyed by surface simulation name; each value is a NamedTuple of
-five host-arrayed fields plus the integer `n_steps`.
+host-arrayed fields plus the integer `n_steps`.
 """
 function restart_flux_accumulators!(cs, input_file)
     ispath(input_file) || error("File $(input_file) not found")
@@ -433,6 +434,12 @@ function restart_flux_accumulators!(cs, input_file)
             for field_name in (:F_lh, :F_sh, :F_turb_moisture, :F_turb_ρτxz, :F_turb_ρτyz)
                 parent(getproperty(live, field_name)) .=
                     ArrayType(parent(getproperty(saved, field_name)))
+            end
+            for field_name in keys(live.coupler_fields)
+                haskey(saved.coupler_fields, field_name) ||
+                    error("Coupler field $(field_name) for $(name) missing from checkpoint")
+                parent(live.coupler_fields[field_name]) .=
+                    ArrayType(parent(saved.coupler_fields[field_name]))
             end
             live.n_steps[] = saved.n_steps
         end

@@ -438,7 +438,12 @@ function _build_coupled_simulation(config_dict::AbstractDict)
             Interfacer.sim_dt(sim) > Δt_cpl_secs
     )
     flux_accumulators = NamedTuple{slow_surface_keys}(
-        Tuple(FluxCalculator.FluxAccumulator(boundary_space) for _ in slow_surface_keys),
+        Tuple(
+            FluxCalculator.FluxAccumulator(
+                boundary_space,
+                FieldExchanger.accumulated_coupler_fields(model_sims[name]),
+            ) for name in slow_surface_keys
+        ),
     )
     isempty(slow_surface_keys) ||
         @info "Allocated flux accumulators for slow surfaces: $(slow_surface_keys)"

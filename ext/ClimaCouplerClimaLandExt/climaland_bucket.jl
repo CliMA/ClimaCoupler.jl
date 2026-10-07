@@ -92,7 +92,7 @@ function BucketSimulation(
             varname = "sw_alb_clr",
         )
     elseif albedo_type == "era5" # Read in albedo from ERA5 processed file
-        # File path is inferred from start_date following the naming convention: albedo_processed_YYYYMMDD_0000.nc
+        # File path is inferred from start_date following the naming convention: albedo_processed_YYYYMMDD_HHMM.nc
         (isnothing(era5_albedo_file_path) || isempty(era5_albedo_file_path)) &&
             error("era5 albedo type requires era5_albedo_file_path to be specified")
         @info "Using ERA5 albedo from" era5_albedo_file_path
@@ -105,7 +105,7 @@ function BucketSimulation(
         )
     elseif albedo_type == "function" # Use prescribed function of lat/lon for surface albedo
         function α_bareground(coordinate_point)
-            (; lat, long) = coordinate_point
+            (; lat) = coordinate_point
             return typeof(lat)(0.38)
         end
         α_snow = toml_dict["alpha_snow"] # snow albedo
@@ -356,7 +356,7 @@ function FluxCalculator.compute_surface_fluxes!(
     thermo_params,
     accumulator = nothing,
 )
-    Y, p, t, model = sim.integrator.u, sim.integrator.p, sim.integrator.t, sim.model
+    Y, p, model = sim.integrator.u, sim.integrator.p, sim.model
 
     # For fast buckets, write directly to the cache. For slow buckets, use `flux_buffer`
     # to hold the intermediate fluxes while we accumulate them.
@@ -460,6 +460,17 @@ function FluxCalculator.update_turbulent_fluxes!(sim::BucketSimulation, fields)
     return nothing
 end
 
+
+"""
+    FieldExchanger.accumulated_coupler_fields(sim::BucketSimulation)
+
+The bucket reads the near-surface atmospheric state in `update_sim!` alongside
+radiation and precipitation, so a bucket stepping more slowly than the coupler
+must have all of them averaged over its timestep.
+"""
+function FieldExchanger.accumulated_coupler_fields(::BucketSimulation)
+    return (:SW_d, :LW_d, :P_liq, :P_snow, :T_atmos, :P_atmos, :q_tot_atmos, :u_int, :v_int)
+end
 
 """
     update_sim!(sim::BucketSimulation, csf)

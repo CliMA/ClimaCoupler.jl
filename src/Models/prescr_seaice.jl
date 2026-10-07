@@ -238,7 +238,7 @@ function PrescribedIceSimulation(
                 @clima_artifact("historical_sst_sic", comms_ctx),
                 "MODEL.ICE.HAD187001-198110.OI198111-202206.nc",
             )
-        catch error
+        catch
             @warn "Using lowres SIC. If you want the higher resolution version, you have to obtain it from ClimaArtifacts"
             joinpath(
                 @clima_artifact("historical_sst_sic_lowres", comms_ctx),

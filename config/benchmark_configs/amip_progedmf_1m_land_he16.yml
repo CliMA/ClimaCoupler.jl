@@ -13,32 +13,6 @@ mode_name: "amip"
 radiation_reset_rng_seed: true
 start_date: "20100101"
 surface_setup: "PrescribedSurface"
-# 86400secs = one simulated day = 2880 coupler steps at dt = 30 s.
-#
-# Was 1200secs (40 steps), which is too short in two independent ways:
-#
-#  * Shorter than the 120-step processes. Cloud fraction and the diagnostics
-#    write are hourly = 120 steps, so neither ever ran in a 40-step window.
-#    Radiation is NOT one of them: dt_rad 600 s = every 20 steps, so 40 steps
-#    is exactly two full periods and weights radiation correctly. What missed
-#    radiation was the 10-step nsys window, which at a 20-step period caught it
-#    0 or 1 times depending on phase (docs/learnings.md 4g, 4t). Gravity waves
-#    are enabled via the atmos config and also fire every 20 steps, not 60 as
-#    this comment previously claimed; at 0.66% of GPU kernel time they are not
-#    a reason to size the window either way.
-#  * Dominated by first-call compilation. The model reported 0.2767 s per
-#    coupling step over 40 steps while steady-state steps measure 0.146 s by
-#    direct CUDA-event timing -- roughly half the reported per-step cost was JIT
-#    amortized over too few steps.
-#
-# One day fires every sub-daily process many times over and the daily ocean and
-# sea-ice diagnostics once, and dilutes first-call compilation ~50x. It costs
-# ~7 minutes of stepping on a job whose compilation is ~35 minutes either way.
-#
-# Set HERE rather than by passing an extra --config_file: that does not merge,
-# it drops the coupler keys in this file back to defaults, which silently
-# changed dt and dt_cpl from 30secs to 400secs on 2026-09-10 and invalidated a
-# full pipeline run.
-t_end: "86400secs"
+t_end: "1200secs"
 topo_smoothing: true
 topography: "Earth"

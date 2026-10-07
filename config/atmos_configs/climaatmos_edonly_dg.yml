@@ -1,0 +1,42 @@
+# EDOnly atmosphere with a horizontal DG discretization.
+# Physics follows climaatmos_edonly.yml; the DG numerics follow
+# config/model_configs/aquaplanet_topo_kgpert_DG.yml in ClimaAtmos.jl (branch as/dg-api).
+# Requires a ClimaAtmos version that supports `horizontal_discretization: "DG"`.
+aerosol_radiation: true
+approximate_linear_solve_iters: 2
+max_newton_iters_ode: 1
+dt: "120secs"
+dt_cloud_fraction: "1hours"
+dt_rad: "1hours"
+dt_save_state_to_disk: "30days"
+dz_bottom: 30.0
+edmfx_sgs_diffusive_flux: true
+use_sgs_quadrature: true
+implicit_diffusion: true
+initial_condition: "WeatherModel"
+insolation: "timevarying"
+netcdf_output_at_levels: true
+ode_algo: ARS343
+prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05", "OC1", "OC2", "SO4", "SSLT01", "SSLT02", "SSLT03", "SSLT04", "SSLT05"]
+rad: "allskywithclear"
+rayleigh_sponge: true
+surface_setup: "DefaultMoninObukhov"
+time_varying_trace_gases: ["CO2", "O3"]
+toml: [toml/longrun_aquaplanet.toml]
+turbconv: "edonly_edmfx"
+viscous_sponge: true
+z_elem: 63
+z_max: 60000.0
+microphysics_model: "0M"
+non_orographic_gravity_wave: true
+orographic_gravity_wave: "raw_topo"
+
+### Horizontal DG numerics (from aquaplanet_topo_kgpert_DG.yml) ###
+horizontal_discretization: "DG"
+dg_equation_form: "vi"
+dg_volume_flux: "kg_pert"
+dg_interface_flux: "roe"
+apply_zhang_shu_limiter: true
+hyperdiff: ~
+mesh_warp_type: "SLEVE"
+topography_damping_factor: 1.0

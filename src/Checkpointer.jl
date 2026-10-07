@@ -438,7 +438,8 @@ function restart_flux_accumulators!(cs, input_file)
             for field_name in keys(live.coupler_fields)
                 haskey(saved.coupler_fields, field_name) ||
                     error("Coupler field $(field_name) for $(name) missing from checkpoint")
-                parent(live.coupler_fields[field_name]) .= ArrayType(parent(saved.coupler_fields[field_name]))
+                parent(live.coupler_fields[field_name]) .=
+                    ArrayType(parent(saved.coupler_fields[field_name]))
             end
             live.n_steps[] = saved.n_steps
         end

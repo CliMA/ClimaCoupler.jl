@@ -83,7 +83,8 @@ end
         F_lh, F_sh = fill(12.0, 4, 4), fill(30.0, 4, 4)
         skin_temperatures = (-25.0, -20.0, -5.0)
         ℵ = setup!(sim, first(skin_temperatures), radiative_per_ice)
-        T_sfc_C = OC.interior(CMIPExt.top_thermodynamics(sim).top_surface_temperature, :, :, 1)
+        T_sfc_C =
+            OC.interior(CMIPExt.top_thermodynamics(sim).top_surface_temperature, :, :, 1)
 
         for Tₛ in skin_temperatures
             T_sfc_C .= Tₛ

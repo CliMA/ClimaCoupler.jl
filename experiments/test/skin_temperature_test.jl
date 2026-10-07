@@ -51,16 +51,7 @@ whose `T_sfc_new` is the updated skin temperature. This mirrors what
 `compute_surface_fluxes!(::ClimaSeaIceSimulation, ...)` does for one grid point.
 """
 function step_surface(c::Column, T_guess)
-    update_T_sfc_cb = CMIPExt.update_T_sfc(
-        c.R,
-        c.T_i,
-        σ,
-        c.ϵ,
-        c.SW_d,
-        c.LW_d,
-        c.α,
-        T_melt,
-    )
+    update_T_sfc_cb = CMIPExt.update_T_sfc(c.R, c.T_i, σ, c.ϵ, c.SW_d, c.LW_d, c.α, T_melt)
     config = SF.SurfaceFluxConfig(
         SF.ConstantRoughnessParams(z0, z0),
         SF.ConstantGustinessSpec(FT(1)),
@@ -142,7 +133,8 @@ const columns = (
         Column(T_atmos = 260.0, u_atmos = 10.0, LW_d = 220.0, R = 1.0),
 )
 
-const melting_column = Column(T_atmos = 274.0, u_atmos = 5.0, SW_d = 400.0, LW_d = 300.0, R = 0.5)
+const melting_column =
+    Column(T_atmos = 274.0, u_atmos = 5.0, SW_d = 400.0, LW_d = 300.0, R = 0.5)
 
 @testset "sea-ice skin temperature solver" begin
     @testset "converges to the flux balance: $name" for (name, c) in columns

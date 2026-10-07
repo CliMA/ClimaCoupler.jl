@@ -321,7 +321,8 @@ function update_model_sims!(model_sims, csf, flux_accumulators = (;))
     for (name, sim) in pairs(model_sims)
         update_sim!(sim, csf)
         accumulator = get(flux_accumulators, name, nothing)
-        isnothing(accumulator) || FluxCalculator.accumulate_coupler_fields!(accumulator, csf)
+        isnothing(accumulator) ||
+            FluxCalculator.accumulate_coupler_fields!(accumulator, csf)
     end
 end
 

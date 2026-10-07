@@ -7,7 +7,7 @@ mode_name: "subseasonal"
 
 # derecho machine data paths
 era5_initial_condition_dir: "/glade/campaign/univ/ucit0011/cchristo/wxquest_data/initial_conditions/initial_conditions_0p25deg_dev/no_hz"
-coupler_output_dir: "/glade/derecho/scratch/cchristo/coupler_runs_v2/weatherbench"
+coupler_output_dir: "/glade/derecho/scratch/asridhar/weatherbench"
 initial_condition: "WeatherModel"
 era5_ic_full_pressure: true
 checkpoint_dt: "1000days"
@@ -18,17 +18,15 @@ dz_bottom: 30.0
 z_elem: 130
 z_max: 70000.0
 
-hyperdiffusion_prandtl_number: 1.0
-divergence_damping_factor: 20.0
-topography_damping_factor: 1.15
+hyperdiff: ~
+topography_damping_factor: 1.0
 
 ### Microphysics: 0M ###
 microphysics_model: "0M"
-atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
+atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 coupler_toml: ["toml/amip_progedmf.toml"]
 dt: "50secs"
 dt_cpl: "50secs"
-vorticity_hyperdiffusion_coefficient: 0.12
 
 land_fraction_source: "era5"
 binary_area_fraction: false

@@ -7,7 +7,11 @@ dt_rad: "1hours"
 dt_save_state_to_disk: "30days"
 dz_bottom: 30.0
 edmfx_sgs_diffusive_flux: true
-h_elem: 16
+horizontal_discretization: "DG"
+dg_equation_form: "vi"
+dg_volume_flux: "kg_pert"
+dg_interface_flux: "roe"
+apply_zhang_shu_limiter: true
 implicit_diffusion: true
 initial_condition: "WeatherModel"
 insolation: "timevarying"
@@ -17,7 +21,6 @@ prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05",
 rad: "allskywithclear"
 rayleigh_sponge: true
 surface_setup: "DefaultMoninObukhov"
-t_end: "120days"
 time_varying_trace_gases: ["CO2", "O3"]
 toml: [toml/longrun_aquaplanet.toml]
 turbconv: "edonly_edmfx"

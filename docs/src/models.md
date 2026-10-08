@@ -190,8 +190,7 @@ The **ice surface temperature** ``T_s`` is obtained by balancing the total surfa
 F_{atm} = F_{ice} = k_i \frac{T_{base} - T_s}{h_i}
 ```
 
-Solving using one Newton iteration (sufficient at the current spatial and temporal
-resolution — see Semtner, 1976):
+Solving using one Newton iteration (see Semtner, 1976):
 
 ```math
 T_s^{t+1} = T_s^{t} + \frac{- F_{atm}^t + k_i (T_{base} - T_s^t) / h_i^{t+1}}{k_i/h_i^{t+1} + \partial F_{atm}^t / \partial T_s^t}

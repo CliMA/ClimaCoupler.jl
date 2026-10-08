@@ -137,6 +137,20 @@ if abspath(PROGRAM_FILE) == @__FILE__
     lat_right = 90
     vars = apply_lat_window.(vars, lat_left, lat_right)
 
+    # Record where each observation has data over the dates in use and apply that
+    # coverage to the observation, before the zonal mean, while longitude still exists.
+    # `observation_map.jl` applies the same masks to the simulation, so the two zonal
+    # means average the same points. A globally covered product gets no mask.
+    mask_date_ranges =
+        unique(vcat(CALIBRATE_CONFIG.sample_date_ranges, covariance_date_ranges))
+    coverage_masks = Dict{String, Any}()
+    vars = map(vars) do var
+        mask = coverage_mask(var, mask_date_ranges)
+        isnothing(mask) && return var
+        coverage_masks[ClimaAnalysis.short_name(var)] = mask
+        return mask(var)
+    end
+
     # Keep this in step with the zonal average in the other file.
     vars = zonal_average.(vars)
 
@@ -150,14 +164,19 @@ if abspath(PROGRAM_FILE) == @__FILE__
     apply_normalization!.(Ref(normalization_stats), vars)
     (; output_dir) = CALIBRATE_CONFIG
     JLD2.save_object(NORMALIZATION_STATS_FP, normalization_stats)
+    # `observation_map.jl` reads these so the simulation is sampled at the same points as
+    # the observation.
+    JLD2.save_object(coverage_mask_path(output_dir), coverage_masks)
 
     # Create observation vector
     (; sample_date_ranges) = CALIBRATE_CONFIG
+    # A config may set `NOISE_BETA`, one model-error variance per observable in
+    # the order of `short_names`.
     observation_vec = make_svdplusd_observation_vector(
         vars,
         sample_date_ranges;
         covariance_date_ranges,
-        beta = 0.05^2,
+        beta = @isdefined(NOISE_BETA) ? NOISE_BETA : 0.05^2,
         rank = 2,
         sigma2 = 1e-6,
         use_latitude_weights = true,

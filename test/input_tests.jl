@@ -4,6 +4,7 @@
 using Test
 import ArgParse
 import Dates
+import ClimaComms
 import ClimaCoupler: Input, Utilities, Interfacer
 import ClimaCoupler
 import YAML
@@ -226,6 +227,42 @@ end
     @test Input.land_diagnostics_period_to_symbol("1months") == :monthly
     @test_throws ErrorException Input.land_diagnostics_period_to_symbol("2hours")
     @test_throws ErrorException Input.land_diagnostics_period_to_symbol("hourly")
+end
+
+# `FluxCalculator.ocean_seaice_fluxes!` runs on the shared ocean/sea-ice cadence, which
+# only exists if the two components share a timestep.
+@testset "parse_component_dts! requires equal ocean and sea ice timesteps" begin
+    cmip_config(dt_ocean, dt_seaice) = Dict{String, Any}(
+        "dt_cpl" => "360secs",
+        "dt_atmos" => "120secs",
+        "dt_land" => "360secs",
+        "dt_ocean" => dt_ocean,
+        "dt_seaice" => dt_seaice,
+        "ocean_model" => "oceananigans",
+        "ice_model" => "clima_seaice",
+    )
+
+    config_dict = cmip_config("1800secs", "1800secs")
+    Input.parse_component_dts!(config_dict)
+    @test config_dict["component_dt_dict"]["dt_ocean"] == 1800.0
+
+    @test_throws AssertionError Input.parse_component_dts!(
+        cmip_config("1800secs", "360secs"),
+    )
+
+    # Prescribed ocean and sea ice exchange no interface fluxes, so they are free to
+    # step independently.
+    prescribed = Dict{String, Any}(
+        "dt_cpl" => "30secs",
+        "dt_atmos" => "30secs",
+        "dt_land" => "60secs",
+        "dt_ocean" => "150secs",
+        "dt_seaice" => "90secs",
+        "ocean_model" => "prescribed",
+        "ice_model" => "prescribed",
+    )
+    Input.parse_component_dts!(prescribed)
+    @test prescribed["component_dt_dict"]["dt_ocean"] == 150.0
 end
 
 @testset "parse_component_dts!" begin
@@ -474,7 +511,7 @@ end
             touch(joinpath(dir, "$(prefix)_$(stamp).nc"))
         end
         start = Dates.DateTime(2019, 12, 31, 12)
-        paths = Input.get_era5_filepaths(Interfacer.SubseasonalMode, dir, start, "")
+        paths = Input.get_era5_filepaths(dir, start, "", ClimaComms.context())
         @test paths.sst_path == joinpath(dir, "sst_processed_$(stamp).nc")
         @test paths.sic_path == joinpath(dir, "sic_processed_$(stamp).nc")
         @test paths.land_ic_path == joinpath(dir, "era5_land_processed_$(stamp).nc")
@@ -494,10 +531,10 @@ end
             touch(joinpath(dir, "$(prefix)_$(stamp00).nc"))
         end
         paths00 = Input.get_era5_filepaths(
-            Interfacer.SubseasonalMode,
             dir,
             Dates.DateTime(2020, 1, 1),
             "",
+            ClimaComms.context(),
         )
         @test endswith(paths00.sst_path, "sst_processed_$(stamp00).nc")
     end

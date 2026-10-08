@@ -102,11 +102,13 @@ Terraplanet is enabled by setting `mode_name: "slabplanet_terra"`.
 
 Generates 3–4 week forecasts initialized from ERA5 reanalysis data. The setup is otherwise
 similar to AMIP, but uses specific ERA5-derived initial conditions for the land model. The
-`era5_initial_condition_dir` option must point to a directory containing the initial
-condition files described below.
+`era5_initial_condition_dir` option sets the directory holding the initial condition
+files described below. Without it, the `wxquest_initial_conditions` artifact is used.
 
-Initial condition files can be generated using the
-[WeatherQuest](https://github.com/CliMA/WeatherQuest) package.
+If the directory lacks the files for `start_date`, they are fetched from the
+Copernicus Climate Data Store by
+[ClimaInitialConditions.jl](https://github.com/CliMA/ClimaInitialConditions.jl). This needs
+a CDS account and a `~/.cdsapirc` file, as described in its README.
 
 Subseasonal mode is enabled by setting `mode_name: "subseasonal"`.
 

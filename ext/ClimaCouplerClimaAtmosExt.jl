@@ -22,6 +22,7 @@ import Insolation
 import Insolation.Parameters: InsolationParameters
 import LinearAlgebra
 import Statistics
+import ClimaCoupler.Utilities: @timed_log
 import ClimaCoupler:
     Checkpointer,
     FieldExchanger,
@@ -89,7 +90,7 @@ end
 function ClimaAtmosSimulation(atmos_config)
     # By passing `parsed_args` to `AtmosConfig`, `parsed_args` overwrites the default atmos config
     FT = atmos_config.parsed_args["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
-    simulation = CA.get_simulation(atmos_config)
+    simulation = @timed_log "ClimaAtmos: get_simulation" CA.get_simulation(atmos_config)
     (; integrator, output_writers) = simulation
     Y = integrator.u
     center_space = axes(Y.c.ρe_tot)
@@ -123,7 +124,7 @@ function ClimaAtmosSimulation(atmos_config)
     sim = ClimaAtmosSimulation(integrator.p.params, spaces, integrator, output_writers)
 
     # DSS state to ensure we have continuous fields
-    dss_state!(sim)
+    @timed_log "ClimaAtmos: zeroed fluxes and applied DSS to the state" dss_state!(sim)
     return sim
 end
 

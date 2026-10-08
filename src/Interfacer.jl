@@ -27,6 +27,7 @@ export CoupledSimulation,
     AbstractOceanSimulation,
     get_field,
     update_field!,
+    update_sim!,
     AbstractSurfaceStub,
     SurfaceStub,
     step!,
@@ -449,6 +450,14 @@ NVTX.@annotate function step!(sim::AbstractComponentSimulation, t::ITime)
 end
 
 """
+    update_sim!(sim::AbstractComponentSimulation, csf)
+
+Update the component model with the coupler fields `csf`, other than the turbulent
+fluxes. Methods are defined in `FieldExchanger`.
+"""
+function update_sim! end
+
+"""
     sim_dt(sim::AbstractComponentSimulation)
 
 Return the component model's timestep in seconds as a `Float64`.
@@ -533,7 +542,7 @@ abstract type AMIPMode <: AbstractSimulationMode end
 An abstract type representing the subseasonal simulation mode. This mode is similar to AMIP
 but uses different data sources and initialization pathways tailored for subseasonal runs.
 
-Inputs are ERA5-derived netcdfs with initial conditions produced by `https://github.com/CliMA/WeatherQuest`. Given `start_date` (`YYYYMMDD` or `YYYYMMDD-HHMM`)
+Inputs are ERA5-derived netcdfs with initial conditions produced by `ClimaInitialConditions.ERA5`, which fetches missing files. Given `start_date` (`YYYYMMDD` or `YYYYMMDD-HHMM`)
 and directory `era5_initial_condition_dir`, filenames containing the initial conditions are inferred as
 (with `HHMM` taken from `start_date`, defaulting to `0000` for date-only strings):
 - `sst_processed_YYYYMMDD_HHMM.nc` (variable `SST`)

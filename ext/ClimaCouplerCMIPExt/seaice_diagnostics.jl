@@ -55,7 +55,7 @@ function add_seaice_diagnostics!(
         schedule = diagnostic_schedule(mode, resolved_interval),
         filename = joinpath(output_dir, filename_prefix * "_surface"),
         file_splitting,
-        overwrite_existing = true,
+        overwrite_files = true,
     )
 
     @info "Sea-ice diagnostics attached:" *

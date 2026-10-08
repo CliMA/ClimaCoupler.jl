@@ -12,6 +12,71 @@ selectable with `ice_model: "eisenman"`. The turbulent flux derivative
 `∂F_turb/∂T_sfc` (whose coupler-side finite-difference machinery was removed
 with the model) is dropped from the surface Newton solve, which now treats
 the turbulent flux explicitly and retains only the radiative derivative.
+
+#### Average the sea-ice skin emission and temperature over the coupling window
+A sea ice stepping more slowly than the coupler solves the skin balance on every coupling step, each with
+its own `Tₛ`, but was pushed a top heat flux that mixed window means of the absorbed radiation and of the
+turbulent fluxes with the emission `σϵTₛ⁴` of the last coupling step only, while ClimaSeaIce computed the
+conductive flux from that same last `Tₛ`. The balance holds on every step, so on average it holds only for
+the mean of `σϵTₛ⁴` and the mean of `Tₛ` (the conductive flux is linear in `Tₛ` while `R` and `Tᵢ` are
+frozen), and the mismatch left a Stefan residual of about 3.5 W m⁻² for each kelvin `Tₛ` drifts within
+the window. `ClimaSeaIceSimulation` now accumulates both after every skin-temperature diagnosis, and
+`compute_ice_top_heat_flux!` builds `Jᵃ` from the mean emission and writes the mean `Tₛ` to
+`top_surface_temperature` before the ice steps. A sea ice stepping every coupling step is unchanged.
+Covered by `experiments/test/sea_ice_fluxes_test.jl`.
+
+#### Weight the sea-ice top heat flux by the ice concentration
+`external_heat_fluxes.top` was handed to ClimaSeaIce as a per-ice-area flux, but ClimaSeaIce reads it
+as a grid-cell mean: `SeaIceThermodynamics/thermodynamic_time_step.jl` recovers the per-ice flux as
+`Qui / ℵ`, and forms the volume tendency from `Qui - Qbi` whose bottom half already carries the
+concentration. The ice therefore absorbed `1/ℵ` times the energy it should, and the surface-melt
+residual `δQ = Qui/ℵ - Qis` was `Jᵃ(1/ℵ - 1)` instead of zero at skin equilibrium — a spurious melt
+term that grows without bound as the concentration falls. Both writes to the Field (the absorbed
+radiative part in `update_sim!` and the emission plus turbulent part in
+`compute_ice_top_heat_flux!`) are now weighted by `ℵ`, matching NumericalEarth's
+`_assemble_net_sea_ice_fluxes!` and `_apply_air_sea_ice_radiative_fluxes!`. The momentum stresses
+stay per unit ice area, as they are there. Covered by
+`experiments/test/sea_ice_fluxes_test.jl`.
+
+#### Scale the sea-ice skin-temperature fluxes by the surface density
+The turbulent fluxes inside the `update_T_sfc` callback were scaled by the interior air density
+`inputs.ρ_int`, while `SurfaceFluxes` scales the fluxes it finally returns by the surface density. The
+skin balance therefore converged to a temperature that does not satisfy the balance formed from the
+fluxes actually handed to the atmosphere and to the ice, leaving a residual of a few percent of the
+turbulent flux — 36 W m⁻² over thin ice — which ClimaSeaIce turns into surface melt. Both fluxes are
+now evaluated at the surface density that the callback already computes for the saturation humidity.
+`experiments/test/skin_temperature_test.jl` drives one column through the real `SurfaceFluxes` solve
+and asserts the residual `Jᵃ(Tₛ) + (Tₛ - Tᵢ)/R` vanishes, over a range of column states and from
+several initial guesses.
+
+#### Time-average the fluxes a slow surface is driven with
+A surface stepping more slowly than the coupler (`dt_ocean = 1800s` against `dt_cpl = 360s`
+in the CMIP configurations) now receives the radiative and precipitation fluxes averaged
+over its own timestep, matching the treatment the turbulent fluxes already had. `SW_d`,
+`LW_d`, `P_liq` and `P_snow` were sampled on the last coupling step before the surface
+stepped and applied for the whole step, so the atmosphere lost `Σ Rᵢ Δt_cpl` while the
+ocean gained `R_last dt_ocean`. Each surface declares what it needs averaged through
+`FieldExchanger.accumulated_coupler_fields`, and the existing `FluxAccumulator` carries
+them under the same step count and the same push as the turbulent fluxes.
+
+#### Run the ice-ocean fluxes on the ice-ocean cadence
+`FluxCalculator.ocean_seaice_fluxes!` ran once per coupling step, but
+`compute_sea_ice_ocean_fluxes!` takes a single `Δt` and its result is consumed by one ocean
+step and one sea-ice step. Its frazil half also clamps supercooled ocean temperature in
+place, so with `dt_cpl < dt_seaice` the first call of a window released the frazil heat and
+every later call recomputed zero against the already-clamped ocean, overwriting it: the
+energy left the ocean and reached nothing. The interface fluxes are now assembled on the
+coupling step that precedes the shared ocean/sea-ice step. **`dt_ocean == dt_seaice` is now
+required** when coupling Oceananigans to ClimaSeaIce, so that shared cadence exists; every
+existing CMIP configuration already satisfies it.
+
+#### Log setup and first-step timings.
+`CoupledSimulation` setup now logs the wall time, allocations, and compile
+time of each phase (atmosphere, land, ocean, sea ice, coupler fields,
+diagnostics, initial exchange) through the new `Utilities.@timed_log` macro,
+and `run!` logs the two warmup coupling steps the same way instead of running
+them silently. Reported SYPD and walltime are unchanged.
+
 #### Support non-00Z `start_date` for subseasonal / WeatherQuest ICs.
 `start_date` now accepts `YYYYMMDD-HHMM` (in addition to `YYYYMMDD`), matching
 ClimaAtmos. Subseasonal ERA5 land/SST/SIC/albedo/bucket paths use that HHMM

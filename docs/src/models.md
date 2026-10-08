@@ -245,10 +245,8 @@ writing to `sim.integrator.p.ocean_qflux` directly (as the unit tests do).
 own mixed layer, it should not be paired with a separate ocean model
 overlapping the same surface area.
 
-### Potential extensions
-
-- add an `ice_area_fraction` adjustment (e.g., assuming a minimal thickness of
-  sea ice, below which the grid area becomes part ice and part ocean)
+### Note
+The current implementation assumes total ice coverage, e.g. an ice area fraction of one for ice thickness above zero.
 
 
 ## Models in Extensions

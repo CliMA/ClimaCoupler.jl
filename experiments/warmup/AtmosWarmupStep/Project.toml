@@ -1,0 +1,14 @@
+name = "AtmosWarmupStep"
+uuid = "a1b2c3d4-0003-4000-8000-000000000003"
+version = "0.1.0"
+
+[deps]
+AtmosWarmupExplicit = "a1b2c3d4-0002-4000-8000-000000000002"
+AtmosWarmupSetup = "a1b2c3d4-0001-4000-8000-000000000001"
+ClimaAtmos = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
+ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
+ClimaTimeSteppers = "595c0a79-7f3d-439a-bc5a-b232dc3bde79"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
+YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"

@@ -1,0 +1,9 @@
+name = "CouplerWarmupCommon"
+uuid = "b7e4c201-9a63-4d85-8f12-3c6a0b94e7d2"
+version = "0.1.0"
+
+[deps]
+ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
+ClimaCoupler = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
+ClimaParams = "5c42b081-d73a-476f-9059-fd94b934656c"
+Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"

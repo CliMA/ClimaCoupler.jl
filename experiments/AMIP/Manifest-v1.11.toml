@@ -532,9 +532,9 @@ version = "1.12.3"
 
 [[deps.ClimaParams]]
 deps = ["Dates", "TOML"]
-git-tree-sha1 = "c264c74b1b77d51b105d65679e6472af93c94a7f"
+git-tree-sha1 = "89432ac3c44544338d87c8109d3ffaf0fde12cf3"
 uuid = "5c42b081-d73a-476f-9059-fd94b934656c"
-version = "1.2.1"
+version = "1.3.0"
 
 [[deps.ClimaTimeSteppers]]
 deps = ["ClimaComms", "Krylov", "LinearAlgebra", "LinearOperators", "NVTX", "NullBroadcasts", "StaticArrays"]
@@ -2488,10 +2488,10 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 version = "1.11.0"
 
 [[deps.RRTMGP]]
-deps = ["Adapt", "Artifacts", "ClimaComms", "PrecompileTools", "Random", "Serialization"]
+deps = ["Adapt", "Artifacts", "ClimaComms", "PrecompileTools", "Serialization"]
 path = "../../../RRTMGP.jl-mod"
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
-version = "1.0.1"
+version = "1.1.0"
 weakdeps = ["CUDA", "ClimaParams", "NCDatasets"]
 
     [deps.RRTMGP.extensions]

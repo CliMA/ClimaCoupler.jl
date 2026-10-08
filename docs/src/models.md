@@ -198,8 +198,8 @@ T_s^{t+1} = T_s^{t} + \frac{- F_{atm}^t + k_i (T_{base} - T_s^t) / h_i^{t+1}}{k_
 
 where the conductive flux is evaluated with the updated ice thickness
 ``h_i^{t+1}`` and the current surface temperature ``T_s^t``. The updated
-``T_s`` is capped at the freezing point (the ice surface stores no energy). The
-derivative ``\partial F_{atm} / \partial T_s = 4 \epsilon \sigma T_s^3``
+``T_s`` is capped at the freezing point (the ice surface stores no energy). 
+**NOTE**: The derivative ``\partial F_{atm} / \partial T_s = 4 \epsilon \sigma T_s^3``
 contains only the radiative contribution: the turbulent flux derivative
 ``\partial F_{\text{turb}} / \partial T_s`` is no longer provided by the
 coupler (its finite-difference machinery was removed in

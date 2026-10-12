@@ -138,7 +138,7 @@ function add_ocean_diagnostics!(
         schedule,
         filename = joinpath(output_dir, filename_prefix * "_surface"),
         file_splitting,
-        overwrite_existing = true,
+        overwrite_files = true,
     )
 
     field_outputs = Dict{Symbol, Any}(
@@ -159,7 +159,7 @@ function add_ocean_diagnostics!(
         schedule,
         filename = joinpath(output_dir, filename_prefix * "_fields"),
         file_splitting,
-        overwrite_existing = true,
+        overwrite_files = true,
     )
 
     @info "Ocean diagnostics attached:" *

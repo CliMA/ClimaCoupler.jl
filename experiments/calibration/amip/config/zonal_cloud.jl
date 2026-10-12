@@ -1,3 +1,7 @@
+# A worked zonal-mean example: liquid water path and the two cloud radiative
+# effects. Every observable here is reduced to a zonal mean by the shared
+# preprocessing.
+
 # Define which coupler file to use
 config_file =
     joinpath(pkgdir(ClimaCoupler), "config", "amip_configs", "amip_calibration.yml")
@@ -13,13 +17,11 @@ covariance_date_ranges =
 
 # On Derecho, it is preferable to save the calibration output to the scratch
 # directory (e.g. "/glade/derecho/scratch")
-output_dir = joinpath(pkgdir(ClimaCoupler), "amip_calibration")
+output_dir = joinpath(pkgdir(ClimaCoupler), "amip_calibration_zonal_cloud")
 
 const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     config_file,
-    # Note: Pressure-level variables require model output with
-    # pressure_coordinates: true in config
-    short_names = ["lwp", "ta", "hur"],
+    short_names = ["lwp", "swcre", "lwcre"],
     minibatch_size = 1,
     n_iterations = 5,
     sample_date_ranges,
@@ -29,8 +31,7 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     rng_seed = 42,
 )
 
-# Used in generate_observations.jl and observation_map.jl
-# Units: Pa (not hPa)
+# No pressure-level variables here, so this selects nothing and the step is a no-op.
 const PRESSURE_LEVELS = 100.0 .* [200.0, 500.0, 850.0]
 
 # To disable normalization, update generate_observations.jl to not apply the
@@ -38,11 +39,15 @@ const PRESSURE_LEVELS = 100.0 .* [200.0, 500.0, 850.0]
 const NORMALIZATION_STATS_FP =
     joinpath(CALIBRATE_CONFIG.output_dir, "normalization_stats.jld2")
 
+# How much of the model-data difference to treat as irreducible model error, as a
+# variance, one value per observable in the order of `short_names`.
+const NOISE_BETA = [0.10, 0.074, 0.074]
+
 const CALIBRATION_PRIORS = [
+    PD.constrained_gaussian("cloud_fraction_eps_rel", 0.05, 0.02, 0.001, 0.2),
+    PD.constrained_gaussian("entr_coeff", 0.3, 0.15, 0.02, 1.0),
+    PD.constrained_gaussian("cloud_liquid_rain_collision_efficiency", 0.8, 0.15, 0.1, 1.0),
     PD.constrained_gaussian("rain_autoconversion_timescale", 1800, 300, 300, 3600),
-    # PD.constrained_gaussian("Tq_correlation_coefficient", 0.4, 0.4, -1.0, 1.0),
-    # PD.constrained_gaussian("mixing_length_eddy_viscosity_coefficient", 0.2, 0.1, 0, 1.0),
-    # PD.constrained_gaussian("mixing_length_tke_surf_flux_coeff", 8.0, 4.0, 0, 100.0),
 ]
 
 const PRIORS = EKP.combine_distributions(CALIBRATION_PRIORS)

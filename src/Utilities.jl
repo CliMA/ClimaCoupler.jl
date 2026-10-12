@@ -21,7 +21,8 @@ export get_device,
     format_start_date,
     integral,
     create_boundary_space,
-    diagnostics_global_attribs
+    diagnostics_global_attribs,
+    @timed_log
 
 """
     get_device(config_dict)
@@ -78,6 +79,71 @@ function get_comms_context(config_dict)
     end
 
     return comms_ctx
+end
+
+"""
+    format_duration(seconds)
+
+Return `seconds` as a short human-readable string: milliseconds below one
+second, seconds below one minute, otherwise minutes and seconds.
+"""
+function format_duration(seconds::Real)
+    seconds < 1 && return string(round(seconds * 1e3, digits = 1), " ms")
+    seconds < 60 && return string(round(seconds, digits = 2), " s")
+    minutes = floor(Int, seconds / 60)
+    return string(minutes, " min ", round(seconds - 60 * minutes, digits = 1), " s")
+end
+
+"""
+    device_sync()
+
+Wait for any work queued on the default device to finish. A no-op on CPU.
+"""
+device_sync() = ClimaComms.sync(Returns(nothing), ClimaComms.device())
+
+"""
+    @timed_log "message" expr
+
+Evaluate `expr` and return its value, logging `message` with the wall time,
+the allocated memory, and the time spent compiling during the evaluation, e.g.
+`"Initialized atmosphere simulation (41.3 s, 1.2 GiB, compile 37.9 s)"`.
+
+The device is synchronized before the clock stops, so that work queued on a
+GPU is counted against the expression that queued it rather than against a
+later one. Logging is already restricted to the root process by ClimaComms.
+
+The value is returned so the macro can wrap the right-hand side of an
+assignment: `atmos_sim = @timed_log "Initialized atmosphere" make_atmos()`.
+"""
+macro timed_log(message, ex)
+    quote
+        # Base.@timed only reports compile time on Julia 1.11 and later, so it
+        # is measured here. The counter keeps its value once tracking is off.
+        Base.cumulative_compile_timing(true)
+        local compile_before = Base.cumulative_compile_time_ns()
+        local stats = try
+            @timed begin
+                local value = $(esc(ex))
+                device_sync()
+                value
+            end
+        finally
+            Base.cumulative_compile_timing(false)
+        end
+        local compile_seconds =
+            (Base.cumulative_compile_time_ns()[1] - compile_before[1]) / 1e9
+        @info string(
+            $(esc(message)),
+            " (",
+            format_duration(stats.time),
+            ", ",
+            Base.format_bytes(stats.gcstats.allocd),
+            ", compile ",
+            format_duration(compile_seconds),
+            ")",
+        )
+        stats.value
+    end
 end
 
 """

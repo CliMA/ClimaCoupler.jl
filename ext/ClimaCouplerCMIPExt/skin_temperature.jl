@@ -20,7 +20,7 @@ import Thermodynamics as TD
 
 Total upward turbulent energy flux `F_sh + F_lh` at a trial surface temperature
 `T_sfc`, with surface density and saturation specific humidity evaluated
-consistently at `T_sfc`.
+consistently at `T_sfc`, and scaled by that surface density.
 """
 function surface_turbulent_energy_flux(
     ζ,
@@ -55,7 +55,7 @@ function surface_turbulent_energy_flux(
         z0s,
         T_sfc,
         q_vap_sfc,
-        inputs.ρ_int,
+        ρ_sfc,
         scheme,
     )
     F_lh = SF.latent_heat_flux(
@@ -66,7 +66,7 @@ function surface_turbulent_energy_flux(
         z0m,
         z0s,
         q_vap_sfc,
-        inputs.ρ_int,
+        ρ_sfc,
         scheme,
     )
     return F_sh + F_lh

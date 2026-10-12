@@ -16,8 +16,22 @@ See the ClimaCalibrate.jl documentation for the methods that
 `CouplerModelInterface` should implement.
 """
 struct CouplerModelInterface <: ClimaCalibrate.AbstractModelInterface
+    "The calibration configuration"
     config::CalibrationTools.CalibrateConfig
+
+    "Whether the `forward_model` emulates the diagnostics instead of running the
+    simulation. The diagnostics have the correct metadata, but the values may be
+    nonsensical, so this is only for testing the pipeline."
+    emulate_diagnostics::Bool
 end
+
+"""
+    CouplerModelInterface(config; emulate_diagnostics = false)
+
+Construct a `CouplerModelInterface` from the calibration config `config`.
+"""
+CouplerModelInterface(config; emulate_diagnostics = false) =
+    CouplerModelInterface(config, emulate_diagnostics)
 
 """
     ClimaCalibrate.forward_model(interface::CouplerModelInterface, iter, member)
@@ -53,12 +67,11 @@ function ClimaCalibrate.forward_model(interface::CouplerModelInterface, iter, me
 
     @info "Simulation dates" start_date end_date
 
-    TEST_CALIBRATION = haskey(ENV, "TEST_CALIBRATION")
-    if !TEST_CALIBRATION
-        ClimaCoupler.SimCoordinator.setup_and_run(config_dict)
-    else
+    if interface.emulate_diagnostics
         @info "Emulating diagnostics for test calibration"
         CalibrationTools.setup_and_emulate_diagnostics(config_dict)
+    else
+        ClimaCoupler.SimCoordinator.setup_and_run(config_dict)
     end
     @info "Completed member $member"
     return nothing

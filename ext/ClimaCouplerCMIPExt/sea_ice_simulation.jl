@@ -115,7 +115,7 @@ function sea_ice_simulation(
     stop_time = default_stop_time(grid, clock),
     Δt = 5minutes,
     ice_salinity = 4, # psu
-    advection = nothing,
+    advection = CSI.IncrementalRemapping(),
     tracers = (),
     ice_heat_capacity = 2100, # J kg⁻¹ K⁻¹
     ice_consolidation_thickness = 0.05, # m
@@ -125,7 +125,7 @@ function sea_ice_simulation(
     dynamics = sea_ice_dynamics(grid, ocean),
     bottom_heat_boundary_condition = nothing,
     top_heat_boundary_condition = nothing,
-    timestepper = :SplitRungeKutta3,
+    timestepper = :ForwardEuler,
     phase_transitions = CSI.PhaseTransitions(
         eltype(grid);
         heat_capacity = ice_heat_capacity,
@@ -231,6 +231,9 @@ default_coriolis(ocean::OC.Simulation) = ocean.model.coriolis
 default_coriolis(ocean::Nothing) =
     OC.HydrostaticSphericalCoriolis(; rotation_rate = default_planet_rotation_rate())
 
+ocean_surface_height(::Nothing, FT) = OC.Fields.ZeroField(FT)
+ocean_surface_height(ocean::OC.Simulation, FT) = ocean.model.free_surface.displacement
+
 function sea_ice_dynamics(
     grid,
     ocean = nothing;
@@ -241,9 +244,10 @@ function sea_ice_dynamics(
     solver = CSI.SplitExplicitSolver(grid; substeps = 100),
 )
 
-    SSU, SSV = ocean_surface_velocities(ocean)
-
     FT = eltype(grid)
+    SSU, SSV = ocean_surface_velocities(ocean)
+    SSH = ocean_surface_height(ocean, FT)
+
     sea_ice_ocean_drag_coefficient = convert(FT, sea_ice_ocean_drag_coefficient)
     ρₑ = ocean_reference_density(ocean, FT)
 
@@ -272,6 +276,7 @@ function sea_ice_dynamics(
     return CSI.SeaIceMomentumEquation(
         velocity_grid;
         coriolis,
+        ocean_surface_height = SSH,
         top_momentum_stress = (u = τua, v = τva),
         bottom_momentum_stress = τo,
         rheology,

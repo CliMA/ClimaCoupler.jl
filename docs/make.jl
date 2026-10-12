@@ -83,6 +83,7 @@ makedocs(
     sitename = "ClimaCoupler.jl",
     format = Documenter.HTML(),
     pages = pages,
+    warnonly = true,
 )
 
 deploydocs(

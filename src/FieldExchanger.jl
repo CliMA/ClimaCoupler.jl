@@ -10,6 +10,7 @@ import ClimaCore as CC
 import .Threads
 
 import ..Interfacer, ..FluxCalculator, ..Utilities
+import ..Interfacer: update_sim!
 
 "True when this quantity has an overlap cache and the coupler fields carry it."
 function has_slow_cache(csf, val)
@@ -32,6 +33,7 @@ slow_cache_name(::Val{:surface_direct_albedo}) = :slow_direct_albedo
 slow_cache_name(::Val{:surface_diffuse_albedo}) = :slow_diffuse_albedo
 
 export update_sim!,
+    accumulated_coupler_fields,
     update_model_sims!,
     step_model_sims!,
     exchange!,
@@ -329,21 +331,46 @@ function update_sim!(sim::Interfacer.AbstractSurfaceSimulation, csf)
 end
 
 """
-    update_model_sims!(model_sims, csf)
+    accumulated_coupler_fields(sim::Interfacer.AbstractSurfaceSimulation)
+
+Return the coupler fields to time-average over this surface's timestep before
+handing them to `update_sim!`.
+"""
+accumulated_coupler_fields(::Interfacer.AbstractSurfaceSimulation) =
+    (:SW_d, :LW_d, :P_liq, :P_snow)
+
+"""
+    update_model_sims!(model_sims, csf, flux_accumulators = (;); slow_frozen = false)
 
 Iterates `update_sim!` over all component model simulations saved in `cs.model_sims`.
+
+For a surface in `flux_accumulators`, the fields it declared in
+`accumulated_coupler_fields` are also added to the accumulator, and
+`FluxCalculator.push_ready_accumulators!` overwrites them with the window average just
+before the surface steps.
 
 # Arguments
 - `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
 - `csf`: [NamedTuple] containing coupler fields.
+- `flux_accumulators`: [NamedTuple] of `FluxCalculator.FluxAccumulator`s keyed by
+    surface simulation name.
+- `slow_frozen`: [Bool] if `true`, skip overlapped sims, whose step is in flight.
 """
-function update_model_sims!(model_sims, csf; slow_frozen::Bool = false)
-    for sim in model_sims
+function update_model_sims!(
+    model_sims,
+    csf,
+    flux_accumulators = (;);
+    slow_frozen::Bool = false,
+)
+    for (name, sim) in pairs(model_sims)
         # `update_sim!` for the ocean zeroes and rebuilds its surface flux
         # fields, which the ocean is integrating with while a slow step is in
         # flight. Leave those sims alone until the step is joined.
         slow_frozen && Interfacer.is_overlapped(sim) && continue
         update_sim!(sim, csf)
+        accumulator = get(flux_accumulators, name, nothing)
+        isnothing(accumulator) ||
+            FluxCalculator.accumulate_coupler_fields!(accumulator, csf)
     end
 end
 
@@ -740,7 +767,7 @@ function exchange!(cs::Interfacer.CoupledSimulation; slow_frozen::Bool = false)
     import_combined_surface_fields!(cs.fields, cs.model_sims; slow_frozen)
 
     # Update the component model simulations with the coupler fields
-    update_model_sims!(cs.model_sims, cs.fields; slow_frozen)
+    update_model_sims!(cs.model_sims, cs.fields, cs.flux_accumulators; slow_frozen)
     return nothing
 end
 

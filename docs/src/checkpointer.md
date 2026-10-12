@@ -121,6 +121,11 @@ accumulators to a per-rank JLD2 file whenever they are non-empty, and
 a restart. Configurations without slow surfaces leave `flux_accumulators`
 empty and no accumulator file is written.
 
+The same file carries the accumulated coupler fluxes (see
+[Coupler flux accumulation for slow surfaces](@ref)), so a restart resumes a partially
+filled window rather than averaging a different number of contributions than the
+original run.
+
 ### Overlapped slow surfaces
 
 When `overlap_slow_surfaces` is set, an ocean/sea ice step may be in flight when

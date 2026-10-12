@@ -81,6 +81,14 @@ type = "float"
 value = 100
 type = "float"
 
+[sgs_variance_horizontal_scale_factor]
+value = 1.5
+type = "float"
+
+[sgs_variance_vertical_scale_factor]
+value = 0.5
+type = "float"
+
 [condensation_evaporation_timescale]
 value = 100
 type = "float"
@@ -101,6 +109,14 @@ type = "float"
 value = 1.25e-4
 type = "float"
 
+[cloud_liquid_water_specific_humidity_autoconversion_threshold_stratiform_scale]
+value = 3.0
+type = "float"
+
+[rain_autoconversion_velocity_scale]
+value = 0.05
+type = "float"
+
 [cloud_ice_specific_humidity_autoconversion_threshold]
 value = 5e-6
 type = "float"
@@ -119,12 +135,4 @@ type = "float"
 
 [cloud_fraction_eps_rel]
 value = 0.05
-type = "float"
-
-[sgs_ice_uniform_fraction]
-value = 1.0
-type = "float"
-
-[sgs_liquid_uniform_fraction]
-value = 0.0
 type = "float"

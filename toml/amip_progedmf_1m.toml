@@ -61,6 +61,12 @@ value = 1
 [mixing_length_Prandtl_maximum]
 value = 100
 
+[sgs_variance_horizontal_scale_factor]
+value = 1.5
+
+[sgs_variance_vertical_scale_factor]
+value = 0.5
+
 [condensation_evaporation_timescale]
 value = 100
 
@@ -76,6 +82,12 @@ value = 1360
 [cloud_liquid_water_specific_humidity_autoconversion_threshold]
 value = 1.25e-4
 
+[cloud_liquid_water_specific_humidity_autoconversion_threshold_stratiform_scale]
+value = 3.0
+
+[rain_autoconversion_velocity_scale]
+value = 0.05
+
 [cloud_ice_specific_humidity_autoconversion_threshold]
 value = 5e-6
 
@@ -90,9 +102,3 @@ value = 1.5
 
 [cloud_fraction_eps_rel]
 value = 0.05
-
-[sgs_ice_uniform_fraction]
-value = 1.0
-
-[sgs_liquid_uniform_fraction]
-value = 0.0

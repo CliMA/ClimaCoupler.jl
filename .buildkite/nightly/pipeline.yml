@@ -9,6 +9,7 @@ env:
   SLURM_KILL_BAD_EXIT: 1
   CONFIG_PATH: "config/nightly_configs"
   BENCHMARK_CONFIG_PATH: "config/benchmark_configs"
+  LONGRUN_CONFIG_PATH: "config/longrun_configs"
   # By default, packages use the main branch.
   # Use `Package@version` to pin a version.
   # Use `Package#rev` to pin a branch or commit.
@@ -16,10 +17,6 @@ env:
   # UPSTREAM_PACKAGES environment variable. For example, if you pass
   # `UPSTREAM_PACKAGES="ClimaAtmos SurfaceFluxes@1.1.0", then the main branch
   # of ClimaAtmos and SurfaceFluxes v1.1.0 will be used.
-  # ClimaLand is pinned to its latest release: ClimaLand main (after CliMA/ClimaLand.jl#1882)
-  # no longer defines `Spaces.issubspace` for pairs of spectral-element spaces under
-  # ClimaCore v1, which `Interfacer.remap!` still relies on to exchange atmosphere
-  # surface fields. Unpin once the coupler no longer depends on that method.
   UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore ClimaTimeSteppers Thermodynamics ClimaLand SurfaceFluxes RRTMGP CloudMicrophysics}"
 
 timeout_in_minutes: 900
@@ -30,28 +27,30 @@ steps:
     command:
       - "echo $$JULIA_DEPOT_PATH"
 
-      - echo "--- Instantiate AMIP env"
-      - "JULIA_PKG_PRECOMPILE_AUTO=0 julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       # For this pipeline, use the main branches of certain upstream packages
       # see UPSTREAM_PACKAGES environment variable
       - |
-        julia --project=experiments/AMIP/ -e '
-          using Pkg
-          Pkg.add(map(split(ENV["UPSTREAM_PACKAGES"])) do entry
-              if occursin("@", entry)
-                  name, version = String.(split(entry, "@"))
-                  Pkg.PackageSpec(; name, version)
-              elseif occursin("#", entry)
-                  name, rev = String.(split(entry, "#"))
-                  Pkg.PackageSpec(; name, rev)
-              else
-                  Pkg.PackageSpec(; name = entry, rev = "main")
-              end
-          end)'
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.resolve()'"
+        for env in AMIP CMIP; do
+          echo "--- Instantiate $$env env"
+          JULIA_PKG_PRECOMPILE_AUTO=0 julia --project=experiments/$$env/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'
+          julia --project=experiments/$$env/ -e '
+            using Pkg
+            Pkg.add(map(split(ENV["UPSTREAM_PACKAGES"])) do entry
+                if occursin("@", entry)
+                    name, version = String.(split(entry, "@"))
+                    Pkg.PackageSpec(; name, version)
+                elseif occursin("#", entry)
+                    name, rev = String.(split(entry, "#"))
+                    Pkg.PackageSpec(; name, rev)
+                else
+                    Pkg.PackageSpec(; name = entry, rev = "main")
+                end
+            end)'
+          julia --project=experiments/$$env/ -e 'using Pkg; Pkg.resolve()'
 
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=experiments/AMIP/ -e 'using Pkg; Pkg.status()'"
+          julia --project=experiments/$$env/ -e 'using Pkg; Pkg.precompile()'
+          julia --project=experiments/$$env/ -e 'using Pkg; Pkg.status()'
+        done
 
     agents:
       slurm_gpus: 1
@@ -106,3 +105,22 @@ steps:
           slurm_cpus_per_task: 4
           slurm_ntasks: 1
           slurm_mem: 16GB
+
+  - group: "CMIP"
+
+    steps:
+      # Shares its config with the longrun pipeline; edits there also affect this run
+      - label: "CMIP: progedmf + 0M + integrated land"
+        key: "cmip_progedmf_land"
+        command:
+          - echo "--- Run simulation"
+          - "julia --threads=3 --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $LONGRUN_CONFIG_PATH/cmip_progedmf_land.yml --job_id cmip_progedmf_land"
+        artifact_paths: "output/cmip_progedmf_land/artifacts/*"
+        timeout_in_minutes: 900
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_ntasks: 1
+          slurm_mem: 32GB

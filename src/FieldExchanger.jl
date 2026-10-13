@@ -587,6 +587,12 @@ function launch_slow_sims!(cs::Interfacer.CoupledSimulation)
     return nothing
 end
 
+"""
+    wait_slow_sims!(cs)
+
+Join an in-flight ice/ocean step, if any, and keep the progress snapshot it
+gathered. A no-op when no step is in flight.
+"""
 function wait_slow_sims!(cs::Interfacer.CoupledSimulation)
     inflight = cs.slow_task[]
     isnothing(inflight) && return nothing
@@ -609,7 +615,12 @@ function slow_progress_snapshot(cs::Interfacer.CoupledSimulation, sim_name::Symb
     return snapshots[sim_name]
 end
 
-"Model time the in-flight slow step is advancing to, or `nothing`."
+"""
+    slow_step_target(cs)
+
+The time an in-flight ice/ocean step is advancing to, or `nothing` if none is in
+flight.
+"""
 slow_step_target(cs::Interfacer.CoupledSimulation) =
     isnothing(cs.slow_task[]) ? nothing : cs.slow_task[].target
 
@@ -623,7 +634,13 @@ fields, so it is safe to call while a slow step is in flight.
 slow_window_steps(cs::Interfacer.CoupledSimulation) =
     round(Int, slow_sim_dt(cs) / Float64(float(cs.Δt_cpl)))
 
-"Shortest timestep among the overlapped sims. Reads only immutable fields."
+"""
+    slow_sim_dt(cs)
+
+The shortest timestep among the overlapped (ice/ocean) simulations, or `Inf` if
+there are none. Reads only immutable model fields, so it is safe to call while a
+slow step is in flight.
+"""
 function slow_sim_dt(cs::Interfacer.CoupledSimulation)
     dt = Inf
     for sim in cs.model_sims
@@ -633,6 +650,11 @@ function slow_sim_dt(cs::Interfacer.CoupledSimulation)
     return dt
 end
 
+"""
+    slow_step_in_flight(cs)
+
+Whether an ice/ocean step is currently running as a task.
+"""
 slow_step_in_flight(cs::Interfacer.CoupledSimulation) = !isnothing(cs.slow_task[])
 
 """

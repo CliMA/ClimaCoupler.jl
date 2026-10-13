@@ -33,6 +33,7 @@ seaice_diagnostic_mode: "instantaneous"
 seaice_progress_interval: "1800secs"
 simple_ocean: true
 start_date: "20100101"
+step_concurrently: true
 surface_setup: "PrescribedSurface"
 t_end: "3hours"
 topo_smoothing: true

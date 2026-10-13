@@ -108,11 +108,9 @@ CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args).
 """
     CoupledSimulation{FT}(start_date, ..., flux_accumulators; step_concurrently, ...)
 
-The fields this constructor takes positionally are the long-standing ones. The
-four that concurrent stepping added are keyword-only and default to off, so a
-caller that does not use it neither names them nor has to keep them in the right
-order -- several are `Bool`s and `Ref`s that no amount of type checking would
-tell apart if they were transposed.
+Construct a `CoupledSimulation`. The concurrent-stepping fields
+`step_concurrently`, `overlap_slow_surfaces`, `slow_task` and `slow_progress`
+are keyword arguments that are off by default.
 """
 function CoupledSimulation{FT}(
     start_date,

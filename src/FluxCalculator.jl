@@ -44,9 +44,13 @@ function turbulent_fluxes!(cs::Interfacer.CoupledSimulation; slow_frozen::Bool =
     return nothing
 end
 
+turb_flux_names() = (:F_turb_ρτxz, :F_turb_ρτyz, :F_lh, :F_sh, :F_turb_moisture)
+slow_turb_flux_names() =
+    (:slow_F_turb_ρτxz, :slow_F_turb_ρτyz, :slow_F_lh, :slow_F_sh, :slow_F_turb_moisture)
+
 """
-    turbulent_fluxes!(cs::CoupledSimulation)
-    turbulent_fluxes!(fields, model_sims, thermo_params, flux_accumulators = (;))
+    turbulent_fluxes!(cs::CoupledSimulation; slow_frozen = false)
+    turbulent_fluxes!(fields, model_sims, thermo_params, flux_accumulators = (;); slow_frozen = false)
 
 Compute turbulent fluxes and associated quantities. Store the results in `fields` as
 area-weighted sums.
@@ -69,10 +73,6 @@ Args:
 
 (NB: Radiation surface fluxes are calculated by the atmosphere.)
 """
-const TURB_FLUX_NAMES = (:F_turb_ρτxz, :F_turb_ρτyz, :F_lh, :F_sh, :F_turb_moisture)
-const SLOW_TURB_FLUX_NAMES =
-    (:slow_F_turb_ρτxz, :slow_F_turb_ρτyz, :slow_F_lh, :slow_F_sh, :slow_F_turb_moisture)
-
 function turbulent_fluxes!(
     csf,
     model_sims,
@@ -84,10 +84,10 @@ function turbulent_fluxes!(
 
     # Reset the coupler fields will compute. We need to do this because we will compute
     # area-weighted averages
-    for p in TURB_FLUX_NAMES
+    for p in turb_flux_names()
         fill!(getproperty(csf, p), 0)
     end
-    have_cache = all(n -> n in propertynames(csf), SLOW_TURB_FLUX_NAMES)
+    have_cache = all(n -> n in propertynames(csf), slow_turb_flux_names())
 
     # Overlapped surfaces go first, into the freshly zeroed fields, so their share
     # can be parked before the fast surfaces are added on top. While their step is
@@ -96,7 +96,7 @@ function turbulent_fluxes!(
     # (one whose timestep equals Δt_cpl) it would also write fluxes back into a
     # model mid-step.
     if slow_frozen
-        have_cache && for (p, q) in zip(TURB_FLUX_NAMES, SLOW_TURB_FLUX_NAMES)
+        have_cache && for (p, q) in zip(turb_flux_names(), slow_turb_flux_names())
             getproperty(csf, p) .= getproperty(csf, q)
         end
     else
@@ -106,7 +106,7 @@ function turbulent_fluxes!(
             accumulator = get(flux_accumulators, name, nothing)
             compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params, accumulator)
         end
-        have_cache && for (p, q) in zip(TURB_FLUX_NAMES, SLOW_TURB_FLUX_NAMES)
+        have_cache && for (p, q) in zip(turb_flux_names(), slow_turb_flux_names())
             getproperty(csf, q) .= getproperty(csf, p)
         end
     end

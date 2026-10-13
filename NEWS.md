@@ -4,6 +4,16 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Update to ClimaAtmos 0.43
+ClimaAtmos 0.43 selects the sedimentation velocity of each 1M species with one config key
+(`cloud_liquid_terminal_velocity`, `cloud_ice_terminal_velocity`, `rain_terminal_velocity`,
+`snow_terminal_velocity`) and changes the defaults to the Chen et al. (2022) snow fall speed and a fixed
+rain fall speed. No coupler config sets these keys, so the 1M AMIP configurations take the new defaults.
+`toml/amip_progedmf_1m.toml` sets `snow_apparent_density` to 300 kg/m³ (ClimaParams default 100), the
+value the Chen snow speed is meant to run with; the coupler TOML replaces the atmosphere's TOML list, so
+the entry ClimaAtmos carries in `toml/prognostic_edmfx_1M.toml` does not reach coupled runs. Compat and
+manifests move to ClimaAtmos 0.43.
+
 #### Average the sea-ice skin emission and temperature over the coupling window
 A sea ice stepping more slowly than the coupler solves the skin balance on every coupling step, each with
 its own `Tₛ`, but was pushed a top heat flux that mixed window means of the absorbed radiation and of the

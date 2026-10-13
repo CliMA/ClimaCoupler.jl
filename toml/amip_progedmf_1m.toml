@@ -102,3 +102,6 @@ value = 1.5
 
 [cloud_fraction_eps_rel]
 value = 0.05
+
+[snow_apparent_density]
+value = 300.0

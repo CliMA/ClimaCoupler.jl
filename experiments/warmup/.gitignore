@@ -1,0 +1,7 @@
+# Written by each workload to record whether it succeeded; a build artifact.
+workload_report.txt
+
+# The warmup packages are developed from this repository rather than registered, so the
+# manifest records absolute paths and is not portable. Generate it with the setup command
+# in README.md.
+Manifest*.toml

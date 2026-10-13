@@ -35,9 +35,9 @@ available is across *processes*, which is what `Pkg.precompile()` provides.
 | `SeaIceWarmup` | ClimaSeaIce (needs a built ocean) | Setup, Ocean |
 | `CMIPWarmup` | the coupled `run!`: field exchange, fluxes, exchange grid | all of the above |
 
-Measured image sizes (production resolution): 1260 / 1205 / 925 / 1240 / 1332 / 108 /
-1554 MiB. `SeaIceWarmup` is small *because* `OceanWarmup` is beneath it -- when that build
-failed, it grew to 713 MiB re-caching the ocean itself.
+Image sizes at production resolution: 1260 / 1205 / 925 / 1240 / 1332 / 108 / 1554 MiB.
+`SeaIceWarmup` is small because `OceanWarmup` is beneath it and it caches only the
+incremental sea-ice code.
 
 ## The dependency edges are required, not an optimisation
 
@@ -46,18 +46,12 @@ serialized blob with 32-bit ELF relocations (`R_X86_64_PC32`, `GOTPC32`) that ca
 the displacement. Over the limit `lld` errors out; just under it, the link succeeds silently
 and the image segfaults on load inside `jl_restore_package_image_from_stream`.
 
-Measured, same three workloads, three dependency shapes:
-
-| shape | result |
-|---|---|
-| chain: Setup -> Explicit -> Step | **works**: `.ldata` 1191 / 1193 / 900 MiB, loads |
-| fan-out: Setup <- {Explicit, Step} | Step fails: 20 relocation errors |
-| fully independent | Step fails: 20 relocation errors |
-| single unsplit workload | fails: one 3.05 GiB `sysimg.o`, `lld` refuses |
-
 The edges must mirror the **call graph**. `step!` calls `remaining_tendency!`, so
-`AtmosWarmupStep` must depend on `AtmosWarmupExplicit` or it re-caches that code and
-exceeds the limit. Where code nests, the build units must nest too.
+`AtmosWarmupStep` depends on `AtmosWarmupExplicit`; without that edge it re-caches the
+tendency code and exceeds the limit. The same applies to `SeaIceWarmup` and `OceanWarmup`.
+Where code nests, the build units must nest too.
+
+A single unsplit workload produces one 3.05 GiB object that `lld` refuses to link.
 
 A consequence: nested units build serially. Parallelism has to come from units that
 genuinely do not share code -- across *components* (atmosphere / ocean / land) and across
@@ -67,10 +61,10 @@ genuinely do not share code -- across *components* (atmosphere / ocean / land) a
 
 Cached specializations are keyed on concrete types. A workload that builds a different type
 than the production run yields an image the run cannot use, which looks exactly like
-"precompilation didn't help". Two traps found the hard way:
+"precompilation didn't help". Two settings are easy to get wrong:
 
 * `FLOAT_TYPE` and `topography` are set in the *coupler* config, not the atmosphere one, so
-  a standalone atmosphere workload silently defaults to `Float32` and `Val{:NoWarp}`.
+  a standalone atmosphere workload defaults to `Float32` and `Val{:NoWarp}`.
 * The gravity-wave model is a type parameter of `AtmosModel`, so a workload that omits
   orographic gravity waves caches specializations nothing uses.
 
@@ -82,13 +76,13 @@ loudly on drift.
 ## The warmup must be the production configuration, briefly
 
 Resolution changes array sizes rather than types, so a cheap low-resolution warmup looks
-like it should work. It does not, and three separate floors were found the hard way:
+like it should work. Three constraints rule it out:
 
 * **Type fidelity** -- model selections must match production exactly (above).
-* **Physical validity** -- at `z_elem=10` the coupled state degrades within a few steps
-  until `@assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ 1`
-  (`FieldExchanger.jl`) fails at step 3. Confirmed resolution-independent horizontally:
-  identical failure at `h_elem` 8 and 16, while production `z_elem=63` ran 5 steps cleanly.
+* **Physical validity** -- the warmup has to be a configuration that actually runs. Below
+  roughly production vertical resolution the coupled state degrades within a few steps until
+  `@assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ 1`
+  (`FieldExchanger.jl`) fails. Horizontal resolution is not the constraint; `z_elem` is.
 * **Schedule coverage** -- code behind a schedule is only compiled if the schedule fires.
   `orchestrate_diagnostics` skips `compute_field!` entirely when inactive, and the same
   applies to radiation (`dt_rad`), cloud fraction, gravity-wave drag and checkpointing.
@@ -128,30 +122,32 @@ julia --project=experiments/warmup experiments/warmup/check_warmup.jl
   workload-level error handling sees it. The symptom is a stale image beside `status = ok`.
 
 A failure low in the DAG makes everything above it re-cache that content, which can push
-those packages over the limit too. Fix the lowest failure first, delete the affected images,
-and rebuild.
+those packages over the limit too. Fix the lowest failure first, delete the affected images
+(a caught failure leaves a current-looking image that Pkg will not rebuild), and rebuild.
 
 ### Worker count is bounded by GPU memory
 
 `JULIA_NUM_PRECOMPILE_TASKS=1` above is deliberate. Each worker builds a full
-production-resolution simulation, which at `z_elem=63` holds ~9 GB on the GPU; two
-concurrent workers exhaust a 15 GB card and several packages fail with `Out of GPU memory`.
-Host memory is not the binding constraint (workers peak near 28 GB against 125 GB). Raise
-the count only if the GPU can hold that many simulations at once.
+production-resolution simulation holding ~9 GB on the GPU, so two concurrent workers exhaust
+a 15 GB card. Host memory is not the binding constraint (workers peak near 28 GB). Raise the
+count only if the GPU can hold that many simulations at once.
 
 `CLIMACOMMS_DEVICE=CUDA` is required, or the cached specializations are for CPU-backed
 fields and a GPU run gains nothing.
 
 ## Do not put these in a developer's environment
 
-The workload packages sit *downstream* of ClimaAtmos. Editing ClimaAtmos invalidates them,
-and rebuilding is expensive -- one observed cascade ran 3.7 h at 28 GB RSS before being
-killed. A developer iterating on, say, microphysics would pay that before every run, making
-iteration **worse**, not better.
+The workload packages sit *downstream* of ClimaAtmos and ClimaCore, so editing either
+invalidates them. A full rebuild is ~95 min, against ~2 min to rebuild the 22 packages a
+ClimaCore change invalidates without them -- so a batch `Pkg.precompile` and run workflow on
+model source pays roughly +95 min per edit. Breakeven is about two coupled runs per edit.
 
-Precompilation workloads speed up *launches of unedited code*: CI, longruns, production.
-They do nothing for someone editing the model, because package images are invalidated at
-package granularity. Keep them in this separate environment.
+Precompilation workloads speed up *launches of unedited code*: CI, longruns, production,
+and calibration (where each persistent worker pays startup once). Iterating on model source
+in a REPL with Revise should be roughly neutral, since Revise patches methods in the live
+session rather than rebuilding images, but that has not been measured.
+
+Keeping them in this separate environment means nobody pays for them who is not using them.
 
 ## Cost at run time
 

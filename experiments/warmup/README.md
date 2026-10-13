@@ -26,10 +26,18 @@ available is across *processes*, which is what `Pkg.precompile()` provides.
 
 | package | caches | depends on |
 |---|---|---|
+| `CouplerWarmupCommon` | shared prologue for the component workloads | ClimaCoupler |
 | `AtmosWarmupSetup` | `ClimaAtmos.get_simulation` | — |
 | `AtmosWarmupExplicit` | `remaining_tendency!` | Setup |
 | `AtmosWarmupStep` | implicit solve, Jacobian, timestepper | Setup, Explicit |
-| `CouplerWarmupCommon` | shared prologue for component workloads | ClimaCoupler |
+| `OceanWarmup` | Oceananigans ocean as the coupler builds it | Setup |
+| `LandWarmup` | ClimaLand as the coupler builds it | Setup |
+| `SeaIceWarmup` | ClimaSeaIce (needs a built ocean) | Setup, Ocean |
+| `CMIPWarmup` | the coupled `run!`: field exchange, fluxes, exchange grid | all of the above |
+
+Measured image sizes (production resolution): 1260 / 1205 / 925 / 1240 / 1332 / 108 /
+1554 MiB. `SeaIceWarmup` is small *because* `OceanWarmup` is beneath it -- when that build
+failed, it grew to 713 MiB re-caching the ocean itself.
 
 ## The dependency edges are required, not an optimisation
 
@@ -69,21 +77,70 @@ than the production run yields an image the run cannot use, which looks exactly 
 `configs/atmos_warmup.yml` therefore replicates the overrides
 `ClimaCoupler.SimCoordinator` applies (`surface_setup`, `albedo_model`, `log_progress`,
 `output_dir_style`, `dt`, `toml`), and `CouplerWarmupCommon.check_matches_coupled` fails
-loudly on drift. Resolution (`h_elem`, `z_elem`) is deliberately small: it changes array
-sizes, not types.
+loudly on drift.
+
+## The warmup must be the production configuration, briefly
+
+Resolution changes array sizes rather than types, so a cheap low-resolution warmup looks
+like it should work. It does not, and three separate floors were found the hard way:
+
+* **Type fidelity** -- model selections must match production exactly (above).
+* **Physical validity** -- at `z_elem=10` the coupled state degrades within a few steps
+  until `@assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ 1`
+  (`FieldExchanger.jl`) fails at step 3. Confirmed resolution-independent horizontally:
+  identical failure at `h_elem` 8 and 16, while production `z_elem=63` ran 5 steps cleanly.
+* **Schedule coverage** -- code behind a schedule is only compiled if the schedule fires.
+  `orchestrate_diagnostics` skips `compute_field!` entirely when inactive, and the same
+  applies to radiation (`dt_rad`), cloud fraction, gravity-wave drag and checkpointing.
+
+So the configuration here is production's, at production resolution, run briefly via `run!`
+with every cadence shortened enough to fire. Periods are safe to shorten: `time_to_period`
+maps everything except `Nmonths` to `Dates.Millisecond`, so the schedule type is preserved.
+ClimaLand accepts only `{1months, 10days, 1days, 1hours, 30mins}`, making `30mins` its floor
+and setting `t_end`.
 
 ## Building
 
+These packages are developed from this repository rather than registered, so the manifest
+is generated locally (and git-ignored, because it records absolute paths):
+
 ```bash
-CLIMACOMMS_DEVICE=CUDA julia --project=experiments/warmup -e 'using Pkg; Pkg.precompile()'
+julia --project=experiments/warmup -e '
+  using Pkg
+  Pkg.develop(path=".")
+  Pkg.develop([PackageSpec(path=joinpath("experiments","warmup",p)) for p in
+    ("CouplerWarmupCommon","AtmosWarmupSetup","AtmosWarmupExplicit","AtmosWarmupStep",
+     "OceanWarmup","LandWarmup","SeaIceWarmup","CMIPWarmup")])'
+
+CLIMACOMMS_DEVICE=CUDA JULIA_NUM_PRECOMPILE_TASKS=1 \
+  julia --project=experiments/warmup -e 'using Pkg; Pkg.precompile()'
+
+julia --project=experiments/warmup experiments/warmup/check_warmup.jl
 ```
 
-`CLIMACOMMS_DEVICE=CUDA` is required, or the cached specializations are for CPU-backed
-fields and a GPU run gains nothing. Cap `JULIA_NUM_PRECOMPILE_TASKS` by available memory:
-workers peaked near 28 GB, and two concurrent ones nearly exhausted a 125 GB machine.
+**Always run `check_warmup.jl` afterwards.** Two failures are invisible otherwise:
 
-Each package writes `workload_report.txt` recording whether its workload succeeded, so a
-caught failure is visible rather than silently producing an image with nothing useful in it.
+* A workload that threw is caught and recorded in `workload_report.txt`, so Pkg sees a
+  successful precompile and builds everything above it anyway. Worse, the resulting image
+  looks current, so Pkg will not rebuild it later -- the degradation is sticky until the
+  image is deleted.
+* A link that overflowed the 2 GiB limit happens *after* the workload returns, so no
+  workload-level error handling sees it. The symptom is a stale image beside `status = ok`.
+
+A failure low in the DAG makes everything above it re-cache that content, which can push
+those packages over the limit too. Fix the lowest failure first, delete the affected images,
+and rebuild.
+
+### Worker count is bounded by GPU memory
+
+`JULIA_NUM_PRECOMPILE_TASKS=1` above is deliberate. Each worker builds a full
+production-resolution simulation, which at `z_elem=63` holds ~9 GB on the GPU; two
+concurrent workers exhaust a 15 GB card and several packages fail with `Out of GPU memory`.
+Host memory is not the binding constraint (workers peak near 28 GB against 125 GB). Raise
+the count only if the GPU can hold that many simulations at once.
+
+`CLIMACOMMS_DEVICE=CUDA` is required, or the cached specializations are for CPU-backed
+fields and a GPU run gains nothing.
 
 ## Do not put these in a developer's environment
 
@@ -98,6 +155,12 @@ package granularity. Keep them in this separate environment.
 
 ## Cost at run time
 
-Loading the images is cheap: 2466 MiB of package images cost **+7.3 s** over a bare
-`import ClimaAtmos` (22.0 s -> 29.3 s), against the ~29 minutes of setup and first step they
-replace. The number of images does not matter; splitting is effectively free at run time.
+Loading the full stack (7 images, ~7.6 GB) takes ~99 s, against 17 s to load the same
+packages without it. That is the per-launch cost, set against a setup and first step
+measured in tens of minutes. The number of images does not matter -- splitting is free at
+run time; total bytes is what costs.
+
+What precompilation cannot reach: **GPU kernel compilation**. CUDA.jl 5.11 cannot persist
+device code, so ~2390 kernels are compiled on every launch warm or cold -- 36 % of a cold
+first step. Only CUDA.jl 6 changes this, and it will add cubins to images already near the
+2 GiB limit, so that migration and this splitting work are coupled.

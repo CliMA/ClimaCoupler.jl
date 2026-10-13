@@ -93,6 +93,35 @@ The simulation runs for 3 years and has a resolution of 16
 elements in the horizontal and 63 in the vertical
 and includes diagnostic EDMF in the atmosphere. It is run on 1 GPU.
 
+# [ClimaCoupler - Time to First Step](https://buildkite.com/clima/climacoupler-time-to-first-step)
+- Triggered manually or by upstream repos
+- Walltime (approx.): 1 hour
+- Runs on Caltech Clima node (1 GPU)
+- Configuration file: `config/amip_configs/amip.yml`
+
+This pipeline measures the wall time to load packages, set up, and take the
+first coupling step of the flagship AMIP simulation. The timings are shown as a
+build annotation and saved to `output/ttfs_amip/artifacts/time_to_first_step.md`.
+
+To run with changes to upstream packages, set `UPSTREAM_PACKAGES` to a
+space-separated list of `Name`, `Name@version`, `Name#rev`, or `url#rev` entries
+(see [add_upstream_packages.jl](add_upstream_packages.jl)). The nightly pipeline
+accepts the same variable. When `UPSTREAM_PACKAGES` is set, a second job measures
+the same packages at their main branches, and the annotation shows the change in
+each phase. The build fails if the total grows by more than
+`TTFS_REGRESSION_THRESHOLD` (default `0.2`, i.e. 20%).
+
+An upstream repo can trigger it from its own pipeline with:
+```yaml
+- trigger: "climacoupler-time-to-first-step"
+  label: ":rocket: ClimaCoupler time to first step"
+  async: true
+  build:
+    branch: main
+    env:
+      UPSTREAM_PACKAGES: "ClimaAtmos#${BUILDKITE_COMMIT}"
+```
+
 # [ClimaCoupler-LongRuns](https://buildkite.com/clima/climacoupler-longruns)
 - Scheduled weekly Sunday at 12am PST (8am UTC)
 - Walltime (approx.): 24 hours

@@ -1,0 +1,44 @@
+FLOAT_TYPE: "Float64"
+albedo_model: "CouplerAlbedo"
+atmos_config_file: "experiments/warmup/configs/atmos_warmup.yml"
+checkpoint_dt: "360secs"
+coupler_diagnostics_period: "360secs"
+coupler_diagnostics_reduction: "average"
+coupler_toml: ["toml/amip_progedmf.toml"]
+dt_atmos: "120secs" # 2 minutes
+dt_cloud_fraction: "120secs"
+dt_cpl: "360secs" # 6 minutes
+dt_land: "120secs" # 2 minutes
+dt_ocean: "360secs" # 6 minutes
+dt_rad: "120secs"
+dt_seaice: "360secs" # 6 minutes
+energy_check: false
+ice_model: "clima_seaice"
+insolation: "timevarying"
+land_diagnostics_period: "30mins"
+land_diagnostics_reduction: "average"
+land_model: "integrated"
+land_spun_up_ic: false
+mode_name: "cmip"
+ocean_model: "oceananigans"
+ocean_grid: "orca"
+ocean_diagnostic_interval: "360secs"
+ocean_diagnostic_mode: "average"
+output_default_diagnostics: true
+rmse_check: false
+seaice_diagnostic_interval: "360secs"
+seaice_diagnostic_mode: "average"
+start_date: "20100101"
+surface_setup: "PrescribedSurface"
+t_end: "2160secs"
+topo_smoothing: true
+topography: "Earth"
+use_intersection_grid: true
+use_itime: true
+walltime_debug: true
+extra_atmos_diagnostics:
+  - short_name: [hur, hus, ta]
+    period: 360secs
+    reduction_time: average
+    pressure_coordinates: true
+    compute_every: 360secs

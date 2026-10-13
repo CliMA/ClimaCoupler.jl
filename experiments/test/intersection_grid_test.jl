@@ -181,26 +181,32 @@ end
         end
         @test all(s -> isapprox(s, 1, atol = 1e-12), row_sums)
 
+        # The scatter weights are the non-negative subcell weights.
+        @test all(>=(0), eg.sweight)
+
         # On a fully wet grid every polygon is retained, so the wet and
-        # geometric coverages coincide identically and their ratio — the wet
-        # fraction — is exactly 1 wherever the ocean grid reaches. The raw
-        # coverages themselves carry quadrature and quad-approximation error
-        # (up to ~15% at fold/pole nodes on this deliberately coarse
-        # fixture), which is exactly why the ratio is the meaningful
-        # quantity.
+        # geometric coverages coincide. The subcell weights are scaled to sum
+        # to exactly 1 over the polygons tiling a node's subcell, so the
+        # coverage is 1 at every node of an element the ocean grid fully
+        # covers (north of its 80°S boundary).
         @test eg.node_cov == eg.node_cov_total
         CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
         coords = CC.Fields.coordinate_field(boundary_space)
         node_lat = to_cpu(CRExt.flat_nodal_data(CC.Fields.field_values(coords.lat)))
+        elem_min_lat =
+            [minimum(node_lat[((e - 1) * Nq ^ 2 + 1):(e * Nq ^ 2)]) for e in 1:n_elem]
         for n in 1:(eg.n_nodes)
-            if node_lat[n] > -75
-                # Interior nodes: geometric coverage is ≈ 1 to within the
-                # coarse-fixture quad-approximation error.
-                @test eg.node_cov_total[n] ≈ 1 rtol = 0.6
+            if elem_min_lat[(n - 1) ÷ Nq ^ 2 + 1] > -75
+                @test eg.node_cov_total[n] ≈ 1 atol = 1e-8
             end
+            @test -1e-12 <= eg.node_cov_total[n] <= 1 + 1e-8
         end
         # Nodes south of the ocean grid boundary are only partially covered.
         @test any(n -> node_lat[n] < -80 && eg.node_cov_total[n] < 0.9, 1:(eg.n_nodes))
+
+        # Scatter column sums (the SE-side polygon areas) match the geometric
+        # areas to within the subcell/quadrature scaling.
+        @test eg.b_area ≈ eg.area rtol = 0.05
 
         # node_cov is consistent with the scatter weights.
         cov_from_sweight = zeros(FT, eg.n_nodes)
@@ -230,18 +236,16 @@ end
             end
         end
 
-        # The wet fraction is the ratio of wet to geometric coverage:
-        # exactly 1 at nodes all of whose polygons are wet, exactly 0 at
-        # interior dry nodes, intermediate (with Gibbs overshoot, clamped by
-        # consumers) at the coastline.
-        wet_frac =
-            [t > 0 ? w / t : zero(w) for (w, t) in zip(eg_c.node_cov, eg_c.node_cov_total)]
-        @test count(==(1), wet_frac) > 0.2 * length(wet_frac)
+        # The wet fraction is the wet subcell coverage: 1 at nodes whose
+        # subcell lies entirely over wet cells, exactly 0 where it lies
+        # entirely over dry cells, intermediate at the coastline. The weights
+        # are non-negative, so it never leaves [0, 1].
+        wet_frac = eg_c.node_cov
+        @test count(f -> isapprox(f, 1; atol = 1e-8), wet_frac) > 0.2 * length(wet_frac)
         @test count(==(0), wet_frac) > 0.2 * length(wet_frac)
         @test any(f -> 0.05 < f < 0.95, wet_frac)
-        @test all(f -> -1 <= f <= 2, wet_frac)
-        clamped = clamp.(wet_frac, 0, 1)
-        @test any(f -> 0.05 < f < 0.95, clamped)
+        @test all(f -> 0 <= f <= 1 + 1e-8, wet_frac)
+        @test all(eg_c.node_cov .<= eg_c.node_cov_total .+ 1e-12)
     end
 end
 
@@ -268,14 +272,9 @@ import Random
 
         # Normalized scatter of a constant is exactly the constant on
         # covered nodes and 0 elsewhere.
-        CMIPExt.scatter_polys_to_nodes_normalized!(
-            nodal_scratch,
-            eg,
-            ones(FT, eg.n_poly),
-            FT(1e-3),
-        )
+        CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, ones(FT, eg.n_poly))
         for n in 1:(eg.n_nodes)
-            if eg.node_cov[n] > 1e-3
+            if eg.node_cov[n] > 0
                 @test nodal_scratch[n] ≈ 1 rtol = 1e-12
             else
                 @test nodal_scratch[n] == 0
@@ -326,6 +325,23 @@ import Random
         @test sum(eg.b_area) ≈ sum(eg.area) rtol = 1e-3
     end
 
+    @testset "bounded normalized scatter" begin
+        # A masked, normalized transfer must stay within the range of its
+        # inputs; a constant-field test cannot detect a violation. Values in
+        # [-1, 1], unweighted and with a random (sea-ice-like) weight.
+        F = 2 .* rand(rng, FT, eg.n_poly) .- 1
+        CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, F)
+        @test all(v -> -1 - 1e-12 <= v <= 1 + 1e-12, nodal_scratch)
+        w = rand(rng, FT, eg.n_poly)
+        num, den = zeros(FT, eg.n_nodes), zeros(FT, eg.n_nodes)
+        CMIPExt.scatter_polys_to_nodes!(num, eg, w .* F)
+        CMIPExt.scatter_polys_to_nodes!(den, eg, w)
+        @test all(
+            n -> den[n] == 0 || -1 - 1e-12 <= num[n] / den[n] <= 1 + 1e-12,
+            1:(eg.n_nodes),
+        )
+    end
+
     @testset "no O(n) allocations (CPU)" begin
         # KernelAbstractions CPU launches allocate small constant-size
         # wrappers; the invariant is that no O(n_poly)/O(n_nodes) buffers
@@ -336,7 +352,7 @@ import Random
         CMIPExt.gather_nodes_to_polys!(poly_scratch, eg, nodal)
         CMIPExt.gather_cells_to_polys!(poly_scratch, eg, cell_scratch)
         CMIPExt.scatter_polys_to_nodes!(nodal_scratch, eg, polyv)
-        CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, polyv, FT(1e-3))
+        CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, polyv)
         CMIPExt.scatter_polys_to_cells!(cell_scratch, eg, polyv)
         CMIPExt.mirror_fold_partners!(cell_scratch, coastal_grid)
         @test @allocated(CMIPExt.gather_nodes_to_polys!(poly_scratch, eg, nodal)) <
@@ -346,7 +362,7 @@ import Random
         @test @allocated(CMIPExt.scatter_polys_to_nodes!(nodal_scratch, eg, polyv)) <
               alloc_budget
         @test @allocated(
-            CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, polyv, FT(1e-3))
+            CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, polyv)
         ) < alloc_budget
         @test @allocated(CMIPExt.scatter_polys_to_cells!(cell_scratch, eg, polyv)) <
               alloc_budget
@@ -380,13 +396,12 @@ import Random
                 CMIPExt.scatter_polys_to_nodes!(to_d(nodal_scratch), eg_d, to_d(polyv)),
             ) ≈ nodal_scratch rtol = rt
 
-            CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, polyv, FT(1e-3))
+            CMIPExt.scatter_polys_to_nodes_normalized!(nodal_scratch, eg, polyv)
             @test Array(
                 CMIPExt.scatter_polys_to_nodes_normalized!(
                     to_d(nodal_scratch),
                     eg_d,
                     to_d(polyv),
-                    FT(1e-3),
                 ),
             ) ≈ nodal_scratch rtol = rt
 
@@ -561,12 +576,6 @@ import ClimaCoupler: FieldExchanger, FluxCalculator, Utilities
                 weight_cov_scratch,
                 temp_uv_vec,
                 uv_basis,
-                # FLUX CLAMP HACK
-                limiter_scratch = (;
-                    lo = CC.Fields.zeros(boundary_space),
-                    hi = CC.Fields.zeros(boundary_space),
-                    cnt = CC.Fields.zeros(boundary_space),
-                ),
                 exchange_grid = eg_d,
             )
 
@@ -574,14 +583,18 @@ import ClimaCoupler: FieldExchanger, FluxCalculator, Utilities
             fs_d.scratch2 .= 1 .- fs_d.sic
             CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg_d, fs_d, fs_d.scratch2)
 
-            # Scalar fluxes: uniform per-polygon values must be reproduced on
-            # well-covered nodes and zeroed on uncovered ones.
-            sh = to_cpu(CRExt.se_field_to_vec(flux_scratch.F_sh))
+            # The flux-weight coverage is the DSS'd wet coverage (weight ≡ 1).
             covd = to_cpu(CRExt.se_field_to_vec(node_cov_dss))
+            @test to_cpu(CRExt.se_field_to_vec(weight_cov_scratch)) ≈ covd rtol = 1e-12
+
+            # Scalar fluxes: the normalized scatter is a convex combination,
+            # so uniform per-polygon values are reproduced at every node with
+            # any coverage and zeroed at uncovered ones.
+            sh = to_cpu(CRExt.se_field_to_vec(flux_scratch.F_sh))
             for n in 1:(eg.n_nodes)
-                if covd[n] > 0.5
+                if covd[n] > 0
                     @test sh[n] ≈ reference.F_sh rtol = 1e-10
-                elseif covd[n] <= 1e-3
+                else
                     @test sh[n] == 0
                 end
             end
@@ -596,7 +609,7 @@ import ClimaCoupler: FieldExchanger, FluxCalculator, Utilities
             τu = to_cpu(CRExt.se_field_to_vec(temp_uv_vec.components.data.:1))
             τv = to_cpu(CRExt.se_field_to_vec(temp_uv_vec.components.data.:2))
             for n in 1:(eg.n_nodes)
-                if covd[n] > 0.5
+                if covd[n] > 0
                     @test τu[n] ≈ reference.F_turb_ρτxz rtol = 1e-8
                     @test abs(τv[n]) < abs(reference.F_turb_ρτxz) * 1e-6
                 end
@@ -694,12 +707,6 @@ end
             weight_cov_scratch,
             temp_uv_vec,
             uv_basis,
-            # FLUX CLAMP HACK
-            limiter_scratch = (;
-                lo = CC.Fields.zeros(boundary_space),
-                hi = CC.Fields.zeros(boundary_space),
-                cnt = CC.Fields.zeros(boundary_space),
-            ),
             exchange_grid = eg_d,
         )
         CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg_d, fs_d, fs_d.sic)
@@ -711,11 +718,69 @@ end
         cov = to_cpu(CRExt.se_field_to_vec(weight_cov_scratch))
         F_ice = fs.F_sh[icy[1]]
         for n in 1:(eg.n_nodes)
-            if cov[n] > 0.1
+            if cov[n] > 0
                 @test sh[n] ≈ F_ice rtol = 1e-8
-            elseif cov[n] <= 1e-3
+            else
                 @test sh[n] == 0
             end
+        end
+    end
+end
+
+@testset "Area fraction × flux conserves the polygon integral" begin
+    # The coupler hands the atmosphere `area_fraction × flux`. With the area
+    # fraction equal to the coverage of the flux weight (as
+    # `align_surface_fractions!` sets it), that product integrates exactly to
+    # the polygon flux integral the ocean / ice receive, and every nodal flux
+    # stays within the range of the polygon fluxes.
+    eg = CMIPExt.build_exchange_grid(boundary_space, coastal_grid)
+    eg_d = on_exchange_device(eg)
+    CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
+    Jw = to_cpu(CRExt.se_node_weights(boundary_space))
+    rng = Random.Xoshiro(11)
+
+    fs = CMIPExt.ExchangeFluxState{FT}(OC.CPU(), eg.n_poly)
+    for f in (fs.F_sh, fs.F_lh, fs.F_moisture, fs.F_τu, fs.F_τv)
+        f .= 100 .+ 50 .* (2 .* rand(rng, FT, eg.n_poly) .- 1)
+    end
+    # Ice-free, partly and fully ice-covered polygons.
+    fs.sic .= clamp.(2 .* rand(rng, FT, eg.n_poly) .- 0.5, 0, 1)
+    fs_d = on_exchange_device(fs)
+
+    flux_scratch = (;
+        F_turb_ρτxz = CC.Fields.zeros(boundary_space),
+        F_turb_ρτyz = CC.Fields.zeros(boundary_space),
+        F_sh = CC.Fields.zeros(boundary_space),
+        F_lh = CC.Fields.zeros(boundary_space),
+        F_turb_moisture = CC.Fields.zeros(boundary_space),
+    )
+    remapping = (;
+        flux_scratch,
+        flux_dss_buffer = Utilities.init_dss_buffer(flux_scratch.F_sh),
+        weight_cov_scratch = CC.Fields.zeros(boundary_space),
+        temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space),
+        uv_basis,
+        exchange_grid = eg_d,
+    )
+    coverage = CC.Fields.zeros(boundary_space)
+
+    for weight in (1 .- fs.sic, copy(fs.sic)) # open water, sea ice
+        weight_d = on_exchange_device(weight)
+        CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg_d, fs_d, weight_d)
+        α = to_cpu(CRExt.se_field_to_vec(remapping.weight_cov_scratch))
+        @test all(a -> 0 <= a <= 1 + 1e-8, α)
+
+        # The area-fraction helper computes exactly the scatter's denominator.
+        CMIPExt.flux_weight_coverage!(coverage, eg_d, weight_d, remapping.flux_dss_buffer)
+        @test to_cpu(CRExt.se_field_to_vec(coverage)) == α
+
+        for (name, F_poly) in
+            ((:F_sh, fs.F_sh), (:F_lh, fs.F_lh), (:F_turb_moisture, fs.F_moisture))
+            F = to_cpu(CRExt.se_field_to_vec(getproperty(flux_scratch, name)))
+            @test sum(Jw .* α .* F) ≈ sum(eg.b_area .* weight .* F_poly) rtol = 1e-10
+            @test sum(Jw .* α .* F) ≈ sum(eg.area .* weight .* F_poly) rtol = 1e-3
+            @test all(v -> v == 0 || 50 - 1e-8 <= v <= 150 + 1e-8, F)
+            @test all(n -> α[n] == 0 || F[n] != 0, eachindex(F))
         end
     end
 end
@@ -760,12 +825,6 @@ end
         weight_cov_scratch = CC.Fields.zeros(boundary_space),
         temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space),
         uv_basis,
-        # FLUX CLAMP HACK
-        limiter_scratch = (;
-            lo = CC.Fields.zeros(boundary_space),
-            hi = CC.Fields.zeros(boundary_space),
-            cnt = CC.Fields.zeros(boundary_space),
-        ),
         exchange_grid = eg,
     )
     fs = CMIPExt.ExchangeFluxState{FT}(exchange_arch(), eg.n_poly)

@@ -351,8 +351,8 @@ The `Interfacer.remap!` methods in `climaocean_helpers.jl` accept
 When `use_intersection_grid = true` and the setup supports it (a
 `SpectralElementSpace2D` boundary space on a single process), the returned
 NamedTuple additionally carries the device-resident [`ExchangeGrid`](@ref),
-the static `wet_ocean_fraction` field (DSS'd nodal ratio of wet to geometric
-coverage), the per-polygon flux states and boundary-space flux scratch, and
+the static `wet_ocean_fraction` field (DSS'd nodal wet coverage), the
+per-polygon flux states and boundary-space flux scratch, and
 `use_exchange_grid::Bool` indicating the exchange-grid path is active.
 """
 function construct_remapper(grid_oc, boundary_space; use_intersection_grid = true)
@@ -428,15 +428,6 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
             F_turb_moisture = CC.Fields.zeros(boundary_space),
         )
         flux_dss_buffer = Utilities.init_dss_buffer(flux_scratch.F_sh)
-
-        # FLUX CLAMP HACK:
-        # Per-node bounds used to keep the normalized flux scatter inside the
-        # range of the polygon values it averages (`_clamp_to_poly_range!`).
-        limiter_scratch = (;
-            lo = CC.Fields.zeros(boundary_space),
-            hi = CC.Fields.zeros(boundary_space),
-            cnt = CC.Fields.zeros(boundary_space),
-        )
     else
         exchange_grid = nothing
         wet_ocean_fraction = nothing
@@ -445,7 +436,6 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
         weight_cov_scratch = nothing
         flux_scratch = nothing
         flux_dss_buffer = nothing
-        limiter_scratch = nothing # FLUX CLAMP HACK
     end
     uv_basis = uv_basis_coefficients(boundary_space)
 
@@ -467,7 +457,6 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
         weight_cov_scratch,
         flux_scratch,
         flux_dss_buffer,
-        limiter_scratch, # FLUX CLAMP HACK
         uv_basis,
         use_exchange_grid,
     )
@@ -497,23 +486,30 @@ function FieldExchanger.resolve_area_fractions!(
 end
 
 """
+    exchange_ice_fraction!(ice_fraction, remapping, ice_sim)
+
+Sea-ice area fraction on the boundary space: the ice model's concentration.
+"""
+exchange_ice_fraction!(ice_fraction, remapping, ice_sim) =
+    Interfacer.get_field!(ice_fraction, ice_sim, Val(:ice_concentration))
+
+"""
     FieldExchanger.align_surface_fractions!(ocean_sim::OceananigansSimulation,
                                             cs::Interfacer.CoupledSimulation) -> Bool
 
 Ocean-bathymetry-authoritative surface fractions on the exchange grid.
 
-The static wet-ocean fraction (`remapping.wet_ocean_fraction`, derived from
-the intersection areas with the ocean's immersed wet mask and DSS'd onto the
-boundary space) partitions each boundary node into wet and land parts. Sea
-ice and open ocean subdivide the wet part; land fills the remainder:
+The static wet-ocean fraction (`remapping.wet_ocean_fraction`, the DSS'd
+coverage of the wet exchange-grid polygons) partitions each boundary node
+into wet and land parts. Sea ice and open ocean subdivide the wet part;
+land fills the remainder:
 
-    ice   = clamp(ice_concentration, 0, wet)
+    ice   = clamp(ice_coverage, 0, wet)
     ocean = wet - ice
     land  = 1 - wet
 
-so the three fractions sum to 1 identically and the flux weights are, by
-construction, consistent with where the ocean model actually has wet cells
-(issue #1838).
+so the three fractions sum to 1 identically, with `ice_coverage` from
+`exchange_ice_fraction!`.
 
 Returns `false` (falling back to the legacy ETOPO-based update) when the
 exchange grid is not active.
@@ -532,10 +528,9 @@ function FieldExchanger.align_surface_fractions!(
 
     if haskey(cs.model_sims, :ice_sim)
         ice_sim = cs.model_sims.ice_sim
-        Interfacer.get_field!(cs.fields.scalar_temp2, ice_sim, Val(:ice_concentration))
-        ice_concentration = cs.fields.scalar_temp2
-        @. cs.fields.scalar_temp3 = clamp(ice_concentration, FT(0), wet_fraction)
         ice_fraction = cs.fields.scalar_temp3
+        exchange_ice_fraction!(ice_fraction, ocean_sim.remapping, ice_sim)
+        @. ice_fraction = clamp(ice_fraction, FT(0), wet_fraction)
         Interfacer.update_field!(ice_sim, Val(:area_fraction), ice_fraction)
     else
         cs.fields.scalar_temp3 .= FT(0)

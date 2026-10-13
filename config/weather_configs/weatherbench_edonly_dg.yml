@@ -59,7 +59,7 @@ extra_atmos_diagnostics:
     period: 1days
     reduction_time: inst
   ### daily average (surface + model-level)
-  - short_name: [zg, orog, tas, mslp, pr, lwp, iwp, clt, ta, hus, ua, va, wa, clw, cli, cl, pfull, waup, arup, tke]
+  - short_name: [zg, orog, tas, mslp, pr, lwp, iwp, clt, ta, hus, ua, va, wa, clw, cli, cl, pfull, tke]
     period: 1days
     reduction_time: average
 

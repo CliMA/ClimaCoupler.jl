@@ -61,8 +61,14 @@ value = 1
 [mixing_length_Prandtl_maximum]
 value = 100
 
+[sgs_ice_uniform_fraction]
+value = 0.0
+
+[sgs_liquid_uniform_fraction]
+value = 0.0
+
 [sgs_variance_horizontal_scale_factor]
-value = 1.5
+value = 1.0
 
 [sgs_variance_vertical_scale_factor]
 value = 0.5
@@ -71,7 +77,7 @@ value = 0.5
 value = 100
 
 [sublimation_deposition_timescale]
-value = 300
+value = 3600
 
 [rain_autoconversion_timescale]
 value = 1200
@@ -83,7 +89,7 @@ value = 1360
 value = 1.25e-4
 
 [cloud_liquid_water_specific_humidity_autoconversion_threshold_stratiform_scale]
-value = 3.0
+value = 2.0
 
 [rain_autoconversion_velocity_scale]
 value = 0.05
@@ -98,7 +104,10 @@ value = 1.0e5
 value = 3000.0
 
 [cloud_fraction_steepness_scale]
-value = 1.5
+value = 1.2
 
 [cloud_fraction_eps_rel]
 value = 0.05
+
+[snow_apparent_density]
+value = 300.0

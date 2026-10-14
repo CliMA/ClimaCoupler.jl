@@ -24,6 +24,7 @@ prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05",
 prognostic_tke: true
 rad: "allskywithclear"
 rayleigh_sponge: true
+snow_terminal_velocity: Fixed
 surface_setup: "DefaultMoninObukhov"
 t_end: "120days"
 time_varying_trace_gases: ["CO2", "O3"]

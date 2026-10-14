@@ -38,6 +38,7 @@ dg_volume_flux: "kg_pert"
 dg_vi_interface_flux: "selective"
 dg_vi_dissipation_floor: 0.05
 apply_zhang_shu_limiter: true
+update_constrain_state_every: "stage"
 hyperdiff: ~
 mesh_warp_type: "SLEVE"
 topography_damping_factor: 1.0

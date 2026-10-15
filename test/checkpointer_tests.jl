@@ -29,7 +29,7 @@ Checkpointer.get_model_prog_state(sim::DummySimulation) = sim.state
 end
 
 @testset "checkpoint_model_state, restart_model_state!" begin
-    comms_ctx = ClimaComms.context(ClimaComms.CPUSingleThreaded())
+    comms_ctx = ClimaComms.context(space_checkpointer)
     t = 1
     prev_checkpoint_t = -1
     # old sim run
@@ -194,7 +194,7 @@ end
         ignore_this::Any
     end
     cache = A(A([4], [3], [2], [42]), [1], [0], [42])
-    itr = Checkpointer.FieldIterator(cache, ignore = Set([:ignore_this]))
+    itr = Checkpointer.CacheIterator(cache, Set([:ignore_this]))
     @test !isempty(itr)
     cache_vec = collect(itr)
     @test cache_vec == [[0], [1], [2], [3], [4]]
@@ -214,8 +214,8 @@ end
 
     ignore_cache = IgnoreFields([1], [1], [1], [1], [1], [1], [1])
     itr = Checkpointer.CacheIterator(
-        cache,
-        ignore = Set([
+        ignore_cache,
+        Set([
             :rc,
             :params,
             :ghost_buffer,

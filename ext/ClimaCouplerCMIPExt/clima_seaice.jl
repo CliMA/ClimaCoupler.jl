@@ -697,7 +697,7 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
     # Write the diagnosed T_sfc back before `update_flux_fields!` so an
     # immediate turbulent push builds Jᵃ with this T.
     T_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
-    scatter_polys_to_cells!(T_cells, eg, is.T_sfc_new)
+    scatter_polys_to_cells!(T_cells, eg, is.T_sfc_new, eg.area, eg.oc_wet_area)
     mirror_fold_partners!(T_cells, grid)
     top_sfc_T = top_thermodynamics(sim).top_surface_temperature
     ice_concentration = sim.ice.model.ice_concentration

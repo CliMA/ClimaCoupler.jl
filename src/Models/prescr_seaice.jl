@@ -8,7 +8,6 @@ import Thermodynamics as TD
 import ..Checkpointer, ..FluxCalculator, ..Interfacer, ..Utilities, ..TimeManager
 import ClimaComms
 import NCDatasets
-import ClimaDiagnostics as CD
 
 """
     PrescribedIceSimulation{P, I}
@@ -313,10 +312,7 @@ function PrescribedIceSimulation(
 
     # Create a schedule to update the SIC daily. The data provides monthly
     # averages, so it doesn't make sense to update the SIC more frequently than daily.
-    SIC_schedule = CD.Schedules.EveryCalendarDtSchedule(
-        TimeManager.time_to_period("1days");
-        start_date,
-    )
+    SIC_schedule = TimeManager.calendar_dt_schedule("1days", start_date, tspan[1])
     SIC_update_cb =
         CTS.DiscreteCallback((_, _, integrator) -> SIC_schedule(integrator), read_sic_data!)
 

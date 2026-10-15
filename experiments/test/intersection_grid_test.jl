@@ -281,9 +281,15 @@ import Random
             end
         end
 
-        # Cell scatter of a constant is exact on wet cells, 0 on dry/shadow
-        # cells; the fold mirror then fills shadow partners.
-        CMIPExt.scatter_polys_to_cells!(cell_scratch, eg, ones(FT, eg.n_poly))
+        # Area-weighted cell mean of a constant is exact on wet cells, 0 on
+        # dry/shadow cells; the fold mirror then fills shadow partners.
+        CMIPExt.scatter_polys_to_cells!(
+            cell_scratch,
+            eg,
+            ones(FT, eg.n_poly),
+            eg.area,
+            eg.oc_wet_area,
+        )
         for c in 1:(eg.n_oc)
             if eg.oc_wet_area[c] > 0
                 @test cell_scratch[c] ≈ 1 rtol = 1e-12
@@ -312,9 +318,15 @@ import Random
     @testset "conservation" begin
         F = rand(rng, FT, eg.n_poly)
 
-        # FV side: the scatter preserves the area integral exactly.
+        # FV side: integrated with the FV grid's own cell areas, the scatter
+        # gives the SE-side integral exactly.
         CMIPExt.scatter_polys_to_cells!(cell_scratch, eg, F)
-        @test sum(eg.area .* F) ≈ sum(eg.oc_wet_area .* cell_scratch) rtol = 1e-12
+        grid_cpu = OC.on_architecture(OC.CPU(), coastal_grid.underlying_grid)
+        Az = [
+            OC.Operators.Azᶜᶜᶜ(mod1(c, Nx), (c - 1) ÷ Nx + 1, Nz, grid_cpu) for
+            c in 1:(eg.n_oc)
+        ]
+        @test sum(Az .* cell_scratch) ≈ sum(eg.b_area .* F) rtol = 1e-12
 
         # SE side: the L2 scatter preserves the quadrature-area integral
         # exactly (before DSS).
@@ -911,9 +923,9 @@ Base.eltype(::FakeOceanModel) = FT
         nothing,
     )
 
-    # Uniform forcing: the node gather preserves constants exactly and the cell
-    # scatter conserves the area integral, so every wet cell must reproduce the
-    # single-column answer to roundoff.
+    # Uniform forcing: the node gather preserves constants exactly, so the cell
+    # fluxes integrated with the grid's own cell areas give the single-column
+    # answer times the SE-side polygon area.
     uniform(v) = (f = CC.Fields.zeros(boundary_space); f .= FT(v); f)
     SW_d, LW_d, P_liq, P_snow = FT(300), FT(350), FT(-1e-5), FT(-2e-6)
     csf = (;
@@ -935,19 +947,22 @@ Base.eltype(::FakeOceanModel) = FT
     cell_values(f) = vec(OC.interior(OC.on_architecture(OC.CPU(), f), :, :, 1))
     flux_T = cell_values(CMIPExt.surface_flux(model.tracers.T))
     flux_S = cell_values(CMIPExt.surface_flux(model.tracers.S))
-    n_wet = 0
-    # Skip the fold row, whose shadow cells are filled by mirroring rather than
-    # by the scatter.
-    for c in 1:((Ny - 1) * Nx)
+    grid_cpu = OC.on_architecture(OC.CPU(), grid.underlying_grid)
+    n_wet, total_T, total_S = 0, zero(FT), zero(FT)
+    for c in 1:(Ny * Nx)
+        i, j = mod1(c, Nx), (c - 1) ÷ Nx + 1
         if eg_cpu.oc_wet_area[c] > 0
             n_wet += 1
-            @test flux_T[c] ≈ expected_T rtol = 1e-12
-            @test flux_S[c] ≈ expected_S rtol = 1e-12
-        else
+            Az = OC.Operators.Azᶜᶜᶜ(i, j, Nz, grid_cpu)
+            total_T += Az * flux_T[c]
+            total_S += Az * flux_S[c]
+        elseif j < Ny # fold-row shadow cells are filled by mirroring
             # Dry cells receive nothing: the property this path exists for.
             @test flux_T[c] == 0
             @test flux_S[c] == 0
         end
     end
     @test n_wet > 0
+    @test total_T ≈ expected_T * sum(eg_cpu.b_area) rtol = 1e-12
+    @test total_S ≈ expected_S * sum(eg_cpu.b_area) rtol = 1e-12
 end

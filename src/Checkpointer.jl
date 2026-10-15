@@ -456,7 +456,10 @@ If not found, return `nothing`.
 function t_start_from_checkpoint(checkpoint_dir)
     isdir(checkpoint_dir) || return nothing
     restart_file_rx = r"checkpoint_(\w+)_(\d+).hdf5"
-    restarts = filter(f -> !isnothing(match(restart_file_rx, f)), readdir(checkpoint_dir))
+    restarts = filter(
+        f -> !isnothing(match(restart_file_rx, f)),
+        readdir(checkpoint_dir, join = true),
+    )
     isempty(restarts) && return nothing
     latest_restart = last(sort_by_creation_time(restarts))
     return parse(Int, match(restart_file_rx, latest_restart)[2])

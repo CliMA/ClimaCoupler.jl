@@ -345,3 +345,17 @@ end
         @test parent(restored.coupler_fields[name]) == parent(acc.coupler_fields[name])
     end
 end
+
+@testset "t_start_from_checkpoint returns the latest time" begin
+    # The newer checkpoint sorts first as a string
+    mktempdir() do dir
+        for t in (864000, 1728000)
+            for sim in ("ClimaAtmosSimulation", "ClimaLandSimulation")
+                touch(joinpath(dir, "checkpoint_$(sim)_$(t).hdf5"))
+            end
+            sleep(1) # file timestamps can be as coarse as a second
+        end
+        @test Checkpointer.t_start_from_checkpoint(dir) == 1728000
+    end
+    @test isnothing(Checkpointer.t_start_from_checkpoint(mktempdir()))
+end

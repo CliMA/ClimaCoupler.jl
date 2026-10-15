@@ -18,4 +18,5 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [compat]
 Documenter = "1"
+Makie = "=0.24.15"
 Poppler_jll = "24"

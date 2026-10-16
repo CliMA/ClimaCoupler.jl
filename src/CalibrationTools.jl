@@ -532,8 +532,8 @@ The ERA5 data comes from the
 [ClimaArtifacts](https://github.com/CliMA/ClimaArtifacts/tree/main/precipitation_obs)
 for more information about this artifact.
 
-Note that the units of precipitation or `pr` are `mm/day` from this dataset. In
-CliMA, the units of `pr` are `kg m^-2 s^-1`.
+The dataset stores precipitation in `mm/day`; it is converted to `kg m^-2 s^-1`, the
+units of the `pr` diagnostic, and the sign is flipped to CliMA's convention.
 
 The keyword argument `gpcp_to_clima_names` is a vector of pairs mapping
 GPCP name to CliMA name.
@@ -562,7 +562,16 @@ function Base.get(loader::GPCPDataLoader, short_name::String)
     return preprocess(loader, var, Val(Symbol(short_name)))
 end
 
-preprocess(::GPCPDataLoader, var, ::Val{:pr}) = _preprocess_var(var, flip_sign = true)
+function preprocess(::GPCPDataLoader, var, ::Val{:pr})
+    var = _preprocess_var(var, flip_sign = true)
+    # GPCP is in mm/day; the `pr` diagnostic is in kg m^-2 s^-1 (1 mm/day of water is
+    # 1 kg m^-2 per 86400 s)
+    return ClimaAnalysis.convert_units(
+        var,
+        "kg m^-2 s^-1",
+        conversion_function = x -> x / 86400,
+    )
+end
 
 """
     ERA5PressureLevelDataLoader
@@ -781,6 +790,49 @@ function preprocess(::CalipsoDataLoader, var, ::Val{:cl})
         data = map(x -> (ismissing(x) || isnan(x)) ? global_mean : T(x), var.data),
     )
 end
+
+"""
+    LocalNetCDFDataLoader
+
+A struct for loading variables from a local NetCDF file as `OutputVar`s. Use it for
+calibration targets that are not ClimaArtifacts yet, such as the EarthCARE frozen water
+path and cloud fraction files.
+"""
+struct LocalNetCDFDataLoader <: AbstractDataLoader
+    catalog::NCCatalog
+    available_vars::Set{String}
+end
+
+"""
+    LocalNetCDFDataLoader(path, file_to_clima_names)
+
+Construct a data loader for the NetCDF file at `path`. `file_to_clima_names` is a vector
+of pairs mapping variable names in the file to CliMA short names. Latitudes are sorted,
+longitudes are shifted to -180 to 180 degrees and times are moved to the first of the
+month, as for the other loaders.
+"""
+function LocalNetCDFDataLoader(path::AbstractString, file_to_clima_names::AbstractVector)
+    isfile(path) || error("No NetCDF file at $path")
+    catalog = NCCatalog()
+    ClimaAnalysis.add_file!(catalog, path, file_to_clima_names...)
+    return LocalNetCDFDataLoader(catalog, Set(last.(file_to_clima_names)))
+end
+
+"""
+    get(loader::LocalNetCDFDataLoader, short_name::String)
+
+Get the preprocessed `OutputVar` with the name `short_name` from the file.
+"""
+function Base.get(loader::LocalNetCDFDataLoader, short_name::String)
+    (; catalog, available_vars) = loader
+    short_name in available_vars ||
+        error("$short_name is not available in this LocalNetCDFDataLoader")
+    var = get(catalog, short_name; var_kwargs = (shift_by = Dates.firstdayofmonth,))
+    return preprocess(loader, var, Val(Symbol(short_name)))
+end
+
+preprocess(::LocalNetCDFDataLoader, var, ::Val{varname}) where {varname} =
+    _preprocess_var(var)
 
 """
     MACDataLoader

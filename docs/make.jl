@@ -64,6 +64,7 @@ pages = Any[
     "Performance tips" => "performance.md",
     "Debugging tips" => "debugging.md",
     "Parameter calibration" => "calibrationtools.md",
+    "EarthCARE cloud calibration" => "earthcare_calibration.md",
     "Contributing to ClimaCoupler" => "contributing.md",
 ]
 

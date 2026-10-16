@@ -24,7 +24,14 @@ default_config_path = joinpath(config_dir, "zonal_cloud.jl")
 test_calibration_config_path = joinpath(config_dir, "pipeline_test.jl")
 const TEST_CALIBRATION = haskey(ENV, "TEST_CALIBRATION")
 
-config_path = TEST_CALIBRATION ? test_calibration_config_path : default_config_path
+# `CALIBRATION_CONFIG` names a file in `config/` to use instead of the default.
+config_path = if TEST_CALIBRATION
+    test_calibration_config_path
+elseif haskey(ENV, "CALIBRATION_CONFIG")
+    joinpath(config_dir, ENV["CALIBRATION_CONFIG"])
+else
+    default_config_path
+end
 
 @info "Using calibration configuration in: $config_path"
 include(config_path)

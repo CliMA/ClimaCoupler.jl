@@ -82,7 +82,8 @@ end
 
 Load and preprocess variables from `simdir`.
 
-The short names `swcre` and `lwcre` are also available.
+The short names `swcre`, `lwcre` and `fwp` (frozen water path, `iwp + swp`) are also
+available.
 """
 function load_and_preprocess_vars(simdir::ClimaAnalysis.SimDir, short_names)
     vars = []
@@ -94,6 +95,14 @@ function load_and_preprocess_vars(simdir::ClimaAnalysis.SimDir, short_names)
             var = rsutcs - rsut
             ClimaAnalysis.set_short_name!(var, "swcre")
             var = ClimaAnalysis.set_units(var, "W m^-2")
+            push!(vars, var)
+            continue
+        elseif short_name == "fwp"
+            iwp = get(simdir; short_name = "iwp", reduction = "average", period = "1M")
+            swp = get(simdir; short_name = "swp", reduction = "average", period = "1M")
+            var = iwp + swp
+            ClimaAnalysis.set_short_name!(var, "fwp")
+            var = ClimaAnalysis.set_units(var, "kg m^-2")
             push!(vars, var)
             continue
         elseif short_name == "lwcre"

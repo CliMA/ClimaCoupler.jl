@@ -48,8 +48,10 @@ function ClimaCalibrate.forward_model(interface::CouplerModelInterface, iter, me
     output_dir_root = config.output_dir
 
     (; sample_date_ranges, spinup, extend) = config
-    start_date = first(sample_date_ranges[iter + 1]) - spinup
-    end_date = last(sample_date_ranges[iter + 1]) + extend
+    # ClimaCalibrate numbers iterations from 1, and the minibatcher hands iteration `iter`
+    # the `iter`th observation, so the forward model has to run the same sample.
+    start_date = first(sample_date_ranges[iter]) - spinup
+    end_date = last(sample_date_ranges[iter]) + extend
     CalibrationTools.update_timespan!(config_dict, start_date, end_date)
 
     # Set member parameter file

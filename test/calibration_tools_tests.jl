@@ -4,6 +4,7 @@ import Dates
 import ClimaCoupler
 import ClimaCoupler: CalibrationTools
 import ClimaAnalysis
+import NCDatasets
 
 # TODO: Remove this once the name is added to ClimaAnalysis
 push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
@@ -249,6 +250,64 @@ end
         end
         @test_throws ErrorException get(data_loader, "idk")
     end
+    @test ClimaAnalysis.units(get(gpcp_data_loader, "pr")) == "kg m^-2 s^-1"
+end
+
+@testset "Local NetCDF data loader" begin
+    # A small file with the conventions of the raw products: longitudes 0 to 360,
+    # latitudes descending, times mid-month
+    path = joinpath(mktempdir(), "targets.nc")
+    NCDatasets.NCDataset(path, "c") do ds
+        NCDatasets.defDim(ds, "lon", 4)
+        NCDatasets.defDim(ds, "lat", 3)
+        NCDatasets.defDim(ds, "time", 2)
+        lon = NCDatasets.defVar(
+            ds,
+            "lon",
+            Float64,
+            ("lon",),
+            attrib = ["units" => "degrees_east"],
+        )
+        lat = NCDatasets.defVar(
+            ds,
+            "lat",
+            Float64,
+            ("lat",),
+            attrib = ["units" => "degrees_north"],
+        )
+        time = NCDatasets.defVar(
+            ds,
+            "time",
+            Float64,
+            ("time",),
+            attrib = ["units" => "days since 2010-01-01", "calendar" => "standard"],
+        )
+        frozen = NCDatasets.defVar(
+            ds,
+            "frozen",
+            Float32,
+            ("lon", "lat", "time"),
+            attrib = ["units" => "kg m^-2", "long_name" => "frozen water path"],
+        )
+        lon[:] = [0.0, 90.0, 180.0, 270.0]
+        lat[:] = [60.0, 0.0, -60.0]
+        time[:] = [14.0, 45.0]
+        frozen[:, :, :] = reshape(Float32.(1:24), 4, 3, 2)
+    end
+
+    @test_throws ErrorException CalibrationTools.LocalNetCDFDataLoader(
+        joinpath(dirname(path), "missing.nc"),
+        ["frozen" => "fwp"],
+    )
+    data_loader = CalibrationTools.LocalNetCDFDataLoader(path, ["frozen" => "fwp"])
+    @test CalibrationTools.available_vars(data_loader) == Set(["fwp"])
+    var = get(data_loader, "fwp")
+    check_conventions(var, "fwp")
+    @test issorted(ClimaAnalysis.latitudes(var))
+    @test ClimaAnalysis.units(var) == "kg m^-2"
+    @test ClimaAnalysis.dates(var) ==
+          [Dates.DateTime(2010, 1, 1), Dates.DateTime(2010, 2, 1)]
+    @test_throws ErrorException get(data_loader, "idk")
 end
 
 @testset "Composite data loader" begin

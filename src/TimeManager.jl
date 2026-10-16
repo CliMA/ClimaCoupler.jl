@@ -215,10 +215,7 @@ date at or before `t_start` reached by repeatedly adding `period` to `start_date
 function calendar_dt_schedule(period, start_date, t_start)
     period isa Dates.Period || (period = time_to_period(period))
     t_start_date = CD.time_to_date(t_start, start_date)
-    # If date_last = DateTime(2010, 1, 31), then
-    # start + Month(2) gives 2010-03-31T00:00:00, and
-    # (start + Month(1)) + Month(1) gives 2010-03-28T00:00:00.
-    # We want the latter, which matches what the schedule does.
+    # Jan 31 + 2 months is Mar 31, but stepping one month at a time gives Feb 28, Mar 28.
     date_last = start_date
     while date_last + period <= t_start_date
         date_last += period

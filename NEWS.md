@@ -4,6 +4,12 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Shrink the checkpointed integrated land cache
+The integrated land cache is now checkpointed with the `CacheIterator`, as the atmosphere cache
+already was, so each array is moved to CPU and saved once instead of once per reference. The shared
+code is in `Checkpointer.get_cache_vector`. Land cache checkpoints written before this change cannot
+be restored.
+
 #### Average the sea-ice skin emission and temperature over the coupling window
 A sea ice stepping more slowly than the coupler solves the skin balance on every coupling step, each with
 its own `Tₛ`, but was pushed a top heat flux that mixed window means of the absorbed radiation and of the

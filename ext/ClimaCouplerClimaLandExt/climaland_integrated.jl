@@ -400,23 +400,27 @@ function Checkpointer.get_model_cache(sim::ClimaLandSimulation)
     return sim.integrator.p
 end
 
+function Checkpointer.get_cache_ignore(::ClimaLandSimulation)
+    return Set([
+        :dss_buffer_2d,
+        :dss_buffer_3d,
+        :scratch1,
+        :scratch2,
+        :scratch3,
+        :sfc_scratch,
+        :subsfc_scratch,
+    ])
+end
+
+Checkpointer.get_model_cache_to_checkpoint(sim::ClimaLandSimulation) =
+    Checkpointer.get_cache_vector(sim)
+
 function Checkpointer.restore_cache!(sim::ClimaLandSimulation, new_cache)
-    old_cache = Checkpointer.get_model_cache(sim)
     comms_ctx = ClimaComms.context(sim.model.soil)
-    Checkpointer.restore!(
-        old_cache,
-        new_cache,
-        comms_ctx,
-        ignore = Set([
-            :dss_buffer_2d,
-            :dss_buffer_3d,
-            :scratch1,
-            :scratch2,
-            :scratch3,
-            :sfc_scratch,
-            :subsfc_scratch,
-        ]),
-    )
+    for (i, obj_restored) in enumerate(Checkpointer.CacheIterator(sim))
+        obj_saved = new_cache[i]
+        Checkpointer.restore!(obj_restored, obj_saved, comms_ctx; name = "", ignore = Set())
+    end
 end
 
 ## Extend functions for land-specific flux calculation

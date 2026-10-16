@@ -183,7 +183,10 @@ Instead of defining a proper `Adapt` method for the cache, an alternative
 approach is to recursively iterate over the cache fields and selectively save
 only the parts that need to be saved. This recursive iteration is performed by
 the `CacheIterator`. To initialize a `CacheIterator` for a component model, you
-must implement `get_cache_ignore`.
+must implement `get_cache_ignore`. A component model then opts in by extending
+`get_model_cache_to_checkpoint` with `get_cache_vector` and `restore_cache!` to
+restore the objects in the order of `CacheIterator`, as is done for the
+atmosphere and the integrated land models.
 
 Using the `CacheIterator` allows `adapt` to be called on each individual field
 instead of on the entire cache. Furthermore, the file size can be reduced by
@@ -199,6 +202,7 @@ This approach allows for a signficant reducation in the file size of the cache.
     Checkpointer.get_model_prog_state
     Checkpointer.get_model_cache
     Checkpointer.get_model_cache_to_checkpoint
+    Checkpointer.get_cache_vector
     Checkpointer.checkpoint_model_state
     Checkpointer.checkpoint_model_cache
     Checkpointer.restart!

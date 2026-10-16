@@ -137,11 +137,14 @@ function get_model_cache_to_checkpoint(sim::Interfacer.AbstractComponentSimulati
     return CC.Adapt.adapt(Array, get_model_cache(sim))
 end
 
-"""
-    get_model_cache_to_checkpoint(sim::Interfacer.AbstractAtmosSimulation)
+get_model_cache_to_checkpoint(sim::Interfacer.AbstractAtmosSimulation) =
+    get_cache_vector(sim)
 
-Prepare the atmos cache for checkpoint by selectively moving parts of the atmos
-cache to CPU instead of moving the entire atmos cache to CPU, resulting in a
+"""
+    get_cache_vector(sim::Interfacer.AbstractComponentSimulation)
+
+Prepare the cache of `sim` for checkpoint by selectively moving parts of the
+cache to CPU instead of moving the entire cache to CPU, resulting in a
 much smaller saved file.
 
 # Implementation Details
@@ -169,13 +172,13 @@ A vector of objects from the cache. Elements may reference the same underlying
 data if they share object IDs. The order of the objects in the vector is
 determined by `CacheIterator`.
 """
-function get_model_cache_to_checkpoint(sim::Interfacer.AbstractAtmosSimulation)
-    atmos_cache_itr = CacheIterator(sim)
+function get_cache_vector(sim::Interfacer.AbstractComponentSimulation)
+    cache_itr = CacheIterator(sim)
     cache_vec = [] # Elements of the vector can be any type
     # Keep track of the object ID and its index in the vector while iterating
     # through the fields of the cache
     obj_id_to_idx_map = Dict{UInt64, Int}()
-    for (i, obj_saved) in enumerate(atmos_cache_itr)
+    for (i, obj_saved) in enumerate(cache_itr)
         obj_id = objectid(obj_saved)
         if obj_id in keys(obj_id_to_idx_map)
             # Reuse the same object if we encountered the same object ID while
@@ -189,8 +192,8 @@ function get_model_cache_to_checkpoint(sim::Interfacer.AbstractAtmosSimulation)
     end
 
     # Recreate views if needed
-    atmos_cache_itr = CacheIterator(sim)
-    for (i, (obj_cache, obj_saved)) in enumerate(zip(cache_vec, atmos_cache_itr))
+    cache_itr = CacheIterator(sim)
+    for (i, (obj_cache, obj_saved)) in enumerate(zip(cache_vec, cache_itr))
         obj_cache isa SubArray || continue
         # When the SubArray is adapted to CPU, its parent array is lost. Here we
         # look up the parent array's object ID in the cache, find the

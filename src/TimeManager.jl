@@ -203,8 +203,7 @@ as `"6hours"`.
 
 `t_start` is the time the simulation starts from, either an `ITime` or a number of
 seconds since `start_date`. The schedule's `date_last` is seeded with the last
-calendar boundary (`start_date` plus a whole number of `period`s) at or before
-`t_start`.
+date at or before `t_start` reached by repeatedly adding `period` to `start_date`.
 
 !!! note "Use this instead of `EveryCalendarDtSchedule` directly"
     A schedule built directly at `t_start > 0` has no record of the time that

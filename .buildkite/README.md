@@ -104,12 +104,16 @@ first coupling step of the flagship AMIP simulation. The timings are shown as a
 build annotation and saved to `output/ttfs_amip/artifacts/time_to_first_step.md`.
 
 To run with changes to upstream packages, set `UPSTREAM_PACKAGES` to a
-space-separated list of `Name`, `Name@version`, `Name#rev`, or `url#rev` entries
-(see [add_upstream_packages.jl](add_upstream_packages.jl)). The nightly pipeline
-accepts the same variable. When `UPSTREAM_PACKAGES` is set, a second job measures
-the same packages at their main branches, and the annotation shows the change in
-each phase. The build fails if the total grows by more than
-`TTFS_REGRESSION_THRESHOLD` (default `0.2`, i.e. 20%).
+space-separated list of entries (see [add_upstream_packages.jl](add_upstream_packages.jl)):
+- `Name`, the main branch: `ClimaAtmos`
+- `Name@version`, a registered version: `ClimaAtmos@0.42.14`
+- `Name#rev`, a branch, tag, or commit: `ClimaAtmos#your_branch`
+- `url#rev`, a branch, tag, or commit of a fork: `https://github.com/your_user/ClimaAtmos.jl#your_branch`
+
+The nightly pipeline accepts the same variable. When `UPSTREAM_PACKAGES` is set,
+a second job measures the same packages at their main branches, and the
+annotation shows the change in each phase. The build fails if the total grows by more than
+`TTFS_REGRESSION_THRESHOLD` (default `0.1`, i.e. 10%).
 
 An upstream repo can trigger it from its own pipeline with:
 ```yaml

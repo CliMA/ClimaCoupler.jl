@@ -1,7 +1,7 @@
 #=
 Compare two time-to-first-step measurements and write a markdown table of the
 change in each phase. Throws an error if the total time grows by more than
-`TTFS_REGRESSION_THRESHOLD`, a fraction that defaults to 0.2.
+`TTFS_REGRESSION_THRESHOLD`, a fraction that defaults to 0.1.
 
 ```bash
 julia .buildkite/time_to_first_step/compare.jl baseline.csv changed.csv comparison.md
@@ -16,7 +16,8 @@ end
 baseline_path, changed_path, output_path = ARGS
 baseline = Dict(read_timings(baseline_path))
 changed = read_timings(changed_path)
-threshold = parse(Float64, get(ENV, "TTFS_REGRESSION_THRESHOLD", "0.2"))
+const DEFAULT_THRESHOLD = 0.1
+threshold = parse(Float64, get(ENV, "TTFS_REGRESSION_THRESHOLD", string(DEFAULT_THRESHOLD)))
 
 relative_change(phase, seconds) = seconds / baseline[phase] - 1
 

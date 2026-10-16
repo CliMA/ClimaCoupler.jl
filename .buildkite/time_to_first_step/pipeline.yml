@@ -7,12 +7,7 @@ env:
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100
   SLURM_KILL_BAD_EXIT: 1
 
-# Measures time to first step for the flagship AMIP simulation.
-# Upstream repos can trigger this pipeline with their changes by setting
-# `UPSTREAM_PACKAGES`, e.g. `UPSTREAM_PACKAGES="ClimaAtmos#<commit>"`.
-# When it is set, a second job measures the same packages at their main
-# branches and a final step reports the difference.
-# See .buildkite/README.md for the trigger step.
+# Time to first step for the flagship AMIP simulation. See .buildkite/README.md.
 
 steps:
   - label: "Time to first step: flagship AMIP"

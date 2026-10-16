@@ -7,7 +7,7 @@ active environment. Entries are separated by spaces and take one of these forms:
 - `url#rev`: a branch, tag, or commit of the repository at `url`, e.g. a fork
 
 With `--main`, every `Name#rev` and `url#rev` entry uses the main branch of the
-registered package instead.
+registered package instead, for the time-to-first-step baseline.
 
 ```bash
 UPSTREAM_PACKAGES="ClimaAtmos#abc1234 ClimaCore SurfaceFluxes@0.12" \

@@ -2,13 +2,15 @@
 # Measure time to first step of the flagship AMIP simulation.
 # Usage: measure.sh JOB_ID [--main]
 # Extra arguments are passed to .buildkite/add_upstream_packages.jl.
-# Each job uses its own copy of experiments/AMIP and its own depot, since
-# jobs in a build share a checkout and depot.
 set -euo pipefail
 
 job_id=$1
 shift
 
+# The copy keeps each job's package versions separate. Jobs in a build share
+# one manifest, which holds the package versions. `rm -rf` removes stale
+# manifests from retried jobs. A separate depot per job keeps concurrent
+# package downloads from colliding.
 project="experiments/AMIP_${job_id}"
 rm -rf "$project"
 cp -r experiments/AMIP "$project"

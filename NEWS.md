@@ -109,6 +109,10 @@ to the previous guess if the update is NaN.
 This PR also addresses a boundary condition bug in the
 sea-ice component, using the diagnosed skin temperature to compute the radiative emission term.(Previously the incorrect energy balance would result in rapid ice melt).
 
+#### Shrink the land checkpoint
+The size of the land checkpoint file is significantly smaller. When running the restart
+test, the size of the land checkpoint file is now 7.6 MiB from 118.8 MiB.
+
 #### Update to use ClimaCore v0.16
 The compat entries now require ClimaCore 0.16, ClimaAtmos 0.42.9, ClimaLand
 1.12.1, ClimaDiagnostics 0.3.9, and ClimaUtilities 0.1.32.

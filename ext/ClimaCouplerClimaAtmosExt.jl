@@ -158,9 +158,9 @@ Restore the cache in `sim` using `cache_vec` saved from
 `checkpoint_model_cache`.
 
 The atmosphere cache is saved as a vector of objects instead of being saved as
-the entire cache, as is done for the other models. This reduces the file size of
+the entire cache, as is done for most other models. This reduces the file size of
 the saved cache. See `checkpoint_model_cache` and
-`get_model_cache_to_checkpoint` for more information on how the atmosphere cache
+`get_cache_vector` for more information on how the atmosphere cache
 is saved.
 """
 function Checkpointer.restore_cache!(sim::ClimaAtmosSimulation, cache_vec)

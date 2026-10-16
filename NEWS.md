@@ -4,6 +4,16 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Non-negative control-volume weights for exchange-grid fluxes and surface fractions.
+The exchange-grid scatter (polygons → SE boundary space) now uses control-volume
+weights instead of the sign-indefinite SEM basis integrals. A control volume is a box
+around a SE node whose area equals the node's quadrature weight. The control-volume
+weights are then simply the area of each polygon inside each node's control volume.
+This ensures that the masked, normalized flux transfer remains bounded and conservative
+at coastal nodes. The wet, sea-ice, and open-ocean area fractions are now the
+coverages of the same weights, so `area_fraction × flux` integrates exactly to
+the polygon flux integral the ocean and sea ice receive.
+
 #### Average the sea-ice skin emission and temperature over the coupling window
 A sea ice stepping more slowly than the coupler solves the skin balance on every coupling step, each with
 its own `Tₛ`, but was pushed a top heat flux that mixed window means of the absorbed radiation and of the

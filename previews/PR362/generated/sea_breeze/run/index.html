@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Coupled Sea Breeze · ClimaCoupler.jl</title><script data-outdated-warner src="../../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../../assets/documenter.js"></script><script src="../../../siteinfo.js"></script><script src="../../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../../"><img src="../../../assets/logo.svg" alt="ClimaCoupler.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../../">ClimaCoupler.jl</a></span></div><form class="docs-search" action="../../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../../">Home</a></li><li><span class="tocitem">Examples</span><ul><li><input class="collapse-toggle" id="menuitem-2-1" type="checkbox" checked/><label class="tocitem" for="menuitem-2-1"><span class="docs-label">Sea Breeze</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../atmos_rhs/">Atmospheric Model</a></li><li><a class="tocitem" href="../land_rhs/">Land Model</a></li><li><a class="tocitem" href="../ocean_rhs/">Ocean Model</a></li><li class="is-active"><a class="tocitem" href>Coupled Sea Breeze</a><ul class="internal"><li><a class="tocitem" href="#Overview"><span>Overview</span></a></li><li><a class="tocitem" href="#Model-Initialization"><span>Model Initialization</span></a></li><li><a class="tocitem" href="#Initialization"><span>Initialization</span></a></li><li><a class="tocitem" href="#Remapping"><span>Remapping</span></a></li><li><a class="tocitem" href="#Simulations"><span>Simulations</span></a></li><li><a class="tocitem" href="#The-Coupler"><span>The Coupler</span></a></li><li><a class="tocitem" href="#Coupled-Time-Integration"><span>Coupled Time Integration</span></a></li></ul></li></ul></li><li><input class="collapse-toggle" id="menuitem-2-2" type="checkbox"/><label class="tocitem" for="menuitem-2-2"><span class="docs-label">AMIP</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../amip/coupler_driver_modular/">AMIP Driver</a></li></ul></li></ul></li><li><span class="tocitem">Coupler Interface</span><ul><li><a class="tocitem" href="../../../couplerstate/">Coupler State</a></li><li><a class="tocitem" href="../../../timestepping/">Coupled Simulations &amp; Timestepping</a></li><li><a class="tocitem" href="../../../regridder/">Regridder</a></li><li><a class="tocitem" href="../../../conservation/">Conservation Checks</a></li><li><a class="tocitem" href="../../../utilities/">Utilities</a></li><li><a class="tocitem" href="../../../bcreader/">BCReader</a></li><li><a class="tocitem" href="../../../testhelper/">TestHelper</a></li><li><a class="tocitem" href="../../../timemanager/">TimeManager</a></li></ul></li><li><span class="tocitem">Performance</span><ul><li><a class="tocitem" href="../../../performance/">Performance Analysis Tools</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li><a class="is-disabled">Sea Breeze</a></li><li class="is-active"><a href>Coupled Sea Breeze</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Coupled Sea Breeze</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/CliMA/ClimaCoupler.jl/blob/main/docs/src/generated/sea_breeze/run.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Coupled-Sea-Breeze"><a class="docs-heading-anchor" href="#Coupled-Sea-Breeze">Coupled Sea Breeze</a><a id="Coupled-Sea-Breeze-1"></a><a class="docs-heading-anchor-permalink" href="#Coupled-Sea-Breeze" title="Permalink"></a></h1><h2 id="Overview"><a class="docs-heading-anchor" href="#Overview">Overview</a><a id="Overview-1"></a><a class="docs-heading-anchor-permalink" href="#Overview" title="Permalink"></a></h2><p>This sea breeze simulation consists of an atmosphere above ocean and land thermal slabs. The difference in heating between the land and ocean components drives circulation: cool ocean air flows towards the land at the surface while warm air over land rises and flows over the ocean.</p><p>In this tutorial we demonstrate the coupling of three component models (atmosphere, ocean, and land) to drive the sea breeze. The primary parts of the ClimaCoupler interface are used and discussed.</p><pre><code class="language-julia hljs">import ClimaCore.Spaces as Spaces</code></pre><h2 id="Model-Initialization"><a class="docs-heading-anchor" href="#Model-Initialization">Model Initialization</a><a id="Model-Initialization-1"></a><a class="docs-heading-anchor-permalink" href="#Model-Initialization" title="Permalink"></a></h2><h3 id="Component-Models"><a class="docs-heading-anchor" href="#Component-Models">Component Models</a><a id="Component-Models-1"></a><a class="docs-heading-anchor-permalink" href="#Component-Models" title="Permalink"></a></h3><p>Component models are the building blocks of coupled models. They are often developed independently from one another and can be executed by themselves as &quot;standalone&quot; simulations. The coupler is used to combine these components into coupled simulations. Importantly, coupled simulations can re-use tendency methods developed for standalone simulations, maximizing code reuse and minimizing the necessary code that must be specialized for a coupled run–only special boundary conditions must be written. This is achieved by multiple dispatch, where methods that deal with boundaries dispatch off of a coupled boundary type. Here, the atmosphere has special boundary conditions for coupling while the ocean and land tendencies are unaltered. See the atmospheric model page for more details.</p><p>In a more mature CliMA ecosystem, the following include statements would be replaced by <code>using</code> statements for the relevant component packages.</p><pre><code class="language-julia hljs">include(&quot;atmos_rhs.jl&quot;)
+include(&quot;ocean_rhs.jl&quot;)
+include(&quot;land_rhs.jl&quot;)
+
+# model parameters
+const atm_T_ini = FT(270.0)
+const MSLP = FT(1e5)
+const grav = FT(9.8)
+const R_d = FT(287.058)
+const γ = FT(1.4)
+const C_p = FT(R_d * γ / (γ - 1))
+const C_v = FT(R_d / (γ - 1))
+const R_m = R_d
+cpl_parameters = (
+    # atmos parameters
+    atm_μ = FT(0.0001), # diffusion coefficient
+    atm_T_top = FT(280.0), # fixed temperature at the top of the domain_atm
+    atm_T_ini = atm_T_ini, # initial condition of at temperature (isothermal) [K]
+    MSLP = MSLP, # mean sea level pressure
+    grav = grav, # gravitational constant
+    R_d = R_d, # R dry (gas constant / mol mass dry air)
+    γ = γ, # heat capacity ratio
+    C_p = C_p, # heat capacity at constant pressure
+    C_v = C_v, # heat capacity at constant volume
+    R_m = R_m, # moist R, assumed to be dry
+    # land slab parameters
+    lnd_h = FT(0.5), # depth of slab layer [m]
+    lnd_ρ = FT(1500), # density [kg m^-3]
+    lnd_c = FT(800), # specific heat [J K^-1 kg^-1]
+    lnd_T_ini = FT(260.0), # initial condition of at temperature (isothermal) [K]
+    # ocean slab parameters
+    ocn_h = FT(0.5), # depth of slab layer [m]
+    ocn_ρ = FT(1025), # density [kg m^-3]
+    ocn_c = FT(3850), # specific heat [J K^-1 kg^-1]
+    ocn_T_ini = FT(260.0), # initial condition of at temperature (isothermal) [K]
+    # coupling parameters
+    C_H = FT(0.0015),
+)
+
+# DSS callback
+function make_dss_func()
+    function _dss!(x::Fields.Field)
+        Spaces.weighted_dss!(x)
+    end
+    function _dss!(::Any)
+        nothing
+    end
+    dss_func(Y, t, integrator) = foreach(_dss!, Fields._values(Y))
+    return dss_func
+end
+dss_func = make_dss_func()
+dss_callback = FunctionCallingCallback(dss_func, func_start = true)</code></pre><h2 id="Initialization"><a class="docs-heading-anchor" href="#Initialization">Initialization</a><a id="Initialization-1"></a><a class="docs-heading-anchor-permalink" href="#Initialization" title="Permalink"></a></h2><p>The coupled simulation synchronizes the component models at a coupling time step, <code>Δt_cpl</code>. Within that step, components may substep - each component specifies a number of substeps to take within <code>Δt_cpl</code>: <code>atm_nsteps, ocn_nsteps, lnd_nsteps</code>.</p><p>Component model states are initialized via the initialization methods each component would use in standalone mode. These states will be modified to reflect the full coupled system before executing the simulation.</p><pre><code class="language-julia hljs">@info &quot;Init Models and Maps&quot;
+
+t_start, t_end = (0.0, 1.0)
+Δt_coupled = 0.1
+saveat = 1e2
+atm_nsteps, ocn_nsteps, lnd_nsteps = (5, 1, 1)
+
+# Initialize Models
+atm_Y_default, atm_bc, atm_domain = atm_init(
+    xmin = -500,
+    xmax = 500,
+    zmin = 0,
+    zmax = 1000,
+    npoly = 4,
+    helem = 20,
+    velem = 20,
+    bc = (ρθ = (bottom = CoupledFlux(), top = ZeroFlux()),),
+)
+
+ocn_Y_default, ocn_domain = ocn_init(xmin = -500, xmax = 0, helem = 10, npoly = 0)
+
+lnd_Y_default, lnd_domain = lnd_init(xmin = 0, xmax = 500, helem = 10, npoly = 0)</code></pre><h2 id="Remapping"><a class="docs-heading-anchor" href="#Remapping">Remapping</a><a id="Remapping-1"></a><a class="docs-heading-anchor-permalink" href="#Remapping" title="Permalink"></a></h2><p>Because models may live on different grids, remapping is necessary at the boundaries. Maps between coupled components must be constructed for each interacting pair. Remapping utilities are imported from <code>ClimaCore.Operators</code>.</p><pre><code class="language-julia hljs">atm_boundary = Spaces.level(atm_domain.hv_face_space, PlusHalf(0))
+
+maps = (
+    atmos_to_ocean = Operators.LinearRemap(ocn_domain, atm_boundary),
+    atmos_to_land = Operators.LinearRemap(lnd_domain, atm_boundary),
+    ocean_to_atmos = Operators.LinearRemap(atm_boundary, ocn_domain),
+    land_to_atmos = Operators.LinearRemap(atm_boundary, lnd_domain),
+)
+
+# initialize coupling fields
+atm_T_sfc =
+    Operators.remap(maps.ocean_to_atmos, ocn_Y_default.T_sfc) .+
+    Operators.remap(maps.land_to_atmos, lnd_Y_default.T_sfc) # masked arrays; regrid to atm grid
+atm_F_sfc = Fields.zeros(atm_boundary)
+ocn_F_sfc = Fields.zeros(ocn_domain)
+lnd_F_sfc = Fields.zeros(lnd_domain)</code></pre><h2 id="Simulations"><a class="docs-heading-anchor" href="#Simulations">Simulations</a><a id="Simulations-1"></a><a class="docs-heading-anchor-permalink" href="#Simulations" title="Permalink"></a></h2><p>Each component is wrapped as a <code>Simulation</code>, which contains both the model (tendency) and the time-stepping information (solver, step size, etc). Simulations are the standard structures that the coupler works with, enabling dispatch of coupler methods. Here, we create three simulations: <code>AtmosSimulation</code>, <code>OceanSimulation</code>, and <code>LandSimulation</code>.</p><pre><code class="language-julia hljs">atm_Y = Fields.FieldVector(Yc = atm_Y_default.Yc, ρw = atm_Y_default.ρw, F_sfc = atm_F_sfc)
+atm_p = (cpl_p = cpl_parameters, T_sfc = atm_T_sfc, bc = atm_bc)
+atmos = AtmosSimulation(atm_Y, t_start, Δt_coupled / atm_nsteps, t_end, SSPRK33(), atm_p, saveat, dss_callback)
+
+ocn_Y = Fields.FieldVector(T_sfc = ocn_Y_default.T_sfc)
+ocn_p = (cpl_parameters, F_sfc = ocn_F_sfc)
+ocean = OceanSimulation(ocn_Y, t_start, Δt_coupled / ocn_nsteps, t_end, SSPRK33(), ocn_p, saveat)
+
+lnd_Y = Fields.FieldVector(T_sfc = lnd_Y_default.T_sfc)
+lnd_p = (cpl_parameters, F_sfc = lnd_F_sfc)
+land = LandSimulation(lnd_Y, t_start, Δt_coupled / lnd_nsteps, t_end, SSPRK33(), lnd_p, saveat)</code></pre><p>Additionally, we create a coupled simulation that contains the component simulations and the coupled time-stepping information.</p><pre><code class="language-julia hljs">struct AOLCoupledSimulation{
+    A &lt;: AtmosSimulation,
+    O &lt;: OceanSimulation,
+    L &lt;: LandSimulation,
+    C &lt;: ClimaCoupler.CouplerState,
+} &lt;: ClimaCoupler.AbstractCoupledSimulation
+    # Atmosphere Simulation
+    atmos::A
+    # Ocean Simulation
+    ocean::O
+    # Land Simulation
+    land::L
+    # Coupler storage
+    coupler::C
+end</code></pre><p><code>step!</code> is a key method within the Simulations interface. It advances a simulation to the specified <code>t_stop</code>, with that simulation advancing by its own internal step size to reach the specified time. Each simulation type should specify its own step method, allowing components to have different time integration backends. Here, all components are using OrdinaryDiffEq integrators and can share the same <code>step!</code> method.</p><pre><code class="language-julia hljs">function step!(sim::ClimaCoupler.AbstractSimulation, t_stop)
+    Δt = t_stop - sim.integrator.t
+    step!(sim.integrator, Δt, true)
+end</code></pre><h2 id="The-Coupler"><a class="docs-heading-anchor" href="#The-Coupler">The Coupler</a><a id="The-Coupler-1"></a><a class="docs-heading-anchor-permalink" href="#The-Coupler" title="Permalink"></a></h2><p>The <code>CouplerState</code> is a coupling struct used to store pointers or copies of the shared boundary information. All components are coupled by updating or accessing data in this <code>CouplerState</code>; component models do not directly interface with one another, only through the coupler.</p><p>After creating the <code>CouplerState</code> object, coupled fields can be registered index the coupler via the <code>coupler_add_field!</code> method. This field is then accessible by <code>coupler_get</code> methods and can be updated via the <code>coupler_put!</code> methods.</p><p>Similarly, the <code>coupler_add_map!</code> method registers remapping operators in the coupler. To provide automatic remapping, there is a strict name convention for remap operators: a map from SimulationA to SimulationB (where <code>ClimaCoupler.name</code> returns <code>:simA</code> and <code>:simB</code>, respectively) must be named <code>simA_to_simB</code> so that the correct operator can be used.</p><p>Here, the models are coupled through heat transfer at the surface. This heat flux is computed by a bulk formula:</p><p class="math-container">\[F_{sfc} = c_p \rho_1 C_H |u_1| (\theta_{sfc} - \theta_{atm1})\]</p><p>where <span>$\theta_{sfc}$</span> is the potential temperature at the land or ocean surface, <span>$\theta_{atm1}$</span> is the potential temperature at the lowest atmospheric level, <span>$c_p$</span> is the specific heat, <span>$C_H = 0.0015$</span> is the bulk transfer coefficient for sensible heat, and <span>$|u_1|$</span> is the near-surface atmospheric wind speed. We assume that the potential temperature is defined with respect to the surface pressure, so that <span>$\theta_{sfc} = T_{sfc}$</span>.</p><pre><code class="language-julia hljs">coupler = CouplerState(Δt_coupled)
+coupler_add_field!(coupler, :T_sfc_ocean, ocean.integrator.u.T_sfc; write_sim = ocean)
+coupler_add_field!(coupler, :T_sfc_land, land.integrator.u.T_sfc; write_sim = land)
+coupler_add_field!(coupler, :F_sfc, atmos.integrator.u.F_sfc; write_sim = atmos)
+for (name, map) in pairs(maps)
+    coupler_add_map!(coupler, name, map)
+end
+
+sim = AOLCoupledSimulation(atmos, ocean, land, coupler)</code></pre><h2 id="Coupled-Time-Integration"><a class="docs-heading-anchor" href="#Coupled-Time-Integration">Coupled Time Integration</a><a id="Coupled-Time-Integration-1"></a><a class="docs-heading-anchor-permalink" href="#Coupled-Time-Integration" title="Permalink"></a></h2><p>Finally, the execution sequence of the component models must be specified. This is currently done explicitly with a combination of <code>step!</code>, <code>coupler_pull!</code>, and <code>coupler_push!</code> methods. The <code>coupler_pull!</code> and <code>coupler_push!</code> methods receive and send coupled field info from the coupler, respectively. They must be written for each component simulation, and are simply collections of <code>coupler_get</code> and <code>coupler_put!</code> methods for each component.</p><p>Here, the atmosphere steps forward first and then sends updated fields to the coupler. The ocean and land (which are not coupled to each other) then retreive the updated coupled information, advance and send their own updates to the coupler.</p><p>Because the models exchange fluxes only at the coupled timestep, the surface flux is accumulated over the coupled time-step coupling time step, <code>Δt_cpl</code></p><p class="math-container">\[F_{integ} = \int_{\Delta t_{coupler}} F_{sfc}  dt\]</p><p>where  <span>$F_{integ}$</span> has units of <span>$J m^{-2}$</span>.</p><pre><code class="language-julia hljs">function cpl_run(simulation::AOLCoupledSimulation)
+    @info &quot;Run model&quot;
+    @unpack atmos, ocean, land, coupler = simulation
+    Δt_coupled = coupler.Δt_coupled
+    # coupler stepping
+    for t in ((t_start + Δt_coupled):Δt_coupled:t_end)
+        # Atmos
+        coupler_pull!(atmos, coupler)
+        step!(atmos, t)
+        coupler_push!(coupler, atmos)
+
+        # Ocean
+        coupler_pull!(ocean, coupler)
+        step!(ocean, t)
+        coupler_push!(coupler, ocean)
+
+        # Land
+        coupler_pull!(land, coupler)
+        step!(land, t)
+        coupler_push!(coupler, land)
+    end
+    @info &quot;Simulation Complete&quot;
+end
+
+# Run simulation
+cpl_run(sim)</code></pre><h3 id="References"><a class="docs-heading-anchor" href="#References">References</a><a id="References-1"></a><a class="docs-heading-anchor-permalink" href="#References" title="Permalink"></a></h3><ul><li><a href="https://journals.ametsoc.org/view/journals/atsc/64/12/2007jas2261.1.xml?tab_body=pdf">Antonelli &amp; Rotunno 2007</a></li></ul><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../ocean_rhs/">« Ocean Model</a><a class="docs-footer-nextpage" href="../../amip/coupler_driver_modular/">AMIP Driver »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.25 on <span class="colophon-date" title="Friday 28 July 2023 00:27">Friday 28 July 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

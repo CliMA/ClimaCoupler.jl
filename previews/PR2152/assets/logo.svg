@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="200" height="200" viewBox="0 0 200 200">
+  <!-- Three swirling commas in Julia colors, shrunk about each lobe's centroid
+       (146.842,106.7) so they separate from each other and leave a gap at the center. -->
+  <defs>
+    <path id="lobe" d="M 127.81,14.40 A 90,90 0 0 1 177.9423,145 A 45,45 0 0 1 95.50,110.85 C 97.83,102.16 102.96,100.80 111.65,98.47 A 45,45 0 0 0 113.90,12.20 C 104.39,9.11 118.30,11.31 127.81,14.40 Z"/>
+    <!-- Sun -->
+    <g id="sun" fill="#4063D8" stroke="#4063D8" stroke-width="1.9" stroke-linecap="round">
+      <circle cx="0" cy="0" r="4.6" stroke="none"/>
+      <g>
+        <line x1="0" y1="-6.5" x2="0" y2="-10"/>
+        <line x1="0" y1="6.5" x2="0" y2="10"/>
+        <line x1="-6.5" y1="0" x2="-10" y2="0"/>
+        <line x1="6.5" y1="0" x2="10" y2="0"/>
+        <line x1="-4.6" y1="-4.6" x2="-7.1" y2="-7.1"/>
+        <line x1="4.6" y1="4.6" x2="7.1" y2="7.1"/>
+        <line x1="-4.6" y1="4.6" x2="-7.1" y2="7.1"/>
+        <line x1="4.6" y1="-4.6" x2="7.1" y2="-7.1"/>
+      </g>
+    </g>
+    <!-- Waterdrop -->
+    <path id="drop" fill="#4063D8" d="M 0,-11 C 6,-3 7.5,1 7.5,4 A 7.5,7.5 0 1 1 -7.5,4 C -7.5,1 -6,-3 0,-11 Z"/>
+    <!-- Leaf -->
+    <g id="leaf" transform="rotate(-25)">
+      <path fill="#4063D8" d="M 0,-11 C 7.5,-6 7.5,6 0,11 C -7.5,6 -7.5,-6 0,-11 Z"/>
+      <path fill="none" stroke="#ffffff" stroke-width="1.3" stroke-linecap="round"
+            d="M 0,-8.5 L 0,8.5 M 0,-3 L 3.5,-6 M 0,1.5 L 3.5,-1.5 M 0,-3 L -3.5,-6 M 0,1.5 L -3.5,-1.5"/>
+    </g>
+  </defs>
+
+  <use href="#lobe" fill="#9558B2" transform="rotate(240 100 100) translate(146.842 106.7) scale(0.78) translate(-146.842 -106.7)"/>
+  <use href="#lobe" fill="#CB3C33" transform="translate(146.842 106.7) scale(0.78) translate(-146.842 -106.7)"/>
+  <use href="#lobe" fill="#389826" transform="rotate(120 100 100) translate(146.842 106.7) scale(0.78) translate(-146.842 -106.7)"/>
+
+  <use href="#sun"  transform="translate(96.12 55.24) scale(1.45)"/>
+  <use href="#drop" transform="translate(140.70 119.02) scale(1.45)"/>
+  <use href="#leaf" transform="translate(63.17 125.74) scale(1.45)"/>
+</svg>

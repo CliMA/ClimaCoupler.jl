@@ -230,7 +230,7 @@ steps:
         agents:
           slurm_mem: 20GB
 
-      - label: "Slabplanet aqua: atmos and slab ocean"
+      - label: "Slabplanet aqua: atmos and slab ocean, prognostic aerosols"
         key: "slabplanet_aqua"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_aqua.yml --job_id slabplanet_aqua"
         retry: *retry_policy

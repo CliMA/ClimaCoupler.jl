@@ -19,11 +19,12 @@ bias_plot_extrema = Dict(
     plot_bias_weekly(ekp, simdir, iteration; output_dir)
 
 Plot bias maps comparing simulation output to ERA5 observations for all variables in
-`CALIBRATE_CONFIG.short_names`. ERA5 vars are reconstructed from the EKP observation
-object and denormalized to physical units when normalization is enabled.
+`CALIBRATE_CONFIG.observables`. ERA5 vars are reconstructed from the EKP observation
+object.
 """
 function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation_path)
-    (; short_names, sample_date_ranges) = CALIBRATE_CONFIG
+    (; observables, sample_date_ranges) = CALIBRATE_CONFIG
+    short_names = [o.name for o in observables]
     sample_date_range = sample_date_ranges[iteration]
     calib_start, _ = sample_date_range
 
@@ -34,7 +35,7 @@ function plot_bias_weekly(ekp, simdir, iteration; output_dir = simdir.simulation
     era5_vars =
         mapreduce(ClimaCalibrate.ObservationRecipe.reconstruct_vars, vcat, minibatch_obs)
 
-    sim_vars = load_and_preprocess_vars(simdir, short_names)
+    sim_vars = load_and_preprocess_vars(simdir, short_names, CALIBRATE_CONFIG)
 
     # Match sim_vars with era5_vars by short_name
     var_pairs = []

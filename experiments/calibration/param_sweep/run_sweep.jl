@@ -212,10 +212,6 @@ function design(experiment_path)
     sample_date = Dates.DateTime(_get(:sample_date, "2010-10-01"))
     config = CalibrationTools.CalibrateConfig(;
         config_file,
-        # `CalibrateConfig` requires `short_names` because a calibration needs
-        # observations to compare against, but these are never used in the sweep.
-        short_names = ["ta"],
-        minibatch_size = 1,
         n_iterations = 1,
         sample_date_ranges = [(sample_date, sample_date)],
         extend = Dates.Month(1),

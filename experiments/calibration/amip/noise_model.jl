@@ -1,6 +1,6 @@
 # The observation noise model used by the AMIP calibrations:
 #
-#     Gamma = C_y + D_y + beta * D_mean + sigma2 * s^2 * I
+#     Gamma = C_y + D_y + beta * max(D_mean, sigma2 * s^2)
 #
 #   C_y      rank-`rank` truncated-SVD sample covariance of the observation years, supplied
 #            by `SVDplusDCovariance`. Only one or two modes are reliably estimated from
@@ -13,9 +13,12 @@
 #            model error, and is a VARIANCE scale: beta = 0.05^2 is a 5% model error.
 #            The mean is squared, not the mean of the squares, so the interannual spread
 #            enters Gamma only through C_y and D_y and is not counted again here.
-#   s^2      the per-variable median of the sample variances, so the absolute
-#            floor sigma2 * s^2 is scale aware. This term is there to keep the covariance
-#            well conditioned, not to express a belief about uncertainty.
+#   s^2      the per-variable median of the sample variances, so the floor sigma2 * s^2
+#            is scale aware. It replaces D_mean only where D_mean falls below it, where
+#            the mean is zero or nearly so, so the model-error term never vanishes where
+#            the field does; elsewhere it has no effect. It keeps the covariance
+#            invertible, it is not a belief about uncertainty. Being inside the beta term,
+#            it is scaled by beta, so a variable with beta = 0 gets no floor.
 #
 # Latitude weighting is applied to the samples before both the SVD and the diagonal, so
 # that C_y and D_y are computed from the same matrix and the subtraction in D_y is valid.
@@ -77,7 +80,8 @@ end
 """
     noise_diagonal(; beta, rank, sigma2 = 1e-6)
 
-The diagonal of `Gamma`: `D_y + beta * D_mean + sigma2 * s^2 * I`.
+The diagonal of `Gamma`: `D_y + beta * max(D_mean, sigma2 * s^2)`, with `D_mean` the
+squared sample mean and `s^2` the median sample variance.
 
 `beta` is a variance scale and may be a scalar or one value per variable, in the order the
 variables appear in the `SampleCollection`. Pair this with an `SVDplusDCovariance` of the
@@ -87,10 +91,12 @@ function noise_diagonal(; beta, rank, sigma2 = 1e-6)
     betas = beta isa AbstractVector ? Float64.(collect(beta)) : [Float64(beta)]
     all(>=(0), betas) || throw(ArgumentError("beta must be non-negative, got $betas"))
     sigma2 >= 0 || throw(ArgumentError("sigma2 must be non-negative, got $sigma2"))
+    floor_term =
+        sigma2 .*
+        ObservationRecipe.QuantileDiagonal(0.5, ObservationRecipe.VarianceDiagonal())
+    mean_squared = max.(ObservationRecipe.ModelErrorScaleDiagonal(1.0), floor_term)
     return ResidualVarianceDiagonal(rank) .+
-           ObservationRecipe.ModelErrorScaleDiagonal(sqrt.(betas)) .+
-           sigma2 .*
-           ObservationRecipe.QuantileDiagonal(0.5, ObservationRecipe.VarianceDiagonal())
+           ObservationRecipe.ScalarDiagonal(betas) .* mean_squared
 end
 
 """

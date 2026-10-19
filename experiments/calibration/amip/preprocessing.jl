@@ -3,6 +3,7 @@
 
 import ClimaAnalysis
 import ClimaCoupler
+import Dates
 import Statistics
 
 """
@@ -23,27 +24,6 @@ function select_pressure_levels(var, pressure_levels::Union{Vector, AbstractFloa
 end
 
 """
-    apply_lat_window(var, lat_left, lat_right)
-
-Apply latitude window by constraining the longitudes to be in the range
-[lat_left, lat_right].
-"""
-function apply_lat_window(var, lat_left, lat_right)
-    lats = ClimaAnalysis.latitudes(var)
-    first_lat_idx = findfirst(lat -> lat >= lat_left, lats)
-    last_lat_idx = findlast(lat -> lat <= lat_right, lats)
-    var = ClimaAnalysis.window(
-        var,
-        "latitude",
-        by = ClimaAnalysis.Index(),
-        left = first_lat_idx,
-        right = last_lat_idx,
-    )
-    @info "Windowing latitudes, latitudes of $(ClimaAnalysis.short_name(var)) is $(ClimaAnalysis.latitudes(var))"
-    return var
-end
-
-"""
     zonal_average(var)
 
 Average `var` over longitude, ignoring `NaN`s. A variable with no longitude dimension is
@@ -60,6 +40,91 @@ function zonal_average(var)
         error("Variable $(ClimaAnalysis.short_name(var)) has no longitude")
     @info "Zonal (longitude) averaging $(ClimaAnalysis.short_name(var))"
     return ClimaAnalysis.average_lon(var; ignore_nan = true)
+end
+
+"""
+    global_mean(var)
+
+The area-weighted global mean of `var`, ignoring `NaN`s, as a function of time.
+"""
+global_mean(var) = ClimaAnalysis.average_lonlat(var; ignore_nan = true, weighted = true)
+
+"""
+    seasonal_average(var)
+
+Average `var` over each meteorological season (DJF, MAM, JJA, SON) of each year. A season is
+dated by its first month, so a calibration targets SON 2010 with the sample date range
+`(DateTime(2010, 9, 1), DateTime(2010, 9, 1))` and `extend = Dates.Month(3)`. The
+simulation's spinup months form their own season, which no sample date selects.
+"""
+function seasonal_average(var)
+    @info "Seasonal averaging $(ClimaAnalysis.short_name(var))"
+    return ClimaAnalysis.average_season_across_time(var)
+end
+
+"""
+    observable(config, name)
+
+The entry of `config.observables` for the loss field `name` (see `CalibrateConfig`).
+"""
+function observable(config, name)
+    i = findfirst(o -> o.name == name, config.observables)
+    isnothing(i) && error("$name is not one of the config's observables")
+    return config.observables[i]
+end
+
+"""
+    loss_values(vars, coverage_masks, config)
+
+The values the loss compares, computed identically for the observations
+(`generate_observations.jl`) and the model output (`observation_map.jl`). Change the loss here
+and both sides change. For each field:
+
+1. Restrict it to the points its observation covers (`coverage_masks`, see `coverage_mask`).
+   A satellite retrieval is not global (MAC `lwp` is ocean only) and the averages ignore
+   `NaN`, so without this the model would also average points the observation never saw.
+   For `lwp` that changed the area-weighted bias by a factor of four.
+2. Apply the observable's `reduce` function.
+"""
+function loss_values(vars, coverage_masks, config)
+    return map(vars) do var
+        name = ClimaAnalysis.short_name(var)
+        mask = get(coverage_masks, name, nothing)
+        var = isnothing(mask) ? var : mask(var)
+        return observable(config, name).reduce(var)
+    end
+end
+
+"""
+    observation_vector_path(output_dir)
+
+Path of the observation vector, kept with the run it belongs to. Written by
+`generate_observations.jl` and read by `run_calibration.jl`.
+"""
+observation_vector_path(output_dir) = joinpath(output_dir, "observation_vec.jld2")
+
+"""
+    check_extend(vars, config)
+
+Error unless members run long enough to produce one full value of every reduced field:
+`extend` must cover the spacing of the reduced observations `vars`, e.g. `Month(3)` for
+seasonal means. A shorter run would silently average fewer months than the observation.
+"""
+function check_extend(vars, config)
+    start = first(first(config.sample_date_ranges))
+    run_after_target = (start + config.extend) - start
+    for var in vars
+        dates = sort(unique(ClimaAnalysis.dates(var)))
+        length(dates) < 2 && continue
+        spacing = minimum(diff(dates))
+        run_after_target >= spacing || error(
+            "$(ClimaAnalysis.short_name(var)) has one value every \
+            $(Dates.value(spacing) ÷ 86_400_000) days after its reduction, but members run \
+            only $(config.extend) past each target date. Set extend to cover it, for example \
+            Month(3) for seasonal means.",
+        )
+    end
+    return nothing
 end
 
 """
@@ -96,6 +161,10 @@ the model's cloud.
 
 Restricted to `date_ranges` on purpose. A record spanning decades, unioned over
 every slice, drops any point that is missing in any single month.
+
+Give it every month the reduced values are made from (each target date to the end of its
+`extend`), not only the first. Every masked date then has the same covered points, so
+averaging over time and over longitude give the same result in either order.
 
 Longitude and latitude only. A masked product with another dimension, such as a
 cloud fraction on levels, errors here rather than guessing how to collapse it.
@@ -170,83 +239,4 @@ function set_unitless_units!(var)
         var.attributes["units"] = "unitless"
     end
     return var
-end
-
-"""
-    compute_mean_and_stddev(normalization_stas, var::ClimaAnalysis.OutputVar)
-
-Generate normalization statistics by computing a single mean and standard
-deviation for `var`, over the finite data only.
-"""
-function compute_mean_and_stddev(var::ClimaAnalysis.OutputVar)
-    finite_data = filter(isfinite, var.data)
-    isempty(finite_data) && error("$(ClimaAnalysis.short_name(var)) has no finite data")
-    mean_of_var = Statistics.mean(finite_data)
-    std_of_var = Statistics.std(finite_data)
-    std_of_var ≈ 0.0 && error("Standard deviation is zero; check your data")
-    return (mean_of_var, std_of_var)
-end
-
-"""
-    compute_normalization!(normalization_stats::Dict, var)
-
-Update `normalization_stats` with a pair of (short_name, pressure_level) to
-(mean, std).
-
-For variables without pressure levels, `pressure_level` is set to `nothing`.
-
-Normalization statistics are computed for each variable and pressure level
-combination.
-"""
-function compute_normalization!(normalization_stats::Dict, var)
-    if ClimaAnalysis.has_pressure(var)
-        for pressure_level in ClimaAnalysis.pressures(var)
-            var_view_of_pressure_level = ClimaAnalysis.view_select(
-                var,
-                by = ClimaAnalysis.MatchValue(),
-                pressure_level = pressure_level,
-            )
-            var_mean, var_stddev = compute_mean_and_stddev(var_view_of_pressure_level)
-            normalization_stats[(
-                ClimaAnalysis.short_name(var_view_of_pressure_level),
-                pressure_level,
-            )] = (var_mean, var_stddev)
-        end
-    else
-        var_mean, var_stddev = compute_mean_and_stddev(var)
-        normalization_stats[(ClimaAnalysis.short_name(var), nothing)] =
-            (var_mean, var_stddev)
-    end
-    return nothing
-end
-
-"""
-    apply_normalization!(normalization_stats, var::ClimaAnalysis.OutputVar)
-
-Apply normalization using the statistics saved in `normalization_stats`.
-"""
-function apply_normalization!(normalization_stats, var::ClimaAnalysis.OutputVar)
-    if ClimaAnalysis.has_pressure(var)
-        for pressure_level in ClimaAnalysis.pressures(var)
-            var_view_of_pressure_level = ClimaAnalysis.view_select(
-                var,
-                by = ClimaAnalysis.MatchValue(),
-                pressure_level = pressure_level,
-            )
-
-            (ClimaAnalysis.short_name(var), pressure_level) in keys(normalization_stats) ||
-                continue
-
-            mean_var, std_var =
-                normalization_stats[(ClimaAnalysis.short_name(var), pressure_level)]
-            var_view_of_pressure_level.data .-= mean_var
-            var_view_of_pressure_level.data ./= std_var
-        end
-    else
-        (ClimaAnalysis.short_name(var), nothing) in keys(normalization_stats) || return
-        mean_var, std_var = normalization_stats[(ClimaAnalysis.short_name(var), nothing)]
-        var.data .-= mean_var
-        var.data ./= std_var
-    end
-    return nothing
 end

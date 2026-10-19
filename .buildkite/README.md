@@ -134,12 +134,7 @@ An upstream repo can trigger it from its own pipeline with:
 
 This pipeline provides a set of simulations of increasing physical and computational complexity.
 
-The simpler setups use the Slabplanet mode and check conservation of the system.
-These include a standalone atmosphere run (meant to provide a direct
-comparison to runs in ClimaAtmos.jl), an aquaplanet run (atmosphere and slab ocean),
-and a couple more complex runs.
-
-We also have a set of AMIP mode simulations, which run the atmosphere, slab ocean,
+We have a set of AMIP mode simulations, which run the atmosphere, slab ocean,
 prescribed sea ice, and either bucket or integrated land model. Unless stated otherwise,
 they are using the bucket land model. They also test a various complexities in the
 atmosphere configuration, which affects the stability and SYPD of the simulations, among
@@ -152,6 +147,5 @@ Finally, we have a calibration longrun experiment, which exercises the calibrati
 pipeline for the coupled system.
 
 The resolution of runs in this pipeline is typically 16 horizontal elements,
-unless otherwise specified (e.g. the slabplanet runs use 8 horizontal elements).
-The simplest simulations are only run on CPU, but the more complex
-simulations are mostly run on GPU.
+unless otherwise specified. All simulations in this pipeline run on GPU on the
+`clima` queue.

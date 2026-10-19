@@ -101,8 +101,9 @@ function add_ocean_diagnostics!(
     JT = surface_flux(T)
     Js = surface_flux(S)
 
-    # Seed FieldStatus with the clock time so computed fields adopt the clock's time type
-    computed_field_status = OC.Fields.FieldStatus(ocean.model.clock.time)
+    # Each computed field gets its own FieldStatus, seeded with the clock time so the status
+    # holds the clock's time type
+    computed_field_status() = OC.Fields.FieldStatus(clock_time)
 
     surface_indices = (:, :, Nz)
     sea_surface_temperature = OC.Field(T; indices = surface_indices)
@@ -110,10 +111,10 @@ function add_ocean_diagnostics!(
     sea_surface_zonal_velocity = OC.Field(u; indices = surface_indices)
     sea_surface_meridional_velocity = OC.Field(v; indices = surface_indices)
     sea_surface_temperature_squared =
-        OC.Field(T * T; indices = surface_indices, status = computed_field_status)
+        OC.Field(T * T; indices = surface_indices, status = computed_field_status())
     sea_surface_salinity_squared =
-        OC.Field(S * S; indices = surface_indices, status = computed_field_status)
-    sea_surface_height_squared = OC.Field(η * η; status = computed_field_status)
+        OC.Field(S * S; indices = surface_indices, status = computed_field_status())
+    sea_surface_height_squared = OC.Field(η * η; status = computed_field_status())
 
     surface_outputs = Dict{Symbol, Any}(
         :sea_surface_temperature => sea_surface_temperature,

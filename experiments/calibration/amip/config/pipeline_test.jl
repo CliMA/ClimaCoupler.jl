@@ -9,55 +9,31 @@
 # completing one iteration will catch most errors with the full calibration
 # pipeline
 
-# Define which coupler config to use (coarse h_elem for CI smoke test only)
-config_file = joinpath(
-    pkgdir(ClimaCoupler),
-    "config",
-    "amip_configs",
-    "amip_calibration_pipeline_test.yml",
-)
-
-# Calibrate on October 2010, the October with initial conditions in the
-# wxquest_initial_conditions artifact. The noise covariance is the interannual
-# spread of the observations, so it is estimated over ten Octobers; identical
-# dates would give it no spread at all.
-sample_date_ranges =
-    [(Dates.DateTime(2010, 10, 1), Dates.DateTime(2010, 10, 1)) for _ in 1:6]
-covariance_date_ranges =
-    [(Dates.DateTime(year, 10, 1), Dates.DateTime(year, 10, 1)) for year in 2001:2010]
-
-# On Derecho, it is preferable to save the calibration output to the scratch
-# directory (e.g. "/glade/derecho/scratch")
-output_dir = joinpath(pkgdir(ClimaCoupler), "amip_calibration")
-
-# spinup and sample_date_ranges are chosen to match the only dates
-# available in the wxquest_initial_conditions artifact
 const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
-    config_file,
-    # Note: Pressure-level variables require model output with
-    # pressure_coordinates: true in config
-    short_names = ["ta", "hur"],
-    minibatch_size = 1,
-    n_iterations = 1,
-    sample_date_ranges = [
-        (Dates.DateTime(2010, 10, 1), Dates.DateTime(2010, 10, 1)) for _ in 1:6
+    # Coarse h_elem for the CI smoke test only
+    config_file = joinpath(
+        pkgdir(ClimaCoupler),
+        "config",
+        "amip_configs",
+        "amip_calibration_pipeline_test.yml",
+    ),
+    # Pressure-level fields need model output with pressure_coordinates: true in the yml.
+    observables = [
+        (name = "ta", reduce = zonal_average, model_error_fraction = 0.05),
+        (name = "hur", reduce = zonal_average, model_error_fraction = 0.05),
     ],
-    extend = Dates.Month(1),
-    spinup = Dates.Day(0),
-    output_dir,
-    rng_seed = 42,
+    pressure_levels = 100.0 .* [200.0, 500.0, 850.0],  # Pa
+    n_iterations = 1,
+    # October 2010 has initial conditions in the wxquest_initial_conditions artifact. The
+    # noise covariance is the spread over ten Octobers; identical dates would give none.
+    sample_date_ranges = [(DateTime(2010, 10, 1), DateTime(2010, 10, 1))],
+    covariance_date_ranges = [(DateTime(y, 10, 1), DateTime(y, 10, 1)) for y in 2001:2010],
+    extend = Month(1),
+    spinup = Day(0),
+    # On Derecho, it is preferable to save the calibration output to scratch.
+    output_dir = joinpath(pkgdir(ClimaCoupler), "amip_calibration"),
+    priors = EKP.combine_distributions([
+        PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400),
+    ]),
+    worker_walltime = 60,
 )
-
-# Used in generate_observations.jl and observation_map.jl
-# Units: Pa (not hPa)
-const PRESSURE_LEVELS = 100.0 .* [200.0, 500.0, 850.0]
-
-# To disable normalization, update generate_observations.jl to not apply the
-# normalization. You may want to do the same in the observation map as well.
-const NORMALIZATION_STATS_FP =
-    joinpath(CALIBRATE_CONFIG.output_dir, "normalization_stats.jld2")
-
-const CALIBRATION_PRIORS =
-    [PD.constrained_gaussian("precipitation_timescale", 1200, 300, 300, 2400)]
-
-const PRIORS = EKP.combine_distributions(CALIBRATION_PRIORS)

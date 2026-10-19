@@ -12,13 +12,13 @@ topography: "Earth"
 start_date: "20100101"
 initial_condition: "WeatherModel"
 t_end: "39days"
-dt: "180secs"
-dt_cpl: "180secs"
-dt_seaice: "180secs"
+dt: "120secs"
+dt_cpl: "120secs"
+dt_seaice: "120secs"
 checkpoint_dt: "900days"
 
 ### Coupler ###
-mode_name: "subseasonal"
+mode_name: "amip"
 binary_area_fraction: false
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
 coupler_toml: ["toml/wxquest_progedmf.toml"]
@@ -29,6 +29,7 @@ radiation_reset_rng_seed: true
 albedo_model: "CouplerAlbedo"
 surface_setup: "PrescribedSurface"
 strict_params: false
+era5_initial_condition_dir: /glade/campaign/univ/ucit0011/ClimaArtifacts2/artifacts/wxquest_initial_conditions/
 
 ### Land ###
 lai_source: "modis_monthly_climatology"

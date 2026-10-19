@@ -839,8 +839,9 @@ Exchange-grid form of the radiative and snowfall part of
 [`FieldExchanger.update_sim!`](@ref): gather the downwelling radiation and
 snowfall onto the polygons and scatter them onto the ClimaSeaIce forcing
 fields, so only wet polygons contribute and dry cells receive exactly
-nothing. Fluxes are per unit ice area, matching the boundary-space path: the
-absorbed radiation written here is completed into the full skin balance
+nothing. The heat flux is a grid-cell mean and the snowfall is per unit ice
+area, as in the boundary-space path; the absorbed radiation written here is
+completed into the full skin balance
 `Jᵃ = σϵTₛ⁴ − (1−α)SW↓ − ϵLW↓ + F_sh + F_lh` by
 [`compute_ice_top_heat_flux!`](@ref).
 """
@@ -859,12 +860,12 @@ NVTX.@annotate function push_exchange_radiation_to_ice!(sim::ClimaSeaIceSimulati
         vec(OC.interior(sim.ice.model.ice_concentration, :, :, 1)),
     )
 
-    # Absorbed radiative part of Jᵃ (upward positive): −(1−α)SW↓ − ϵLW↓.
+    # Absorbed radiative part of Jᵃ (upward positive): −(1−α)SW↓ − ϵLW↓, weighted to a cell mean.
     si_flux_heat = sim.ice.model.external_heat_fluxes.top
     if si_flux_heat isa OC.Field
         gather_nodes_to_polys!(fs.SW_d, eg, se_nodal_vec(csf.SW_d))
         gather_nodes_to_polys!(fs.LW_d, eg, se_nodal_vec(csf.LW_d))
-        @. fs.scratch1 = (fs.sic > 0) * (-(1 - α) * fs.SW_d - ϵ * fs.LW_d)
+        @. fs.scratch1 = fs.sic * (-(1 - α) * fs.SW_d - ϵ * fs.LW_d)
         heat_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
         scatter_polys_to_cells!(heat_cells, eg, fs.scratch1)
         mirror_fold_partners!(heat_cells, grid)
@@ -877,7 +878,7 @@ NVTX.@annotate function push_exchange_radiation_to_ice!(sim::ClimaSeaIceSimulati
     snowfall = sim.ice.model.snowfall
     if snowfall isa OC.Field
         gather_nodes_to_polys!(fs.P_snow, eg, se_nodal_vec(csf.P_snow))
-        @. fs.scratch1 = -(fs.sic > 0) * fs.P_snow
+        @. fs.scratch1 = (fs.sic > 0) * -fs.P_snow
         snow_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
         scatter_polys_to_cells!(snow_cells, eg, fs.scratch1)
         mirror_fold_partners!(snow_cells, grid)

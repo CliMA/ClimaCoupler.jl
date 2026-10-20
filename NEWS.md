@@ -4,6 +4,11 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Reflect diffuse shortwave with the diffuse albedo over the Oceananigans ocean
+The ocean now imports the diffuse shortwave as the coupler field `SW_d_diffuse`, averaged with the 
+other radiation when the ocean steps more slowly than the coupler. Coupler checkpoints written before 
+this change have no `SW_d_diffuse` and cannot be restored.
+
 #### Average the sea-ice skin emission and temperature over the coupling window
 A sea ice stepping more slowly than the coupler solves the skin balance on every coupling step, each with
 its own `Tₛ`, but was pushed a top heat flux that mixed window means of the absorbed radiation and of the

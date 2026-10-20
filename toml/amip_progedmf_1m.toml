@@ -9,40 +9,40 @@ value = 1.0e-5
 
 [KK2000_autoconversion_coeff_A]
 type = "float"
-value = 90000.0
+value = 55000.0
 
 [alpha_rayleigh_tracer]
 value = 0.001
 
 [cloud_fraction_eps_rel]
-value = 0.05
+value = 0.065
 
 [cloud_fraction_floor_condensate_release]
 type = "float"
-value = 1.0
+value = 0.8
 
 [cloud_fraction_floor_release_abs_margin]
 type = "float"
-value = 0.05
+value = 0.18
 
 [cloud_fraction_floor_release_margin]
 type = "float"
-value = 10.0
+value = 0.85
 
 [cloud_fraction_floor_release_sharpness]
 type = "float"
-value = 4.0
+value = 2.0
 
 [cloud_fraction_floor_residual]
 type = "float"
-value = 0.16
+value = 0.05
 
 [cloud_fraction_sigma_abs]
 type = "float"
-value = 2.0e-6
+value = 5.0e-7
 
 [cloud_fraction_steepness_scale]
-value = 1.0
+value = 4.0
 
 [cloud_ice_number_max]
 value = 100000.0
@@ -65,7 +65,7 @@ type = "float"
 value = 0.5
 
 [condensation_evaporation_timescale]
-value = 100.0
+value = 100
 
 [detr_buoy_coeff]
 value = 1
@@ -120,61 +120,53 @@ value = 1.0
 type = "float"
 value = 8.5e7
 
+[rain_autoconversion_timescale_stratiform_scale]
+type = "float"
+value = 1.0
+
+[rain_autoconversion_tke_coeff]
+type = "float"
+value = 0.0
+
+[rain_autoconversion_velocity_scale]
+type = "float"
+value = 0.20
+
 [sgs_fidelity_equilibrium_weight]
 type = "float"
 value = 0.0
 
 [sgs_ice_uniform_fraction]
-value = 0.15
+value = 0.2
 
 [sgs_liquid_uniform_fraction]
-value = 0.1
+value = 0.04
 
 [sgs_precip_fraction_floor]
 type = "float"
-value = 0.5
+value = 0.05
 
 [sgs_precip_incloud_fraction]
 type = "float"
-value = 0.5
+value = 0.45
 
 [sgs_precip_overlap_decay]
 type = "float"
 value = 1.0
 
-[sgs_variance_floor_time_scale]
+[diagnostic_covariance_coeff]
 type = "float"
-value = 240.0
-
-[sgs_variance_horizontal_cross_correlation]
-type = "float"
-value = 0.5
+value = 0.55
 
 [sgs_variance_horizontal_scale_factor]
 type = "float"
-value = 1.52
-
-[sgs_variance_moisture_bl_transition_scale]
-type = "float"
-value = 0.16
-
-[sgs_variance_theta_horizontal_scale_ratio]
-type = "float"
-value = 0.7
-
-[sgs_variance_theta_vertical_scale_ratio]
-type = "float"
-value = 0.4
-
-[sgs_variance_vertical_velocity_floor]
-type = "float"
-value = 0.32
+value = 1.85
 
 [snow_autoconversion_timescale]
 value = 1360
 
 [sublimation_deposition_timescale]
-value = 300
+value = 300.0
 
 [turb_entr_param_vec]
 value = [0.001, 100000.0]

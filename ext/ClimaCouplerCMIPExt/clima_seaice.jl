@@ -27,8 +27,8 @@ It contains the following objects:
     and Celsius offset `C_to_K` (water freezing point in K).
 - `model_Δt::MDT`: The sea ice timestep.
 - `skin_accumulator::SA`: A NamedTuple with the running sums of the diagnosed skin temperature
-    `surface_temperature` [°C] and of its emission `surface_emission` [W m⁻²], and the number of
-    contributions `n_steps`. See `accumulate_skin_state!`.
+    `surface_temperature` [°C] and of the skin emission `surface_emission` [W m⁻²], and the
+    number of contributions `n_steps`. See `accumulate_skin_state!`.
 """
 struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, MDT, SA} <:
        Interfacer.AbstractSeaIceSimulation
@@ -505,9 +505,9 @@ Complete the ice top heat flux Field as the skin-balance net upward flux
 The absorbed radiative part `−(1−α)SW↓ − ϵLW↓` is written in `update_sim!`.
 This adds surface emission and the turbulent fluxes. At skin equilibrium
 `Jᵃ = Q_conductive`, so the Stefan residual vanishes; when `Tₛ` is capped at `T_melt`,
-the residual drives melt. On the exchange grid, every term reaches the cell through the cell
-scatter, which multiplies it by `Σ_{k ∈ c} b_area_k / A_c`, so the residual at equilibrium is
-about that factor minus 1 times `Q_conductive`.
+the residual drives melt. On the exchange grid, each term arrives as
+`r_c = Σ_{k ∈ c} b_area_k / A_c` times its `b_area`-weighted polygon mean, so at equilibrium
+the residual is about `(r_c − 1) Q_conductive`.
 
 Every term of `Jᵃ` is averaged over the same coupling steps: the emission is the mean of
 `σϵTₛ⁴` from `average_and_reset_skin_accumulator!`, which also sets
@@ -715,7 +715,7 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
         OC.interior(remapping.scratch_field_oc1, :, :, 1) .- C_to_K,
         OC.interior(top_sfc_T, :, :, 1),
     )
-    # Each polygon's skin emission reaches its cell like the other ice fluxes.
+    # Skin emission of each polygon, scattered to the cells as a flux.
     @. fs.scratch1 = σ * ϵ * is.T_sfc_new^4
     emission = OC.interior(remapping.scratch_field_oc1, :, :, 1)
     scatter_polys_to_cells!(vec(emission), eg, fs.scratch1)

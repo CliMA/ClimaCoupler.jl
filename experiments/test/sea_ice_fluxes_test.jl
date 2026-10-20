@@ -88,7 +88,10 @@ end
 
         for Tₛ in skin_temperatures
             T_sfc_C .= Tₛ
-            CMIPExt.accumulate_skin_state!(sim)
+            CMIPExt.accumulate_skin_state!(
+                sim,
+                CMIPExt.skin_emission!(similar(T_sfc_C), sim),
+            )
         end
         @test sim.skin_accumulator.n_steps[] == length(skin_temperatures)
 

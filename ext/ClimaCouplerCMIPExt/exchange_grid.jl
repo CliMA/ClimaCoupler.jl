@@ -396,14 +396,14 @@ end
 @kernel function _scatter_cells_kernel!(dst, ptr, polys, area, cell_area, src)
     c = @index(Global)
     @inbounds begin
-        aw = cell_area[c]
-        if aw > 0
+        A = cell_area[c]
+        if A > 0
             acc = zero(eltype(dst))
             for p in ptr[c]:(ptr[c + 1] - 1)
                 k = polys[p]
                 acc += area[k] * src[k]
             end
-            dst[c] = acc / aw
+            dst[c] = acc / A
         else
             dst[c] = 0
         end

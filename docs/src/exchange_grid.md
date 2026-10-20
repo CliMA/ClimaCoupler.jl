@@ -58,8 +58,13 @@ control-volume weights have the same nodal masses as ClimaCore's GLL
 quadrature, and each normalized scatter is a convex combination of the
 polygon values.
 
-On the FV side, each polygon belongs to exactly one cell; gathers are direct
-reads and scatters are area-weighted averages.
+On the FV side, each polygon belongs to exactly one cell, and gathers are
+direct reads. A flux is scattered as
+``F_c = \\sum_{k \\in c} (\\sum_n \\tilde B_{kn}) F_k / A_c``, with ``A_c`` the
+FV grid's own cell area, so the FV integral ``\\sum_c A_c F_c`` equals the
+SE-side integral exactly even where the two grids disagree on a cell's area.
+A state, such as the diagnosed sea-ice surface temperature, is scattered as
+the mean weighted by the geometric polygon areas.
 
 ## Surface fractions
 
@@ -94,7 +99,7 @@ Aggregation:
 
 - **To the ocean/ice**: the sea-ice-concentration weighting is applied *per
   polygon* — `(1 - sic)` for ocean heat/salinity/momentum, per-ice-area
-  fluxes for ClimaSeaIce — before the conservative area-weighted scatter, so
+  fluxes for ClimaSeaIce — before the conservative scatter to the cells, so
   the ice/ocean partition is resolved at polygon level rather than after
   remapping.
 - **To the atmosphere**: the raw (coverage-weighted) control-volume scatter is DSS'd

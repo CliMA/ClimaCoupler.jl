@@ -926,9 +926,9 @@ Base.eltype(::FakeOceanModel) = FT
         nothing,
     )
 
-    # Uniform forcing: the node gather preserves constants exactly, so the cell
-    # fluxes integrated with the grid's own cell areas give the single-column
-    # answer times the SE-side polygon area.
+    # Uniform forcing: the node gather preserves constants exactly, so each wet
+    # cell receives the single-column answer times its SE-side polygon area over
+    # the grid's own cell area.
     uniform(v) = (f = CC.Fields.zeros(boundary_space); f .= FT(v); f)
     SW_d, LW_d, P_liq, P_snow = FT(300), FT(350), FT(-1e-5), FT(-2e-6)
     csf = (;
@@ -951,23 +951,26 @@ Base.eltype(::FakeOceanModel) = FT
     flux_T = cell_values(CMIPExt.surface_flux(model.tracers.T))
     flux_S = cell_values(CMIPExt.surface_flux(model.tracers.S))
     grid_cpu = OC.on_architecture(OC.CPU(), grid.underlying_grid)
-    n_wet, total_T, total_S = 0, zero(FT), zero(FT)
-    for c in 1:(Ny * Nx)
-        i, j = mod1(c, Nx), (c - 1) ÷ Nx + 1
+    b_area_of_cell = zeros(FT, eg_cpu.n_oc)
+    for k in 1:(eg_cpu.n_poly)
+        b_area_of_cell[eg_cpu.oc_of_poly[k]] += eg_cpu.b_area[k]
+    end
+    n_wet = 0
+    # Skip the fold row, whose shadow cells are filled by mirroring rather than
+    # by the scatter.
+    for c in 1:((Ny - 1) * Nx)
         if eg_cpu.oc_wet_area[c] > 0
             n_wet += 1
-            Az = OC.Operators.Azᶜᶜᶜ(i, j, Nz, grid_cpu)
-            total_T += Az * flux_T[c]
-            total_S += Az * flux_S[c]
-        elseif j < Ny # fold-row shadow cells are filled by mirroring
+            Az = OC.Operators.Azᶜᶜᶜ(mod1(c, Nx), (c - 1) ÷ Nx + 1, Nz, grid_cpu)
+            @test flux_T[c] ≈ expected_T * b_area_of_cell[c] / Az rtol = 1e-12
+            @test flux_S[c] ≈ expected_S * b_area_of_cell[c] / Az rtol = 1e-12
+        else
             # Dry cells receive nothing: the property this path exists for.
             @test flux_T[c] == 0
             @test flux_S[c] == 0
         end
     end
     @test n_wet > 0
-    @test total_T ≈ expected_T * sum(eg_cpu.b_area) rtol = 1e-12
-    @test total_S ≈ expected_S * sum(eg_cpu.b_area) rtol = 1e-12
 end
 
 # Stand-in for a ClimaSeaIce model in the `update_sim!` exchange-grid path

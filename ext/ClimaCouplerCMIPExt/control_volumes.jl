@@ -1,5 +1,5 @@
 #=
-Control-volume (subcell) weights for the exchange-grid scatter. Each SE node owns a box in
+Control-volume weights for the exchange-grid scatter. Each SE node owns a box in
 reference coordinates; the boxes of an element tile it, and each box's area is the node's
 quadrature weight `(Jw)_n`. The weight of polygon `Ω_k` at node `n` is the area of `Ω_k`
 inside the box, `B̃_{kn} = ∫_{Ω_k ∩ box(n)} dA ≥ 0`.
@@ -62,14 +62,15 @@ function _increasing_root(f, target, lo, hi)
 end
 
 """
-    accumulate_subcell_b(cv::ControlVolumes, space, elem, polygon) -> Matrix{Float64}
+    control_volume_weights(cv::ControlVolumes, space, elem, polygon) -> Matrix{Float64}
 
-Control-volume weights of one exchange-grid polygon inside SE element `elem`: an `Nq × Nq`
-block with `B̃[i, j] = ∫_{polygon ∩ box(i, j)} J dξ dη ≥ 0`, where the polygon's vertices are
-mapped to reference coordinates and joined by straight edges there. The outermost box edges
-lie at `±2` to keep vertices that invert to just outside `[-1, 1]`.
+Control-volume weights of one exchange-grid polygon inside SE element `elem`: an
+`Nq × Nq` block with `B̃[i, j] = ∫_{polygon ∩ box(i, j)} J dξ dη ≥ 0`, where the
+polygon's vertices are mapped to reference coordinates and joined by straight edges
+there. The outermost box edges lie at `±2` to keep vertices that invert to just
+outside `[-1, 1]`.
 """
-function accumulate_subcell_b(cv::ControlVolumes, space, elem, polygon)
+function control_volume_weights(cv::ControlVolumes, space, elem, polygon)
     CRExt = get_ConservativeRegriddingCCExt()
     GI, GO = CRExt.GI, CRExt.GO
     Nq = size(cv.ξ, 2)

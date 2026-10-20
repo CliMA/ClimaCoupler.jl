@@ -40,19 +40,18 @@ carries two sets of weights.
   volume of node ``n``. The control volumes are boxes in reference
   coordinates that tile the element, close to the GLL subcells (whose 1D
   widths are the GLL weights). Their edges are placed element by element so
-  that each box has physical area exactly ``(Jw)_n``. Then
+  that each box's area under the interpolated Jacobian is exactly
+  ``(Jw)_n``. Then
   ``F_n = \\sum_k (\\tilde B_{kn}/(Jw)_n) F_k``, and the weights at a node
   sum to exactly 1 over the polygons tiling its control volume. The scatter
   is followed by `weighted_dss!`.
 - **Nodal coverage**: `node_cov` (sum over wet polygons) is the fraction of
-  each node's area over wet ocean, in ``[0, 1]`` by construction.
-  `node_cov_total` (sum over all polygons) is 1 wherever the ocean grid
-  covers the node and less where it does not reach. The wet-ocean fraction
-  is the DSS'd `node_cov`.
+  each node's area over wet ocean, in ``[0, 1]`` by construction. The
+  wet-ocean fraction is the DSS'd `node_cov`.
 
 The scatter cannot use ``B_{kn}``, because the GLL Lagrange basis is
-sign-indefinite for ``N_q \\ge 3``. Summed over all polygons, ``B_{kn}``
-telescopes to the nodal weight. Summed over a subset (wet polygons, or
+sign-indefinite for ``N_q \\ge 3``. Summed over all polygons, ``B_{kn}`` is
+close to the nodal weight. Summed over a subset (wet polygons, or
 polygons weighted by sea-ice concentration) it can cancel. Then a transfer
 normalized by that sum is unbounded, and the sum is not an area fraction. The
 control-volume weights have the same nodal masses as ClimaCore's GLL
@@ -76,9 +75,10 @@ land  = 1 - wet
 which sum to 1 identically (asserted at runtime). `ice_coverage` is the DSS'd
 control-volume scatter of the per-polygon sea-ice concentration. That is exactly the
 denominator of the ice flux scatter; `wet - ice` is the denominator of the
-open-ocean one. So the fractions and the fluxes share one set of weights, and
-`area_fraction × flux` integrates exactly to the polygon flux integral the
-ocean and sea ice receive.
+open-ocean one. So the fractions and the fluxes share one set of
+weights, and `area_fraction × flux` integrates exactly to
+``\\sum_k b_k w_k F_k``, the polygon flux integral over the control-volume
+areas ``b_k = \\sum_n \\tilde B_{kn}``.
 
 ## Per-polygon fluxes
 

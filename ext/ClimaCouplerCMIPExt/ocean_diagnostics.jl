@@ -54,22 +54,24 @@ end
     add_ocean_diagnostics!(ocean_sim::OceananigansSimulation;
                            output_dir = joinpath("output_active", "clima_ocean"),
                            interval = Dates.Day(1),
+                           interval_3d = interval,
                            mode = :average,
                            filename_prefix = "ocean",
                            file_splitting_interval = Dates.Day(15))
 
 Attach output writers to the underlying Oceananigans simulation inside an `OceananigansSimulation`.
-Two writers are added to `ocean_sim.ocean.output_writers`, both with the same `interval` and `mode`:
+Two writers are added to `ocean_sim.ocean.output_writers`, both with the same `mode`:
 
-1. **Surface diagnostics** (`<prefix>_surface.jld2`): 2-D fields —
+1. **Surface diagnostics** (`<prefix>_surface.jld2`), every `interval`: 2D fields —
    SST, SSS, SSH, surface velocities, squared surface fields for variance, surface momentum/heat/freshwater fluxes.
-2. **3-D field diagnostics** (`<prefix>_fields.jld2`): full 3-D temperature, salinity, velocity (and TKE if a `:e` tracer is present).
+2. **3D field diagnostics** (`<prefix>_fields.jld2`), every `interval_3d`: full 3D temperature, salinity, velocity
+   (and TKE if a `:e` tracer is present).
 
 `mode` selects the reduction:
-- `:average` uses `Oceananigans.AveragedTimeInterval(interval)` (time-averaged fields).
-- `:instantaneous` uses `Oceananigans.TimeInterval(interval)` (snapshots).
+- `:average` uses `Oceananigans.AveragedTimeInterval` (time-averaged fields).
+- `:instantaneous` uses `Oceananigans.TimeInterval` (snapshots).
 
-`interval` and `file_splitting_interval` accept either a `Dates.Period` or a `Real` number of seconds.
+`interval`, `interval_3d` and `file_splitting_interval` accept either a `Dates.Period` or a `Real` number of seconds.
 The value is automatically converted to match the model clock's time type via [`to_clock_interval`](@ref):
 a `Dates.Period` is converted to seconds for Float64 clocks, or kept as-is for DateTime clocks.
 
@@ -82,6 +84,7 @@ function add_ocean_diagnostics!(
     ocean_sim::OceananigansSimulation;
     output_dir = joinpath("output_active", "clima_ocean"),
     interval = Dates.Day(1),
+    interval_3d = interval,
     mode = :average,
     filename_prefix = "ocean",
     file_splitting_interval = Dates.Day(15),
@@ -90,7 +93,7 @@ function add_ocean_diagnostics!(
     Nz = size(ocean.model.grid, 3)
     clock_time = ocean.model.clock.time
     resolved_interval = to_clock_interval(interval, clock_time)
-    file_splitting = OC.TimeInterval(to_clock_interval(file_splitting_interval, clock_time))
+    resolved_splitting_interval = to_clock_interval(file_splitting_interval, clock_time)
 
     T, S = ocean.model.tracers.T, ocean.model.tracers.S
     u, v, w = ocean.model.velocities
@@ -138,7 +141,7 @@ function add_ocean_diagnostics!(
         surface_outputs;
         schedule,
         filename = joinpath(output_dir, filename_prefix * "_surface"),
-        file_splitting,
+        file_splitting = OC.TimeInterval(resolved_splitting_interval),
         overwrite_files = true,
     )
 
@@ -157,15 +160,15 @@ function add_ocean_diagnostics!(
     ocean.output_writers[:field_diagnostics] = OC.JLD2Writer(
         ocean.model,
         field_outputs;
-        schedule,
+        schedule = diagnostic_schedule(mode, to_clock_interval(interval_3d, clock_time)),
         filename = joinpath(output_dir, filename_prefix * "_fields"),
-        file_splitting,
+        file_splitting = OC.TimeInterval(resolved_splitting_interval),
         overwrite_files = true,
     )
 
     @info "Ocean diagnostics attached:" *
           " surface ($(length(surface_outputs)) fields, $mode, every $interval)," *
-          " 3-D ($(length(field_outputs)) fields, $mode, every $interval)"
+          " 3D ($(length(field_outputs)) fields, $mode, every $interval_3d)"
 
     return nothing
 end

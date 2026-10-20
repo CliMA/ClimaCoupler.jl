@@ -20,7 +20,7 @@ z_elem: 130
 z_max: 70000.0
 
 ic_hydrostatic_rebalance: true
-topography_damping_factor: 1.0
+topography_damping_factor: 2.0
 
 ### Microphysics: 0M ###
 microphysics_model: "0M"

@@ -1,7 +1,8 @@
 # EDOnly atmosphere with a horizontal DG discretization.
-# Physics follows climaatmos_edonly.yml; the DG numerics follow
-# config/model_configs/aquaplanet_topo_kgpert_DG.yml in ClimaAtmos.jl (branch as/dg-api).
-# Requires a ClimaAtmos version that supports `horizontal_discretization: "DG"`.
+# Physics follows climaatmos_edonly.yml; the DG numerics follow the ES-VI block of
+# config/model_configs/edonly_0M_dg_es.yml in ClimaAtmos.jl (branch as/dg-api2).
+# Requires a ClimaAtmos version that supports `horizontal_discretization: "DG"`
+# and `dg_vi_interface_flux` (as/dg-api2 or later).
 aerosol_radiation: true
 approximate_linear_solve_iters: 2
 max_newton_iters_ode: 1
@@ -31,14 +32,15 @@ microphysics_model: "0M"
 non_orographic_gravity_wave: true
 orographic_gravity_wave: "raw_topo"
 
-### Horizontal DG numerics (from aquaplanet_topo_kgpert_DG.yml) ###
+### Horizontal DG numerics: ES-VI (from edonly_0M_dg_es.yml) ###
+# Vector-invariant form with entropy-variable (ES) face penalties.
 horizontal_discretization: "DG"
 dg_equation_form: "vi"
-dg_volume_flux: "kg_pert"
-dg_vi_interface_flux: "selective"
-dg_vi_dissipation_floor: 0.05
+dg_vi_interface_flux: "es"
 apply_zhang_shu_limiter: true
 update_constrain_state_every: "stage"
 hyperdiff: ~
 mesh_warp_type: "SLEVE"
-topography_damping_factor: 1.0
+# Earth terrain smoothing: number of diffusion passes scales with this factor
+# (`topo_smoothing` is a Bool used only for analytic topography).
+topography_damping_factor: 2.0

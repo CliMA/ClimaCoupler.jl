@@ -29,7 +29,7 @@ Checkpointer.get_model_prog_state(sim::DummySimulation) = sim.state
 end
 
 @testset "checkpoint_model_state, restart_model_state!" begin
-    comms_ctx = ClimaComms.context(ClimaComms.CPUSingleThreaded())
+    comms_ctx = ClimaComms.context(space_checkpointer)
     t = 1
     prev_checkpoint_t = -1
     # old sim run
@@ -194,7 +194,7 @@ end
         ignore_this::Any
     end
     cache = A(A([4], [3], [2], [42]), [1], [0], [42])
-    itr = Checkpointer.FieldIterator(cache, ignore = Set([:ignore_this]))
+    itr = Checkpointer.CacheIterator(cache, Set([:ignore_this]))
     @test !isempty(itr)
     cache_vec = collect(itr)
     @test cache_vec == [[0], [1], [2], [3], [4]]
@@ -214,8 +214,8 @@ end
 
     ignore_cache = IgnoreFields([1], [1], [1], [1], [1], [1], [1])
     itr = Checkpointer.CacheIterator(
-        cache,
-        ignore = Set([
+        ignore_cache,
+        Set([
             :rc,
             :params,
             :ghost_buffer,
@@ -344,4 +344,18 @@ end
     for name in field_names
         @test parent(restored.coupler_fields[name]) == parent(acc.coupler_fields[name])
     end
+end
+
+@testset "t_start_from_checkpoint returns the latest time" begin
+    # The newer checkpoint sorts first as a string
+    mktempdir() do dir
+        for t in (864000, 1728000)
+            for sim in ("ClimaAtmosSimulation", "ClimaLandSimulation")
+                touch(joinpath(dir, "checkpoint_$(sim)_$(t).hdf5"))
+            end
+            sleep(1) # file timestamps can be as coarse as a second
+        end
+        @test Checkpointer.t_start_from_checkpoint(dir) == 1728000
+    end
+    @test isnothing(Checkpointer.t_start_from_checkpoint(mktempdir()))
 end

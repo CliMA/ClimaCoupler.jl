@@ -255,6 +255,7 @@ function _build_coupled_simulation(config_dict::AbstractDict)
         sst_adjustment,
         ocean_progress_interval,
         ocean_diagnostic_interval,
+        ocean_3d_diagnostic_interval,
         ocean_diagnostic_mode,
         ice_model,
         seaice_diagnostic_interval,
@@ -382,6 +383,7 @@ function _build_coupled_simulation(config_dict::AbstractDict)
         saveat,
         evolving = evolving_ocean,
         ocean_diagnostic_interval,
+        ocean_3d_diagnostic_interval,
         ocean_diagnostic_mode,
     )
 

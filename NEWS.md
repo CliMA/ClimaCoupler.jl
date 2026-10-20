@@ -9,6 +9,11 @@ The ocean now imports the diffuse shortwave as the coupler field `SW_d_diffuse`,
 other radiation when the ocean steps more slowly than the coupler. Coupler checkpoints written before 
 this change have no `SW_d_diffuse` and cannot be restored.
 
+#### Separate output interval for 3D ocean diagnostics
+The new `ocean_3d_diagnostic_interval` option sets how often the 3D ocean fields (`ocean_fields.jld2`)
+are written, while `ocean_diagnostic_interval` sets the surface fields (`ocean_surface.jld2`). It defaults
+to `ocean_diagnostic_interval`.
+
 #### Average the sea-ice skin emission and temperature over the coupling window
 A sea ice stepping more slowly than the coupler solves the skin balance on every coupling step, each with
 its own `Tₛ`, but was pushed a top heat flux that mixed window means of the absorbed radiation and of the

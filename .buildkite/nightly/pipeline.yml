@@ -13,6 +13,8 @@ env:
   # By default, packages use the main branch.
   # Use `Package@version` to pin a version.
   # Use `Package#rev` to pin a branch or commit.
+  # Use `url#rev` to use a branch or commit of a fork.
+  # See .buildkite/add_upstream_packages.jl.
   # If you are starting a new build using the web API, you can set the
   # UPSTREAM_PACKAGES environment variable. For example, if you pass
   # `UPSTREAM_PACKAGES="ClimaAtmos SurfaceFluxes@1.1.0", then the main branch
@@ -33,19 +35,7 @@ steps:
         for env in AMIP CMIP; do
           echo "--- Instantiate $$env env"
           JULIA_PKG_PRECOMPILE_AUTO=0 julia --project=experiments/$$env/ -e 'using Pkg; Pkg.instantiate(;verbose=true)'
-          julia --project=experiments/$$env/ -e '
-            using Pkg
-            Pkg.add(map(split(ENV["UPSTREAM_PACKAGES"])) do entry
-                if occursin("@", entry)
-                    name, version = String.(split(entry, "@"))
-                    Pkg.PackageSpec(; name, version)
-                elseif occursin("#", entry)
-                    name, rev = String.(split(entry, "#"))
-                    Pkg.PackageSpec(; name, rev)
-                else
-                    Pkg.PackageSpec(; name = entry, rev = "main")
-                end
-            end)'
+          julia --project=experiments/$$env/ .buildkite/add_upstream_packages.jl
           julia --project=experiments/$$env/ -e 'using Pkg; Pkg.resolve()'
 
           julia --project=experiments/$$env/ -e 'using Pkg; Pkg.precompile()'

@@ -158,7 +158,8 @@ dispatch in coupling.
 - `comms_ctx`: Communication context (default: `ClimaComms.context()`)
 - `FT_ocean`: Float type for the ocean simulation (default: `Float64`)
 - `coupled_param_dict`: Coupled parameter dictionary (default: created from `ClimaParams.create_toml_dict(FT)`)
-- `ocean_diagnostic_interval`: Interval for ocean diagnostics (default: `"1days"`)
+- `ocean_diagnostic_interval`: Interval for ocean surface diagnostics (default: `"1days"`)
+- `ocean_3d_diagnostic_interval`: Interval for 3D ocean diagnostics (default: `ocean_diagnostic_interval`)
 - `ocean_diagnostic_mode`: Mode for ocean diagnostics (default: `:average`)
 
 Specific details about the default model configuration
@@ -179,6 +180,7 @@ function OceananigansSimulation(
     FT_ocean = Float64, # Use Float64 for the ocean to avoid precision issues
     coupled_param_dict = CP.create_toml_dict(FT_ocean),
     ocean_diagnostic_interval = "1days",
+    ocean_3d_diagnostic_interval = ocean_diagnostic_interval,
     ocean_diagnostic_mode = :average,
     extra_kwargs...,
 ) where {FT}
@@ -266,6 +268,7 @@ function OceananigansSimulation(
         sim;
         output_dir,
         interval = TimeManager.time_to_period(ocean_diagnostic_interval),
+        interval_3d = TimeManager.time_to_period(ocean_3d_diagnostic_interval),
         mode = ocean_diagnostic_mode,
     )
 

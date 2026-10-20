@@ -181,15 +181,13 @@ end
         end
         @test all(s -> isapprox(s, 1, atol = 1e-12), row_sums)
 
-        # The scatter weights are the non-negative subcell weights.
+        # The scatter weights are the non-negative control-volume weights.
         @test all(>=(0), eg.sweight)
 
-        # On a fully wet grid every polygon is retained, so the wet and
-        # geometric coverages coincide. The subcell weights are scaled to sum
-        # to exactly 1 over the polygons tiling a node's subcell, so the
-        # coverage is 1 at every node of an element the ocean grid fully
-        # covers (north of its 80°S boundary).
-        @test eg.node_cov == eg.node_cov_total
+        # On a fully wet grid every polygon is retained. The control volumes are
+        # sized so the weights sum to exactly 1 over the polygons tiling a node's
+        # control volume, so the coverage is 1 at every node of an element the
+        # ocean grid fully covers (north of its 80°S boundary).
         CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
         coords = CC.Fields.coordinate_field(boundary_space)
         node_lat = to_cpu(CRExt.flat_nodal_data(CC.Fields.field_values(coords.lat)))
@@ -197,15 +195,15 @@ end
             [minimum(node_lat[((e - 1) * Nq ^ 2 + 1):(e * Nq ^ 2)]) for e in 1:n_elem]
         for n in 1:(eg.n_nodes)
             if elem_min_lat[(n - 1) ÷ Nq ^ 2 + 1] > -75
-                @test eg.node_cov_total[n] ≈ 1 atol = 1e-8
+                @test eg.node_cov[n] ≈ 1 atol = 1e-8
             end
-            @test -1e-12 <= eg.node_cov_total[n] <= 1 + 1e-8
+            @test -1e-12 <= eg.node_cov[n] <= 1 + 1e-8
         end
         # Nodes south of the ocean grid boundary are only partially covered.
-        @test any(n -> node_lat[n] < -80 && eg.node_cov_total[n] < 0.9, 1:(eg.n_nodes))
+        @test any(n -> node_lat[n] < -80 && eg.node_cov[n] < 0.9, 1:(eg.n_nodes))
 
-        # Scatter column sums (the SE-side polygon areas) match the geometric
-        # areas to within the subcell/quadrature scaling.
+        # Scatter column sums (the control-volume polygon areas) match the
+        # geometric areas closely.
         @test eg.b_area ≈ eg.area rtol = 0.05
 
         # node_cov is consistent with the scatter weights.
@@ -236,8 +234,8 @@ end
             end
         end
 
-        # The wet fraction is the wet subcell coverage: 1 at nodes whose
-        # subcell lies entirely over wet cells, exactly 0 where it lies
+        # The wet fraction is the wet control-volume coverage: 1 at nodes whose
+        # control volume lies entirely over wet cells, exactly 0 where it lies
         # entirely over dry cells, intermediate at the coastline. The weights
         # are non-negative, so it never leaves [0, 1].
         wet_frac = eg_c.node_cov
@@ -245,7 +243,6 @@ end
         @test count(==(0), wet_frac) > 0.2 * length(wet_frac)
         @test any(f -> 0.05 < f < 0.95, wet_frac)
         @test all(f -> 0 <= f <= 1 + 1e-8, wet_frac)
-        @test all(eg_c.node_cov .<= eg_c.node_cov_total .+ 1e-12)
     end
 end
 
@@ -316,12 +313,12 @@ import Random
         CMIPExt.scatter_polys_to_cells!(cell_scratch, eg, F)
         @test sum(eg.area .* F) ≈ sum(eg.oc_wet_area .* cell_scratch) rtol = 1e-12
 
-        # SE side: the L2 scatter preserves the quadrature-area integral
-        # exactly (before DSS).
+        # SE side: the scatter preserves the integral over the control-volume
+        # areas exactly (before DSS).
         CMIPExt.scatter_polys_to_nodes!(nodal_scratch, eg, F)
         @test sum(Jw .* nodal_scratch) ≈ sum(eg.b_area .* F) rtol = 1e-12
 
-        # And the quadrature areas agree with the geometric areas.
+        # And the control-volume areas agree with the geometric areas.
         @test sum(eg.b_area) ≈ sum(eg.area) rtol = 1e-3
     end
 
@@ -729,10 +726,9 @@ end
 
 @testset "Area fraction × flux conserves the polygon integral" begin
     # The coupler hands the atmosphere `area_fraction × flux`. With the area
-    # fraction equal to the coverage of the flux weight (as
-    # `align_surface_fractions!` sets it), that product integrates exactly to
-    # the polygon flux integral the ocean / ice receive, and every nodal flux
-    # stays within the range of the polygon fluxes.
+    # fraction equal to the coverage of the flux weight, that product integrates
+    # exactly to the polygon flux integral over the control-volume areas, and
+    # every nodal flux stays within the range of the polygon fluxes.
     eg = CMIPExt.build_exchange_grid(boundary_space, coastal_grid)
     eg_d = on_exchange_device(eg)
     CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
@@ -770,10 +766,6 @@ end
         α = to_cpu(CRExt.se_field_to_vec(remapping.weight_cov_scratch))
         @test all(a -> 0 <= a <= 1 + 1e-8, α)
 
-        # The area-fraction helper computes exactly the scatter's denominator.
-        CMIPExt.flux_weight_coverage!(coverage, eg_d, weight_d, remapping.flux_dss_buffer)
-        @test to_cpu(CRExt.se_field_to_vec(coverage)) == α
-
         for (name, F_poly) in
             ((:F_sh, fs.F_sh), (:F_lh, fs.F_lh), (:F_turb_moisture, fs.F_moisture))
             F = to_cpu(CRExt.se_field_to_vec(getproperty(flux_scratch, name)))
@@ -783,6 +775,17 @@ end
             @test all(n -> α[n] == 0 || F[n] != 0, eachindex(F))
         end
     end
+
+    # The open-ocean fraction the coupler builds, wet − ice, is the coverage of
+    # `1 - sic`: the denominator of the open-ocean flux scatter.
+    wet =
+        to_cpu(CRExt.se_field_to_vec(CMIPExt.wet_ocean_fraction_field(boundary_space, eg)))
+    buffer = remapping.flux_dss_buffer
+    function coverage_of(weight)
+        CMIPExt.flux_weight_coverage!(coverage, eg_d, on_exchange_device(weight), buffer)
+        return copy(to_cpu(CRExt.se_field_to_vec(coverage)))
+    end
+    @test wet .- coverage_of(copy(fs.sic)) ≈ coverage_of(1 .- fs.sic) atol = 1e-12
 end
 
 @testset "Full ocean flux driver allocations (CPU)" begin

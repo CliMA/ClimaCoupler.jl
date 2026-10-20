@@ -32,9 +32,7 @@ SE-side weights come in two flavors over each polygon `Ω_k`:
     inside node `n`'s control volume, whose area is `(Jw)_n`; follow with
     `weighted_dss!`;
   - `node_cov[n] = Σ_{k wet} sweight[n,k]`: the fraction of node `n`'s area
-    over wet ocean. `node_cov_total` is the same sum over all polygons (wet
-    and dry): 1 wherever the ocean grid covers the node, less where it does
-    not reach (e.g. Antarctica).
+    over wet ocean.
 
 Flat index conventions: SE node `n = (e-1) Nq² + (j-1) Nq + i` (i fastest
 within each element, then elements — the order of
@@ -47,7 +45,7 @@ column index).
 - `n_poly`, `n_nodes`, `n_elem`, `n_oc`: entity counts
 - `gpoly_ptr`, `gnode`, `gweight`: polygon-major CSR of the node→polygon gather
 - `snode_ptr`, `spoly`, `sweight`: node-major CSR of the polygon→node scatter
-- `node_cov`, `node_cov_total`: nodal wet / geometric coverage fractions
+- `node_cov`: nodal wet coverage fractions
 - `elem_of_poly`, `oc_of_poly`: SE element / FV cell owning each polygon
 - `soc_ptr`, `soc_poly`: FV-cell-major CSR of the polygon→cell scatter
 - `area`: geometric polygon areas [m²]
@@ -69,7 +67,6 @@ struct ExchangeGrid{FT, VI <: AbstractVector{Int32}, VF <: AbstractVector{FT}}
     spoly::VI
     sweight::VF
     node_cov::VF
-    node_cov_total::VF
     elem_of_poly::VI
     oc_of_poly::VI
     soc_ptr::VI
@@ -117,8 +114,8 @@ Construct an [`ExchangeGrid`](@ref) between a ClimaCore cubed-sphere
 intersect SE elements with FV cells (fold-aware on a `TripolarGrid`, so fold
 shadow cells never produce polygons), drop polygons over dry (immersed)
 cells, then integrate the SEM basis (`accumulate_principled_b`, gather
-weights) and the GLL subcell partition (`accumulate_subcell_b`, scatter
-weights and nodal coverages) over each polygon. Move the result to the
+weights) and the control volumes (`control_volume_weights`, scatter weights
+and nodal coverages) over each polygon. Move the result to the
 device with [`on_device`](@ref).
 """
 function build_exchange_grid(boundary_space, grid_oc)
@@ -147,9 +144,7 @@ function build_exchange_grid(boundary_space, grid_oc)
     n_elem, n_oc = size(intersections)
     area = [GO.area(manifold, poly) for poly in polys]
 
-    # 2. Mark polygons over dry (immersed) surface cells. They are dropped
-    #    from the exchange grid but still contribute to the geometric
-    #    coverage `node_cov_total`.
+    # 2. Mark polygons over dry (immersed) surface cells, which are dropped.
     keep = trues(length(area))
     if grid_oc isa OC.ImmersedBoundaryGrid
         grid_with_mask_cpu = OC.on_architecture(OC.CPU(), grid_oc)
@@ -162,9 +157,8 @@ function build_exchange_grid(boundary_space, grid_oc)
     end
 
     # 3. Per-polygon weights: the SEM basis integrals B_kn for the gather and
-    #    the control-volume weights B̃_kn for the scatter and the coverages.
-    #    All polygons contribute to node_cov_total; only kept (wet) polygons
-    #    produce COO weights, indexed by their position in the kept numbering.
+    #    the control-volume weights B̃_kn for the scatter and the coverages,
+    #    indexed by each kept (wet) polygon's position in the kept numbering.
     qs = CC.Spaces.quadrature_style(boundary_space_cpu)
     Nq = CC.Quadratures.degrees_of_freedom(qs)
     triangle_quad_degree = 2 * (Nq - 1)
@@ -174,10 +168,11 @@ function build_exchange_grid(boundary_space, grid_oc)
 
     g_poly, g_node, g_b = Int[], Int[], Float64[] # gather COO: B_kn
     s_poly, s_node, s_w = Int[], Int[], Float64[] # scatter COO: B̃_kn / A_n
-    node_cov_total = zeros(Float64, n_nodes)
     b_sum = zeros(Float64, count(keep))
     kept_id = 0
     for k in eachindex(area)
+        keep[k] || continue
+        kept_id += 1
         elem = elem_of_poly[k]
         B = CRExt.accumulate_principled_b(
             manifold,
@@ -186,23 +181,18 @@ function build_exchange_grid(boundary_space, grid_oc)
             polys[k];
             triangle_quad_degree,
         )
-        B̃ = accumulate_subcell_b(volumes, boundary_space_cpu, elem, polys[k])
-        kept = keep[k]
-        kept && (kept_id += 1)
+        B̃ = control_volume_weights(volumes, boundary_space_cpu, elem, polys[k])
         node_offset = (elem - 1) * Nq^2
         for j in 1:Nq, i in 1:Nq
             n = node_offset + (j - 1) * Nq + i
             w = B̃[i, j] / Jw[n]
             if w != 0
-                node_cov_total[n] += w
-                if kept
-                    push!(s_poly, kept_id)
-                    push!(s_node, n)
-                    push!(s_w, w)
-                end
+                push!(s_poly, kept_id)
+                push!(s_node, n)
+                push!(s_w, w)
             end
             Bij = B[i, j]
-            if kept && Bij != 0
+            if Bij != 0
                 push!(g_poly, kept_id)
                 push!(g_node, n)
                 push!(g_b, Bij)
@@ -263,7 +253,6 @@ function build_exchange_grid(boundary_space, grid_oc)
         spoly,
         FT.(sweight),
         FT.(node_cov),
-        FT.(node_cov_total),
         Int32.(elem_of_poly),
         Int32.(oc_of_poly),
         soc_ptr,
@@ -345,9 +334,9 @@ end
 """
     scatter_polys_to_nodes!(nodal_values, eg::ExchangeGrid, poly_values)
 
-Aggregate per-polygon values onto SE nodes with the subcell weights:
+Aggregate per-polygon values onto SE nodes with the control-volume weights:
 `F_n = Σ_k sweight F_k`, the area integral of the values over node `n`'s
-subcell divided by its area. The result is *coverage-weighted*: scattering a
+control volume divided by its area. The result is *coverage-weighted*: scattering a
 constant yields `constant × node_cov`. Follow with `weighted_dss!` on the
 receiving field. For a per-unit-wet-area result use
 [`scatter_polys_to_nodes_normalized!`](@ref).

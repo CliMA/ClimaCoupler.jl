@@ -575,7 +575,7 @@ Aggregate per-polygon fluxes onto the SE boundary space as a `weight`-weighted
 average, filling the `remapping.flux_scratch` fields for
 `FluxCalculator.update_flux_fields!`. `weight` selects the sub-surface the
 fluxes apply to — `1 - sic` for open ocean, `sic` for sea ice — so the nodal
-result is a per-unit-*weighted*-area flux. Uses `fs.scratch1` internally; 
+result is a per-unit-*weighted*-area flux. Uses `fs.scratch1` internally;
 `weight` must not alias it.
 """
 NVTX.@annotate function scatter_poly_fluxes_to_boundary!(

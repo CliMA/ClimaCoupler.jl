@@ -50,7 +50,6 @@ These are used when `step_concurrently` or `overlap_slow_surfaces` is set. See
     FieldExchanger.slow_step_target
     FieldExchanger.slow_launch_target
     FieldExchanger.slow_sim_dt
-    FieldExchanger.slow_window_steps
     FieldExchanger.slow_progress_snapshot
 ```
 

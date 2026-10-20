@@ -21,10 +21,6 @@ end
 """
 Coupler field parking the slow surfaces' contribution to each blended quantity,
 or `nothing` for quantities that have no such cache.
-
-`combine_surfaces!` is generic over the field name, so this needs a fallback:
-only the four quantities blended by `import_combined_surface_fields!` are cached
-across an overlapped step, but callers may ask for any field.
 """
 slow_cache_name(::Val) = nothing
 slow_cache_name(::Val{:emissivity}) = :slow_emissivity
@@ -43,7 +39,6 @@ export update_sim!,
     slow_launch_target,
     slow_progress_snapshot,
     slow_sim_dt,
-    slow_window_steps,
     launch_slow_sims!,
     wait_slow_sims!,
     slow_step_in_flight,
@@ -68,9 +63,7 @@ function update_surface_fractions!(
     cs::Interfacer.CoupledSimulation;
     slow_frozen::Bool = false,
 )
-    # Area fractions derive from sea ice concentration and the ocean wet mask,
-    # so they cannot be recomputed while those models are stepping -- and do not
-    # change over the window anyway.
+    # Area fractions derive from ice concentration and the ocean wet mask.
     slow_frozen && return nothing
 
     # An ocean model may provide its own authoritative surface fractions
@@ -363,9 +356,6 @@ function update_model_sims!(
     slow_frozen::Bool = false,
 )
     for (name, sim) in pairs(model_sims)
-        # `update_sim!` for the ocean zeroes and rebuilds its surface flux
-        # fields, which the ocean is integrating with while a slow step is in
-        # flight. Leave those sims alone until the step is joined.
         slow_frozen && Interfacer.is_overlapped(sim) && continue
         update_sim!(sim, csf)
         accumulator = get(flux_accumulators, name, nothing)
@@ -381,14 +371,10 @@ function Interfacer.step!(
     coupler_fields,
     thermo_params,
 )
-    # Step the land simulation first
     Interfacer.step!(land_sim, t)
 
-    # The atmosphere must not be stepped before this update, as in the serial
-    # branch of `step_model_sims!`.
+    # The atmosphere needs its turbulent fluxes before it steps.
     FluxCalculator.update_turbulent_fluxes!(atmos_sim, coupler_fields)
-
-    # Step the atmosphere model
     Interfacer.step!(atmos_sim, t)
 end
 
@@ -399,7 +385,6 @@ function Interfacer.step!(
     coupler_fields,
     thermo_params,
 )
-    # Step the implicit flux simulation first
     Interfacer.step!(implicit_flux_sim, t)
 
     # For an implicit flux simulation, `compute_surface_fluxes!` reads in the precomputed
@@ -453,8 +438,7 @@ function step_model_sims!(
                     thermo_params,
                 )
             else
-                # Same ordering requirement as the grouped land/atmos methods above:
-                # the atmosphere needs its turbulent fluxes before it steps.
+                # The atmosphere needs its turbulent fluxes before it steps.
                 FluxCalculator.update_turbulent_fluxes!(model_sims.atmos_sim, coupler_fields)
                 Interfacer.step!(model_sims.atmos_sim, t)
             end
@@ -515,9 +499,6 @@ end
     step_slow_sims!(model_sims, t)
 
 Advance the overlapped group (sea ice, then ocean) to time `t`.
-
-This is the body handed to the asynchronous task when `overlap_slow_surfaces` is
-set. The ordering matches the group in `step_model_sims!`.
 """
 function step_slow_sims!(model_sims, t; gather_progress::Bool = false)
     for sim in model_sims
@@ -526,9 +507,7 @@ function step_slow_sims!(model_sims, t; gather_progress::Bool = false)
     for sim in model_sims
         sim isa Interfacer.AbstractOceanSimulation && Interfacer.step!(sim, t)
     end
-    # Gather progress scalars here, where this task still owns the state:
-    # reducing over these fields from the coupling loop would race with the
-    # writes above. Only the overlapped path needs this.
+    # Reduce over the slow sims here, where this task still owns their state.
     gather_progress || return nothing
     names = Symbol[]
     snapshots = Any[]
@@ -544,20 +523,14 @@ end
     slow_launch_target(cs)
 
 The model time an about-to-be-launched slow step should advance to: exactly one
-slow step, never more.
-
-The caller has already established that a step is due by the next coupling time.
-If one is *also* due at the current coupling time, the slow sims are a step
-behind the coupler and the target is the current time; otherwise it is the next.
-Using the next coupling time unconditionally would ask for two steps at once
-whenever the slow timestep equals the coupling timestep.
+slow step, never more. The current coupling time if a step is already due then,
+otherwise the next.
 """
 function slow_launch_target(cs::Interfacer.CoupledSimulation)
     t_now = cs.t[]
     for sim in cs.model_sims
         Interfacer.is_overlapped(sim) || continue
-        # Pass coupler time through unconverted: under `use_itime`, coercing to
-        # Float64 selects a method that then computes `Float64 - DateTime`.
+        # Native time: `will_step` dispatches on it under `use_itime`.
         Interfacer.will_step(sim, t_now) && return t_now
     end
     return t_now + cs.Δt_cpl
@@ -565,21 +538,16 @@ end
 
 """
     launch_slow_sims!(cs)
-    wait_slow_sims!(cs)
 
-Start, and later join, the asynchronous ice/ocean step used by
-`overlap_slow_surfaces`. Between the two calls the coupler must not read or
-write ice or ocean state; the `slow_frozen` paths through `exchange!`,
-`update_surface_fractions!`, `turbulent_fluxes!` and `ocean_seaice_fluxes!`
-enforce that, and `step_model_sims!` leaves the slow group alone entirely.
+Start the asynchronous ice/ocean step used by `overlap_slow_surfaces`. Until it
+is joined by [`wait_slow_sims!`](@ref), the coupler must not read or write ice
+or ocean state.
 """
 function launch_slow_sims!(cs::Interfacer.CoupledSimulation)
     @assert isnothing(cs.slow_task[]) "a slow-surface step is already in flight"
     model_sims = cs.model_sims
     target = slow_launch_target(cs)
-    # Record the target alongside the task: the ocean's clock is being written
-    # by it, so scheduling must not read that. The task gets native time so
-    # `step!` dispatches; the recorded copy is seconds, for comparison only.
+    # The task writes the ocean clock, so scheduling reads this copy instead.
     cs.slow_task[] = (;
         task = Threads.@spawn(step_slow_sims!(model_sims, target; gather_progress = true)),
         target = Float64(float(target)),
@@ -596,8 +564,6 @@ gathered. A no-op when no step is in flight.
 function wait_slow_sims!(cs::Interfacer.CoupledSimulation)
     inflight = cs.slow_task[]
     isnothing(inflight) && return nothing
-    # Keep the snapshots the task gathered, so reports falling due during the
-    # next window have settled values to print.
     cs.slow_progress[] = fetch(inflight.task)
     cs.slow_task[] = nothing
     return nothing
@@ -624,15 +590,6 @@ flight.
 slow_step_target(cs::Interfacer.CoupledSimulation) =
     isnothing(cs.slow_task[]) ? nothing : cs.slow_task[].target
 
-
-"""
-    slow_window_steps(cs)
-
-Number of coupling steps spanned by one slow step. Reads only immutable model
-fields, so it is safe to call while a slow step is in flight.
-"""
-slow_window_steps(cs::Interfacer.CoupledSimulation) =
-    round(Int, slow_sim_dt(cs) / Float64(float(cs.Δt_cpl)))
 
 """
     slow_sim_dt(cs)
@@ -687,8 +644,7 @@ function combine_surfaces!(
     FT = eltype(combined_field)
     combined_field .= zero(FT)
 
-    # The slow surfaces' contribution is summed separately so it can be carried
-    # across an overlapped step, during which their state must not be read.
+    # Summed separately so it can be carried across an overlapped step.
     slow_sum = nothing
     if has_slow_cache(csf, field_name_val)
         slow_sum = getproperty(csf, slow_cache_name(field_name_val))
@@ -697,7 +653,6 @@ function combine_surfaces!(
 
     for sim in sims
         if sim isa Interfacer.AbstractSurfaceSimulation
-            # While a slow step is in flight, skip those sims and use the parked sum
             slow_frozen && Interfacer.is_overlapped(sim) && continue
 
             # Store the area fraction of this simulation in `scalar_temp` and rename for clarity
@@ -732,8 +687,7 @@ function combine_surfaces!(
     FT = eltype(T_sfc)
     T_sfc .= zero(FT)
 
-    # As in the generic method, the slow surfaces' share of the upward longwave
-    # sum is kept separately so it survives an overlapped step.
+    # Summed separately so it can be carried across an overlapped step.
     slow_sum = nothing
     if has_slow_cache(csf, val)
         slow_sum = getproperty(csf, slow_cache_name(val))

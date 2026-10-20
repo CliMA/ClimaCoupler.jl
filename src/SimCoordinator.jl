@@ -79,9 +79,8 @@ function run!(
             end
         end
     finally
-        # Nothing may outlive the coupling loop with ice/ocean state in flight,
-        # including a loop that threw. Failures joining are reported rather than
-        # raised, so they cannot mask whatever ended the run.
+        # Join here too on a loop that threw, reporting rather than raising so
+        # the failure cannot mask whatever ended the run.
         try
             FieldExchanger.wait_slow_sims!(cs)
         catch e
@@ -137,8 +136,7 @@ function step!(cs::Interfacer.CoupledSimulation)
     # Compute any ocean-sea ice fluxes
     frozen || FluxCalculator.ocean_seaice_fluxes!(cs)
 
-    # The slow surfaces' forcing is now fully assembled, so their step can be
-    # launched and left to run across the coupling steps that follow.
+    # The slow surfaces' forcing is now fully assembled.
     launch_slow_if_due!(cs, frozen)
 
     # Maybe call the callbacks
@@ -153,8 +151,7 @@ end
     join_slow_if_due!(cs) -> frozen
 
 Join an overlapped ice/ocean step if this coupling step needs its result, and
-report whether one is still in flight afterwards. `frozen` is what every
-slow-surface-touching call in `step!` keys off.
+report whether one is still in flight afterwards.
 """
 function join_slow_if_due!(cs::Interfacer.CoupledSimulation)
     cs.overlap_slow_surfaces && slow_surfaces_due(cs) && FieldExchanger.wait_slow_sims!(cs)
@@ -165,8 +162,7 @@ end
     skip_slow_stepping(cs, frozen)
 
 Whether `step_model_sims!` should leave the slow group alone. Under overlap the
-task advances them, never the loop: at `k == 1` they would otherwise be stepped
-twice.
+task advances them, never the loop.
 """
 skip_slow_stepping(cs::Interfacer.CoupledSimulation, frozen::Bool) =
     frozen || cs.overlap_slow_surfaces
@@ -187,17 +183,14 @@ end
     slow_surfaces_due(cs)
 
 Whether the overlapped ice/ocean group would take a step at the next coupling
-time. This is the same predicate `push_ready_accumulators!` uses to decide when
-to deliver their window-averaged forcing, so launching on it guarantees the
-forcing is complete before the step begins.
+time.
 """
 function slow_surfaces_due(cs::Interfacer.CoupledSimulation)
     t_next = cs.t[] + cs.Δt_cpl
     target = FieldExchanger.slow_step_target(cs)
     if !isnothing(target)
-        # A step is in flight, so the ocean clock is being written and must not
-        # be read. Once the step lands the clock will read `target`, so the next
-        # step falls due one slow timestep after that.
+        # The in-flight step is writing the ocean clock; `target` is where it
+        # will land, so the next step falls due one slow timestep after that.
         return Float64(float(t_next)) >= target + FieldExchanger.slow_sim_dt(cs)
     end
     for sim in cs.model_sims
@@ -611,8 +604,8 @@ function _build_coupled_simulation(config_dict::AbstractDict)
             let sim_name = sim_name
                 cs -> begin
                     sim = cs.model_sims[sim_name]
-                    # An overlapped sim's fields are being written by its
-                    # in-flight step, so report from the task's last snapshot.
+                    # Report from the task's last snapshot: the in-flight
+                    # step is writing this sim's fields.
                     if Interfacer.is_overlapped(sim) &&
                        FieldExchanger.slow_step_in_flight(cs)
                         snapshot = FieldExchanger.slow_progress_snapshot(cs, sim_name)

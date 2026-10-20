@@ -36,9 +36,7 @@ function turbulent_fluxes!(cs::Interfacer.CoupledSimulation; slow_frozen::Bool =
         cs.flux_accumulators;
         slow_frozen,
     )
-    # Accumulating is coupler-side and safe; pushing writes surface boundary
-    # conditions and reads the ocean clock, so it must not run while a slow step
-    # is in flight. The push falls due on a sync step anyway.
+    # The push writes surface boundary conditions and reads the ocean clock.
     slow_frozen ||
         push_ready_accumulators!(cs.model_sims, cs.flux_accumulators, cs.t[] + cs.Δt_cpl)
     return nothing
@@ -89,12 +87,9 @@ function turbulent_fluxes!(
     end
     have_cache = all(n -> n in propertynames(csf), slow_turb_flux_names())
 
-    # Overlapped surfaces go first, into the freshly zeroed fields, so their share
-    # can be parked before the fast surfaces are added on top. While their step is
-    # in flight that share is restored instead of recomputed: computing it reads
-    # surface state the task is writing, and for a surface with no accumulator
-    # (one whose timestep equals Δt_cpl) it would also write fluxes back into a
-    # model mid-step.
+    # Overlapped surfaces go first, into the freshly zeroed fields, so their
+    # share can be parked before the fast surfaces are added on top, and
+    # restored rather than recomputed while their step is in flight.
     if slow_frozen
         have_cache && for (p, q) in zip(turb_flux_names(), slow_turb_flux_names())
             getproperty(csf, p) .= getproperty(csf, q)

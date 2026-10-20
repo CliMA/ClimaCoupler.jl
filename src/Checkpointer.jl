@@ -232,8 +232,7 @@ This is a callback function that checkpoints all simulations defined in the
 current coupled simulation.
 """
 function checkpoint_sims(cs::Interfacer.CoupledSimulation)
-    # Checkpointing reads every component's state, so an overlapped ice/ocean
-    # step must be joined first. No-op unless one is in flight.
+    # Checkpointing reads every component's state.
     FieldExchanger.wait_slow_sims!(cs)
     time = Int(round(float(cs.t[])))
     day = floor(Int, time / (60 * 60 * 24))

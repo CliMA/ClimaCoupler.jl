@@ -483,7 +483,7 @@ end
 import SurfaceFluxes as SF
 import Thermodynamics.Parameters as TDP
 import ClimaParams as CP
-import ClimaCoupler: FieldExchanger, FluxCalculator, Utilities
+import ClimaCoupler: FieldExchanger, FluxCalculator, Interfacer, Utilities
 
 @testset "Per-polygon ocean fluxes" begin
     eg = CMIPExt.build_exchange_grid(boundary_space, coastal_grid)
@@ -812,6 +812,16 @@ end
             @test all(v -> v == 0 || 50 - 1e-8 <= v <= 150 + 1e-8, F)
             @test all(n -> α[n] == 0 || F[n] != 0, eachindex(F))
         end
+
+        # The emission temperature: area fraction × T⁴ integrates to the
+        # polygon integral of T⁴, and T stays within the polygon range.
+        T⁴ = (250 .+ 50 .* rand(rng, FT, eg.n_poly)) .^ 4
+        emitted = sum(eg.b_area .* weight .* T⁴)
+        T_field = CC.Fields.zeros(boundary_space)
+        CMIPExt.emission_temperature!(T_field, remapping, on_exchange_device(T⁴), weight_d)
+        T = to_cpu(CRExt.se_field_to_vec(T_field))
+        @test sum(Jw .* α .* T .^ 4) ≈ emitted rtol = 1e-10
+        @test all(n -> α[n] == 0 || 250 - 1e-8 <= T[n] <= 300 + 1e-8, eachindex(T))
     end
 
     # The open-ocean fraction the coupler builds, wet − ice, is the coverage of
@@ -956,6 +966,7 @@ end
         exchange_grid = eg,
         ocean_flux_state = CMIPExt.ExchangeFluxState{FT}(ocean_arch, eg_cpu.n_poly),
         scratch_field_oc3 = surface_field(),
+        weight_cov_scratch = CC.Fields.zeros(boundary_space),
         downward_flux_scratch = CC.Fields.zeros(boundary_space),
         flux_dss_buffer = Utilities.init_dss_buffer(CC.Fields.zeros(boundary_space)),
     )
@@ -1007,6 +1018,22 @@ end
         end
     end
     @test n_wet > 0
+
+    # The emission temperature: the open-ocean area fraction times T⁴ integrates to
+    # the polygon integral of (1 − SIC) T⁴ of the top-layer temperature in kelvin.
+    OC.set!(model.tracers.T, (λ, φ, z) -> 10 + 10 * cosd(φ))
+    OC.set!(sim.ice_concentration, (λ, φ) -> φ < 0 ? FT(0.3) : FT(0))
+    T_field = CC.Fields.zeros(boundary_space)
+    Interfacer.get_field!(T_field, sim, Val(:surface_temperature))
+    CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
+    Jw = to_cpu(CRExt.se_node_weights(boundary_space))
+    coverage = to_cpu(CRExt.se_field_to_vec(remapping.weight_cov_scratch))
+    T = to_cpu(CRExt.se_field_to_vec(T_field))
+    T_cells = vec(OC.interior(OC.on_architecture(OC.CPU(), model.tracers.T), :, :, Nz))
+    k_cell = eg_cpu.oc_of_poly
+    sic = cell_values(sim.ice_concentration)[k_cell]
+    emitted = sum(eg_cpu.b_area .* (1 .- sic) .* (T_cells[k_cell] .+ C_to_K) .^ 4)
+    @test sum(Jw .* coverage .* T .^ 4) ≈ emitted rtol = 1e-10
 end
 
 # Stand-in for a ClimaSeaIce model in the `update_sim!` exchange-grid path
@@ -1033,6 +1060,7 @@ Base.eltype(::FakeIceModel) = FT
         exchange_grid = eg,
         ice_flux_state = CMIPExt.IceExchangeState{FT}(ice_arch, eg_cpu.n_poly),
         scratch_field_oc1 = surface_field(),
+        weight_cov_scratch = CC.Fields.zeros(boundary_space),
         downward_flux_scratch = CC.Fields.zeros(boundary_space),
         flux_dss_buffer = Utilities.init_dss_buffer(CC.Fields.zeros(boundary_space)),
     )
@@ -1071,4 +1099,17 @@ Base.eltype(::FakeIceModel) = FT
         end
     end
     @test n_icy > 0
+
+    # The emission temperature: the ice area fraction times T⁴ integrates to the
+    # polygon integral of SIC T⁴ of the polygons' last diagnosed skin temperatures.
+    T_sfc_new = 240 .+ 30 .* rand(Random.Xoshiro(3), FT, eg_cpu.n_poly)
+    copyto!(remapping.ice_flux_state.T_sfc_new, T_sfc_new)
+    T_field = CC.Fields.zeros(boundary_space)
+    Interfacer.get_field!(T_field, sim, Val(:surface_temperature))
+    CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
+    Jw = to_cpu(CRExt.se_node_weights(boundary_space))
+    coverage = to_cpu(CRExt.se_field_to_vec(remapping.weight_cov_scratch))
+    T = to_cpu(CRExt.se_field_to_vec(T_field))
+    emitted = sum(eg_cpu.b_area .* ℵ[eg_cpu.oc_of_poly] .* T_sfc_new .^ 4)
+    @test sum(Jw .* coverage .* T .^ 4) ≈ emitted rtol = 1e-10
 end

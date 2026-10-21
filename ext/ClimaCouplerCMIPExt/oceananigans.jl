@@ -612,6 +612,45 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
     sim.ocean.model.tracers.T + sim.ocean_properties.C_to_K # convert from Celsius to Kelvin
 
 """
+    Interfacer.get_field!(target_field, sim::OceananigansSimulation, ::Val{:surface_temperature})
+
+Open-water surface temperature on the boundary space, from which the atmosphere computes
+the emitted longwave. With the exchange grid it is the `(1 - SIC)`-weighted
+control-volume transfer of `T⁴`, so that the open-ocean area fraction times `ϵσT⁴`
+integrates to the emission `(1 - SIC) ϵσT⁴` the ocean loses on each polygon.
+"""
+function Interfacer.get_field!(
+    target_field,
+    sim::OceananigansSimulation,
+    ::Val{:surface_temperature},
+)
+    remapping = sim.remapping
+    if !remapping.use_exchange_grid
+        surface_temperature = Interfacer.get_field(sim, Val(:surface_temperature))
+        Interfacer.remap!(target_field, surface_temperature, remapping)
+        return nothing
+    end
+    eg = remapping.exchange_grid
+    fs = remapping.ocean_flux_state
+    C_to_K = eltype(fs.scratch1)(sim.ocean_properties.C_to_K)
+    Nz = sim.ocean.model.grid.Nz
+    gather_cells_to_polys!(
+        fs.scratch1,
+        eg,
+        vec(OC.interior(sim.ocean.model.tracers.T, :, :, Nz)),
+    )
+    @. fs.scratch1 = (fs.scratch1 + C_to_K)^4
+    gather_cells_to_polys!(
+        fs.scratch2,
+        eg,
+        vec(OC.interior(sim.ice_concentration, :, :, 1)),
+    )
+    @. fs.scratch2 = 1 - fs.scratch2
+    emission_temperature!(target_field, remapping, fs.scratch1, fs.scratch2)
+    return nothing
+end
+
+"""
     FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)
 
 Update the turbulent fluxes in the simulation using the values computed at this time step.

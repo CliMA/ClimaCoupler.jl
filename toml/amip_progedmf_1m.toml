@@ -68,10 +68,7 @@ value = 0.0
 value = 0.0
 
 [sgs_variance_horizontal_scale_factor]
-value = 1.0
-
-[sgs_variance_vertical_scale_factor]
-value = 0.5
+value = 1.8
 
 [condensation_evaporation_timescale]
 value = 100

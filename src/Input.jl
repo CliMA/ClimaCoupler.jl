@@ -286,9 +286,13 @@ function argparse_settings()
         arg_type = String
         default = "never"
         "--ocean_diagnostic_interval"
-        help = "Time interval between ocean diagnostic outputs [\"1days\" (default), allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\"]"
+        help = "Time interval between ocean surface diagnostic outputs [\"1days\" (default), allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\"]"
         arg_type = String
         default = "1days"
+        "--ocean_3d_diagnostic_interval"
+        help = "Time interval between 3D ocean diagnostic outputs [`ocean_diagnostic_interval` (default), same formats]"
+        arg_type = String
+        default = nothing
         "--ocean_diagnostic_mode"
         help = "Reduction mode for ocean diagnostic outputs. [`average` (default) uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval`]"
         arg_type = String
@@ -597,6 +601,8 @@ function get_coupler_args(config_dict::Dict)
     sst_adjustment = FT(config_dict["sst_adjustment"])
     ocean_progress_interval = config_dict["ocean_progress_interval"]
     ocean_diagnostic_interval = config_dict["ocean_diagnostic_interval"]
+    ocean_3d_diagnostic_interval =
+        something(config_dict["ocean_3d_diagnostic_interval"], ocean_diagnostic_interval)
     ocean_diagnostic_mode = Symbol(config_dict["ocean_diagnostic_mode"])
 
     # Ice model-specific information
@@ -687,6 +693,7 @@ function get_coupler_args(config_dict::Dict)
         sst_adjustment,
         ocean_progress_interval,
         ocean_diagnostic_interval,
+        ocean_3d_diagnostic_interval,
         ocean_diagnostic_mode,
         ice_model,
         seaice_diagnostic_interval,

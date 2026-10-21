@@ -172,6 +172,7 @@ function ORCAOneGrid(
             mesh.north_poles_latitude,
             mesh.first_pole_longitude,
             mesh.southernmost_latitude,
+            RightFaceFolded,
         ),
     )
 

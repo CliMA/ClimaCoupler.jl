@@ -93,6 +93,39 @@ The simulation runs for 3 years and has a resolution of 16
 elements in the horizontal and 63 in the vertical
 and includes diagnostic EDMF in the atmosphere. It is run on 1 GPU.
 
+# [ClimaCoupler - Time to First Step](https://buildkite.com/clima/climacoupler-time-to-first-step)
+- Triggered manually or by upstream repos
+- Walltime (approx.): 1 hour
+- Runs on Caltech Clima node (1 GPU)
+- Configuration file: `config/amip_configs/amip.yml`
+
+This pipeline measures the wall time to load packages, set up, and take the
+first coupling step of the flagship AMIP simulation. The timings are shown as a
+build annotation and saved to `output/ttfs_amip/artifacts/time_to_first_step.md`.
+
+To run with changes to upstream packages, set `UPSTREAM_PACKAGES` to a
+space-separated list of entries (see [add_upstream_packages.jl](add_upstream_packages.jl)):
+- `Name`, the main branch: `ClimaAtmos`
+- `Name@version`, a registered version: `ClimaAtmos@0.42.14`
+- `Name#rev`, a branch, tag, or commit: `ClimaAtmos#your_branch`
+- `url#rev`, a branch, tag, or commit of a fork: `https://github.com/your_user/ClimaAtmos.jl#your_branch`
+
+The nightly pipeline accepts the same variable. When `UPSTREAM_PACKAGES` is set,
+a second job measures the same packages at their main branches, and the
+annotation shows the change in each phase. The build fails if the total grows by more than
+`TTFS_REGRESSION_THRESHOLD` (default `0.1`, i.e. 10%).
+
+An upstream repo can trigger it from its own pipeline with:
+```yaml
+- trigger: "climacoupler-time-to-first-step"
+  label: ":rocket: ClimaCoupler time to first step"
+  async: true
+  build:
+    branch: main
+    env:
+      UPSTREAM_PACKAGES: "ClimaAtmos#${BUILDKITE_COMMIT}"
+```
+
 # [ClimaCoupler-LongRuns](https://buildkite.com/clima/climacoupler-longruns)
 - Scheduled weekly Sunday at 12am PST (8am UTC)
 - Walltime (approx.): 24 hours
@@ -101,12 +134,7 @@ and includes diagnostic EDMF in the atmosphere. It is run on 1 GPU.
 
 This pipeline provides a set of simulations of increasing physical and computational complexity.
 
-The simpler setups use the Slabplanet mode and check conservation of the system.
-These include a standalone atmosphere run (meant to provide a direct
-comparison to runs in ClimaAtmos.jl), an aquaplanet run (atmosphere and slab ocean),
-and a couple more complex runs.
-
-We also have a set of AMIP mode simulations, which run the atmosphere, slab ocean,
+We have a set of AMIP mode simulations, which run the atmosphere, slab ocean,
 prescribed sea ice, and either bucket or integrated land model. Unless stated otherwise,
 they are using the bucket land model. They also test a various complexities in the
 atmosphere configuration, which affects the stability and SYPD of the simulations, among
@@ -119,6 +147,5 @@ Finally, we have a calibration longrun experiment, which exercises the calibrati
 pipeline for the coupled system.
 
 The resolution of runs in this pipeline is typically 16 horizontal elements,
-unless otherwise specified (e.g. the slabplanet runs use 8 horizontal elements).
-The simplest simulations are only run on CPU, but the more complex
-simulations are mostly run on GPU.
+unless otherwise specified. All simulations in this pipeline run on GPU on the
+`clima` queue.

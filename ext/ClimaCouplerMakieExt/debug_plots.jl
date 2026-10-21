@@ -353,15 +353,8 @@ function _debug_plot_heatmap!(ax, fig, cpu_field, i, j)
         return nothing
     else
         colorrange = (field_valid_min, field_valid_max)
-        # Diagnostics only, and they crash on current Makie; calling
-        # ClimaCoreMakie directly instead fails precompilation, since it is in the
-        # manifest but not a dependency of this extension.
-        try
-            hm = CC.Visualize.fieldheatmap!(ax, cpu_field, colorrange = colorrange)
-            Makie.Colorbar(fig[i, j * 2], hm)
-        catch err
-            @warn "skipping debug heatmap" exception = err
-        end
+        hm = CC.Visualize.fieldheatmap!(ax, cpu_field, colorrange = colorrange)
+        Makie.Colorbar(fig[i, j * 2], hm)
     end
     return nothing
 end

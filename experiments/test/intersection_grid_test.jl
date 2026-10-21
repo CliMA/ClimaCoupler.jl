@@ -892,3 +892,63 @@ Base.eltype(::FakeOceanModel) = FT
     end
     @test n_wet > 0
 end
+
+# Stand-in for a ClimaSeaIce model in the `update_sim!` exchange-grid path
+struct FakeIceModel{G, C, H, S}
+    grid::G
+    ice_concentration::C
+    external_heat_fluxes::H
+    snowfall::S
+end
+Base.eltype(::FakeIceModel) = FT
+
+@testset "Exchange-grid radiation and snowfall on sea ice" begin
+    ice_arch = exchange_arch()
+    grid = coastal_grid_on(ice_arch)
+    eg_cpu = CMIPExt.build_exchange_grid(boundary_space, grid)
+    eg = on_exchange_device(eg_cpu)
+
+    surface_field() = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    ice_concentration, top, snowfall = surface_field(), surface_field(), surface_field()
+    OC.set!(ice_concentration, (λ, φ) -> φ < 0 ? FT(0.8) : FT(0))
+    model = FakeIceModel(grid, ice_concentration, (; top), snowfall)
+    remapping = (;
+        use_exchange_grid = true,
+        exchange_grid = eg,
+        ice_flux_state = CMIPExt.IceExchangeState{FT}(ice_arch, eg_cpu.n_poly),
+        scratch_field_oc1 = surface_field(),
+    )
+    sim = CMIPExt.ClimaSeaIceSimulation(
+        (; model),
+        nothing,
+        remapping,
+        nothing,
+        nothing,
+        nothing,
+        nothing,
+    )
+
+    uniform(v) = (f = CC.Fields.zeros(boundary_space); f .= FT(v); f)
+    SW_d, LW_d, P_snow = FT(300), FT(250), FT(-2e-6) # P_snow is downward
+    csf = (; SW_d = uniform(SW_d), LW_d = uniform(LW_d), P_snow = uniform(P_snow))
+    FieldExchanger.update_sim!(sim, csf)
+
+    # Wet cells with ice receive the absorbed radiation as a cell mean and the
+    # downward snow flux as positive snowfall; all other cells receive neither.
+    α = FT(0.7) # `Val(:surface_direct_albedo)`
+    ϵ = FT(1)   # `Val(:emissivity)`
+    cell_values(f) = vec(OC.interior(OC.on_architecture(OC.CPU(), f), :, :, 1))
+    ℵ, heat, snow = cell_values(ice_concentration), cell_values(top), cell_values(snowfall)
+    n_icy = 0
+    for c in 1:((Ny - 1) * Nx) # Skip the fold row
+        if eg_cpu.oc_wet_area[c] > 0 && ℵ[c] > 0
+            n_icy += 1
+            @test heat[c] ≈ ℵ[c] * (-(1 - α) * SW_d - ϵ * LW_d) rtol = 1e-12
+            @test snow[c] ≈ -P_snow rtol = 1e-12
+        else
+            @test heat[c] == 0
+            @test snow[c] == 0
+        end
+    end
+    @test n_icy > 0
+end

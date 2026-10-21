@@ -202,7 +202,8 @@ or a string of the form `<NUM><unit>` accepted by [`time_to_period`](@ref), such
 as `"6hours"`.
 
 `t_start` is the time the simulation starts from, either an `ITime` or a number of
-seconds since `start_date`. It is used to seed the schedule's `date_last`.
+seconds since `start_date`. The schedule's `date_last` is seeded with the last
+date at or before `t_start` reached by repeatedly adding `period` to `start_date`.
 
 !!! note "Use this instead of `EveryCalendarDtSchedule` directly"
     A schedule built directly at `t_start > 0` has no record of the time that
@@ -213,14 +214,17 @@ seconds since `start_date`. It is used to seed the schedule's `date_last`.
 """
 function calendar_dt_schedule(period, start_date, t_start)
     period isa Dates.Period || (period = time_to_period(period))
-    date_last =
-        t_start isa ITime ? date(t_start) :
-        start_date + Dates.Millisecond(round(Int64, 1000 * float(t_start)))
+    t_start_date = CD.time_to_date(t_start, start_date)
+    # Jan 31 + 2 months is Mar 31, but stepping one month at a time gives Feb 28, Mar 28.
+    date_last = start_date
+    while date_last + period <= t_start_date
+        date_last += period
+    end
     return CD.Schedules.EveryCalendarDtSchedule(period; start_date, date_last)
 end
 
 """
-    walltime_schedule(walltime_dt, walltime_debug, start_date, t_start = 0)
+    walltime_schedule(walltime_dt, walltime_debug, start_date, t_start = 0.0)
 
 Return the schedule to be used for walltime reporting, or `nothing` if walltime
 reporting is disabled.
@@ -232,7 +236,7 @@ If `walltime_debug` is `true`, reporting also happens on every coupling step who
 number is a power of two (see [`PowerOfTwoSchedule`](@ref)). Note that this is the
 only reporting if `walltime_dt` is `"never"`.
 """
-function walltime_schedule(walltime_dt, walltime_debug, start_date, t_start = 0)
+function walltime_schedule(walltime_dt, walltime_debug, start_date, t_start = 0.0)
     if walltime_dt == "never"
         return walltime_debug ? PowerOfTwoSchedule() : nothing
     end

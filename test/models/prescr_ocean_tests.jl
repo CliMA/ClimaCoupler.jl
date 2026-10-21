@@ -87,4 +87,19 @@ end
     @test Interfacer.get_field(sim, Val(:surface_direct_albedo)) == sim.cache.α_direct
     @test Interfacer.get_field(sim, Val(:surface_diffuse_albedo)) == sim.cache.α_diffuse
     @test Interfacer.get_field(sim, Val(:surface_temperature)) == sim.cache.T_sfc
+
+    # A run restarted at a day boundary updates the SST at the next one, as an
+    # uninterrupted run does
+    day = 86400.0
+    restarted_sim = Models.PrescribedOceanSimulation(
+        FT;
+        boundary_space = space,
+        start_date,
+        tspan = (day, 3 * day),
+        coupled_param_dict,
+        thermo_params,
+        comms_ctx,
+    )
+    @test !restarted_sim.cache.SST_schedule((; t = day + 120))
+    @test restarted_sim.cache.SST_schedule((; t = 2 * day))
 end

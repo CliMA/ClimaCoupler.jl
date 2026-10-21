@@ -20,7 +20,7 @@ cells, and the intersection polygons that tile their overlap, stored in
 compressed-sparse-row (CSR) form for the direction each coupling is consumed
 in, so every per-step gather/scatter is a race-free segmented reduction.
 
-SE-side weights come in two flavors over each polygon `Ω_k`:
+SE-side weights come in three flavors over each polygon `Ω_k`:
 
   - gather (polygon-major): `f̄_k = Σ_n gweight[k,n] f_n` with the SEM basis
     integrals `B_{kn} = ∫_{Ω_k} ϕ_n \\, dA`
@@ -31,6 +31,10 @@ SE-side weights come in two flavors over each polygon `Ω_k`:
     `sweight = B̃_{kn} / (Jw)_n`, where `B̃_{kn} ≥ 0` is the area of `Ω_k`
     inside node `n`'s control volume, whose area is `(Jw)_n`; follow with
     `weighted_dss!`;
+  - transpose of the scatter (polygon-major, on the gather's sparsity):
+    `ḡ_k = Σ_n tweight[k,n] g_n` with `tweight = B̃_{kn} / b_area_k`, for the
+    fluxes the atmosphere hands down (radiation, precipitation). For any
+    polygon weights `w`, `Σ_k b_area_k w_k ḡ_k = Σ_n (Jw)_n (Σ_k sweight[n,k] w_k) g_n`;
   - `node_cov[n] = Σ_{k wet} sweight[n,k]`: the fraction of node `n`'s area
     over wet ocean.
 
@@ -44,12 +48,13 @@ column index).
 # Fields
 - `n_poly`, `n_nodes`, `n_elem`, `n_oc`: entity counts
 - `gpoly_ptr`, `gnode`, `gweight`: polygon-major CSR of the node→polygon gather
+- `tweight`: transpose weights `B̃_{kn} / b_area_k` on the gather's CSR
 - `snode_ptr`, `spoly`, `sweight`: node-major CSR of the polygon→node scatter
 - `node_cov`: nodal wet coverage fractions
 - `elem_of_poly`, `oc_of_poly`: SE element / FV cell owning each polygon
 - `soc_ptr`, `soc_poly`: FV-cell-major CSR of the polygon→cell scatter
 - `area`: geometric polygon areas [m²]
-- `b_area`: SE-side scatter areas `Σ_n sweight[n,k] (Jw)_n` [m²]; equals
+- `b_area`: SE-side scatter areas `Σ_n B̃_{kn} = Σ_n sweight[n,k] (Jw)_n` [m²]; equals
   `area` up to quadrature error and makes SE-side conservation statements
   exact
 - `oc_wet_area`: retained (wet) polygon area per FV cell [m²]; zero for dry
@@ -65,6 +70,7 @@ struct ExchangeGrid{FT, VI <: AbstractVector{Int32}, VF <: AbstractVector{FT}}
     gpoly_ptr::VI
     gnode::VI
     gweight::VF
+    tweight::VF
     snode_ptr::VI
     spoly::VI
     sweight::VF
@@ -117,8 +123,8 @@ Construct an [`ExchangeGrid`](@ref) between a ClimaCore cubed-sphere
 intersect SE elements with FV cells (fold-aware on a `TripolarGrid`, so fold
 shadow cells never produce polygons), drop polygons over dry (immersed)
 cells, then integrate the SEM basis (`accumulate_principled_b`, gather
-weights) and the control volumes (`control_volume_weights`, scatter weights
-and nodal coverages) over each polygon. Move the result to the
+weights) and the control volumes (`control_volume_weights`, scatter and
+transpose weights and nodal coverages) over each polygon. Move the result to the
 device with [`on_device`](@ref).
 """
 function build_exchange_grid(boundary_space, grid_oc)
@@ -169,9 +175,10 @@ function build_exchange_grid(boundary_space, grid_oc)
     n_nodes = length(Jw)
     volumes = ControlVolumes(boundary_space_cpu)
 
-    g_poly, g_node, g_b = Int[], Int[], Float64[] # gather COO: B_kn
+    g_poly, g_node, g_b, g_t = Int[], Int[], Float64[], Float64[] # gather COO: B_kn, B̃_kn
     s_poly, s_node, s_w = Int[], Int[], Float64[] # scatter COO: B̃_kn / A_n
     b_sum = zeros(Float64, count(keep))
+    b_area = zeros(Float64, count(keep))
     kept_id = 0
     for k in eachindex(area)
         keep[k] || continue
@@ -195,30 +202,33 @@ function build_exchange_grid(boundary_space, grid_oc)
                 push!(s_w, w)
             end
             Bij = B[i, j]
-            if Bij != 0
+            if Bij != 0 || B̃[i, j] != 0
                 push!(g_poly, kept_id)
                 push!(g_node, n)
                 push!(g_b, Bij)
+                push!(g_t, B̃[i, j])
                 b_sum[kept_id] += Bij
+                b_area[kept_id] += B̃[i, j]
             end
         end
     end
     elem_of_poly, oc_of_poly, area = elem_of_poly[keep], oc_of_poly[keep], area[keep]
 
-    # Degenerate polygons (b_sum ≤ 0 can only come from quadrature round-off
-    # on slivers) cannot be normalized for the gather; drop their COO entries
-    # in both directions and zero their area so they are inert in every
-    # reduction.
-    degenerate = findall(<=(0), b_sum)
+    # Degenerate polygons (b_sum ≤ 0 or b_area ≤ 0 can only come from
+    # round-off on slivers) cannot be normalized for the gathers; drop their
+    # COO entries in both directions and zero their area so they are inert in
+    # every reduction.
+    degenerate = findall((b_sum .<= 0) .| (b_area .<= 0))
     if !isempty(degenerate)
         is_degenerate = falses(length(area))
         is_degenerate[degenerate] .= true
         g_keep = .!is_degenerate[g_poly]
-        g_poly, g_node, g_b = g_poly[g_keep], g_node[g_keep], g_b[g_keep]
+        g_poly, g_node, g_b, g_t = g_poly[g_keep], g_node[g_keep], g_b[g_keep], g_t[g_keep]
         s_keep = .!is_degenerate[s_poly]
         s_poly, s_node, s_w = s_poly[s_keep], s_node[s_keep], s_w[s_keep]
         area[degenerate] .= 0
         b_sum[degenerate] .= 0
+        b_area[degenerate] .= 0
     end
 
     # 4. CSR assembly for both directions.
@@ -226,16 +236,15 @@ function build_exchange_grid(boundary_space, grid_oc)
     gpoly_ptr, gperm = _build_csr(g_poly, n_poly)
     gnode = Int32.(g_node[gperm])
     gweight = [g_b[p] / b_sum[g_poly[p]] for p in gperm]
+    tweight = [g_t[p] / b_area[g_poly[p]] for p in gperm]
 
     snode_ptr, sperm = _build_csr(s_node, n_nodes)
     spoly = Int32.(s_poly[sperm])
     sweight = s_w[sperm]
 
     node_cov = zeros(Float64, n_nodes)
-    b_area = zeros(Float64, n_poly)
     for p in eachindex(s_node)
         node_cov[s_node[p]] += s_w[p]
-        b_area[s_poly[p]] += s_w[p] * Jw[s_node[p]]
     end
 
     soc_ptr, soc_poly = _build_csr(Vector{Int}(oc_of_poly), n_oc)
@@ -258,6 +267,7 @@ function build_exchange_grid(boundary_space, grid_oc)
         gpoly_ptr,
         gnode,
         FT.(gweight),
+        FT.(tweight),
         snode_ptr,
         spoly,
         FT.(sweight),
@@ -309,13 +319,15 @@ function _csr_matvec!(dst, ptr, col, w, src)
 end
 
 """
-    gather_nodes_to_polys!(poly_values, eg::ExchangeGrid, nodal_values)
+    gather_nodes_to_polys!(poly_values, eg::ExchangeGrid, nodal_values, weight = eg.gweight)
 
-Average a flat SE nodal vector onto each polygon: `f̄_k = Σ_n gweight f_n`.
-Rows sum to 1, so constants are preserved exactly.
+Average a flat SE nodal vector onto each polygon: `f̄_k = Σ_n weight[k,n] f_n`.
+Rows sum to 1, so constants are preserved exactly. The default `gweight`
+interpolates the atmospheric state to high order; `eg.tweight` is the transpose of
+the scatter weights.
 """
-gather_nodes_to_polys!(poly_values, eg::ExchangeGrid, nodal_values) =
-    _csr_matvec!(poly_values, eg.gpoly_ptr, eg.gnode, eg.gweight, nodal_values)
+gather_nodes_to_polys!(poly_values, eg::ExchangeGrid, nodal_values, weight = eg.gweight) =
+    _csr_matvec!(poly_values, eg.gpoly_ptr, eg.gnode, weight, nodal_values)
 
 @kernel function _gather_cells_kernel!(dst, oc_of_poly, src)
     k = @index(Global)

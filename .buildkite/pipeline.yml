@@ -352,6 +352,16 @@ steps:
         agents:
           slurm_mem: 16GB
 
+      - label: "MPI exchange (intersection) grid unit tests"
+        key: "mpi_intersection_grid_tests"
+        command: "srun julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/test/exchange_mpi_test.jl"
+        retry: *retry_policy
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+        agents:
+          slurm_ntasks: 2
+          slurm_mem: 16GB
+
       - label: "GPU exchange (intersection) grid unit tests"
         key: "gpu_intersection_grid_tests"
         command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/test/intersection_grid_test.jl"
@@ -383,6 +393,20 @@ steps:
         agents:
           slurm_mem: 20GB
           slurm_gpus: 1
+
+      - label: "GPU MPI CMIP (2 GPUs): ClimaAtmos + bucket land + Oceananigans + ClimaSeaIce"
+        key: "gpu_mpi_cmip_oceananigans_climaseaice_bucket"
+        command: "srun julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice_bucket.yml --job_id gpu_mpi_cmip_oceananigans_climaseaice_bucket"
+        artifact_paths: "output/gpu_mpi_cmip_oceananigans_climaseaice_bucket/artifacts/*"
+        timeout_in_minutes: 40
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
+        agents:
+          slurm_ntasks: 2
+          slurm_gpus_per_task: 1
+          slurm_mem_per_cpu: 20GB
 
   - group: "Calibration"
     steps:

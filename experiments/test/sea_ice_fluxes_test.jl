@@ -41,6 +41,7 @@ function bare_ice_simulation()
         (; σ, C_to_K),
         300.0,
         CMIPExt.skin_accumulator(grid),
+        ice.model.clock,
     )
 end
 

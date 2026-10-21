@@ -969,6 +969,13 @@ end
         weight_cov_scratch = CC.Fields.zeros(boundary_space),
         downward_flux_scratch = CC.Fields.zeros(boundary_space),
         flux_dss_buffer = Utilities.init_dss_buffer(CC.Fields.zeros(boundary_space)),
+        exchange_fields = (;
+            SW_d = CC.Fields.zeros(boundary_space),
+            LW_d = CC.Fields.zeros(boundary_space),
+            P_liq = CC.Fields.zeros(boundary_space),
+            P_snow = CC.Fields.zeros(boundary_space),
+            scalar_temp = CC.Fields.zeros(boundary_space),
+        ),
     )
     sim = CMIPExt.OceananigansSimulation(
         (; model),
@@ -976,6 +983,7 @@ end
         ocean_properties,
         remapping,
         surface_field(), # ice concentration: ice-free
+        nothing,
         nothing,
     )
 
@@ -1063,11 +1071,18 @@ Base.eltype(::FakeIceModel) = FT
         weight_cov_scratch = CC.Fields.zeros(boundary_space),
         downward_flux_scratch = CC.Fields.zeros(boundary_space),
         flux_dss_buffer = Utilities.init_dss_buffer(CC.Fields.zeros(boundary_space)),
+        exchange_fields = (;
+            SW_d = CC.Fields.zeros(boundary_space),
+            LW_d = CC.Fields.zeros(boundary_space),
+            P_snow = CC.Fields.zeros(boundary_space),
+            scalar_temp = CC.Fields.zeros(boundary_space),
+        ),
     )
     sim = CMIPExt.ClimaSeaIceSimulation(
         (; model),
         nothing,
         remapping,
+        nothing,
         nothing,
         nothing,
         nothing,

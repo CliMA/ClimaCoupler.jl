@@ -5,7 +5,7 @@ Module containing CMIP component models (Oceananigans and ClimaSeaIce models)
 which extend the ClimaCoupler.jl simulation interface.
 
 This extension is loaded when Oceananigans, ClimaSeaIce,
-KernelAbstractions, ConservativeRegridding, and Adapt are loaded with
+KernelAbstractions, ConservativeRegridding, MPI, and Adapt are loaded with
 either `import` or `using`.
 
 
@@ -46,6 +46,7 @@ get_ConservativeRegriddingOCExt() =
 # ocean and sea-ice models below
 include("ClimaCouplerCMIPExt/control_volumes.jl")
 include("ClimaCouplerCMIPExt/exchange_grid.jl")
+include("ClimaCouplerCMIPExt/exchange_space.jl")
 include("ClimaCouplerCMIPExt/exchange_fluxes.jl")
 
 # Data readers first: the model files call into them during construction

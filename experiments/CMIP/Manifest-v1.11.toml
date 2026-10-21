@@ -2,7 +2,7 @@
 
 julia_version = "1.11.9"
 manifest_format = "2.0"
-project_hash = "4c5d394600403611e818012f5c683176e0a801f7"
+project_hash = "797d3640c3f91c7d68152da7658727332e64465a"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -471,10 +471,10 @@ deps = ["ArgParse", "ClimaAnalysis", "ClimaComms", "ClimaCore", "ClimaDiagnostic
 path = "../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
 version = "0.2.3"
-weakdeps = ["Adapt", "CairoMakie", "ClimaAtmos", "ClimaLand", "ClimaSeaIce", "ConservativeRegridding", "GeoMakie", "KernelAbstractions", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
+weakdeps = ["Adapt", "CairoMakie", "ClimaAtmos", "ClimaLand", "ClimaSeaIce", "ConservativeRegridding", "GeoMakie", "KernelAbstractions", "MPI", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
 
     [deps.ClimaCoupler.extensions]
-    ClimaCouplerCMIPExt = ["Adapt", "ClimaAtmos", "ClimaSeaIce", "ConservativeRegridding", "KernelAbstractions", "Oceananigans"]
+    ClimaCouplerCMIPExt = ["Adapt", "ClimaAtmos", "ClimaSeaIce", "ConservativeRegridding", "KernelAbstractions", "MPI", "Oceananigans"]
     ClimaCouplerCMIPMakieExt = ["CairoMakie", "GeoMakie", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
     ClimaCouplerClimaAtmosExt = ["ClimaAtmos"]
     ClimaCouplerClimaLandExt = ["ClimaLand"]

@@ -285,19 +285,26 @@ function Interfacer.will_step(
     sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
     t::Float64,
 )
-    oc_sim = get_oc_sim(sim)
-    return (t - oc_sim.model.clock.time) >= Float64(sim.model_Δt)
+    return (t - sim.clock.time) >= Float64(sim.model_Δt)
 end
 
 function Interfacer.will_step(
     sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
     t::ITime,
 )
-    oc_sim = get_oc_sim(sim)
-    Δt_msec = date(t) - oc_sim.model.clock.time
+    Δt_msec = date(t) - sim.clock.time
     model_Δt_msec = counter(sim.model_Δt) * Dates.Millisecond(period(sim.model_Δt))
     return Δt_msec >= model_Δt_msec
 end
+
+"""
+    step_model!(oc_sim, clock, Δt)
+
+Advance the Oceananigans-backed simulation this rank holds by `Δt`, or only
+its `clock` on a rank that holds none.
+"""
+step_model!(oc_sim::OC.Simulation, clock, Δt) = OC.time_step!(oc_sim, Δt)
+step_model!(::Nothing, clock, Δt) = OC.TimeSteppers.tick!(clock, Δt)
 
 """
     Checkpointer.checkpoint_model_state(sim, comms_ctx, t, prev_checkpoint_t; output_dir)
@@ -315,6 +322,7 @@ function Checkpointer.checkpoint_model_state(
     prev_checkpoint_t::Int;
     output_dir = "output",
 )
+    isnothing(get_oc_sim(sim)) && return nothing
     day = floor(Int, t / (60 * 60 * 24))
     sec = floor(Int, t % (60 * 60 * 24))
     @info "Saving checkpoint $(nameof(sim)) model state to JLD2 on day $day second $sec"
@@ -340,6 +348,7 @@ function Checkpointer.restart_model_state!(
     input_file,
     comms_ctx,
 )
+    isnothing(get_oc_sim(sim)) && return nothing
     jld2_file = replace(input_file, ".hdf5" => ".jld2")
     ispath(jld2_file) || error("Oceananigans checkpoint file not found: $jld2_file")
     OC.set!(get_oc_sim(sim); checkpoint = jld2_file)

@@ -293,6 +293,20 @@ steps:
 
       # GPU RUNS: AMIP
 
+      - label: "GPU MPI AMIP (2 GPUs)"
+        key: "gpu_mpi_amip_coarse"
+        command: "srun julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_mpi.yml --job_id gpu_mpi_amip_coarse"
+        artifact_paths: "output/gpu_mpi_amip_coarse/artifacts/*"
+        timeout_in_minutes: 30
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
+        agents:
+          slurm_ntasks: 2
+          slurm_gpus_per_task: 1
+          slurm_mem_per_cpu: 12GB
+
       - label: "GPU AMIP: prog. EDMF + bucket"
         key: "gpu_amip_progedmf_bucket"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_progedmf_bucket.yml --job_id gpu_amip_progedmf_bucket"

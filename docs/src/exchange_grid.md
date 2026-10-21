@@ -130,9 +130,10 @@ the ocean/ice retains full polygon resolution.
 ## Fallbacks
 
 The exchange grid requires a process-local `SpectralElementSpace2D` boundary
-space; column (`PointSpace`) and distributed setups automatically fall back
-to the regridder-based boundary-space flux path and the legacy fraction
-update, as does `use_intersection_grid: false`.
+space; the column (`PointSpace`) setup and `use_intersection_grid: false`
+fall back to the regridder-based boundary-space flux path and the legacy
+fraction update. Distributed runs take the same fallback, which fails under
+MPI; see [Multi-GPU coupled runs](@ref).
 
 ## API
 

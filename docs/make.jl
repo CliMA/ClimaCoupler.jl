@@ -45,6 +45,7 @@ interface_pages = [
     "fieldexchanger.md",
     "fluxcalculator.md",
     "exchange_grid.md",
+    "multi_gpu.md",
     "checkpointer.md",
     "conservation.md",
     "utilities.md",

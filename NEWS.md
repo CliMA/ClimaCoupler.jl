@@ -20,6 +20,11 @@ ClimaCoupler.jl Release Notes
   the sea-ice skin emission reaches the ice through the cell scatter, so the emitted longwave
   also conserves.
 
+#### Multi-GPU design document and 2-GPU CI job
+`docs/src/multi_gpu.md` records what ties the coupled CMIP run to one GPU and the design
+for running it on several. The "GPU MPI AMIP (2 GPUs)" Buildkite job runs `amip_coarse_mpi`
+on two MPI ranks with one GPU each.
+
 #### Separate output interval for 3D ocean diagnostics
 The new `ocean_3d_diagnostic_interval` option sets how often the 3D ocean fields (`ocean_fields.jld2`)
 are written, while `ocean_diagnostic_interval` sets the surface fields (`ocean_surface.jld2`). It defaults

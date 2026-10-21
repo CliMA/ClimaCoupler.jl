@@ -15,7 +15,7 @@ ClimaCoupler.jl Release Notes
 - [#2173](https://github.com/CliMA/ClimaCoupler.jl/pull/2173): Radiation and precipitation
   reach the polygons through the transpose of the scatter weights, after a DSS, so they also
   conserve from the atmosphere to the cells.
-- [#XXXX](https://github.com/CliMA/ClimaCoupler.jl/pull/XXXX): The ocean and sea-ice
+- [#2174](https://github.com/CliMA/ClimaCoupler.jl/pull/2174): The ocean and sea-ice
   temperatures used by the atmosphere's radiation are averaged as `T⁴` with the same weights, and
   the sea-ice skin emission reaches the ice through the cell scatter, so the emitted longwave
   also conserves.

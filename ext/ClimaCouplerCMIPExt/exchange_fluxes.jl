@@ -636,3 +636,25 @@ NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
     )
     return nothing
 end
+
+"""
+    emission_temperature!(field, remapping, T⁴, weight)
+
+Temperature on the SE boundary space whose fourth power is the `weight`-weighted
+control-volume average of the per-polygon `T⁴`,
+`(Σ_k sweight[n,k] w_k T⁴_k / Σ_k sweight[n,k] w_k)^(1/4)` after DSS, and 0 where
+`weight` covers nothing. When the surface's area fraction is the DSS'd coverage of
+`weight`, it times `ϵσT⁴` integrates to `Σ_k b_area_k w_k ϵσT⁴_k`. Overwrites `T⁴`.
+"""
+function emission_temperature!(field, remapping, T⁴, weight)
+    eg = remapping.exchange_grid
+    cov = remapping.weight_cov_scratch
+    buf = remapping.flux_dss_buffer
+    FT = CC.Spaces.undertype(axes(field))
+    flux_weight_coverage!(cov, eg, weight, buf)
+    @. T⁴ = weight * T⁴
+    scatter_polys_to_nodes!(se_nodal_vec(field), eg, T⁴)
+    _dss_and_normalize!(field, cov, buf, zero(FT))
+    @. field = sqrt(sqrt(field))
+    return field
+end

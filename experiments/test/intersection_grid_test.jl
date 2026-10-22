@@ -128,17 +128,17 @@ end
         end
 
         # Per-element polygon areas match the element areas (the integral of
-        # the nodal quadrature weights Jw over each element) wherever the
+        # the nodal quadrature weights WJ over each element) wherever the
         # element lies fully inside the ocean grid (north of 80°S).
         CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
-        Jw = to_cpu(CRExt.se_node_weights(boundary_space))
+        WJ = to_cpu(CRExt.se_node_weights(boundary_space))
         coords = CC.Fields.coordinate_field(boundary_space)
         node_lat = to_cpu(CRExt.flat_nodal_data(CC.Fields.field_values(coords.lat)))
-        elem_area_from_Jw = zeros(FT, n_elem)
+        elem_area_from_WJ = zeros(FT, n_elem)
         elem_min_lat = fill(FT(90), n_elem)
         for n in 1:(eg.n_nodes)
             e = (n - 1) ÷ Nq^2 + 1
-            elem_area_from_Jw[e] += Jw[n]
+            elem_area_from_WJ[e] += WJ[n]
             elem_min_lat[e] = min(elem_min_lat[e], node_lat[n])
         end
         elem_area_from_polys = zeros(FT, n_elem)
@@ -147,10 +147,10 @@ end
         end
         for e in 1:n_elem
             if elem_min_lat[e] > -75
-                @test elem_area_from_polys[e] ≈ elem_area_from_Jw[e] rtol = 1e-4
+                @test elem_area_from_polys[e] ≈ elem_area_from_WJ[e] rtol = 1e-4
             end
             # No element is over-covered by polygons.
-            @test elem_area_from_polys[e] <= elem_area_from_Jw[e] * (1 + 1e-4)
+            @test elem_area_from_polys[e] <= elem_area_from_WJ[e] * (1 + 1e-4)
         end
 
         # Per-cell wet areas are consistent with the polygon areas.
@@ -251,7 +251,7 @@ import Random
 @testset "Gather/scatter operations" begin
     eg = CMIPExt.build_exchange_grid(boundary_space, coastal_grid)
     CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
-    Jw = to_cpu(CRExt.se_node_weights(boundary_space))
+    WJ = to_cpu(CRExt.se_node_weights(boundary_space))
     rng = Random.Xoshiro(42)
 
     poly_scratch = zeros(FT, eg.n_poly)
@@ -316,7 +316,7 @@ import Random
         # SE side: the scatter preserves the integral over the control-volume
         # areas exactly (before DSS).
         CMIPExt.scatter_polys_to_nodes!(nodal_scratch, eg, F)
-        @test sum(Jw .* nodal_scratch) ≈ sum(eg.b_area .* F) rtol = 1e-12
+        @test sum(WJ .* nodal_scratch) ≈ sum(eg.b_area .* F) rtol = 1e-12
 
         # And the control-volume areas agree with the geometric areas.
         @test sum(eg.b_area) ≈ sum(eg.area) rtol = 1e-3
@@ -732,7 +732,7 @@ end
     eg = CMIPExt.build_exchange_grid(boundary_space, coastal_grid)
     eg_d = on_exchange_device(eg)
     CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
-    Jw = to_cpu(CRExt.se_node_weights(boundary_space))
+    WJ = to_cpu(CRExt.se_node_weights(boundary_space))
     rng = Random.Xoshiro(11)
 
     fs = CMIPExt.ExchangeFluxState{FT}(OC.CPU(), eg.n_poly)
@@ -769,8 +769,8 @@ end
         for (name, F_poly) in
             ((:F_sh, fs.F_sh), (:F_lh, fs.F_lh), (:F_turb_moisture, fs.F_moisture))
             F = to_cpu(CRExt.se_field_to_vec(getproperty(flux_scratch, name)))
-            @test sum(Jw .* α .* F) ≈ sum(eg.b_area .* weight .* F_poly) rtol = 1e-10
-            @test sum(Jw .* α .* F) ≈ sum(eg.area .* weight .* F_poly) rtol = 1e-3
+            @test sum(WJ .* α .* F) ≈ sum(eg.b_area .* weight .* F_poly) rtol = 1e-10
+            @test sum(WJ .* α .* F) ≈ sum(eg.area .* weight .* F_poly) rtol = 1e-3
             @test all(v -> v == 0 || 50 - 1e-8 <= v <= 150 + 1e-8, F)
             @test all(n -> α[n] == 0 || F[n] != 0, eachindex(F))
         end

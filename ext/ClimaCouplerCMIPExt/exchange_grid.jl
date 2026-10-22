@@ -28,8 +28,8 @@ SE-side weights come in two flavors over each polygon `Ω_k`:
     `gweight = B_{kn} / Σ_n B_{kn}` (rows sum to 1; constants preserved;
     high-order interpolation of the atmospheric state);
   - scatter (node-major): `F_n = Σ_k sweight[n,k] F_k` with
-    `sweight = B̃_{kn} / (Jw)_n`, where `B̃_{kn} ≥ 0` is the area of `Ω_k`
-    inside node `n`'s control volume, whose area is `(Jw)_n`; follow with
+    `sweight = B̃_{kn} / (WJ)_n`, where `B̃_{kn} ≥ 0` is the area of `Ω_k`
+    inside node `n`'s control volume, whose area is `(WJ)_n`; follow with
     `weighted_dss!`;
   - `node_cov[n] = Σ_{k wet} sweight[n,k]`: the fraction of node `n`'s area
     over wet ocean.
@@ -49,7 +49,7 @@ column index).
 - `elem_of_poly`, `oc_of_poly`: SE element / FV cell owning each polygon
 - `soc_ptr`, `soc_poly`: FV-cell-major CSR of the polygon→cell scatter
 - `area`: geometric polygon areas [m²]
-- `b_area`: SE-side scatter areas `Σ_n sweight[n,k] (Jw)_n` [m²]; equals
+- `b_area`: SE-side scatter areas `Σ_n sweight[n,k] (WJ)_n` [m²]; equals
   `area` up to quadrature error and makes SE-side conservation statements
   exact
 - `oc_wet_area`: retained (wet) polygon area per FV cell [m²]; zero for dry
@@ -162,8 +162,8 @@ function build_exchange_grid(boundary_space, grid_oc)
     qs = CC.Spaces.quadrature_style(boundary_space_cpu)
     Nq = CC.Quadratures.degrees_of_freedom(qs)
     triangle_quad_degree = 2 * (Nq - 1)
-    Jw = CRExt.se_node_weights(boundary_space_cpu) # Float64, flat nodal
-    n_nodes = length(Jw)
+    WJ = CRExt.se_node_weights(boundary_space_cpu) # Float64, flat nodal
+    n_nodes = length(WJ)
     volumes = ControlVolumes(boundary_space_cpu)
 
     g_poly, g_node, g_b = Int[], Int[], Float64[] # gather COO: B_kn
@@ -185,7 +185,7 @@ function build_exchange_grid(boundary_space, grid_oc)
         node_offset = (elem - 1) * Nq^2
         for j in 1:Nq, i in 1:Nq
             n = node_offset + (j - 1) * Nq + i
-            w = B̃[i, j] / Jw[n]
+            w = B̃[i, j] / WJ[n]
             if w != 0
                 push!(s_poly, kept_id)
                 push!(s_node, n)
@@ -232,7 +232,7 @@ function build_exchange_grid(boundary_space, grid_oc)
     b_area = zeros(Float64, n_poly)
     for p in eachindex(s_node)
         node_cov[s_node[p]] += s_w[p]
-        b_area[s_poly[p]] += s_w[p] * Jw[s_node[p]]
+        b_area[s_poly[p]] += s_w[p] * WJ[s_node[p]]
     end
 
     soc_ptr, soc_poly = _build_csr(Vector{Int}(oc_of_poly), n_oc)

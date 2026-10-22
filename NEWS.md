@@ -20,10 +20,29 @@ ClimaCoupler.jl Release Notes
   the sea-ice skin emission reaches the ice through the cell scatter, so the emitted longwave
   also conserves.
 
-#### Multi-GPU design document and 2-GPU CI job
-`docs/src/multi_gpu.md` records what ties the coupled CMIP run to one GPU and the design
-for running it on several. The "GPU MPI AMIP (2 GPUs)" Buildkite job runs `amip_coarse_mpi`
-on two MPI ranks with one GPU each.
+#### Multi-GPU CMIP runs
+The coupled CMIP configuration runs on several MPI ranks with one GPU each. The
+atmosphere and land are distributed; the ocean, the sea ice and the exchange grid live
+on the root rank, on a single-process replica of the boundary space. The coupler fields
+the exchange reads are gathered into the replica each coupling step and the surface
+temperatures, area fractions and turbulent fluxes it produces are scattered back, so the
+exchange is the same as on one GPU. See `docs/src/multi_gpu.md`. The "GPU MPI CMIP
+(2 GPUs)" Buildkite job runs the one-degree `cmip_oceananigans_climaseaice_bucket`
+configuration on two ranks, "MPI exchange (intersection) grid unit tests" checks the
+gathers and scatters bitwise against the single-process exchange, and "GPU MPI AMIP
+(2 GPUs)" runs `amip_coarse_mpi` on two ranks.
+
+The longrun pipeline gains a "CMIP multi-GPU scaling" group: `cmip_edonly_land_he16` on 1, 2
+and 4 GPUs, `cmip_edonly_land_he30` on 4 and 8, and `cmip_edonly_land_he30_half_deg` on 4 and 8,
+summarised by `experiments/CMIP/scaling_table.jl` (SYPD, walltime per step, parallel efficiency
+and resident memory). Every run now writes `max_rss_gib.txt`, one line per rank, next to
+`sypd.txt`.
+
+#### Half-degree tripolar ocean grid
+`ocean_grid: half_deg_tripolar` builds the `720 × 360` tripolar grid with the
+`tripolar_half_degree_bathymetry` artifact. `ocean_bathymetry_file` points either tripolar grid
+at a local NetCDF `bottom_height` file written by the artifact's `create_artifact.jl` instead of
+the artifact.
 
 #### Separate output interval for 3D ocean diagnostics
 The new `ocean_3d_diagnostic_interval` option sets how often the 3D ocean fields (`ocean_fields.jld2`)

@@ -137,11 +137,143 @@ steps:
           slurm_mem: 32GB
           slurm_gpus: 1
 
+  - group: "CMIP multi-GPU scaling"
+
+    steps:
+      - label: "GPU CMIP scaling: cmip_edonly_land_he16 on 1 GPUs"
+        key: "cmip_edonly_land_he16_1gpu"
+        command:
+            - "srun julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_edonly_land_he16.yml --job_id cmip_edonly_land_he16_1gpu"
+        artifact_paths: "output/cmip_edonly_land_he16_1gpu/artifacts/*"
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          queue: clima
+          slurm_nodes: 1
+          slurm_ntasks: 1
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_mem_per_cpu: 16GB
+
+      - label: "GPU CMIP scaling: cmip_edonly_land_he16 on 2 GPUs"
+        key: "cmip_edonly_land_he16_2gpu"
+        command:
+            - "srun julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_edonly_land_he16.yml --job_id cmip_edonly_land_he16_2gpu"
+        artifact_paths: "output/cmip_edonly_land_he16_2gpu/artifacts/*"
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          queue: clima
+          slurm_nodes: 1
+          slurm_ntasks: 2
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_mem_per_cpu: 16GB
+
+      - label: "GPU CMIP scaling: cmip_edonly_land_he16 on 4 GPUs"
+        key: "cmip_edonly_land_he16_4gpu"
+        command:
+            - "srun julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_edonly_land_he16.yml --job_id cmip_edonly_land_he16_4gpu"
+        artifact_paths: "output/cmip_edonly_land_he16_4gpu/artifacts/*"
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          queue: clima
+          slurm_nodes: 1
+          slurm_ntasks: 4
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_mem_per_cpu: 16GB
+
+      - label: "GPU CMIP scaling: cmip_edonly_land_he30 on 4 GPUs"
+        key: "cmip_edonly_land_he30_4gpu"
+        command:
+            - "srun julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_edonly_land_he30.yml --job_id cmip_edonly_land_he30_4gpu"
+        artifact_paths: "output/cmip_edonly_land_he30_4gpu/artifacts/*"
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          queue: clima
+          slurm_nodes: 1
+          slurm_ntasks: 4
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_mem_per_cpu: 16GB
+
+      - label: "GPU CMIP scaling: cmip_edonly_land_he30 on 8 GPUs"
+        key: "cmip_edonly_land_he30_8gpu"
+        command:
+            - "srun julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_edonly_land_he30.yml --job_id cmip_edonly_land_he30_8gpu"
+        artifact_paths: "output/cmip_edonly_land_he30_8gpu/artifacts/*"
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          queue: clima
+          slurm_nodes: 2
+          slurm_ntasks: 8
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_mem_per_cpu: 16GB
+
+      - label: "GPU CMIP scaling: cmip_edonly_land_he30_half_deg on 4 GPUs"
+        key: "cmip_edonly_land_he30_half_deg_4gpu"
+        command:
+            - "srun julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_edonly_land_he30_half_deg.yml --job_id cmip_edonly_land_he30_half_deg_4gpu"
+        artifact_paths: "output/cmip_edonly_land_he30_half_deg_4gpu/artifacts/*"
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          queue: clima
+          slurm_nodes: 1
+          slurm_ntasks: 4
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_mem_per_cpu: 16GB
+
+      - label: "GPU CMIP scaling: cmip_edonly_land_he30_half_deg on 8 GPUs"
+        key: "cmip_edonly_land_he30_half_deg_8gpu"
+        command:
+            - "srun julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_edonly_land_he30_half_deg.yml --job_id cmip_edonly_land_he30_half_deg_8gpu"
+        artifact_paths: "output/cmip_edonly_land_he30_half_deg_8gpu/artifacts/*"
+        env:
+          CLIMACOMMS_CONTEXT: "MPI"
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          queue: clima
+          slurm_nodes: 2
+          slurm_ntasks: 8
+          slurm_gpus_per_task: 1
+          slurm_cpus_per_task: 4
+          slurm_mem_per_cpu: 16GB
+
   - wait
 
   - group: "Job analysis and reporting"
 
+
     steps:
+
+      - label: ":bar_chart: CMIP multi-GPU scaling table"
+        key: "cmip_scaling_table"
+        depends_on:
+          - "cmip_edonly_land_he16_1gpu"
+          - "cmip_edonly_land_he16_2gpu"
+          - "cmip_edonly_land_he16_4gpu"
+          - "cmip_edonly_land_he30_4gpu"
+          - "cmip_edonly_land_he30_8gpu"
+          - "cmip_edonly_land_he30_half_deg_4gpu"
+          - "cmip_edonly_land_he30_half_deg_8gpu"
+        command:
+          - "julia --color=yes --project=experiments/CMIP experiments/CMIP/scaling_table.jl --coupler_output_dir output cmip_edonly_land_he16_1gpu cmip_edonly_land_he16_2gpu cmip_edonly_land_he16_4gpu cmip_edonly_land_he30_4gpu cmip_edonly_land_he30_8gpu cmip_edonly_land_he30_half_deg_4gpu cmip_edonly_land_he30_half_deg_8gpu"
+        artifact_paths: "output/scaling/table.txt"
+        agents:
+          queue: clima
 
       - label: ":thermometer: Cess climate sensitivity approximation from p2K runs"
         key: "cess_from_p2k"

@@ -270,11 +270,15 @@ function argparse_settings()
         arg_type = Bool
         default = false
         "--ocean_grid"
-        help = "Horizontal grid for Oceananigans ocean model. [`one_deg_tripolar` (default), `orca`]"
+        help = "Horizontal grid for Oceananigans ocean model. [`one_deg_tripolar` (default), `half_deg_tripolar`, `orca`]"
         arg_type = String
         default = "one_deg_tripolar"
+        "--ocean_bathymetry_file"
+        help = "NetCDF file with the `bottom_height` of a tripolar ocean grid, in place of the bathymetry artifact [none (default)]"
+        arg_type = String
+        default = nothing
         "--use_intersection_grid"
-        help = "Boolean flag indicating whether to use the atmosphere-ocean intersection (exchange) grid for surface fractions and ocean/sea-ice fluxes with Oceananigans. Automatically disabled for unsupported setups (column mode, distributed runs). [`true` (default), `false`]"
+        help = "Boolean flag indicating whether to use the atmosphere-ocean intersection (exchange) grid for surface fractions and ocean/sea-ice fluxes with Oceananigans. Automatically disabled in column mode; required for distributed runs. [`true` (default), `false`]"
         arg_type = Bool
         default = true
         "--sst_adjustment"
@@ -597,6 +601,7 @@ function get_coupler_args(config_dict::Dict)
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
     simple_ocean = config_dict["simple_ocean"]
     ocean_grid = Symbol(lowercase(config_dict["ocean_grid"]))
+    ocean_bathymetry_file = config_dict["ocean_bathymetry_file"]
     use_intersection_grid = config_dict["use_intersection_grid"]
     sst_adjustment = FT(config_dict["sst_adjustment"])
     ocean_progress_interval = config_dict["ocean_progress_interval"]
@@ -689,6 +694,7 @@ function get_coupler_args(config_dict::Dict)
         ocean_model,
         simple_ocean,
         ocean_grid,
+        ocean_bathymetry_file,
         use_intersection_grid,
         sst_adjustment,
         ocean_progress_interval,

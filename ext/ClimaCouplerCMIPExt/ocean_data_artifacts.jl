@@ -155,21 +155,27 @@ function set_sea_ice_initial_conditions!(sea_ice_model, start_date)
 end
 
 """
-    tripolar_one_degree_bottom_height(grid; minimum_depth, major_basins, interpolation_passes)
+    tripolar_bottom_height(grid, bathymetry; minimum_depth, major_basins, interpolation_passes)
 
-The ETOPO-derived bottom height for the one-degree tripolar grid.
+The ETOPO-derived bottom height for a tripolar `grid`, read from `bathymetry`: the name of a
+ClimaArtifact (`tripolar_one_degree_bathymetry` or `tripolar_half_degree_bathymetry`) or the path of a
+NetCDF file written by the artifact's `create_artifact.jl`.
 
-The regridding parameters are baked into the artifact, so they are validated rather than applied: a
-mismatch means the caller is asking for bathymetry this artifact does not describe.
+The regridding parameters are baked into the file, so they are validated rather than applied: a
+mismatch means the caller is asking for bathymetry this file does not describe.
 """
-function tripolar_one_degree_bottom_height(
-    grid;
+function tripolar_bottom_height(
+    grid,
+    bathymetry;
     minimum_depth,
     major_basins,
     interpolation_passes,
 )
-    directory = @clima_artifact("tripolar_one_degree_bathymetry")
-    path = joinpath(directory, "tripolar_one_degree_bathymetry.nc")
+    path = if endswith(bathymetry, ".nc")
+        bathymetry
+    else
+        joinpath(@clima_artifact(bathymetry), bathymetry * ".nc")
+    end
 
     bottom_height, attributes = NCDatasets.NCDataset(path) do ds
         Array(ds["bottom_height"][:, :]), Dict(ds.attrib)
@@ -181,11 +187,8 @@ function tripolar_one_degree_bottom_height(
         ("interpolation_passes", interpolation_passes),
     )
         baked = attributes[name]
-        baked == requested || error("""
-              The tripolar bathymetry artifact was generated with $name = $baked, but $requested was \
-              requested. Regenerate it with staging/climaartifacts/tripolar_one_degree_bathymetry/ \
-              or use the baked value.
-              """)
+        baked == requested ||
+            error("$path was generated with $name = $baked, but $requested was requested")
     end
 
     size(bottom_height) == (grid.Nx, grid.Ny) || error(

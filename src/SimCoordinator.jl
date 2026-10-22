@@ -132,16 +132,20 @@ end
 """
     save_sypd_walltime_to_disk(cs, walltime, t_timed_start = cs.tspan[begin])
 
-Save the computed `sypd`, `walltime_per_coupling_step`, and memory usage to text files 
-in the `artifacts` directory. `t_timed_start` is the simulated time (in seconds) at which 
-the timed portion of the run began (see the `precompile` flag in [run!](@ref)). 
+Save the computed `sypd`, `walltime_per_coupling_step`, and the maximum resident memory of
+each rank (one line per rank, in GiB) to text files in the `artifacts` directory.
+`t_timed_start` is the simulated time (in seconds) at which the timed portion of the run
+began (see the `precompile` flag in [run!](@ref)).
 """
 function save_sypd_walltime_to_disk(cs, walltime, t_timed_start = cs.tspan[begin])
-    if ClimaComms.iamroot(ClimaComms.context(cs))
+    comms_ctx = ClimaComms.context(cs)
+    max_rss_gib = ClimaComms.gather(comms_ctx, [Sys.maxrss() / 2^30])
+    if ClimaComms.iamroot(comms_ctx)
         sypd = TimeManager.simulated_years_per_day(t_timed_start, cs.tspan[end], walltime)
         walltime_per_step = walltime / ((cs.tspan[end] - t_timed_start) / cs.Δt_cpl)
         @info "SYPD: $sypd"
         @info "Walltime per coupling step: $(walltime_per_step)"
+        @info "Maximum resident memory per rank: $(round.(max_rss_gib, digits = 2)) GiB"
 
         open(joinpath(cs.dir_paths.artifacts_dir, "sypd.txt"), "w") do sypd_filename
             println(sypd_filename, "$sypd")
@@ -152,6 +156,10 @@ function save_sypd_walltime_to_disk(cs, walltime, t_timed_start = cs.tspan[begin
             "w",
         ) do walltime_per_step_filename
             println(walltime_per_step_filename, "$(walltime_per_step)")
+        end
+
+        open(joinpath(cs.dir_paths.artifacts_dir, "max_rss_gib.txt"), "w") do file
+            foreach(rss -> println(file, rss), max_rss_gib)
         end
     end
     return nothing
@@ -251,6 +259,7 @@ function _build_coupled_simulation(config_dict::AbstractDict)
         ocean_model,
         simple_ocean,
         ocean_grid,
+        ocean_bathymetry_file,
         use_intersection_grid,
         sst_adjustment,
         ocean_progress_interval,
@@ -377,6 +386,7 @@ function _build_coupled_simulation(config_dict::AbstractDict)
         output_dir = dir_paths.ocean_output_dir,
         simple_ocean,
         ocean_grid,
+        ocean_bathymetry_file,
         use_intersection_grid,
         sst_path,
         sst_adjustment,

@@ -44,13 +44,16 @@ function Interfacer.OceanSimulation(::Type{FT}, ::Val{:oceananigans}; kwargs...)
 end
 
 """
-    horizontal_ocean_grid(arch, ocean_grid; z, halo, active_cells_map, minimum_depth, interpolation_passes)
+    horizontal_ocean_grid(arch, ocean_grid; z, halo, active_cells_map, minimum_depth,
+                          interpolation_passes, bathymetry_file)
 
-Build the immersed ocean grid named by `ocean_grid`, either `:one_deg_tripolar` or `:orca`.
+Build the immersed ocean grid named by `ocean_grid`: `:one_deg_tripolar` (360 × 180),
+`:half_deg_tripolar` (720 × 360) or `:orca`.
 
-Both grids come with pre-generated bathymetry: the tripolar grid from the
-`tripolar_one_degree_bathymetry` artifact, generated with the `minimum_depth`, `major_basins` and
-`interpolation_passes` given here (validated against the artifact rather than applied), and the eORCA1
+All grids come with pre-generated bathymetry: the tripolar grids from the
+`tripolar_one_degree_bathymetry` and `tripolar_half_degree_bathymetry` artifacts, or from
+`bathymetry_file` when given, generated with the `minimum_depth`, `major_basins` and
+`interpolation_passes` given here (validated against the file rather than applied), and the eORCA1
 mesh from the `orca_one_grid` artifact.
 
 `active_cells_map` is exposed because tripolar immersed grids with `active_cells_map = true` exceed the
@@ -66,17 +69,27 @@ function horizontal_ocean_grid(
     active_cells_map = true,
     minimum_depth = 10,
     interpolation_passes = 10,
+    bathymetry_file = nothing,
 )
     if ocean_grid == :orca
         @info "Using ORCA1 ocean grid"
         return ORCAOneGrid(arch; Nz, z, halo, active_cells_map)
     end
 
-    @info "Using one-degree tripolar ocean grid"
-    grid = OC.TripolarGrid(arch; size = (360, 180, Nz), z, halo)
+    if ocean_grid == :half_deg_tripolar
+        @info "Using half-degree tripolar ocean grid"
+        size = (720, 360, Nz)
+        bathymetry = "tripolar_half_degree_bathymetry"
+    else
+        @info "Using one-degree tripolar ocean grid"
+        size = (360, 180, Nz)
+        bathymetry = "tripolar_one_degree_bathymetry"
+    end
+    grid = OC.TripolarGrid(arch; size, z, halo)
 
-    bottom_height = tripolar_one_degree_bottom_height(
-        grid;
+    bottom_height = tripolar_bottom_height(
+        grid,
+        something(bathymetry_file, bathymetry);
         minimum_depth,
         major_basins = 2,
         interpolation_passes,
@@ -106,6 +119,7 @@ function ocean_simulation(
     closure,
     clock,
     stop_time,
+    bathymetry_file = nothing,
     depth = 5500,
     Nz = 60,
     momentum_advection = OC.WENOVectorInvariant(
@@ -124,7 +138,7 @@ function ocean_simulation(
     zstar = !simple_ocean
 
     z = OC.ExponentialDiscretization(Nz, -depth, 0; mutable = zstar)
-    grid = horizontal_ocean_grid(arch, ocean_grid; z, Nz, active_cells_map)
+    grid = horizontal_ocean_grid(arch, ocean_grid; z, Nz, active_cells_map, bathymetry_file)
 
     free_surface = OC.SplitExplicitFreeSurface(grid; substeps)
 
@@ -155,7 +169,8 @@ dispatch in coupling.
 
 # Optional keyword arguments
 - `simple_ocean`: Whether to use a simple ocean model setup (default: `false`)
-- `ocean_grid`: Horizontal grid for Oceananigans (`:one_deg_tripolar` or `:orca`, default: `:one_deg_tripolar`)
+- `ocean_grid`: Horizontal grid for Oceananigans (`:one_deg_tripolar`, `:half_deg_tripolar` or `:orca`, default: `:one_deg_tripolar`)
+- `ocean_bathymetry_file`: NetCDF file with the tripolar grid's `bottom_height`, in place of the bathymetry artifact (default: `nothing`)
 - `depth`: Maximum ocean depth in metres (default: 5500 m for EN4 compatibility)
 - `dt`: Time step (default: `1800.0` seconds, or 30 minutes)
 - `comms_ctx`: Communication context; the ocean is built on its root rank only (default: `ClimaComms.context()`)
@@ -176,6 +191,7 @@ function OceananigansSimulation(
     output_dir,
     simple_ocean = false,
     ocean_grid = :one_deg_tripolar,
+    ocean_bathymetry_file = nothing,
     use_intersection_grid = true,
     depth = 5500,
     dt = 1800.0, # 30 minutes
@@ -235,6 +251,7 @@ function OceananigansSimulation(
         ocean = ocean_simulation(
             arch,
             ocean_grid;
+            bathymetry_file = ocean_bathymetry_file,
             clock,
             stop_time,
             simple_ocean,
@@ -370,7 +387,9 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
         use_intersection_grid && boundary_space isa CC.Spaces.SpectralElementSpace2D
     use_exchange_grid ||
         context isa ClimaComms.SingletonCommsContext ||
-        error("The regridder-based exchange runs on one process; set use_intersection_grid: true")
+        error(
+            "The regridder-based exchange runs on one process; set use_intersection_grid: true",
+        )
     space = exchange_space(boundary_space)
     FT = CC.Spaces.undertype(boundary_space)
 

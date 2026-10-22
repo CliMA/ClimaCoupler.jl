@@ -820,7 +820,7 @@ end
         T_field = CC.Fields.zeros(boundary_space)
         CMIPExt.emission_temperature!(T_field, remapping, on_exchange_device(T⁴), weight_d)
         T = to_cpu(CRExt.se_field_to_vec(T_field))
-        @test sum(Jw .* α .* T .^ 4) ≈ emitted rtol = 1e-10
+        @test sum(WJ .* α .* T .^ 4) ≈ emitted rtol = 1e-10
         @test all(n -> α[n] == 0 || 250 - 1e-8 <= T[n] <= 300 + 1e-8, eachindex(T))
     end
 
@@ -1026,14 +1026,14 @@ end
     T_field = CC.Fields.zeros(boundary_space)
     Interfacer.get_field!(T_field, sim, Val(:surface_temperature))
     CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
-    Jw = to_cpu(CRExt.se_node_weights(boundary_space))
+    WJ = to_cpu(CRExt.se_node_weights(boundary_space))
     coverage = to_cpu(CRExt.se_field_to_vec(remapping.weight_cov_scratch))
     T = to_cpu(CRExt.se_field_to_vec(T_field))
     T_cells = vec(OC.interior(OC.on_architecture(OC.CPU(), model.tracers.T), :, :, Nz))
     k_cell = eg_cpu.oc_of_poly
     sic = cell_values(sim.ice_concentration)[k_cell]
     emitted = sum(eg_cpu.b_area .* (1 .- sic) .* (T_cells[k_cell] .+ C_to_K) .^ 4)
-    @test sum(Jw .* coverage .* T .^ 4) ≈ emitted rtol = 1e-10
+    @test sum(WJ .* coverage .* T .^ 4) ≈ emitted rtol = 1e-10
 end
 
 # Stand-in for a ClimaSeaIce model in the `update_sim!` exchange-grid path
@@ -1107,9 +1107,9 @@ Base.eltype(::FakeIceModel) = FT
     T_field = CC.Fields.zeros(boundary_space)
     Interfacer.get_field!(T_field, sim, Val(:surface_temperature))
     CRExt = Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)
-    Jw = to_cpu(CRExt.se_node_weights(boundary_space))
+    WJ = to_cpu(CRExt.se_node_weights(boundary_space))
     coverage = to_cpu(CRExt.se_field_to_vec(remapping.weight_cov_scratch))
     T = to_cpu(CRExt.se_field_to_vec(T_field))
     emitted = sum(eg_cpu.b_area .* ℵ[eg_cpu.oc_of_poly] .* T_sfc_new .^ 4)
-    @test sum(Jw .* coverage .* T .^ 4) ≈ emitted rtol = 1e-10
+    @test sum(WJ .* coverage .* T .^ 4) ≈ emitted rtol = 1e-10
 end

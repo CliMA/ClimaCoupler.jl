@@ -60,8 +60,8 @@ polygon values.
 
 On the FV side, each polygon belongs to exactly one cell, and gathers are
 direct reads. A flux is scattered as
-``F_c = \\sum_{k \\in c} (\\sum_n \\tilde B_{kn}) F_k / A_c``, with ``A_c`` the
-FV grid's own cell area, so the FV integral ``\\sum_c A_c F_c`` equals the
+``F_c = \sum_{k \in c} (\sum_n \widetilde{B}_{kn}) F_k / A_c``, with ``A_c`` the
+FV grid's own cell area, so the FV integral ``\sum_c A_c F_c`` equals the
 SE-side integral exactly even where the two grids disagree on a cell's area.
 A state, such as the diagnosed sea-ice surface temperature, is scattered as
 the mean weighted by the geometric polygon areas.

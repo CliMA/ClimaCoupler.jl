@@ -336,11 +336,11 @@ import Random
         @test sum(eg.b_area) ≈ sum(eg.area) rtol = 1e-3
 
         # Transpose gather: weighted by any w, the polygons receive the
-        # atmosphere's share Σ_n Jw_n α_n g_n, with α the scatter of w.
+        # atmosphere's share Σ_n WJ_n α_n g_n, with α the scatter of w.
         g, w = rand(rng, FT, eg.n_nodes), rand(rng, FT, eg.n_poly)
         CMIPExt.gather_nodes_to_polys!(poly_scratch, eg, g, eg.tweight)
         CMIPExt.scatter_polys_to_nodes!(nodal_scratch, eg, w)
-        atmosphere_share = sum(Jw .* nodal_scratch .* g)
+        atmosphere_share = sum(WJ .* nodal_scratch .* g)
         @test sum(eg.b_area .* w .* poly_scratch) ≈ atmosphere_share rtol = 1e-12
     end
 
@@ -796,13 +796,13 @@ end
 
         # A downward flux whose element copies of a shared node disagree, as the
         # atmosphere's radiation can, still reaches the polygons as exactly the
-        # atmosphere's share Σ_n Jw_n α_n g_n.
+        # atmosphere's share Σ_n WJ_n α_n g_n.
         g = rand(rng, FT, eg.n_nodes)
         g_field = CC.Fields.zeros(boundary_space)
         CRExt.vec_to_se_field!(g_field, on_exchange_device(g))
         poly_d = on_exchange_device(zeros(FT, eg.n_poly))
         CMIPExt.gather_downward_flux!(poly_d, remapping, g_field)
-        @test sum(eg.b_area .* weight .* to_cpu(poly_d)) ≈ sum(Jw .* α .* g) rtol = 1e-12
+        @test sum(eg.b_area .* weight .* to_cpu(poly_d)) ≈ sum(WJ .* α .* g) rtol = 1e-12
 
         for (name, F_poly) in
             ((:F_sh, fs.F_sh), (:F_lh, fs.F_lh), (:F_turb_moisture, fs.F_moisture))

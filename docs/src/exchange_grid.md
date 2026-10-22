@@ -47,15 +47,15 @@ carries two sets of weights.
   is followed by `weighted_dss!`.
 - **Downward fluxes** (radiation and precipitation, SE nodes → FV polygons)
   use the transpose of the scatter:
-  ``\\bar g_k = \\sum_n (\\tilde B_{kn}/\\sum_n \\tilde B_{kn}) g_n``. Each
+  ``\bar g_k = \sum_n (\widetilde{B}_{kn}/\sum_n \widetilde{B}_{kn}) g_n``. Each
   polygon then receives a convex combination of the nodal values whose
   control volumes it overlaps, so these fluxes are resolved at the scale of
   the control volumes. The polygons together receive exactly the
-  atmosphere's share ``\\sum_n (Jw)_n \\alpha_n g_n`` for an area fraction
-  ``\\alpha_n`` built from the scatter weights and DSS'd, as the surface
+  atmosphere's share ``\sum_n (WJ)_n \alpha_n g_n`` for an area fraction
+  ``\alpha_n`` built from the scatter weights and DSS'd, as the surface
   fractions are. The atmosphere's radiation and precipitation can
   differ between the element copies of a shared node, so they are DSS'd
-  (weighted, which keeps ``\\sum_n (Jw)_n g_n``) before the gather.
+  (weighted, which keeps ``\sum_n (WJ)_n g_n``) before the gather.
 - **Nodal coverage**: `node_cov` (sum over wet polygons) is the fraction of
   each node's area over wet ocean, in ``[0, 1]`` by construction. The
   wet-ocean fraction is the DSS'd `node_cov`.

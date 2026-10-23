@@ -257,7 +257,7 @@ function argparse_settings()
         arg_type = String
         default = ""
         "--era5_initial_condition_dir"
-        help = "Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from start_date. Missing files are fetched from the Copernicus Climate Data Store by ClimaInitialConditions.jl [none (default)]"
+        help = "Directory containing ERA5 initial condition files (subseasonal mode). Filenames inferred from start_date. Missing files are fetched from the Copernicus Climate Data Store by ClimaInitialConditions.jl. If unset, uses the wxquest_initial_conditions artifact when it has the date, otherwise the ClimaInitialConditions cache (CLIMA_INITIAL_CONDITIONS_CACHE_DIR or a Scratch.jl dir) [none (default)]"
         arg_type = String
         default = nothing
         # Ocean model specific
@@ -1057,22 +1057,36 @@ function _apply_scm_surface_type(scm_surface_type, ocean_model, ice_model, land_
 end
 
 """
-    resolve_era5_dir(era5_initial_condition_dir)
+    era5_paths(dir, start_date)
 
-Return `era5_initial_condition_dir` if it is not `nothing`, otherwise attempt to
-use the `wxquest_initial_conditions` ClimaArtifact as a fallback.  Errors if
-neither source is available.
+The ERA5 initial condition files for `start_date` in `dir`.
 """
-function resolve_era5_dir(era5_initial_condition_dir)
+era5_paths(dir, start_date) = (;
+    sst_path = joinpath(dir, ERA5.sst_filename(start_date)),
+    sic_path = joinpath(dir, ERA5.sic_filename(start_date)),
+    land_ic_path = joinpath(dir, ERA5.land_filename(start_date)),
+    albedo_path = joinpath(dir, ERA5.albedo_filename(start_date)),
+    era5_bucket_path = joinpath(dir, ERA5.bucket_filename(start_date)),
+)
+
+"""
+    resolve_era5_dir(era5_initial_condition_dir, start_date)
+
+Return `era5_initial_condition_dir` if it is not `nothing`. Otherwise return the
+`wxquest_initial_conditions` ClimaArtifact if it has the files for `start_date`,
+and the ClimaInitialConditions cache (`ERA5.cache_dir()`) if not.
+"""
+function resolve_era5_dir(era5_initial_condition_dir, start_date)
     isnothing(era5_initial_condition_dir) || return era5_initial_condition_dir
-    try
-        return @clima_artifact("wxquest_initial_conditions")
+    artifact = try
+        @clima_artifact("wxquest_initial_conditions")
     catch
-        error(
-            "subseasonal mode requires --era5_initial_condition_dir or the " *
-            "wxquest_initial_conditions ClimaArtifact",
-        )
+        nothing
     end
+    if !isnothing(artifact) && all(isfile, era5_paths(artifact, start_date))
+        return artifact
+    end
+    return ERA5.cache_dir()
 end
 
 """
@@ -1082,15 +1096,13 @@ Return the ERA5 initial condition file paths for a subseasonal run starting at
 `start_date`, fetching the files if needed. Filenames include hour/minute, e.g.
 `sst_processed_20191231_1200.nc`.
 
-If `era5_initial_condition_dir` is set and lacks the files, they are fetched from
-the Copernicus Climate Data Store into that directory by
+The directory comes from `resolve_era5_dir`. If it lacks the files, they are
+fetched from the Copernicus Climate Data Store into it by
 `ClimaInitialConditions.ERA5`. The fetch runs on the root rank only, with a barrier
-after. If `era5_initial_condition_dir` is `nothing`, the
-`wxquest_initial_conditions` ClimaArtifact is used and nothing is fetched.
-Errors if the files are still missing.
+after. Errors if the files are still missing.
 
 # Arguments
-- `era5_initial_condition_dir`: Directory containing ERA5 initial condition files
+- `era5_initial_condition_dir`: Directory containing ERA5 initial condition files, or `nothing`
 - `start_date`: The start date of the simulation (DateTime)
 - `bucket_initial_condition`: User-specified bucket IC path (empty string if not specified)
 - `comms_ctx`: The communications context
@@ -1109,16 +1121,10 @@ function get_era5_filepaths(
     bucket_initial_condition,
     comms_ctx,
 )
-    dir = resolve_era5_dir(era5_initial_condition_dir)
-    paths = (;
-        sst_path = joinpath(dir, ERA5.sst_filename(start_date)),
-        sic_path = joinpath(dir, ERA5.sic_filename(start_date)),
-        land_ic_path = joinpath(dir, ERA5.land_filename(start_date)),
-        albedo_path = joinpath(dir, ERA5.albedo_filename(start_date)),
-        era5_bucket_path = joinpath(dir, ERA5.bucket_filename(start_date)),
-    )
+    dir = resolve_era5_dir(era5_initial_condition_dir, start_date)
+    paths = era5_paths(dir, start_date)
     all_present() = all(isfile, paths)
-    if !all_present() && !isnothing(era5_initial_condition_dir)
+    if !all_present()
         if ClimaComms.iamroot(comms_ctx)
             @info "ERA5 initial conditions incomplete, fetching from CDS" dir start_date
             ERA5.fetch_initial_conditions(start_date; dir)
@@ -1128,8 +1134,7 @@ function get_era5_filepaths(
     all_present() || error(
         "ERA5 initial condition files missing from $dir: " *
         "$(join(basename.(filter(!isfile, collect(paths))), ", ")). " *
-        "Check that start_date matches an available initialization, or set " *
-        "era5_initial_condition_dir to fetch them.",
+        "Check that start_date lands on the hour and the CDS fetch succeeded.",
     )
 
     # Use ERA5-derived bucket IC if user didn't specify one

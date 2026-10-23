@@ -4,6 +4,12 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Non-negative control-volume weights for exchange-grid fluxes
+- [#2152](https://github.com/CliMA/ClimaCoupler.jl/pull/2152): The polygon → SE-node scatter
+  weights each polygon by its area inside control volumes around the nodes, so masked flux
+  transfers stay bounded without the flux clamp or `cov_cutoff`. The wet, sea-ice and
+  open-ocean area fractions are the DSS'd coverages of these weights.
+
 #### Separate output interval for 3D ocean diagnostics
 The new `ocean_3d_diagnostic_interval` option sets how often the 3D ocean fields (`ocean_fields.jld2`)
 are written, while `ocean_diagnostic_interval` sets the surface fields (`ocean_surface.jld2`). It defaults

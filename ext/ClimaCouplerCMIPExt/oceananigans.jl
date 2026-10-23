@@ -351,8 +351,8 @@ The `Interfacer.remap!` methods in `climaocean_helpers.jl` accept
 When `use_intersection_grid = true` and the setup supports it (a
 `SpectralElementSpace2D` boundary space on a single process), the returned
 NamedTuple additionally carries the device-resident [`ExchangeGrid`](@ref),
-the static `wet_ocean_fraction` field (DSS'd nodal ratio of wet to geometric
-coverage), the per-polygon flux states and boundary-space flux scratch, and
+the static `wet_ocean_fraction` field (DSS'd nodal wet coverage), the
+per-polygon flux states and boundary-space flux scratch, and
 `use_exchange_grid::Bool` indicating the exchange-grid path is active.
 """
 function construct_remapper(grid_oc, boundary_space; use_intersection_grid = true)
@@ -416,10 +416,12 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
         # Per-polygon flux scratch, boundary-space flux scratch fields (in the
         # layout `update_flux_fields!` expects), the boundary-space nodal
         # coverage of the current flux weight (`scatter_poly_fluxes_to_boundary!`
-        # fills it each step), and a shared DSS buffer.
+        # fills it each step), a copy of each downward flux for its DSS, and a
+        # shared DSS buffer.
         ocean_flux_state = ExchangeFluxState{FT}(arch, exchange_grid_cpu.n_poly)
         ice_flux_state = IceExchangeState{FT}(arch, exchange_grid_cpu.n_poly)
         weight_cov_scratch = CC.Fields.zeros(boundary_space)
+        downward_flux_scratch = CC.Fields.zeros(boundary_space)
         flux_scratch = (;
             F_turb_ρτxz = CC.Fields.zeros(boundary_space),
             F_turb_ρτyz = CC.Fields.zeros(boundary_space),
@@ -428,24 +430,15 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
             F_turb_moisture = CC.Fields.zeros(boundary_space),
         )
         flux_dss_buffer = Utilities.init_dss_buffer(flux_scratch.F_sh)
-
-        # FLUX CLAMP HACK:
-        # Per-node bounds used to keep the normalized flux scatter inside the
-        # range of the polygon values it averages (`_clamp_to_poly_range!`).
-        limiter_scratch = (;
-            lo = CC.Fields.zeros(boundary_space),
-            hi = CC.Fields.zeros(boundary_space),
-            cnt = CC.Fields.zeros(boundary_space),
-        )
     else
         exchange_grid = nothing
         wet_ocean_fraction = nothing
         ocean_flux_state = nothing
         ice_flux_state = nothing
         weight_cov_scratch = nothing
+        downward_flux_scratch = nothing
         flux_scratch = nothing
         flux_dss_buffer = nothing
-        limiter_scratch = nothing # FLUX CLAMP HACK
     end
     uv_basis = uv_basis_coefficients(boundary_space)
 
@@ -465,9 +458,9 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
         ocean_flux_state,
         ice_flux_state,
         weight_cov_scratch,
+        downward_flux_scratch,
         flux_scratch,
         flux_dss_buffer,
-        limiter_scratch, # FLUX CLAMP HACK
         uv_basis,
         use_exchange_grid,
     )
@@ -497,23 +490,30 @@ function FieldExchanger.resolve_area_fractions!(
 end
 
 """
+    exchange_ice_fraction!(ice_fraction, remapping, ice_sim)
+
+Sea-ice area fraction on the boundary space: the ice model's concentration.
+"""
+exchange_ice_fraction!(ice_fraction, remapping, ice_sim) =
+    Interfacer.get_field!(ice_fraction, ice_sim, Val(:ice_concentration))
+
+"""
     FieldExchanger.align_surface_fractions!(ocean_sim::OceananigansSimulation,
                                             cs::Interfacer.CoupledSimulation) -> Bool
 
 Ocean-bathymetry-authoritative surface fractions on the exchange grid.
 
-The static wet-ocean fraction (`remapping.wet_ocean_fraction`, derived from
-the intersection areas with the ocean's immersed wet mask and DSS'd onto the
-boundary space) partitions each boundary node into wet and land parts. Sea
-ice and open ocean subdivide the wet part; land fills the remainder:
+The static wet-ocean fraction (`remapping.wet_ocean_fraction`, the DSS'd
+coverage of the wet exchange-grid polygons) partitions each boundary node
+into wet and land parts. Sea ice and open ocean subdivide the wet part;
+land fills the remainder:
 
-    ice   = clamp(ice_concentration, 0, wet)
+    ice   = clamp(ice_coverage, 0, wet)
     ocean = wet - ice
     land  = 1 - wet
 
-so the three fractions sum to 1 identically and the flux weights are, by
-construction, consistent with where the ocean model actually has wet cells
-(issue #1838).
+so the three fractions sum to 1 identically, with `ice_coverage` from
+`exchange_ice_fraction!`.
 
 Returns `false` (falling back to the legacy ETOPO-based update) when the
 exchange grid is not active.
@@ -532,10 +532,9 @@ function FieldExchanger.align_surface_fractions!(
 
     if haskey(cs.model_sims, :ice_sim)
         ice_sim = cs.model_sims.ice_sim
-        Interfacer.get_field!(cs.fields.scalar_temp2, ice_sim, Val(:ice_concentration))
-        ice_concentration = cs.fields.scalar_temp2
-        @. cs.fields.scalar_temp3 = clamp(ice_concentration, FT(0), wet_fraction)
         ice_fraction = cs.fields.scalar_temp3
+        exchange_ice_fraction!(ice_fraction, ocean_sim.remapping, ice_sim)
+        @. ice_fraction = clamp(ice_fraction, FT(0), wet_fraction)
         Interfacer.update_field!(ice_sim, Val(:area_fraction), ice_fraction)
     else
         cs.fields.scalar_temp3 .= FT(0)
@@ -629,6 +628,45 @@ FieldExchanger.accumulated_coupler_fields(::OceananigansSimulation) =
 # NOTE: This is 3D, but it will be remapped to 2D
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
     sim.ocean.model.tracers.T + sim.ocean_properties.C_to_K # convert from Celsius to Kelvin
+
+"""
+    Interfacer.get_field!(target_field, sim::OceananigansSimulation, ::Val{:surface_temperature})
+
+Open-water surface temperature on the boundary space, from which the atmosphere computes
+the emitted longwave. With the exchange grid it is the `(1 - SIC)`-weighted
+control-volume transfer of `T⁴`, so that the open-ocean area fraction times `ϵσT⁴`
+integrates to the emission `(1 - SIC) ϵσT⁴` the ocean loses on each polygon.
+"""
+function Interfacer.get_field!(
+    target_field,
+    sim::OceananigansSimulation,
+    ::Val{:surface_temperature},
+)
+    remapping = sim.remapping
+    if !remapping.use_exchange_grid
+        surface_temperature = Interfacer.get_field(sim, Val(:surface_temperature))
+        Interfacer.remap!(target_field, surface_temperature, remapping)
+        return nothing
+    end
+    eg = remapping.exchange_grid
+    fs = remapping.ocean_flux_state
+    C_to_K = eltype(fs.scratch1)(sim.ocean_properties.C_to_K)
+    Nz = sim.ocean.model.grid.Nz
+    gather_cells_to_polys!(
+        fs.scratch1,
+        eg,
+        vec(OC.interior(sim.ocean.model.tracers.T, :, :, Nz)),
+    )
+    @. fs.scratch1 = (fs.scratch1 + C_to_K)^4
+    gather_cells_to_polys!(
+        fs.scratch2,
+        eg,
+        vec(OC.interior(sim.ice_concentration, :, :, 1)),
+    )
+    @. fs.scratch2 = 1 - fs.scratch2
+    emission_temperature!(target_field, remapping, fs.scratch1, fs.scratch2)
+    return nothing
+end
 
 """
     FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)
@@ -1021,12 +1059,10 @@ NVTX.@annotate function push_exchange_radiation_to_ocean!(sim::OceananigansSimul
     )
     fs.T_sfc .+= C_to_K
     gather_cells_to_polys!(fs.sic, eg, vec(OC.interior(sim.ice_concentration, :, :, 1)))
-    gather_nodes_to_polys!(fs.SW_d, eg, se_nodal_vec(csf.SW_d))
-    SW_d_diffuse = fs.scratch2
-    gather_nodes_to_polys!(SW_d_diffuse, eg, se_nodal_vec(csf.SW_d_diffuse))
-    gather_nodes_to_polys!(fs.LW_d, eg, se_nodal_vec(csf.LW_d))
-    gather_nodes_to_polys!(fs.P_liq, eg, se_nodal_vec(csf.P_liq))
-    gather_nodes_to_polys!(fs.P_snow, eg, se_nodal_vec(csf.P_snow))
+    gather_downward_flux!(fs.SW_d, remapping, csf.SW_d)
+    gather_downward_flux!(fs.LW_d, remapping, csf.LW_d)
+    gather_downward_flux!(fs.P_liq, remapping, csf.P_liq)
+    gather_downward_flux!(fs.P_snow, remapping, csf.P_snow)
 
     # TODO: Note, SW radiation penetrates the surface. Right now, we just put
     # everything on the surface, but later we will need to account for this.

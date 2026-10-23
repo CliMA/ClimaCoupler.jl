@@ -27,8 +27,8 @@ It contains the following objects:
     and Celsius offset `C_to_K` (water freezing point in K).
 - `model_Δt::MDT`: The sea ice timestep.
 - `skin_accumulator::SA`: A NamedTuple with the running sums of the diagnosed skin temperature
-    `surface_temperature` [°C] and of its emission `surface_emission` [W m⁻²], and the number of
-    contributions `n_steps`. See `accumulate_skin_state!`.
+    `surface_temperature` [°C] and of the skin emission `surface_emission` [W m⁻²], and the
+    number of contributions `n_steps`. See `accumulate_skin_state!`.
 """
 struct ClimaSeaIceSimulation{SIM, A, REMAP, NT, IP, MDT, SA} <:
        Interfacer.AbstractSeaIceSimulation
@@ -167,6 +167,18 @@ function ClimaSeaIceSimulation(
         skin_accumulator(grid),
     )
 
+    # Polygon skin temperatures [K] until the first skin-temperature solve
+    if remapping.use_exchange_grid
+        T_sfc_new = remapping.ice_flux_state.T_sfc_new
+        T_top = top_thermodynamics(sim).top_surface_temperature
+        gather_cells_to_polys!(
+            T_sfc_new,
+            remapping.exchange_grid,
+            vec(OC.interior(T_top, :, :, 1)),
+        )
+        T_sfc_new .+= eltype(T_sfc_new)(ice_properties.C_to_K)
+    end
+
     add_seaice_diagnostics!(
         sim;
         output_dir,
@@ -260,6 +272,37 @@ top_thermodynamics(sim::ClimaSeaIceSimulation) =
 # Surface temperature from last timestep (Celsius → Kelvin)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
     sim.ice_properties.C_to_K + top_thermodynamics(sim).top_surface_temperature
+
+"""
+    Interfacer.get_field!(target_field, sim::ClimaSeaIceSimulation, ::Val{:surface_temperature})
+
+Ice surface temperature on the boundary space, from which the atmosphere computes the
+emitted longwave. With the exchange grid it is the SIC-weighted control-volume transfer
+of `T⁴` of each polygon's last diagnosed skin temperature, so that the ice area fraction
+times `ϵσT⁴` integrates to the emission charged to the ice, `Σ_k b_area_k SIC_k ϵσT_k⁴`.
+"""
+function Interfacer.get_field!(
+    target_field,
+    sim::ClimaSeaIceSimulation,
+    ::Val{:surface_temperature},
+)
+    remapping = sim.remapping
+    if !remapping.use_exchange_grid
+        surface_temperature = Interfacer.get_field(sim, Val(:surface_temperature))
+        Interfacer.remap!(target_field, surface_temperature, remapping)
+        return nothing
+    end
+    is = remapping.ice_flux_state
+    fs = is.fluxes
+    @. fs.scratch2 = is.T_sfc_new^4
+    gather_cells_to_polys!(
+        fs.scratch1,
+        remapping.exchange_grid,
+        vec(OC.interior(sim.ice.model.ice_concentration, :, :, 1)),
+    )
+    emission_temperature!(target_field, remapping, fs.scratch2, fs.scratch1)
+    return nothing
+end
 
 """
     FluxCalculator.compute_surface_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim, thermo_params)
@@ -394,7 +437,8 @@ function _compute_ice_boundary_fluxes!(
         remapped_T_sfc,
         OC.interior(top_sfc_T, :, :, 1),
     )
-    accumulate_skin_state!(sim)
+    emission = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
+    accumulate_skin_state!(sim, skin_emission!(emission, sim))
 
     FluxCalculator.update_flux_fields!(csf, sim, fluxes, accumulator)
 
@@ -432,23 +476,33 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
 end
 
 """
-    accumulate_skin_state!(sim::ClimaSeaIceSimulation)
+    skin_emission!(emission, sim::ClimaSeaIceSimulation)
 
-Add the skin temperature just diagnosed into `top_surface_temperature`, and its emission
-`σϵTₛ⁴`, to `sim.skin_accumulator`. Called once per coupling step, after the write-back and
-before the turbulent fluxes are pushed or accumulated.
+Write the emission `σϵTₛ⁴` [W m⁻²] of each cell's `top_surface_temperature` into `emission`.
 """
-function accumulate_skin_state!(sim::ClimaSeaIceSimulation)
-    acc = sim.skin_accumulator
-    T_sfc_C = top_thermodynamics(sim).top_surface_temperature
-    FT = eltype(T_sfc_C)
+function skin_emission!(emission, sim::ClimaSeaIceSimulation)
+    Tₛ = OC.interior(top_thermodynamics(sim).top_surface_temperature, :, :, 1)
+    FT = eltype(Tₛ)
     σ = FT(sim.ice_properties.σ)
     C_to_K = FT(sim.ice_properties.C_to_K)
     ϵ = FT(Interfacer.get_field(sim, Val(:emissivity)))
+    @. emission = σ * ϵ * (Tₛ + C_to_K)^4
+    return emission
+end
 
-    Tₛ = OC.interior(T_sfc_C, :, :, 1)
-    OC.interior(acc.surface_temperature, :, :, 1) .+= Tₛ
-    OC.interior(acc.surface_emission, :, :, 1) .+= σ .* ϵ .* (Tₛ .+ C_to_K) .^ 4
+"""
+    accumulate_skin_state!(sim::ClimaSeaIceSimulation, emission)
+
+Add the skin temperature just diagnosed into `top_surface_temperature`, and the skin
+`emission` [W m⁻²] per unit ice area of each cell, to `sim.skin_accumulator`. Called once per
+coupling step, after the write-back and before the turbulent fluxes are pushed or
+accumulated.
+"""
+function accumulate_skin_state!(sim::ClimaSeaIceSimulation, emission)
+    acc = sim.skin_accumulator
+    OC.interior(acc.surface_temperature, :, :, 1) .+=
+        OC.interior(top_thermodynamics(sim).top_surface_temperature, :, :, 1)
+    OC.interior(acc.surface_emission, :, :, 1) .+= emission
     acc.n_steps[] += 1
     return nothing
 end
@@ -456,7 +510,7 @@ end
 """
     average_and_reset_skin_accumulator!(sim::ClimaSeaIceSimulation)
 
-Return the window-mean skin emission `σϵTₛ⁴` [W m⁻²] per unit ice area, and write the
+Return the window-mean skin emission [W m⁻²] per unit ice area, and write the
 window-mean skin temperature into `top_surface_temperature` where there is ice.
 The conductive flux `(Tₛ − Tᵢ)/R` is linear in `Tₛ` and `R`, `Tᵢ` are frozen until the ice
 steps, so the mean temperature gives the mean conductive flux of the window.
@@ -467,17 +521,13 @@ The returned array is overwritten by the next call.
 function average_and_reset_skin_accumulator!(sim::ClimaSeaIceSimulation)
     acc = sim.skin_accumulator
     T_sfc_C = top_thermodynamics(sim).top_surface_temperature
-    FT = eltype(T_sfc_C)
     n = acc.n_steps[]
 
     Tₛ = OC.interior(T_sfc_C, :, :, 1)
     ΣTₛ = OC.interior(acc.surface_temperature, :, :, 1)
     emission = OC.interior(acc.surface_emission, :, :, 1)
     if iszero(n)
-        σ = FT(sim.ice_properties.σ)
-        C_to_K = FT(sim.ice_properties.C_to_K)
-        ϵ = FT(Interfacer.get_field(sim, Val(:emissivity)))
-        emission .= σ .* ϵ .* (Tₛ .+ C_to_K) .^ 4
+        skin_emission!(emission, sim)
     else
         ℵ = OC.interior(sim.ice.model.ice_concentration, :, :, 1)
         Tₛ .= ifelse.(ℵ .> 0, ΣTₛ ./ n, Tₛ)
@@ -498,7 +548,9 @@ Complete the ice top heat flux Field as the skin-balance net upward flux
 The absorbed radiative part `−(1−α)SW↓ − ϵLW↓` is written in `update_sim!`.
 This adds surface emission and the turbulent fluxes. At skin equilibrium
 `Jᵃ = Q_conductive`, so the Stefan residual vanishes; when `Tₛ` is capped at `T_melt`,
-the residual drives melt.
+the residual drives melt. On the exchange grid, each term arrives as
+`r_c = Σ_{k ∈ c} b_area_k / A_c` times its `b_area`-weighted polygon mean, so at equilibrium
+the residual is about `(r_c − 1) Q_conductive`.
 
 Every term of `Jᵃ` is averaged over the same coupling steps: the emission is the mean of
 `σϵTₛ⁴` from `average_and_reset_skin_accumulator!`, which also sets
@@ -571,6 +623,25 @@ function _update_ice_turbulent_fluxes_boundary!(sim::ClimaSeaIceSimulation, fiel
 end
 
 """
+    exchange_ice_fraction!(ice_fraction, remapping, sim::ClimaSeaIceSimulation)
+
+Sea-ice area fraction on the boundary space: the exchange-grid coverage of
+the per-polygon ice concentration. Uses the ocean flux state's `scratch1` as
+per-polygon scratch.
+"""
+function exchange_ice_fraction!(ice_fraction, remapping, sim::ClimaSeaIceSimulation)
+    eg = remapping.exchange_grid
+    sic = remapping.ocean_flux_state.scratch1
+    gather_cells_to_polys!(
+        sic,
+        eg,
+        vec(OC.interior(sim.ice.model.ice_concentration, :, :, 1)),
+    )
+    flux_weight_coverage!(ice_fraction, eg, sic, remapping.flux_dss_buffer)
+    return ice_fraction
+end
+
+"""
     compute_ice_exchange_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim,
                                  thermo_params, accumulator = nothing)
 
@@ -606,8 +677,8 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
     # Atmospheric state, including the downwelling radiation entering the
     # skin-temperature balance.
     gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec, remapping.uv_basis)
-    gather_nodes_to_polys!(fs.SW_d, eg, se_nodal_vec(csf.SW_d))
-    gather_nodes_to_polys!(fs.LW_d, eg, se_nodal_vec(csf.LW_d))
+    gather_downward_flux!(fs.SW_d, remapping, csf.SW_d)
+    gather_downward_flux!(fs.LW_d, remapping, csf.LW_d)
 
     # Ice state from the owning cells. Conductive resistance
     # R = h_ice/k_ice + h_snow/k_snow (series; reduces to h_ice/k_ice with no
@@ -678,7 +749,7 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
     # Write the diagnosed T_sfc back before `update_flux_fields!` so an
     # immediate turbulent push builds Jᵃ with this T.
     T_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
-    scatter_polys_to_cells!(T_cells, eg, is.T_sfc_new)
+    scatter_polys_to_cells!(T_cells, eg, is.T_sfc_new, eg.area, eg.oc_wet_area)
     mirror_fold_partners!(T_cells, grid)
     top_sfc_T = top_thermodynamics(sim).top_surface_temperature
     ice_concentration = sim.ice.model.ice_concentration
@@ -687,7 +758,12 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
         OC.interior(remapping.scratch_field_oc1, :, :, 1) .- C_to_K,
         OC.interior(top_sfc_T, :, :, 1),
     )
-    accumulate_skin_state!(sim)
+    # Skin emission of each polygon, scattered to the cells as a flux.
+    @. fs.scratch1 = σ * ϵ * is.T_sfc_new^4
+    emission = OC.interior(remapping.scratch_field_oc1, :, :, 1)
+    scatter_polys_to_cells!(vec(emission), eg, fs.scratch1)
+    mirror_fold_partners!(vec(emission), grid)
+    accumulate_skin_state!(sim, emission)
 
     FluxCalculator.update_flux_fields!(csf, sim, remapping.flux_scratch, accumulator)
     return nothing
@@ -863,8 +939,8 @@ NVTX.@annotate function push_exchange_radiation_to_ice!(sim::ClimaSeaIceSimulati
     # Absorbed radiative part of Jᵃ (upward positive): −(1−α)SW↓ − ϵLW↓, weighted to a cell mean.
     si_flux_heat = sim.ice.model.external_heat_fluxes.top
     if si_flux_heat isa OC.Field
-        gather_nodes_to_polys!(fs.SW_d, eg, se_nodal_vec(csf.SW_d))
-        gather_nodes_to_polys!(fs.LW_d, eg, se_nodal_vec(csf.LW_d))
+        gather_downward_flux!(fs.SW_d, remapping, csf.SW_d)
+        gather_downward_flux!(fs.LW_d, remapping, csf.LW_d)
         @. fs.scratch1 = fs.sic * (-(1 - α) * fs.SW_d - ϵ * fs.LW_d)
         heat_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
         scatter_polys_to_cells!(heat_cells, eg, fs.scratch1)
@@ -877,7 +953,7 @@ NVTX.@annotate function push_exchange_radiation_to_ice!(sim::ClimaSeaIceSimulati
     # atmospheric mass flux to positive `snowfall`).
     snowfall = sim.ice.model.snowfall
     if snowfall isa OC.Field
-        gather_nodes_to_polys!(fs.P_snow, eg, se_nodal_vec(csf.P_snow))
+        gather_downward_flux!(fs.P_snow, remapping, csf.P_snow)
         @. fs.scratch1 = (fs.sic > 0) * -fs.P_snow
         snow_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
         scatter_polys_to_cells!(snow_cells, eg, fs.scratch1)

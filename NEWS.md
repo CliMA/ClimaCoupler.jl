@@ -4,6 +4,22 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Non-negative control-volume weights for exchange-grid fluxes
+- [#2152](https://github.com/CliMA/ClimaCoupler.jl/pull/2152): The polygon → SE-node scatter
+  weights each polygon by its area inside control volumes around the nodes, so masked flux
+  transfers stay bounded without the flux clamp or `cov_cutoff`. The wet, sea-ice and
+  open-ocean area fractions are the DSS'd coverages of these weights.
+- [#2160](https://github.com/CliMA/ClimaCoupler.jl/pull/2160): Fluxes into ocean and sea-ice
+  cells are divided by the ocean's cell area, so the step from the polygons to the cells
+  conserves their global integral.
+- [#2173](https://github.com/CliMA/ClimaCoupler.jl/pull/2173): Radiation and precipitation
+  reach the polygons through the transpose of the scatter weights, after a DSS, so they also
+  conserve from the atmosphere to the cells.
+- [#2174](https://github.com/CliMA/ClimaCoupler.jl/pull/2174): The ocean and sea-ice
+  temperatures used by the atmosphere's radiation are averaged as `T⁴` with the same weights, and
+  the sea-ice skin emission reaches the ice through the cell scatter, so the emitted longwave
+  also conserves.
+
 #### Reflect diffuse shortwave with the diffuse albedo over the Oceananigans ocean
 The ocean now imports the diffuse shortwave as the coupler field `SW_d_diffuse`, averaged with the 
 other radiation when the ocean steps more slowly than the coupler. Coupler checkpoints written before 

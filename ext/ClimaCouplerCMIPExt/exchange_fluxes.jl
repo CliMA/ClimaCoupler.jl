@@ -6,9 +6,10 @@ atmospheric state gathered off the SE nodes and surface state read from the
 owning FV cell, aggregated conservatively to both sides:
 
 - to the FV grid with per-polygon sea-ice-concentration weighting;
-- to the SE boundary space via the L2 scatter, `weighted_dss!`, then division
-  by the DSS'd nodal wet coverage — dividing only after DSS avoids averaging
-  real coastal fluxes with no-data zeros from dry neighbor elements.
+- to the SE boundary space via the control-volume scatter, `weighted_dss!`,
+  then division by the DSS'd coverage of the flux weight (which is also the
+  surface's area fraction). Dividing only after DSS avoids averaging real
+  coastal fluxes with no-data zeros from dry neighbor elements.
 
 Momentum is handled in the global UV (east/north) basis — whose components
 are DSS-safe scalars — and converted to the local CT1/CT2 components expected
@@ -545,71 +546,67 @@ function scalar_weighted_dss!(field::CC.Fields.Field, buffer)
     return nothing
 end
 
-function _dss_and_normalize!(field, cov, buffer, cutoff, z)
-    scalar_weighted_dss!(field, buffer)
-    @. field = ifelse(cov > cutoff, field / max(cov, cutoff), z)
-    return nothing
+"""
+    gather_downward_flux!(poly_values, remapping, field)
+
+Gather a flux the atmosphere hands down (radiation, precipitation) onto the polygons.
+
+Start with a weighted DSS of a copy of `field`, so that the element copies of each shared 
+node agree without changing `Σ_n (WJ)_n g_n`. Then apply the transpose gather with `tweight`. 
+The polygons then receive exactly the atmosphere's share `Σ_n (WJ)_n α_n g_n` for any area
+fraction `α` built from the scatter and DSS'd (as the surface fractions are).
+"""
+function gather_downward_flux!(poly_values, remapping, field)
+    nodal = remapping.downward_flux_scratch
+    nodal .= field
+    scalar_weighted_dss!(nodal, remapping.flux_dss_buffer)
+    eg = remapping.exchange_grid
+    gather_nodes_to_polys!(poly_values, eg, se_nodal_vec(nodal), eg.tweight)
+    return poly_values
 end
 
-# FLUX CLAMP HACK
-# `_dss_and_normalize!` forms `Σ_k B_kn F_k / Σ_k B_kn` with the L2 projection
-# weights `B_kn = ∫_poly ϕ_i ϕ_j dA`. Those weights can be negative, so summing 
-# over only the wet subset (and not *all* polygons) can lead to cancelations in 
-# the denominator. The functions below clamp each nodal flux back into the range 
-# of the polygon values that fed it. The real fix would be to give the scatter a 
-# non-negative partition of unity so it is bounded by construction.
-function _nodal_flux_bounds!(scratch, eg, buffer, poly_values, weight)
-    (; lo, hi, cnt) = scratch
-    poly_extrema_at_nodes!(
-        se_nodal_vec(lo),
-        se_nodal_vec(hi),
-        se_nodal_vec(cnt),
-        eg,
-        poly_values,
-        weight,
-    )
-    scalar_weighted_dss!(lo, buffer)
-    scalar_weighted_dss!(hi, buffer)
-    scalar_weighted_dss!(cnt, buffer)
-    FT = CC.Spaces.undertype(axes(lo))
-    @. lo = ifelse(cnt > 0, lo / max(cnt, eps(FT)), zero(FT))
-    @. hi = ifelse(cnt > 0, hi / max(cnt, eps(FT)), zero(FT))
-    return nothing
+"""
+    flux_weight_coverage!(field, eg::ExchangeGrid, weight, buffer)
+
+Nodal coverage of the per-polygon flux weight `weight ∈ [0, 1]` on the SE
+boundary space: the control-volume scatter of `weight` followed by
+`weighted_dss!`. With `weight = sic` this is the sea-ice area fraction, with
+`1 - sic` the open-ocean one.
+"""
+function flux_weight_coverage!(field, eg::ExchangeGrid, weight, buffer)
+    scatter_polys_to_nodes!(se_nodal_vec(field), eg, weight)
+    scalar_weighted_dss!(field, buffer)
+    return field
 end
-function _clamp_to_poly_range!(field, scratch, eg, buffer, poly_values, weight, cov, cutoff)
-    _nodal_flux_bounds!(scratch, eg, buffer, poly_values, weight)
-    (; lo, hi) = scratch
-    @. field = ifelse(cov > cutoff, clamp(field, lo, hi), field)
+
+# DSS a coverage-weighted scatter and divide by the coverage
+function _dss_and_normalize!(field, cov, buffer, z)
+    scalar_weighted_dss!(field, buffer)
+    @. field = ifelse(cov > 0, field / cov, z)
     return nothing
 end
 
 """
     scatter_poly_fluxes_to_boundary!(remapping, eg::ExchangeGrid,
-                                     fs::ExchangeFluxState, weight;
-                                     cov_cutoff = 1e-3)
+                                     fs::ExchangeFluxState, weight)
 
 Aggregate per-polygon fluxes onto the SE boundary space as a `weight`-weighted
 average, filling the `remapping.flux_scratch` fields for
 `FluxCalculator.update_flux_fields!`. `weight` selects the sub-surface the
 fluxes apply to — `1 - sic` for open ocean, `sic` for sea ice — so the nodal
-result is a per-unit-*weighted*-area flux, consistent with the area fraction
-the coupler multiplies it by: L2-scatter `weight * F` (momentum in UV) and
-`weight` itself, `weighted_dss!` each scalar, divide by the DSS'd weighted
-coverage, then convert momentum UV → CT1/CT2. Nodes with relative coverage
-below `cov_cutoff` get zero flux (they are essentially not covered by wet
-ocean; their area fraction vanishes there too, so they never contribute to
-the coupler sums). Uses `fs.scratch1` internally; `weight` must not alias it.
+result is a per-unit-*weighted*-area flux. Uses `fs.scratch1` internally;
+`weight` must not alias it.
 """
 NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
     remapping,
     eg::ExchangeGrid,
     fs::ExchangeFluxState,
-    weight;
-    cov_cutoff = 1e-3,
+    weight,
 )
     fx = remapping.flux_scratch
     cov = remapping.weight_cov_scratch
-    scatter_polys_to_nodes!(se_nodal_vec(cov), eg, weight)
+    buf = remapping.flux_dss_buffer
+    flux_weight_coverage!(cov, eg, weight, buf)
 
     @. fs.scratch1 = weight * fs.F_sh
     scatter_polys_to_nodes!(se_nodal_vec(fx.F_sh), eg, fs.scratch1)
@@ -622,25 +619,12 @@ NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
     @. fs.scratch1 = weight * fs.F_τv
     scatter_polys_to_nodes!(se_nodal_vec(fx.F_turb_ρτyz), eg, fs.scratch1)
 
-    FT = CC.Spaces.undertype(axes(cov))
-    cutoff = FT(cov_cutoff)
-    z = zero(FT)
-    buf = remapping.flux_dss_buffer
-    scalar_weighted_dss!(cov, buf)
-    _dss_and_normalize!(fx.F_sh, cov, buf, cutoff, z)
-    _dss_and_normalize!(fx.F_lh, cov, buf, cutoff, z)
-    _dss_and_normalize!(fx.F_turb_moisture, cov, buf, cutoff, z)
-    _dss_and_normalize!(fx.F_turb_ρτxz, cov, buf, cutoff, z)
-    _dss_and_normalize!(fx.F_turb_ρτyz, cov, buf, cutoff, z)
-
-    # FLUX CLAMP HACK
-    ls = remapping.limiter_scratch
-    w = weight
-    _clamp_to_poly_range!(fx.F_sh, ls, eg, buf, fs.F_sh, w, cov, cutoff)
-    _clamp_to_poly_range!(fx.F_lh, ls, eg, buf, fs.F_lh, w, cov, cutoff)
-    _clamp_to_poly_range!(fx.F_turb_moisture, ls, eg, buf, fs.F_moisture, w, cov, cutoff)
-    _clamp_to_poly_range!(fx.F_turb_ρτxz, ls, eg, buf, fs.F_τu, w, cov, cutoff)
-    _clamp_to_poly_range!(fx.F_turb_ρτyz, ls, eg, buf, fs.F_τv, w, cov, cutoff)
+    z = zero(CC.Spaces.undertype(axes(cov)))
+    _dss_and_normalize!(fx.F_sh, cov, buf, z)
+    _dss_and_normalize!(fx.F_lh, cov, buf, z)
+    _dss_and_normalize!(fx.F_turb_moisture, cov, buf, z)
+    _dss_and_normalize!(fx.F_turb_ρτxz, cov, buf, z)
+    _dss_and_normalize!(fx.F_turb_ρτyz, cov, buf, z)
 
     parent(remapping.temp_uv_vec.components.data.:1) .= parent(fx.F_turb_ρτxz)
     parent(remapping.temp_uv_vec.components.data.:2) .= parent(fx.F_turb_ρτyz)
@@ -651,4 +635,26 @@ NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
         remapping.uv_basis,
     )
     return nothing
+end
+
+"""
+    emission_temperature!(field, remapping, T⁴, weight)
+
+Temperature on the SE boundary space whose fourth power is the `weight`-weighted
+control-volume average of the per-polygon `T⁴`,
+`(Σ_k sweight[n,k] w_k T⁴_k / Σ_k sweight[n,k] w_k)^(1/4)` after DSS, and 0 where
+`weight` covers nothing. When the surface's area fraction is the DSS'd coverage of
+`weight`, it times `ϵσT⁴` integrates to `Σ_k b_area_k w_k ϵσT⁴_k`. Overwrites `T⁴`.
+"""
+function emission_temperature!(field, remapping, T⁴, weight)
+    eg = remapping.exchange_grid
+    cov = remapping.weight_cov_scratch
+    buf = remapping.flux_dss_buffer
+    FT = CC.Spaces.undertype(axes(field))
+    flux_weight_coverage!(cov, eg, weight, buf)
+    @. T⁴ = weight * T⁴
+    scatter_polys_to_nodes!(se_nodal_vec(field), eg, T⁴)
+    _dss_and_normalize!(field, cov, buf, zero(FT))
+    @. field = sqrt(sqrt(field))
+    return field
 end

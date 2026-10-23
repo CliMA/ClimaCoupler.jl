@@ -547,6 +547,25 @@ function scalar_weighted_dss!(field::CC.Fields.Field, buffer)
 end
 
 """
+    gather_downward_flux!(poly_values, remapping, field)
+
+Gather a flux the atmosphere hands down (radiation, precipitation) onto the polygons.
+
+Start with a weighted DSS of a copy of `field`, so that the element copies of each shared 
+node agree without changing `Σ_n (WJ)_n g_n`. Then apply the transpose gather with `tweight`. 
+The polygons then receive exactly the atmosphere's share `Σ_n (WJ)_n α_n g_n` for any area
+fraction `α` built from the scatter and DSS'd (as the surface fractions are).
+"""
+function gather_downward_flux!(poly_values, remapping, field)
+    nodal = remapping.downward_flux_scratch
+    nodal .= field
+    scalar_weighted_dss!(nodal, remapping.flux_dss_buffer)
+    eg = remapping.exchange_grid
+    gather_nodes_to_polys!(poly_values, eg, se_nodal_vec(nodal), eg.tweight)
+    return poly_values
+end
+
+"""
     flux_weight_coverage!(field, eg::ExchangeGrid, weight, buffer)
 
 Nodal coverage of the per-polygon flux weight `weight ∈ [0, 1]` on the SE

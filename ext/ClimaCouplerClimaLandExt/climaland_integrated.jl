@@ -223,16 +223,17 @@ function ClimaLandSimulation(
     set_ic! =
         (Y, p, t, model) ->
             _coupler_set_ic!(Y, p, t, model, surface_T, surface_elevation, set_ic_land!)
-    # Convert start_date and stop_date to ITime if using ITime
+    # `tspan` can start at a non-zero time when restarting, so start the land model there
     if dt isa ITime
-        start_date = tspan[1]
-        sim_stop_date = tspan[2]
+        t0, tf, Δt = tspan..., dt
+    else
+        t0, tf, Δt = promote(ITime.((tspan..., dt); epoch = start_date)...)
     end
     simulation =
         @timed_log "ClimaLand: initialized LandSimulation" CL.Simulations.LandSimulation(
-            start_date,
-            sim_stop_date,
-            dt,
+            t0,
+            tf,
+            Δt,
             model;
             outdir = output_dir,
             set_ic!,

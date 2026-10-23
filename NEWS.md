@@ -4,6 +4,10 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Fix land restarts
+Restarted runs with a ClimaLand model now start the land model at the restart time instead of
+`t = 0` when not using `ITime`.
+
 #### Separate output interval for 3D ocean diagnostics
 The new `ocean_3d_diagnostic_interval` option sets how often the 3D ocean fields (`ocean_fields.jld2`)
 are written, while `ocean_diagnostic_interval` sets the surface fields (`ocean_surface.jld2`). It defaults

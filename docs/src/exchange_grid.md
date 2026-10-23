@@ -88,7 +88,7 @@ ocean = wet - ice
 land  = 1 - wet
 ```
 
-which sum to 1 identically (asserted at runtime). `ice_coverage` is the DSS'd
+which sum to 1 identically. `ice_coverage` is the DSS'd
 control-volume scatter of the per-polygon sea-ice concentration. That is exactly the
 denominator of the ice flux scatter; `wet - ice` is the denominator of the
 open-ocean one. So the fractions and the fluxes share one set of

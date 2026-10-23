@@ -741,6 +741,7 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
         ϵ,
         α_albedo,
         T_melt,
+        !isnothing(accumulator),
     )
 
     # The ice fluxes apply to the ice-covered part of each polygon.
@@ -750,7 +751,6 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
     # immediate turbulent push builds Jᵃ with this T.
     T_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
     scatter_polys_to_cells!(T_cells, eg, is.T_sfc_new, eg.area, eg.oc_wet_area)
-    mirror_fold_partners!(T_cells, grid)
     top_sfc_T = top_thermodynamics(sim).top_surface_temperature
     ice_concentration = sim.ice.model.ice_concentration
     OC.interior(top_sfc_T, :, :, 1) .= ifelse.(
@@ -762,7 +762,6 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
     @. fs.scratch1 = σ * ϵ * is.T_sfc_new^4
     emission = OC.interior(remapping.scratch_field_oc1, :, :, 1)
     scatter_polys_to_cells!(vec(emission), eg, fs.scratch1)
-    mirror_fold_partners!(vec(emission), grid)
     accumulate_skin_state!(sim, emission)
 
     FluxCalculator.update_flux_fields!(csf, sim, remapping.flux_scratch, accumulator)
@@ -788,8 +787,6 @@ NVTX.@annotate function push_exchange_fluxes_to_ice!(sim::ClimaSeaIceSimulation)
         τv_cells = vec(OC.interior(remapping.scratch_field_oc2, :, :, 1))
         scatter_polys_to_cells!(τu_cells, eg, fs.F_τu)
         scatter_polys_to_cells!(τv_cells, eg, fs.F_τv)
-        mirror_fold_partners!(τu_cells, grid)
-        mirror_fold_partners!(τv_cells, grid)
         si_flux_u = sim.ice.model.dynamics.external_momentum_stresses.top.u
         si_flux_v = sim.ice.model.dynamics.external_momentum_stresses.top.v
         set_from_extrinsic_vector!(
@@ -806,8 +803,6 @@ NVTX.@annotate function push_exchange_fluxes_to_ice!(sim::ClimaSeaIceSimulation)
     F_sh_cells = vec(OC.interior(remapping.scratch_field_oc2, :, :, 1))
     scatter_polys_to_cells!(F_lh_cells, eg, fs.F_lh)
     scatter_polys_to_cells!(F_sh_cells, eg, fs.F_sh)
-    mirror_fold_partners!(F_lh_cells, grid)
-    mirror_fold_partners!(F_sh_cells, grid)
     compute_ice_top_heat_flux!(
         sim,
         OC.interior(remapping.scratch_field_oc1, :, :, 1),
@@ -836,11 +831,10 @@ function FluxCalculator.push_and_reset!(
             acc,
         )
     end
-    fs = sim.remapping.ice_flux_state.fluxes
-    average_and_reset_exchange_accumulators!(fs) || return nothing
+    n = acc.n_steps[]
+    iszero(n) && return nothing
+    average_and_reset_exchange_accumulators!(sim.remapping.ice_flux_state.fluxes, n)
     push_exchange_fluxes_to_ice!(sim)
-    # Keep the (unused but still accumulated) boundary-space accumulator in
-    # sync so its averages stay well-defined.
     FluxCalculator.reset!(acc)
     return nothing
 end
@@ -944,7 +938,6 @@ NVTX.@annotate function push_exchange_radiation_to_ice!(sim::ClimaSeaIceSimulati
         @. fs.scratch1 = fs.sic * (-(1 - α) * fs.SW_d - ϵ * fs.LW_d)
         heat_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
         scatter_polys_to_cells!(heat_cells, eg, fs.scratch1)
-        mirror_fold_partners!(heat_cells, grid)
         OC.interior(si_flux_heat, :, :, 1) .=
             OC.interior(remapping.scratch_field_oc1, :, :, 1)
     end
@@ -957,7 +950,6 @@ NVTX.@annotate function push_exchange_radiation_to_ice!(sim::ClimaSeaIceSimulati
         @. fs.scratch1 = (fs.sic > 0) * -fs.P_snow
         snow_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
         scatter_polys_to_cells!(snow_cells, eg, fs.scratch1)
-        mirror_fold_partners!(snow_cells, grid)
         OC.interior(snowfall, :, :, 1) .= OC.interior(remapping.scratch_field_oc1, :, :, 1)
     end
     return nothing

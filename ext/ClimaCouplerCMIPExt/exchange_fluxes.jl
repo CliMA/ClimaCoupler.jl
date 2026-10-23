@@ -8,8 +8,7 @@ owning FV cell, aggregated conservatively to both sides:
 - to the FV grid with per-polygon sea-ice-concentration weighting;
 - to the SE boundary space via the control-volume scatter, `weighted_dss!`,
   then division by the DSS'd coverage of the flux weight (which is also the
-  surface's area fraction). Dividing only after DSS avoids averaging real
-  coastal fluxes with no-data zeros from dry neighbor elements.
+  surface's area fraction).
 
 Momentum is handled in the global UV (east/north) basis — whose components
 are DSS-safe scalars — and converted to the local CT1/CT2 components expected
@@ -29,8 +28,7 @@ one surface model (one instance for the ocean, one for sea ice): the gathered
 atmospheric and surface state (momentum in the UV basis; downwelling
 radiation `SW_d`/`LW_d` and precipitation `P_liq`/`P_snow`; `T_sfc` in [K]),
 the flux outputs (`F_*`), running time accumulators for the slow-surface path
-(`acc_*`, with `n_acc` counting contributions), and two generic scratch
-vectors.
+(`acc_*`), and two generic scratch vectors.
 """
 struct ExchangeFluxState{FT, VF <: AbstractVector{FT}}
     T_atmos::VF
@@ -60,21 +58,14 @@ struct ExchangeFluxState{FT, VF <: AbstractVector{FT}}
     acc_F_τv::VF
     scratch1::VF
     scratch2::VF
-    n_acc::Base.RefValue{Int}
 end
 
 Adapt.@adapt_structure ExchangeFluxState
 
-# CPU-resident, zero-initialized flux state. Every field is a per-polygon
-# vector except the trailing `n_acc` counter, so allocate one vector per field
-# and cap it with the counter.
-function _cpu_exchange_flux_state(FT, n_poly::Int)
-    n_vec = fieldcount(ExchangeFluxState) - 1
-    return ExchangeFluxState{FT, Vector{FT}}(
-        ntuple(_ -> zeros(FT, n_poly), n_vec)...,
-        Ref(0),
-    )
-end
+# CPU-resident, zero-initialized flux state
+_cpu_exchange_flux_state(FT, n_poly::Int) = ExchangeFluxState{FT, Vector{FT}}(
+    ntuple(_ -> zeros(FT, n_poly), fieldcount(ExchangeFluxState))...,
+)
 
 ExchangeFluxState{FT}(arch, n_poly::Int) where {FT} =
     on_device(arch, _cpu_exchange_flux_state(FT, n_poly))
@@ -107,15 +98,12 @@ function IceExchangeState{FT}(arch, n_poly::Int) where {FT}
 end
 
 """
-    average_and_reset_exchange_accumulators!(fs::ExchangeFluxState) -> Bool
+    average_and_reset_exchange_accumulators!(fs::ExchangeFluxState, n)
 
-Write the time-averaged accumulated fluxes into the flux-state outputs
-(`F_*`), zero the accumulators and the contribution counter. Returns `false`
-without touching anything when no contributions have been accumulated.
+Write the accumulated fluxes divided by the number of contributions `n` into the
+flux-state outputs (`F_*`), and zero the accumulators.
 """
-function average_and_reset_exchange_accumulators!(fs::ExchangeFluxState)
-    n = fs.n_acc[]
-    iszero(n) && return false
+function average_and_reset_exchange_accumulators!(fs::ExchangeFluxState, n)
     @. fs.F_sh = fs.acc_F_sh / n
     @. fs.F_lh = fs.acc_F_lh / n
     @. fs.F_moisture = fs.acc_F_moisture / n
@@ -126,8 +114,7 @@ function average_and_reset_exchange_accumulators!(fs::ExchangeFluxState)
     fill!(fs.acc_F_moisture, 0)
     fill!(fs.acc_F_τu, 0)
     fill!(fs.acc_F_τv, 0)
-    fs.n_acc[] = 0
-    return true
+    return nothing
 end
 
 """
@@ -162,10 +149,10 @@ NVTX.@annotate function gather_atmos_state_to_polys!(
     return nothing
 end
 
-# SurfaceFluxes evaluation for one polygon. Mirrors the nodal computation in
-# `FluxCalculator.compute_surface_fluxes!` (surface density and saturation
-# humidity from the atmospheric state, zero surface velocity, zero
-# displacement height), but with scalar inputs so it can run inside a kernel.
+# SurfaceFluxes evaluation for one polygon, with scalar inputs so it can run inside
+# a kernel: surface density and saturation humidity from the atmospheric state, zero
+# surface velocity, zero displacement height. `update_T_sfc_cb` diagnoses the skin
+# temperature.
 @inline function _polygon_surface_fluxes(
     surface_fluxes_params,
     thermo_params,
@@ -180,6 +167,7 @@ end
     height_int,
     height_sfc,
     T_sfc,
+    update_T_sfc_cb = nothing,
 )
     FT = typeof(T_atmos)
     ρ_sfc = SF.surface_density(
@@ -209,47 +197,25 @@ end
         height_sfc,
         FT(0), # d
         config,
+        update_T_sfc_cb,
     )
 end
 
-# The flux-state vectors as a NamedTuple, for passing to GPU kernels (the
-# struct itself holds a host `RefValue` and cannot be a kernel argument).
-@inline _kernel_state(fs::ExchangeFluxState) = (;
-    fs.T_atmos,
-    fs.q_tot,
-    fs.q_liq,
-    fs.q_ice,
-    fs.ρ_atmos,
-    fs.u_atmos,
-    fs.v_atmos,
-    fs.height_int,
-    fs.height_sfc,
-    fs.T_sfc,
-    fs.sic,
-    fs.F_sh,
-    fs.F_lh,
-    fs.F_moisture,
-    fs.F_τu,
-    fs.F_τv,
-    fs.acc_F_sh,
-    fs.acc_F_lh,
-    fs.acc_F_moisture,
-    fs.acc_F_τu,
-    fs.acc_F_τv,
-)
-
-@inline function _store_ocean_polygon_fluxes!(fs, k, out)
+# Store polygon `k`'s fluxes, and add them to the time accumulators if `accumulate`
+@inline function _store_polygon_fluxes!(fs, k, out, accumulate)
     @inbounds begin
         fs.F_sh[k] = out.F_sh
         fs.F_lh[k] = out.F_lh
         fs.F_moisture[k] = out.F_turb_moisture
         fs.F_τu[k] = out.F_turb_ρτxz
         fs.F_τv[k] = out.F_turb_ρτyz
-        fs.acc_F_sh[k] += out.F_sh
-        fs.acc_F_lh[k] += out.F_lh
-        fs.acc_F_moisture[k] += out.F_turb_moisture
-        fs.acc_F_τu[k] += out.F_turb_ρτxz
-        fs.acc_F_τv[k] += out.F_turb_ρτyz
+        if accumulate
+            fs.acc_F_sh[k] += out.F_sh
+            fs.acc_F_lh[k] += out.F_lh
+            fs.acc_F_moisture[k] += out.F_turb_moisture
+            fs.acc_F_τu[k] += out.F_turb_ρτxz
+            fs.acc_F_τv[k] += out.F_turb_ρτyz
+        end
     end
     return nothing
 end
@@ -259,6 +225,7 @@ end
     surface_fluxes_params,
     thermo_params,
     config,
+    accumulate,
 )
     k = @index(Global)
     @inbounds out = _polygon_surface_fluxes(
@@ -276,46 +243,39 @@ end
         fs.height_sfc[k],
         fs.T_sfc[k],
     )
-    _store_ocean_polygon_fluxes!(fs, k, out)
+    _store_polygon_fluxes!(fs, k, out, accumulate)
 end
 
 """
     compute_ocean_polygon_fluxes!(fs::ExchangeFluxState, surface_fluxes_params,
-                                  thermo_params, config)
+                                  thermo_params, config, accumulate::Bool)
 
 Run the SurfaceFluxes evaluation for every exchange-grid polygon, storing the
-flux outputs and adding them to the running time accumulators (fused), then
-incrementing `fs.n_acc`.
+flux outputs and, if `accumulate`, adding them to the time accumulators.
 """
 NVTX.@annotate function compute_ocean_polygon_fluxes!(
     fs::ExchangeFluxState,
     surface_fluxes_params,
     thermo_params,
     config,
+    accumulate::Bool,
 )
     backend = KernelAbstractions.get_backend(fs.F_sh)
     launch_kernel!(
         _ocean_polygon_fluxes_kernel!,
         backend,
         length(fs.F_sh),
-        _kernel_state(fs),
+        fs,
         surface_fluxes_params,
         thermo_params,
         config,
+        accumulate,
     )
-    fs.n_acc[] += 1
     return nothing
 end
 
-@inline _kernel_state(is::IceExchangeState) = merge(
-    _kernel_state(is.fluxes),
-    (; is.R, is.T_i, is.fluxes.SW_d, is.fluxes.LW_d, is.T_sfc_new),
-)
-
 # SurfaceFluxes evaluation with skin-temperature diagnosis for one sea-ice
-# polygon. Polygons without ice short-circuit to zero flux. Mirrors the nodal
-# computation in the boundary-space `compute_surface_fluxes!` for
-# `ClimaSeaIceSimulation`.
+# polygon. Polygons without ice short-circuit to zero flux.
 @inline function _polygon_ice_fluxes(
     surface_fluxes_params,
     thermo_params,
@@ -352,47 +312,26 @@ end
             T_sfc_new = T_sfc_guess,
         )
     end
-    update_T_sfc_cb = update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
-    ρ_sfc = SF.surface_density(
+    return _polygon_surface_fluxes(
         surface_fluxes_params,
-        T_atmos,
-        ρ_atmos,
-        T_sfc_guess,
-        height_int - height_sfc,
-        q_tot,
-        FT(0),
-        FT(0),
-    )
-    q_sfc = TD.q_vap_saturation(thermo_params, T_sfc_guess, ρ_sfc, FT(0), FT(0))
-    uv_int = StaticArrays.SVector(u_atmos, v_atmos)
-    return FluxCalculator.get_surface_fluxes(
-        surface_fluxes_params,
-        uv_int,
+        thermo_params,
+        config,
         T_atmos,
         q_tot,
         q_liq,
         q_ice,
         ρ_atmos,
+        u_atmos,
+        v_atmos,
         height_int,
-        zero(uv_int),
-        T_sfc_guess,
-        q_sfc,
         height_sfc,
-        FT(0), # d
-        config,
-        update_T_sfc_cb,
+        T_sfc_guess,
+        update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt),
     )
 end
 
-@inline function _store_ice_polygon_fluxes!(vecs, k, out)
-    _store_ocean_polygon_fluxes!(vecs, k, out)
-    @inbounds vecs.T_sfc_new[k] = out.T_sfc_new
-    return nothing
-end
-
-@inline function _ice_polygon_fluxes_at(
-    vecs,
-    k,
+@kernel function _ice_polygon_fluxes_kernel!(
+    is,
     surface_fluxes_params,
     thermo_params,
     config,
@@ -400,7 +339,10 @@ end
     ϵ,
     α_albedo,
     T_melt,
+    accumulate,
 )
+    k = @index(Global)
+    fs = is.fluxes
     @inbounds out = _polygon_ice_fluxes(
         surface_fluxes_params,
         thermo_params,
@@ -409,58 +351,35 @@ end
         ϵ,
         α_albedo,
         T_melt,
-        vecs.T_atmos[k],
-        vecs.q_tot[k],
-        vecs.q_liq[k],
-        vecs.q_ice[k],
-        vecs.ρ_atmos[k],
-        vecs.u_atmos[k],
-        vecs.v_atmos[k],
-        vecs.height_int[k],
-        vecs.height_sfc[k],
-        vecs.T_sfc[k],
-        vecs.sic[k],
-        vecs.R[k],
-        vecs.T_i[k],
-        vecs.SW_d[k],
-        vecs.LW_d[k],
+        fs.T_atmos[k],
+        fs.q_tot[k],
+        fs.q_liq[k],
+        fs.q_ice[k],
+        fs.ρ_atmos[k],
+        fs.u_atmos[k],
+        fs.v_atmos[k],
+        fs.height_int[k],
+        fs.height_sfc[k],
+        fs.T_sfc[k],
+        fs.sic[k],
+        is.R[k],
+        is.T_i[k],
+        fs.SW_d[k],
+        fs.LW_d[k],
     )
-    _store_ice_polygon_fluxes!(vecs, k, out)
-    return nothing
-end
-
-@kernel function _ice_polygon_fluxes_kernel!(
-    vecs,
-    surface_fluxes_params,
-    thermo_params,
-    config,
-    σ,
-    ϵ,
-    α_albedo,
-    T_melt,
-)
-    k = @index(Global)
-    _ice_polygon_fluxes_at(
-        vecs,
-        k,
-        surface_fluxes_params,
-        thermo_params,
-        config,
-        σ,
-        ϵ,
-        α_albedo,
-        T_melt,
-    )
+    _store_polygon_fluxes!(fs, k, out, accumulate)
+    @inbounds is.T_sfc_new[k] = out.T_sfc_new
 end
 
 """
     compute_ice_polygon_fluxes!(is::IceExchangeState, surface_fluxes_params,
-                                thermo_params, config, σ, ϵ, α_albedo, T_melt)
+                                thermo_params, config, σ, ϵ, α_albedo, T_melt,
+                                accumulate::Bool)
 
 Run the SurfaceFluxes evaluation with skin-temperature diagnosis for every
-exchange-grid polygon with ice (`sic > 0`), storing the flux outputs, the
-diagnosed `T_sfc_new`, and adding the fluxes to the running accumulators,
-then incrementing `is.fluxes.n_acc`.
+exchange-grid polygon with ice (`sic > 0`), storing the flux outputs and the
+diagnosed `T_sfc_new`, and, if `accumulate`, adding the fluxes to the time
+accumulators.
 """
 NVTX.@annotate function compute_ice_polygon_fluxes!(
     is::IceExchangeState,
@@ -471,13 +390,14 @@ NVTX.@annotate function compute_ice_polygon_fluxes!(
     ϵ,
     α_albedo,
     T_melt,
+    accumulate::Bool,
 )
     backend = KernelAbstractions.get_backend(is.fluxes.F_sh)
     launch_kernel!(
         _ice_polygon_fluxes_kernel!,
         backend,
         length(is.fluxes.F_sh),
-        _kernel_state(is),
+        is,
         surface_fluxes_params,
         thermo_params,
         config,
@@ -485,23 +405,18 @@ NVTX.@annotate function compute_ice_polygon_fluxes!(
         ϵ,
         α_albedo,
         T_melt,
+        accumulate,
     )
-    is.fluxes.n_acc[] += 1
     return nothing
 end
 
 """
     cartesian_to_contravariant!(ρτxz, ρτyz, uv_field, uv_basis)
-    cartesian_to_contravariant!(ρτxz, ρτyz, uv_field)
 
 Convert a `UVVector` field into the local CT1/CT2 unit-basis components
-expected by the coupler flux fields (`csf.F_turb_ρτxz/yz`). Exact inverse of
-`contravariant_to_cartesian!`. The 4-argument form applies precomputed
-[`uv_basis_coefficients`](@ref); the 3-argument form builds them on the fly.
+expected by the coupler flux fields (`csf.F_turb_ρτxz/yz`), with the
+precomputed `uv_basis_coefficients`. Exact inverse of `contravariant_to_cartesian!`.
 """
-cartesian_to_contravariant!(ρτxz, ρτyz, uv_field) =
-    cartesian_to_contravariant!(ρτxz, ρτyz, uv_field, uv_basis_coefficients(axes(ρτxz)))
-
 function cartesian_to_contravariant!(ρτxz, ρτyz, uv_field, uv_basis)
     a = parent(ρτxz)
     b = parent(ρτyz)
@@ -519,10 +434,8 @@ end
 """
     scalar_weighted_dss!(field::CC.Fields.Field, buffer)
 
-Weighted DSS for a scalar field, bit-identical to `Spaces.weighted_dss!` but
-without loading `LocalGeometry` (which `dss_transform` does even for scalars,
-boxing a 22-float struct per perimeter node at `-O0`). Multiplies by
-`dss_weights` then reuses `buffer` for the unweighted topology DSS.
+Weighted DSS of a scalar field, without loading `LocalGeometry`: multiply by
+`dss_weights`, then run the unweighted topology DSS with `buffer`.
 """
 function scalar_weighted_dss!(field::CC.Fields.Field, buffer)
     isnothing(buffer) && return nothing

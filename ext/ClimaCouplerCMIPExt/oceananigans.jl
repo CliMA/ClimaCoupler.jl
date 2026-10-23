@@ -418,8 +418,9 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
         # coverage of the current flux weight (`scatter_poly_fluxes_to_boundary!`
         # fills it each step), a copy of each downward flux for its DSS, and a
         # shared DSS buffer.
-        ocean_flux_state = ExchangeFluxState{FT}(arch, exchange_grid_cpu.n_poly)
-        ice_flux_state = IceExchangeState{FT}(arch, exchange_grid_cpu.n_poly)
+        n_poly = length(exchange_grid_cpu.area)
+        ocean_flux_state = ExchangeFluxState{FT}(arch, n_poly)
+        ice_flux_state = IceExchangeState{FT}(arch, n_poly)
         weight_cov_scratch = CC.Fields.zeros(boundary_space)
         downward_flux_scratch = CC.Fields.zeros(boundary_space)
         flux_scratch = (;
@@ -442,10 +443,6 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
     end
     uv_basis = uv_basis_coefficients(boundary_space)
 
-    # `TripolarGrid` covers the full sphere by construction, so no polar
-    # masking is needed on either the OC or CC side. The FV → SE projection
-    # has no structural-zero "no-data" nodes to repair, and `weighted_dss!`
-    # operates on a fully-physical SE field.
     return (;
         remapper_oc_to_cc,
         remapper_cc_to_oc,
@@ -471,11 +468,6 @@ end
 
 Sync the ice concentration field on the ocean simulation with the ice
 simulation's concentration so that it can be used for weighting flux updates.
-
-With a `TripolarGrid` covering the full sphere there is no polar band to
-exclude from physical contribution; previously this routine forced land
-fraction to 1 (and ice / ocean fractions to 0) for `|lat| ≥ 78°` on a
-`LatitudeLongitudeGrid`, which is no longer needed.
 """
 function FieldExchanger.resolve_area_fractions!(
     ocean_sim::OceananigansSimulation,
@@ -541,11 +533,11 @@ function FieldExchanger.align_surface_fractions!(
         ice_fraction = cs.fields.scalar_temp3
     end
 
-    @. cs.fields.scalar_temp2 = max(wet_fraction - ice_fraction, FT(0))
+    @. cs.fields.scalar_temp2 = wet_fraction - ice_fraction
     ocean_fraction = cs.fields.scalar_temp2
     Interfacer.update_field!(ocean_sim, Val(:area_fraction), ocean_fraction)
 
-    @. cs.fields.scalar_temp1 = max(FT(1) - wet_fraction, FT(0))
+    @. cs.fields.scalar_temp1 = 1 - wet_fraction
     land_fraction = cs.fields.scalar_temp1
     Interfacer.update_field!(cs.model_sims.land_sim, Val(:area_fraction), land_fraction)
     cs.fields.land_area_fraction .= land_fraction
@@ -560,9 +552,6 @@ function FieldExchanger.align_surface_fractions!(
 
     cs.fields.ice_area_fraction .= ice_fraction
     cs.fields.ocean_area_fraction .= ocean_fraction
-
-    @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
-    @assert maximum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
     return true
 end
 
@@ -834,7 +823,13 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
         SF.COARE3RoughnessParams{FT}(),
         SF.ConstantGustinessSpec(FT(1)),
     )
-    compute_ocean_polygon_fluxes!(fs, surface_fluxes_params, thermo_params, config)
+    compute_ocean_polygon_fluxes!(
+        fs,
+        surface_fluxes_params,
+        thermo_params,
+        config,
+        !isnothing(accumulator),
+    )
 
     # The ocean fluxes apply to the open-water part of each polygon.
     @. fs.scratch2 = 1 - fs.sic
@@ -861,15 +856,13 @@ NVTX.@annotate function push_exchange_fluxes_to_ocean!(sim::OceananigansSimulati
     grid = sim.ocean.model.grid
 
     # Momentum (UV basis): weight by open-ocean fraction per polygon, scatter
-    # to cells, mirror the tripolar fold, then rotate/stagger onto the C-grid.
+    # to cells, then rotate/stagger onto the C-grid.
     @. fs.scratch1 = fs.F_τu * (1 - fs.sic) / reference_density
     @. fs.scratch2 = fs.F_τv * (1 - fs.sic) / reference_density
     τu_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
     τv_cells = vec(OC.interior(remapping.scratch_field_oc2, :, :, 1))
     scatter_polys_to_cells!(τu_cells, eg, fs.scratch1)
     scatter_polys_to_cells!(τv_cells, eg, fs.scratch2)
-    mirror_fold_partners!(τu_cells, grid)
-    mirror_fold_partners!(τv_cells, grid)
     oc_flux_u = surface_flux(sim.ocean.model.velocities.u)
     oc_flux_v = surface_flux(sim.ocean.model.velocities.v)
     set_from_extrinsic_vector!(
@@ -884,7 +877,6 @@ NVTX.@annotate function push_exchange_fluxes_to_ocean!(sim::OceananigansSimulati
         (1 - fs.sic) * (fs.F_lh + fs.F_sh) / (reference_density * heat_capacity)
     heat_cells = vec(OC.interior(remapping.scratch_field_oc3, :, :, 1))
     scatter_polys_to_cells!(heat_cells, eg, fs.scratch1)
-    mirror_fold_partners!(heat_cells, grid)
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
     OC.interior(oc_flux_T, :, :, 1) .+= OC.interior(remapping.scratch_field_oc3, :, :, 1)
 
@@ -893,7 +885,6 @@ NVTX.@annotate function push_exchange_fluxes_to_ocean!(sim::OceananigansSimulati
     @. fs.scratch1 = (1 - fs.sic) * fs.F_moisture / reference_density
     moisture_cells = vec(OC.interior(remapping.scratch_field_oc3, :, :, 1))
     scatter_polys_to_cells!(moisture_cells, eg, fs.scratch1)
-    mirror_fold_partners!(moisture_cells, grid)
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
     OC.interior(oc_flux_S, :, :, 1) .-=
@@ -922,11 +913,10 @@ function FluxCalculator.push_and_reset!(
             acc,
         )
     end
-    fs = sim.remapping.ocean_flux_state
-    average_and_reset_exchange_accumulators!(fs) || return nothing
+    n = acc.n_steps[]
+    iszero(n) && return nothing
+    average_and_reset_exchange_accumulators!(sim.remapping.ocean_flux_state, n)
     push_exchange_fluxes_to_ocean!(sim)
-    # Keep the (unused but still accumulated) boundary-space accumulator in
-    # sync so its averages stay well-defined.
     FluxCalculator.reset!(acc)
     return nothing
 end
@@ -1060,6 +1050,8 @@ NVTX.@annotate function push_exchange_radiation_to_ocean!(sim::OceananigansSimul
     fs.T_sfc .+= C_to_K
     gather_cells_to_polys!(fs.sic, eg, vec(OC.interior(sim.ice_concentration, :, :, 1)))
     gather_downward_flux!(fs.SW_d, remapping, csf.SW_d)
+    SW_d_diffuse = fs.scratch2
+    gather_downward_flux!(SW_d_diffuse, remapping, csf.SW_d_diffuse)
     gather_downward_flux!(fs.LW_d, remapping, csf.LW_d)
     gather_downward_flux!(fs.P_liq, remapping, csf.P_liq)
     gather_downward_flux!(fs.P_snow, remapping, csf.P_snow)
@@ -1075,7 +1067,6 @@ NVTX.@annotate function push_exchange_radiation_to_ocean!(sim::OceananigansSimul
         ) / (ρ_ref * c_p)
     rad_cells = vec(OC.interior(remapping.scratch_field_oc3, :, :, 1))
     scatter_polys_to_cells!(rad_cells, eg, fs.scratch1)
-    mirror_fold_partners!(rad_cells, grid)
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
     OC.interior(oc_flux_T, :, :, 1) .+= OC.interior(remapping.scratch_field_oc3, :, :, 1)
 
@@ -1085,7 +1076,6 @@ NVTX.@annotate function push_exchange_radiation_to_ocean!(sim::OceananigansSimul
     @. fs.scratch1 = (fs.P_liq + (1 - fs.sic) * fs.P_snow) / ρ_ref
     precip_cells = vec(OC.interior(remapping.scratch_field_oc3, :, :, 1))
     scatter_polys_to_cells!(precip_cells, eg, fs.scratch1)
-    mirror_fold_partners!(precip_cells, grid)
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     OC.interior(oc_flux_S, :, :, 1) .-=
         OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .*

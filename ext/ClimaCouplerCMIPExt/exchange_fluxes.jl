@@ -26,7 +26,8 @@ import ClimaComms
 Device-resident per-polygon scratch for the exchange-grid flux computation of
 one surface model (one instance for the ocean, one for sea ice): the gathered
 atmospheric and surface state (momentum in the UV basis; downwelling
-radiation `SW_d`/`LW_d` and precipitation `P_liq`/`P_snow`; `T_sfc` in [K]),
+radiation `SW_d`/`LW_d` and precipitation `P_liq`/`P_snow`; `T_sfc` in [K],
+`S_sfc` in [g kg⁻¹]),
 the flux outputs (`F_*`), running time accumulators for the slow-surface path
 (`acc_*`), and two generic scratch vectors.
 """
@@ -45,6 +46,7 @@ struct ExchangeFluxState{FT, VF <: AbstractVector{FT}}
     P_liq::VF
     P_snow::VF
     T_sfc::VF
+    S_sfc::VF
     sic::VF
     F_sh::VF
     F_lh::VF
@@ -149,10 +151,29 @@ NVTX.@annotate function gather_atmos_state_to_polys!(
     return nothing
 end
 
+"""
+    seawater_water_activity(S, seawater)
+
+Water activity of seawater of salinity `S` [g kg⁻¹], with sea salt as a solution of
+molar mass `M_s` [kg mol⁻¹] dissociating into `ν` ions, osmotic coefficient `φ`,
+in water of molar mass `M_w` [kg mol⁻¹] (`seawater = (; M_w, M_s, ν, φ)`):
+
+    ln a_w = -φ ν M_w m,    m = (S / 1000) / ((1 - S / 1000) M_s),
+
+with `m` the molality [mol kg⁻¹]. By Raoult's law, the vapor pressure at the sea
+surface is `a_w` times the saturation vapor pressure over pure liquid water.
+"""
+@inline function seawater_water_activity(S, seawater)
+    (; M_w, M_s, ν, φ) = seawater
+    s = S / 1000
+    m = s / ((1 - s) * M_s)
+    return exp(-φ * ν * M_w * m)
+end
+
 # SurfaceFluxes evaluation for one polygon, with scalar inputs so it can run inside
-# a kernel: surface density and saturation humidity from the atmospheric state, zero
-# surface velocity, zero displacement height. `update_T_sfc_cb` diagnoses the skin
-# temperature.
+# a kernel: surface density from the atmospheric state, surface specific humidity
+# from the surface vapor pressure `p_vap_sfc`, zero surface velocity, zero
+# displacement height. `update_T_sfc_cb` diagnoses the skin temperature.
 @inline function _polygon_surface_fluxes(
     surface_fluxes_params,
     thermo_params,
@@ -167,6 +188,7 @@ end
     height_int,
     height_sfc,
     T_sfc,
+    p_vap_sfc,
     update_T_sfc_cb = nothing,
 )
     FT = typeof(T_atmos)
@@ -180,7 +202,7 @@ end
         FT(0), # q_liq
         FT(0), # q_ice
     )
-    q_sfc = TD.q_vap_saturation(thermo_params, T_sfc, ρ_sfc, FT(0), FT(0))
+    q_sfc = TD.q_vap_from_p_vap(thermo_params, T_sfc, ρ_sfc, p_vap_sfc)
     uv_int = StaticArrays.SVector(u_atmos, v_atmos)
     return FluxCalculator.get_surface_fluxes(
         surface_fluxes_params,
@@ -225,9 +247,14 @@ end
     surface_fluxes_params,
     thermo_params,
     config,
+    seawater,
     accumulate,
 )
     k = @index(Global)
+    @inbounds T_sfc = fs.T_sfc[k]
+    @inbounds p_vap_sfc =
+        seawater_water_activity(fs.S_sfc[k], seawater) *
+        TD.saturation_vapor_pressure(thermo_params, T_sfc, TD.Liquid())
     @inbounds out = _polygon_surface_fluxes(
         surface_fluxes_params,
         thermo_params,
@@ -241,23 +268,26 @@ end
         fs.v_atmos[k],
         fs.height_int[k],
         fs.height_sfc[k],
-        fs.T_sfc[k],
+        T_sfc,
+        p_vap_sfc,
     )
     _store_polygon_fluxes!(fs, k, out, accumulate)
 end
 
 """
     compute_ocean_polygon_fluxes!(fs::ExchangeFluxState, surface_fluxes_params,
-                                  thermo_params, config, accumulate::Bool)
+                                  thermo_params, config, seawater, accumulate::Bool)
 
-Run the SurfaceFluxes evaluation for every exchange-grid polygon, storing the
-flux outputs and, if `accumulate`, adding them to the time accumulators.
+Run the SurfaceFluxes evaluation for every exchange-grid polygon, with the surface
+vapor pressure over seawater of salinity `fs.S_sfc` (see [`seawater_water_activity`](@ref)),
+storing the flux outputs and, if `accumulate`, adding them to the time accumulators.
 """
 NVTX.@annotate function compute_ocean_polygon_fluxes!(
     fs::ExchangeFluxState,
     surface_fluxes_params,
     thermo_params,
     config,
+    seawater,
     accumulate::Bool,
 )
     backend = KernelAbstractions.get_backend(fs.F_sh)
@@ -269,6 +299,7 @@ NVTX.@annotate function compute_ocean_polygon_fluxes!(
         surface_fluxes_params,
         thermo_params,
         config,
+        seawater,
         accumulate,
     )
     return nothing
@@ -326,6 +357,7 @@ end
         height_int,
         height_sfc,
         T_sfc_guess,
+        TD.saturation_vapor_pressure(thermo_params, T_sfc_guess, FT(0), FT(0)),
         update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt),
     )
 end

@@ -459,6 +459,15 @@ import SurfaceFluxes as SF
 import Thermodynamics.Parameters as TDP
 import ClimaParams as CP
 import ClimaCoupler: FieldExchanger, FluxCalculator, Interfacer, Utilities
+import Thermodynamics as TD
+
+param_dict = CP.create_toml_dict(FT)
+seawater = (;
+    M_w = param_dict["molar_mass_water"],
+    M_s = param_dict["seasalt_aerosol_molar_mass"],
+    ν = param_dict["seasalt_aerosol_ion_number"],
+    φ = param_dict["seasalt_aerosol_osmotic_coefficient"],
+)
 
 @testset "Per-polygon ocean fluxes" begin
     eg = CMIPExt.build_exchange_grid(boundary_space, coastal_grid)
@@ -486,6 +495,14 @@ import ClimaCoupler: FieldExchanger, FluxCalculator, Interfacer, Utilities
         height_sfc = FT(0),
         T_sfc = FT(290),
     )
+    S_sfc = FT(35)
+
+    @testset "seawater water activity" begin
+        # Pure water is unreduced; standard seawater lowers the vapor pressure by
+        # about 2% (the bulk-formula factor 0.98).
+        @test CMIPExt.seawater_water_activity(FT(0), seawater) == 1
+        @test CMIPExt.seawater_water_activity(S_sfc, seawater) ≈ 0.98 atol = 1e-3
+    end
 
     @testset "UV <-> CT12 round trip" begin
         import Random
@@ -515,6 +532,7 @@ import ClimaCoupler: FieldExchanger, FluxCalculator, Interfacer, Utilities
         fs.height_int .= state.height_int
         fs.height_sfc .= state.height_sfc
         fs.T_sfc .= state.T_sfc
+        fs.S_sfc .= S_sfc
         fs.sic .= 0
 
         CMIPExt.compute_ocean_polygon_fluxes!(
@@ -522,14 +540,19 @@ import ClimaCoupler: FieldExchanger, FluxCalculator, Interfacer, Utilities
             surface_fluxes_params,
             thermo_params,
             config,
+            seawater,
             true,
         )
 
+        p_vap_sfc =
+            CMIPExt.seawater_water_activity(S_sfc, seawater) *
+            TD.saturation_vapor_pressure(thermo_params, state.T_sfc, TD.Liquid())
         reference = CMIPExt._polygon_surface_fluxes(
             surface_fluxes_params,
             thermo_params,
             config,
             state...,
+            p_vap_sfc,
         )
         @test all(fs.F_sh .== reference.F_sh)
         @test all(fs.F_lh .== reference.F_lh)
@@ -856,6 +879,7 @@ end
     )
     fs = CMIPExt.ExchangeFluxState{FT}(exchange_arch(), length(eg.area))
     fs.T_sfc .= FT(290)
+    fs.S_sfc .= FT(35)
     fs.sic .= 0
 
     function ocean_driver!()
@@ -871,6 +895,7 @@ end
             surface_fluxes_params,
             thermo_params,
             config,
+            seawater,
             true,
         )
         fs.scratch2 .= 1 .- fs.sic

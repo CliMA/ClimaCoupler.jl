@@ -226,6 +226,11 @@ function OceananigansSimulation(
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         C_to_K = coupled_param_dict["temperature_water_freeze"],
         coare3_roughness_params,
+        # Sea salt as an NaCl solution, for the water activity of seawater
+        molar_mass_water = coupled_param_dict["molar_mass_water"],
+        molar_mass_salt = coupled_param_dict["seasalt_aerosol_molar_mass"],
+        salt_ion_number = coupled_param_dict["seasalt_aerosol_ion_number"],
+        salt_osmotic_coefficient = coupled_param_dict["seasalt_aerosol_osmotic_coefficient"],
     )
 
     ocean = ocean_simulation(
@@ -765,8 +770,8 @@ end
 
 Compute atmosphere-ocean turbulent fluxes on the exchange (intersection)
 grid: one SurfaceFluxes evaluation per polygon, with the atmospheric state
-gathered from the SE nodes and the SST read directly from the owning ocean
-cell. The per-polygon fluxes are aggregated to the boundary space (see
+gathered from the SE nodes and the surface temperature and salinity read directly
+from the owning ocean cell. The per-polygon fluxes are aggregated to the boundary space (see
 `scatter_poly_fluxes_to_boundary!`) and handed to
 `FluxCalculator.update_flux_fields!`, which applies the (exchange-grid
 derived) area-fraction weighting for the coupler sums and triggers the
@@ -815,6 +820,11 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
         vec(OC.interior(sim.ocean.model.tracers.T, :, :, Nz)),
     )
     fs.T_sfc .+= FT(sim.ocean_properties.C_to_K)
+    gather_cells_to_polys!(
+        fs.S_sfc,
+        eg,
+        vec(OC.interior(sim.ocean.model.tracers.S, :, :, Nz)),
+    )
     gather_cells_to_polys!(fs.sic, eg, vec(OC.interior(sim.ice_concentration, :, :, 1)))
 
     # COARE3 roughness is spatially uniform, so the whole flux configuration
@@ -823,11 +833,20 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
         SF.COARE3RoughnessParams{FT}(),
         SF.ConstantGustinessSpec(FT(1)),
     )
+    (; molar_mass_water, molar_mass_salt, salt_ion_number, salt_osmotic_coefficient) =
+        sim.ocean_properties
+    seawater = (;
+        M_w = FT(molar_mass_water),
+        M_s = FT(molar_mass_salt),
+        ν = FT(salt_ion_number),
+        φ = FT(salt_osmotic_coefficient),
+    )
     compute_ocean_polygon_fluxes!(
         fs,
         surface_fluxes_params,
         thermo_params,
         config,
+        seawater,
         !isnothing(accumulator),
     )
 

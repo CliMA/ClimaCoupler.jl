@@ -4,6 +4,10 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Fix land restarts
+Restarted runs with a ClimaLand model now start the land model at the restart time instead of
+`t = 0` when not using `ITime`.
+
 #### Add ocean config options
 New `ocean_float_type` (`Float64` by default) and `ocean_vertical_levels` (60 by default) options set the
 Oceananigans float type and number of levels.

@@ -184,6 +184,7 @@ function ClimaLandSimulation(
             reduction_period = land_diagnostics_period,
             reduction_type = land_diagnostics_reduction,
             dt = float(dt),
+            date_last = sim_start_date,
         )
     else
         output_writer = nothing

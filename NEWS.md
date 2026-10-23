@@ -4,6 +4,13 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Update to ClimaDiagnostics v0.4
+Time-reduced diagnostics no longer include the initial state, so the first
+window is no longer `NaN` for fields such as shortwave fluxes, and coupler,
+  atmosphere. NetCDF diagnostics no longer have `date` and `date_bnds`, and
+  `time` is in seconds since `start_date`. `DictWriter` and `HDF5Writer` save
+  time-reduced diagnostics at the start of their window.
+
 #### Fix land restarts
 Restarted runs with a ClimaLand model now start the land model at the restart time instead of
 `t = 0` when not using `ITime`.

@@ -174,6 +174,7 @@ function BucketSimulation(
             reduction_period = land_diagnostics_period,
             reduction_type = land_diagnostics_reduction,
             dt = float(dt),
+            date_last = start_date + Dates.Second(float(tspan[1])),
         )
     else
         diagnostics = nothing

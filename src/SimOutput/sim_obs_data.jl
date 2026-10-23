@@ -80,11 +80,6 @@ function get_sim_var_dict(diagnostics_folder_path)
                     "mm/day",
                     conversion_function = x -> x .* Float32(-86400),
                 )
-                # For ClimaDiagnostics v0.3 and later, the dates are saved at
-                # the start of the reduction period
-                pkgversion(CD) < v"0.3" && (
-                    sim_var = ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
-                )
                 return sim_var
             end
     )
@@ -99,12 +94,6 @@ function get_sim_var_dict(diagnostics_folder_path)
                         reduction = "average",
                         period = "1M",
                         coord_type = nothing,
-                    )
-                    # For ClimaDiagnostics v0.3 and later, the dates are saved at
-                    # the start of the reduction period
-                    pkgversion(CD) < v"0.3" && (
-                        sim_var =
-                            ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
                     )
                     return sim_var
                 end

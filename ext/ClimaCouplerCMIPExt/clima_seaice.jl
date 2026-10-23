@@ -167,6 +167,18 @@ function ClimaSeaIceSimulation(
         skin_accumulator(grid),
     )
 
+    # Polygon skin temperatures [K] until the first skin-temperature solve
+    if remapping.use_exchange_grid
+        T_sfc_new = remapping.ice_flux_state.T_sfc_new
+        T_top = top_thermodynamics(sim).top_surface_temperature
+        gather_cells_to_polys!(
+            T_sfc_new,
+            remapping.exchange_grid,
+            vec(OC.interior(T_top, :, :, 1)),
+        )
+        T_sfc_new .+= eltype(T_sfc_new)(ice_properties.C_to_K)
+    end
+
     add_seaice_diagnostics!(
         sim;
         output_dir,
@@ -260,6 +272,37 @@ top_thermodynamics(sim::ClimaSeaIceSimulation) =
 # Surface temperature from last timestep (Celsius → Kelvin)
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
     sim.ice_properties.C_to_K + top_thermodynamics(sim).top_surface_temperature
+
+"""
+    Interfacer.get_field!(target_field, sim::ClimaSeaIceSimulation, ::Val{:surface_temperature})
+
+Ice surface temperature on the boundary space, from which the atmosphere computes the
+emitted longwave. With the exchange grid it is the SIC-weighted control-volume transfer
+of `T⁴` of each polygon's last diagnosed skin temperature, so that the ice area fraction
+times `ϵσT⁴` integrates to the emission charged to the ice, `Σ_k b_area_k SIC_k ϵσT_k⁴`.
+"""
+function Interfacer.get_field!(
+    target_field,
+    sim::ClimaSeaIceSimulation,
+    ::Val{:surface_temperature},
+)
+    remapping = sim.remapping
+    if !remapping.use_exchange_grid
+        surface_temperature = Interfacer.get_field(sim, Val(:surface_temperature))
+        Interfacer.remap!(target_field, surface_temperature, remapping)
+        return nothing
+    end
+    is = remapping.ice_flux_state
+    fs = is.fluxes
+    @. fs.scratch2 = is.T_sfc_new^4
+    gather_cells_to_polys!(
+        fs.scratch1,
+        remapping.exchange_grid,
+        vec(OC.interior(sim.ice.model.ice_concentration, :, :, 1)),
+    )
+    emission_temperature!(target_field, remapping, fs.scratch2, fs.scratch1)
+    return nothing
+end
 
 """
     FluxCalculator.compute_surface_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim, thermo_params)

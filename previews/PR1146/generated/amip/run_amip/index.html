@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>AMIP Driver · ClimaCoupler.jl</title><script data-outdated-warner src="../../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../../assets/documenter.js"></script><script src="../../../siteinfo.js"></script><script src="../../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../../"><img src="../../../assets/logo.svg" alt="ClimaCoupler.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../../">ClimaCoupler.jl</a></span></div><form class="docs-search" action="../../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../../">Home</a></li><li><span class="tocitem">Examples</span><ul><li><input class="collapse-toggle" id="menuitem-2-1" type="checkbox"/><label class="tocitem" for="menuitem-2-1"><span class="docs-label">Sea Breeze</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../sea_breeze/atmos_rhs/">Atmospheric Model</a></li><li><a class="tocitem" href="../../sea_breeze/land_rhs/">Land Model</a></li><li><a class="tocitem" href="../../sea_breeze/ocean_rhs/">Ocean Model</a></li><li><a class="tocitem" href="../../sea_breeze/run/">Coupled Sea Breeze</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-2-2" type="checkbox" checked/><label class="tocitem" for="menuitem-2-2"><span class="docs-label">AMIP</span><i class="docs-chevron"></i></label><ul class="collapsed"><li class="is-active"><a class="tocitem" href>AMIP Driver</a><ul class="internal"><li><a class="tocitem" href="#Overview"><span>Overview</span></a></li><li><a class="tocitem" href="#Logging"><span>Logging</span></a></li><li><a class="tocitem" href="#Configuration-initialization"><span>Configuration initialization</span></a></li><li><a class="tocitem" href="#ClimaESM-packages"><span>ClimaESM packages</span></a></li><li><a class="tocitem" href="#Coupler-specific-imports"><span>Coupler specific imports</span></a></li><li><a class="tocitem" href="#Data-File-Paths"><span>Data File Paths</span></a></li><li><a class="tocitem" href="#Component-Model-Initialization"><span>Component Model Initialization</span></a></li><li><a class="tocitem" href="#Coupler-Initialization"><span>Coupler Initialization</span></a></li><li><a class="tocitem" href="#Initialize-Conservation-Checks"><span>Initialize Conservation Checks</span></a></li><li><a class="tocitem" href="#Initialize-Callbacks"><span>Initialize Callbacks</span></a></li><li><a class="tocitem" href="#Initialize-turbulent-fluxes"><span>Initialize turbulent fluxes</span></a></li><li><a class="tocitem" href="#Initialize-Coupled-Simulation"><span>Initialize Coupled Simulation</span></a></li><li><a class="tocitem" href="#Restart-component-model-states-if-specified"><span>Restart component model states if specified</span></a></li><li><a class="tocitem" href="#Initialize-Component-Model-Exchange"><span>Initialize Component Model Exchange</span></a></li><li><a class="tocitem" href="#Coupling-Loop"><span>Coupling Loop</span></a></li><li><a class="tocitem" href="#Precompilation-of-Coupling-Loop"><span>Precompilation of Coupling Loop</span></a></li><li><a class="tocitem" href="#Solving-and-Timing-the-Full-Simulation"><span>Solving and Timing the Full Simulation</span></a></li><li><a class="tocitem" href="#Postprocessing"><span>Postprocessing</span></a></li></ul></li></ul></li></ul></li><li><span class="tocitem">Coupler Interface</span><ul><li><a class="tocitem" href="../../../checkpointer/">Checkpointer</a></li><li><a class="tocitem" href="../../../conservation/">Conservation Checks</a></li><li><a class="tocitem" href="../../../fieldexchanger/">FieldExchanger</a></li><li><a class="tocitem" href="../../../fluxcalculator/">FluxCalculator</a></li><li><a class="tocitem" href="../../../interfacer/">Interfacer</a></li><li><a class="tocitem" href="../../../timemanager/">TimeManager</a></li><li><a class="tocitem" href="../../../utilities/">Utilities</a></li></ul></li><li><span class="tocitem">Performance</span><ul><li><a class="tocitem" href="../../../performance/">Performance Analysis Tools</a></li></ul></li><li><span class="tocitem">Model Output</span><ul><li><a class="tocitem" href="../../../diagnostics/">Diagnostics</a></li><li><a class="tocitem" href="../../../leaderboard/">Leaderboard</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li><a class="is-disabled">AMIP</a></li><li class="is-active"><a href>AMIP Driver</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>AMIP Driver</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/CliMA/ClimaCoupler.jl/blob/main/docs/src/generated/amip/run_amip.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="AMIP-Driver"><a class="docs-heading-anchor" href="#AMIP-Driver">AMIP Driver</a><a id="AMIP-Driver-1"></a><a class="docs-heading-anchor-permalink" href="#AMIP-Driver" title="Permalink"></a></h1><h2 id="Overview"><a class="docs-heading-anchor" href="#Overview">Overview</a><a id="Overview-1"></a><a class="docs-heading-anchor-permalink" href="#Overview" title="Permalink"></a></h2><p>AMIP is a standard experimental protocol of the Program for Climate Model Diagnosis &amp; Intercomparison (PCMDI). It is used as a model benchmark for the atmospheric and land model components, while sea-surface temperatures (SST) and sea-ice concentration (SIC) are prescribed using time-interpolations between monthly observed data. We use standard data files with original sources:</p><ul><li>SST and SIC: https://gdex.ucar.edu/dataset/158_asphilli.html</li><li>land-sea mask: https://www.ncl.ucar.edu/Applications/Data/#cdf</li></ul><p>For more information, see the PCMDI&#39;s specifications for <a href="https://pcmdi.github.io/mips/amip/">AMIP I</a> and <a href="https://pcmdi.github.io/mips/amip2/">AMIP II</a>.</p><p>This driver contains two modes. The full <code>AMIP</code> mode and a <code>SlabPlanet</code> (all surfaces are thermal slabs) mode. Since <code>AMIP</code> is not a closed system, the <code>SlabPlanet</code> mode is useful for checking conservation properties of the coupling.</p><h2 id="Logging"><a class="docs-heading-anchor" href="#Logging">Logging</a><a id="Logging-1"></a><a class="docs-heading-anchor-permalink" href="#Logging" title="Permalink"></a></h2><p>When Julia 1.10+ is used interactively, stacktraces contain reduced type information to make them shorter. Given that ClimaCore objects are heavily parametrized, non-abbreviated stacktraces are hard to read, so we force abbreviated stacktraces even in non-interactive runs. (See also <code>Base.type_limited_string_from_context()</code>)</p><pre><code class="language-julia hljs">redirect_stderr(IOContext(stderr, :stacktrace_types_limited =&gt; Ref(false)))</code></pre><h2 id="Configuration-initialization"><a class="docs-heading-anchor" href="#Configuration-initialization">Configuration initialization</a><a id="Configuration-initialization-1"></a><a class="docs-heading-anchor-permalink" href="#Configuration-initialization" title="Permalink"></a></h2><p>Here we import standard Julia packages, ClimaESM packages, parse in command-line arguments (if none are specified then the defaults in <code>cli_options.jl</code> apply). We then specify the input data file names. If these are not already downloaded, include <code>artifacts/download_artifacts.jl</code>.</p><h3 id="Package-Import"><a class="docs-heading-anchor" href="#Package-Import">Package Import</a><a id="Package-Import-1"></a><a class="docs-heading-anchor-permalink" href="#Package-Import" title="Permalink"></a></h3><pre><code class="language-julia hljs"># standard packages
+import Dates
+import DelimitedFiles</code></pre><h2 id="ClimaESM-packages"><a class="docs-heading-anchor" href="#ClimaESM-packages">ClimaESM packages</a><a id="ClimaESM-packages-1"></a><a class="docs-heading-anchor-permalink" href="#ClimaESM-packages" title="Permalink"></a></h2><pre><code class="language-julia hljs">import ClimaAtmos as CA
+import ClimaComms
+import ClimaCore as CC</code></pre><h2 id="Coupler-specific-imports"><a class="docs-heading-anchor" href="#Coupler-specific-imports">Coupler specific imports</a><a id="Coupler-specific-imports-1"></a><a class="docs-heading-anchor-permalink" href="#Coupler-specific-imports" title="Permalink"></a></h2><pre><code class="language-julia hljs">import ClimaCoupler
+import ClimaCoupler:
+    ConservationChecker, Checkpointer, FieldExchanger, FluxCalculator, Interfacer, TimeManager, Utilities
+import ClimaCoupler.Interfacer:
+    AbstractSlabplanetSimulationMode,
+    AMIPMode,
+    SlabplanetAquaMode,
+    SlabplanetEisenmanMode,
+    SlabplanetMode,
+    SlabplanetTerraMode
+
+import ClimaUtilities.SpaceVaryingInputs: SpaceVaryingInput
+import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
+import ClimaUtilities.Utils: period_to_seconds_float
+import ClimaUtilities.ClimaArtifacts: @clima_artifact
+import Interpolations # triggers InterpolationsExt in ClimaUtilities</code></pre><p>Random is used by RRMTGP for some cloud properties</p><pre><code class="language-julia hljs">import Random</code></pre><p>TODO: Move to ClimaUtilities once we move the Schedules to ClimaUtilities</p><pre><code class="language-julia hljs">import ClimaDiagnostics.Schedules: EveryCalendarDtSchedule
+
+pkg_dir = pkgdir(ClimaCoupler)</code></pre><h3 id="Helper-Functions"><a class="docs-heading-anchor" href="#Helper-Functions">Helper Functions</a><a id="Helper-Functions-1"></a><a class="docs-heading-anchor-permalink" href="#Helper-Functions" title="Permalink"></a></h3><p>These will be eventually moved to their respective component model and utility packages, and so they should not contain any internals of the ClimaCoupler source code, except extensions to the Interfacer functions.</p><pre><code class="language-julia hljs"># helpers for component models
+include(&quot;components/atmosphere/climaatmos.jl&quot;)
+include(&quot;components/land/climaland_bucket.jl&quot;)
+include(&quot;components/ocean/slab_ocean.jl&quot;)
+include(&quot;components/ocean/prescr_ocean.jl&quot;)
+include(&quot;components/ocean/prescr_seaice.jl&quot;)
+include(&quot;components/ocean/eisenman_seaice.jl&quot;)</code></pre><h3 id="Configuration-Dictionaries"><a class="docs-heading-anchor" href="#Configuration-Dictionaries">Configuration Dictionaries</a><a id="Configuration-Dictionaries-1"></a><a class="docs-heading-anchor-permalink" href="#Configuration-Dictionaries" title="Permalink"></a></h3><p>Each simulation mode has its own configuration dictionary. The <code>config_dict</code> of each simulation is a merge of the default configuration dictionary and the simulation-specific configuration dictionary, which allows the user to override the default settings.</p><p>We can additionally pass the configuration dictionary to the component model initializers, which will then override the default settings of the component models.</p><pre><code class="language-julia hljs">include(&quot;cli_options.jl&quot;)
+include(&quot;user_io/arg_parsing.jl&quot;)
+include(&quot;user_io/postprocessing.jl&quot;)
+config_dict = get_coupler_config()</code></pre><p>Select the correct timestep for each component model based on which are available</p><pre><code class="language-julia hljs">parse_component_dts!(config_dict)</code></pre><p>Add extra diagnostics if specified</p><pre><code class="language-julia hljs">add_extra_diagnostics!(config_dict)
+
+(;
+    job_id,
+    sim_mode,
+    random_seed,
+    FT,
+    comms_ctx,
+    t_end,
+    t_start,
+    date0,
+    date,
+    Δt_cpl,
+    component_dt_dict,
+    saveat,
+    checkpoint_dt,
+    restart_dir,
+    restart_t,
+    use_coupler_diagnostics,
+    use_land_diagnostics,
+    calendar_dt,
+    evolving_ocean,
+    mono_surface,
+    turb_flux_partition,
+    land_domain_type,
+    land_albedo_type,
+    land_initial_condition,
+    land_temperature_anomaly,
+    energy_check,
+    conservation_softfail,
+    output_dir_root,
+    plot_diagnostics,
+) = get_coupler_args(config_dict)</code></pre><h3 id="I/O-Directory-Setup-setup_output_dirs-returns-dir_paths.output"><a class="docs-heading-anchor" href="#I/O-Directory-Setup-setup_output_dirs-returns-dir_paths.output">I/O Directory Setup <code>setup_output_dirs</code> returns `dir_paths.output =</a><a id="I/O-Directory-Setup-setup_output_dirs-returns-dir_paths.output-1"></a><a class="docs-heading-anchor-permalink" href="#I/O-Directory-Setup-setup_output_dirs-returns-dir_paths.output" title="Permalink"></a></h3><p>COUPLER<em>OUTPUT</em>DIR<code>, which is the directory where the output of the simulation will be saved,</code>dir<em>paths.artifacts<code>is the directory where the plots (from postprocessing and the conservation checks) of the simulation will be saved, #and</code>dir</em>paths.checkpoints`, where restart files are saved.</p><pre><code class="language-julia hljs">COUPLER_OUTPUT_DIR = joinpath(output_dir_root, job_id)
+dir_paths = Utilities.setup_output_dirs(output_dir = COUPLER_OUTPUT_DIR, comms_ctx = comms_ctx)
+@info &quot;Coupler output directory $(dir_paths.output)&quot;
+@info &quot;Coupler artifacts directory $(dir_paths.artifacts)&quot;
+@info &quot;Coupler checkpoint directory $(dir_paths.checkpoints)&quot;
+
+atmos_output_dir = joinpath(dir_paths.output, &quot;clima_atmos&quot;)
+isdir(atmos_output_dir) || mkpath(atmos_output_dir)
+land_output_dir = joinpath(dir_paths.output, &quot;clima_land&quot;)
+isdir(land_output_dir) || mkpath(land_output_dir)
+
+
+# get component model dictionaries (if applicable)
+# Note this step must come after parsing the coupler config dictionary, since
+#  some parameters are passed from the coupler config to the component model configs
+atmos_config_dict = get_atmos_config_dict(config_dict, job_id, atmos_output_dir)
+(; dt_rad, output_default_diagnostics) = get_atmos_args(atmos_config_dict)
+
+# set unique random seed if desired, otherwise use default
+Random.seed!(random_seed)
+@info &quot;Random seed set to $(random_seed)&quot;
+
+tspan = (t_start, t_end)</code></pre><h2 id="Data-File-Paths"><a class="docs-heading-anchor" href="#Data-File-Paths">Data File Paths</a><a id="Data-File-Paths-1"></a><a class="docs-heading-anchor-permalink" href="#Data-File-Paths" title="Permalink"></a></h2><pre><code class="language-julia hljs">co2_data = joinpath(@clima_artifact(&quot;co2_dataset&quot;, comms_ctx), &quot;co2_mm_mlo.txt&quot;)
+land_mask_data = joinpath(@clima_artifact(&quot;landsea_mask_60arcseconds&quot;, comms_ctx), &quot;landsea_mask.nc&quot;)</code></pre><h2 id="Component-Model-Initialization"><a class="docs-heading-anchor" href="#Component-Model-Initialization">Component Model Initialization</a><a id="Component-Model-Initialization-1"></a><a class="docs-heading-anchor-permalink" href="#Component-Model-Initialization" title="Permalink"></a></h2><p>Here we set initial and boundary conditions for each component model. Each component model is required to have an <code>init</code> function that returns a <code>ComponentModelSimulation</code> object (see <code>Interfacer</code> docs for more details).</p><h3 id="Atmosphere"><a class="docs-heading-anchor" href="#Atmosphere">Atmosphere</a><a id="Atmosphere-1"></a><a class="docs-heading-anchor-permalink" href="#Atmosphere" title="Permalink"></a></h3><p>This uses the <code>ClimaAtmos.jl</code> model, with parameterization options specified in the <code>atmos_config_object</code> dictionary.</p><pre><code class="language-julia hljs">Utilities.show_memory_usage()
+
+# init atmos model component
+atmos_sim = ClimaAtmosSimulation(CA.AtmosConfig(atmos_config_dict));</code></pre><p>Get surface elevation from <code>atmos</code> coordinate field</p><pre><code class="language-julia hljs">surface_elevation = CC.Fields.level(CC.Fields.coordinate_field(atmos_sim.integrator.u.f).z, CC.Utilities.half)
+Utilities.show_memory_usage()
+
+thermo_params = get_thermo_params(atmos_sim) # TODO: this should be shared by all models #342</code></pre><h3 id="Boundary-Space"><a class="docs-heading-anchor" href="#Boundary-Space">Boundary Space</a><a id="Boundary-Space-1"></a><a class="docs-heading-anchor-permalink" href="#Boundary-Space" title="Permalink"></a></h3><p>We use a common <code>Space</code> for all global surfaces. This enables the MPI processes to operate on the same columns in both the atmospheric and surface components, so exchanges are parallelized. Note this is only possible when the atmosphere and surface are of the same horizontal resolution.</p><p>Currently, we use the 2D surface space from the atmosphere model as our shared space, but ultimately we want this to specified within the coupler and passed to all component models. (see issue #665)</p><pre><code class="language-julia hljs"># init a 2D boundary space at the surface
+boundary_space = CC.Spaces.horizontal_space(atmos_sim.domain.face_space) # TODO: specify this in the coupler and pass it to all component models #665</code></pre><h3 id="Land-sea-Fraction"><a class="docs-heading-anchor" href="#Land-sea-Fraction">Land-sea Fraction</a><a id="Land-sea-Fraction-1"></a><a class="docs-heading-anchor-permalink" href="#Land-sea-Fraction" title="Permalink"></a></h3><p>This is a static field that contains the area fraction of land and sea, ranging from 0 to 1. If applicable, sea ice is included in the sea fraction at this stage. Note that land-sea area fraction is different to the land-sea mask, which is a binary field (masks are used internally by the coupler to indicate passive cells that are not populated by a given component model).</p><p>Preprocess the file to be 1s and 0s before remapping into onto the grid</p><pre><code class="language-julia hljs">land_fraction = SpaceVaryingInput(land_mask_data, &quot;landsea&quot;, boundary_space)
+if !mono_surface
+    land_fraction = Utilities.binary_mask.(land_fraction)
+end
+Utilities.show_memory_usage()</code></pre><h3 id="Surface-Models:-AMIP-and-SlabPlanet-Modes"><a class="docs-heading-anchor" href="#Surface-Models:-AMIP-and-SlabPlanet-Modes">Surface Models: AMIP and SlabPlanet Modes</a><a id="Surface-Models:-AMIP-and-SlabPlanet-Modes-1"></a><a class="docs-heading-anchor-permalink" href="#Surface-Models:-AMIP-and-SlabPlanet-Modes" title="Permalink"></a></h3><p>Both modes evolve <code>ClimaLand.jl</code>&#39;s bucket model.</p><p>In the <code>AMIP</code> mode, all ocean properties are prescribed from a file, while sea-ice temperatures are calculated using observed SIC and assuming a 2m thickness of the ice.</p><p>In the <code>SlabPlanet</code> mode, all ocean and sea ice are dynamical models, namely thermal slabs, with different parameters. We have several <code>SlabPlanet</code> versions</p><ul><li><code>slabplanet</code> = land + slab ocean</li><li><code>slabplanet_aqua</code> = slab ocean everywhere</li><li><code>slabplanet_terra</code> = land everywhere</li><li><code>slabplanet_eisenman</code> = land + slab ocean + slab sea ice with an evolving thickness</li></ul><p>In this section of the code, we initialize all component models and read in the prescribed data we&#39;ll be using. The specific models and data that are set up depend on which mode we&#39;re running.</p><pre><code class="language-julia hljs">@info(sim_mode)
+if sim_mode &lt;: AMIPMode
+    @info(&quot;AMIP boundary conditions - do not expect energy conservation&quot;)
+
+    # land model
+    land_sim = BucketSimulation(
+        FT,
+        tspan,
+        land_domain_type,
+        land_albedo_type,
+        land_initial_condition,
+        land_temperature_anomaly,
+        land_output_dir;
+        dt = component_dt_dict[&quot;dt_land&quot;],
+        space = boundary_space,
+        saveat = saveat,
+        area_fraction = land_fraction,
+        date_ref = date0,
+        t_start = t_start,
+        energy_check = energy_check,
+        surface_elevation,
+        use_land_diagnostics,
+    )
+
+    # sea ice model
+    ice_sim = PrescribedIceSimulation(
+        FT;
+        tspan = tspan,
+        dt = component_dt_dict[&quot;dt_seaice&quot;],
+        saveat = saveat,
+        space = boundary_space,
+        thermo_params = thermo_params,
+        comms_ctx,
+        date0,
+        mono_surface,
+        land_fraction,
+    )
+
+    # ocean model using prescribed data
+    ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
+    ocean_fraction = FT(1) .- ice_fraction .- land_fraction
+    ocean_sim = PrescribedOceanSimulation(FT, boundary_space, date0, t_start, ocean_fraction, thermo_params, comms_ctx)
+
+    # CO2 concentration from temporally varying file
+    CO2_text = DelimitedFiles.readdlm(co2_data, Float64; comments = true)</code></pre><p>The text file only has month and year, so we set the day to 15th of the month</p><pre><code class="language-julia hljs">    years = CO2_text[:, 1]
+    months = CO2_text[:, 2]
+    CO2_dates = Dates.DateTime.(years, months) + Dates.Day(14)
+    CO2_times = period_to_seconds_float.(CO2_dates .- date0)</code></pre><p>convert from ppm to fraction, data is in fourth column of the text file</p><pre><code class="language-julia hljs">    CO2_vals = CO2_text[:, 4] .* 10^(-6)
+    CO2_timevaryinginput = TimeVaryingInput(CO2_times, CO2_vals;)
+
+    CO2_init = zeros(boundary_space)
+    evaluate!(CO2_init, CO2_timevaryinginput, t_start)
+    CO2_field = Interfacer.update_field!(atmos_sim, Val(:co2), CO2_init)
+
+    mode_specifics = (; type = sim_mode, CO2_timevaryinginput = CO2_timevaryinginput)
+    Utilities.show_memory_usage()
+
+elseif (sim_mode &lt;: AbstractSlabplanetSimulationMode) &amp;&amp; !(sim_mode &lt;: SlabplanetEisenmanMode)
+
+
+    land_fraction = sim_mode &lt;: SlabplanetAquaMode ? land_fraction .* 0 : land_fraction
+    land_fraction = sim_mode &lt;: SlabplanetTerraMode ? land_fraction .* 0 .+ 1 : land_fraction
+
+    # land model
+    land_sim = BucketSimulation(
+        FT,
+        tspan,
+        land_domain_type,
+        land_albedo_type,
+        land_initial_condition,
+        land_temperature_anomaly,
+        land_output_dir;
+        dt = component_dt_dict[&quot;dt_land&quot;],
+        space = boundary_space,
+        saveat = saveat,
+        area_fraction = land_fraction,
+        date_ref = date0,
+        t_start = t_start,
+        energy_check = energy_check,
+        surface_elevation,
+        use_land_diagnostics,
+    )
+
+    # ocean model
+    ocean_sim = SlabOceanSimulation(
+        FT;
+        tspan = tspan,
+        dt = component_dt_dict[&quot;dt_ocean&quot;],
+        space = boundary_space,
+        saveat = saveat,
+        area_fraction = (FT(1) .- land_fraction), ## NB: this ocean fraction includes areas covered by sea ice (unlike the one contained in the cs)
+        thermo_params = thermo_params,
+        evolving = evolving_ocean,
+    )
+
+    # sea ice stub (here set to zero area coverage)
+    ice_sim = Interfacer.SurfaceStub((;
+        T_sfc = ones(boundary_space),
+        ρ_sfc = zeros(boundary_space),
+        z0m = FT(0),
+        z0b = FT(0),
+        beta = FT(1),
+        α_direct = ones(boundary_space),
+        α_diffuse = ones(boundary_space),
+        area_fraction = zeros(boundary_space),
+        phase = TD.Ice(),
+        thermo_params = thermo_params,
+    ))
+
+    mode_specifics = (; type = sim_mode)
+    Utilities.show_memory_usage()
+
+elseif sim_mode &lt;: SlabplanetEisenmanMode
+
+    # land model
+    land_sim = BucketSimulation(
+        FT,
+        tspan,
+        land_domain_type,
+        land_albedo_type,
+        land_initial_condition,
+        land_temperature_anomaly,
+        land_output_dir;
+        dt = component_dt_dict[&quot;dt_land&quot;],
+        space = boundary_space,
+        saveat = saveat,
+        area_fraction = land_fraction,
+        date_ref = date0,
+        t_start = t_start,
+        energy_check = energy_check,
+        surface_elevation,
+        use_land_diagnostics,
+    )
+
+    # ocean stub (here set to zero area coverage)
+    ocean_sim = SlabOceanSimulation(
+        FT;
+        tspan = tspan,
+        dt = component_dt_dict[&quot;dt_ocean&quot;],
+        space = boundary_space,
+        saveat = saveat,
+        area_fraction = zeros(boundary_space), # zero, since ML is calculated below
+        thermo_params = thermo_params,
+    )
+
+    # sea ice + ocean model
+    ice_sim = EisenmanIceSimulation(
+        FT,
+        tspan,
+        space = boundary_space,
+        area_fraction = (FT(1) .- land_fraction),
+        dt = component_dt_dict[&quot;dt_seaice&quot;],
+        saveat = saveat,
+        thermo_params = thermo_params,
+    )
+
+    mode_specifics = (; type = sim_mode)
+    Utilities.show_memory_usage()
+end</code></pre><h2 id="Coupler-Initialization"><a class="docs-heading-anchor" href="#Coupler-Initialization">Coupler Initialization</a><a id="Coupler-Initialization-1"></a><a class="docs-heading-anchor-permalink" href="#Coupler-Initialization" title="Permalink"></a></h2><p>The coupler needs to contain exchange information, access all component models, and manage the calendar, among other responsibilities. Objects containing information to enable these are initialized here and saved in the global <code>CoupledSimulation</code> struct, <code>cs</code>, below.</p><pre><code class="language-julia hljs"># coupler exchange fields
+coupler_field_names = (
+    :T_S,
+    :z0m_S,
+    :z0b_S,
+    :ρ_sfc,
+    :q_sfc,
+    :surface_direct_albedo,
+    :surface_diffuse_albedo,
+    :beta,
+    :F_turb_energy,
+    :F_turb_moisture,
+    :F_turb_ρτxz,
+    :F_turb_ρτyz,
+    :F_radiative,
+    :P_liq,
+    :P_snow,
+    :radiative_energy_flux_toa,
+    :P_net,
+    :temp1,
+    :temp2,
+)
+coupler_fields = NamedTuple{coupler_field_names}(ntuple(i -&gt; zeros(boundary_space), length(coupler_field_names)))
+Utilities.show_memory_usage()
+
+# model simulations
+model_sims = (atmos_sim = atmos_sim, ice_sim = ice_sim, land_sim = land_sim, ocean_sim = ocean_sim);
+
+# dates
+dates = (; date = [date], date0 = [date0])</code></pre><h2 id="Initialize-Conservation-Checks"><a class="docs-heading-anchor" href="#Initialize-Conservation-Checks">Initialize Conservation Checks</a><a id="Initialize-Conservation-Checks-1"></a><a class="docs-heading-anchor-permalink" href="#Initialize-Conservation-Checks" title="Permalink"></a></h2><p>The conservation checks are used to monitor the global energy and water conservation of the coupled system. The checks are only applicable to the <code>slabplanet</code> mode, as the <code>amip</code> mode is not a closed system. The conservation checks are initialized here and saved in a global <code>ConservationChecks</code> struct, <code>conservation_checks</code>, which is then stored as part of the larger <code>cs</code> struct.</p><pre><code class="language-julia hljs"># init conservation info collector
+conservation_checks = nothing
+if energy_check
+    @assert(
+        sim_mode &lt;: AbstractSlabplanetSimulationMode &amp;&amp; !CA.is_distributed(ClimaComms.context(boundary_space)),
+        &quot;Only non-distributed slabplanet allowable for energy_check&quot;
+    )
+    conservation_checks = (;
+        energy = ConservationChecker.EnergyConservationCheck(model_sims),
+        water = ConservationChecker.WaterConservationCheck(model_sims),
+    )
+end</code></pre><h2 id="Initialize-Callbacks"><a class="docs-heading-anchor" href="#Initialize-Callbacks">Initialize Callbacks</a><a id="Initialize-Callbacks-1"></a><a class="docs-heading-anchor-permalink" href="#Initialize-Callbacks" title="Permalink"></a></h2><p>Callbacks are used to update at a specified interval. The callbacks are initialized here and saved in a global <code>Callbacks</code> struct, <code>callbacks</code>. The <code>trigger_callback!</code> function is used to call the callback during the simulation below.</p><p>The currently implemented callbacks are:</p><ul><li><code>checkpoint_cb</code>: generates a checkpoint of all model states at a specified interval. This is mainly used for restarting simulations.</li><li><code>albedo_cb</code>: for the amip mode, the water albedo is time varying (since the reflectivity of water depends on insolation and wave characteristics, with the latter being approximated from wind speed). It is updated at the same frequency as the atmospheric radiation. NB: Eventually, we will call all of radiation from the coupler, in addition to the albedo calculation.</li></ul><pre><code class="language-julia hljs">schedule_checkpoint = EveryCalendarDtSchedule(TimeManager.time_to_period(checkpoint_dt); start_date = date0)
+checkpoint_cb = TimeManager.TimeManager.Callback(schedule_checkpoint, Checkpointer.checkpoint_sims)
+
+if sim_mode &lt;: AMIPMode
+    schedule_albedo = EveryCalendarDtSchedule(TimeManager.time_to_period(dt_rad); start_date = date0)
+else
+    schedule_albedo = TimeManager.NeverSchedule()
+end
+albedo_cb = TimeManager.Callback(schedule_albedo, FluxCalculator.water_albedo_from_atmosphere!)
+
+callbacks = (; checkpoint = checkpoint_cb, water_albedo = albedo_cb)</code></pre><h2 id="Initialize-turbulent-fluxes"><a class="docs-heading-anchor" href="#Initialize-turbulent-fluxes">Initialize turbulent fluxes</a><a id="Initialize-turbulent-fluxes-1"></a><a class="docs-heading-anchor-permalink" href="#Initialize-turbulent-fluxes" title="Permalink"></a></h2><p>Decide on the type of turbulent flux partition, partitioned or combined (see <code>FluxCalculator</code> documentation for more details).</p><pre><code class="language-julia hljs">turbulent_fluxes = nothing
+if turb_flux_partition == &quot;PartitionedStateFluxes&quot;
+    turbulent_fluxes = FluxCalculator.PartitionedStateFluxes()
+elseif turb_flux_partition == &quot;CombinedStateFluxesMOST&quot;
+    turbulent_fluxes = FluxCalculator.CombinedStateFluxesMOST()
+else
+    error(&quot;turb_flux_partition must be either PartitionedStateFluxes or CombinedStateFluxesMOST&quot;)
+end
+
+#= Set up default AMIP diagnostics
+Use ClimaDiagnostics for default AMIP diagnostics, which currently include turbulent energy fluxes.
+=#
+if sim_mode &lt;: AMIPMode &amp;&amp; use_coupler_diagnostics
+    include(&quot;user_io/amip_diagnostics.jl&quot;)
+    coupler_diags_path = joinpath(dir_paths.output, &quot;coupler&quot;)
+    isdir(coupler_diags_path) || mkpath(coupler_diags_path)
+    amip_diags_handler =
+        amip_diagnostics_setup(coupler_fields, coupler_diags_path, dates.date0[1], tspan[1], calendar_dt)
+else
+    amip_diags_handler = nothing
+end</code></pre><h2 id="Initialize-Coupled-Simulation"><a class="docs-heading-anchor" href="#Initialize-Coupled-Simulation">Initialize Coupled Simulation</a><a id="Initialize-Coupled-Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Initialize-Coupled-Simulation" title="Permalink"></a></h2><p>The coupled simulation is initialized here and saved in a global <code>CoupledSimulation</code> struct, <code>cs</code>. It contains all the information required to run the coupled simulation, including the communication context, the dates, the boundary space, the coupler fields, the configuration dictionary, the conservation checks, the time span, the time step, the land fraction, the model simulations, the mode specifics, the callbacks, the directory paths, and diagnostics for AMIP simulations.</p><pre><code class="language-julia hljs">cs = Interfacer.CoupledSimulation{FT}(
+    comms_ctx,
+    dates,
+    boundary_space,
+    coupler_fields,
+    conservation_checks,
+    [tspan[1], tspan[2]],
+    Δt_cpl,
+    model_sims,
+    mode_specifics,
+    callbacks,
+    dir_paths,
+    turbulent_fluxes,
+    thermo_params,
+    amip_diags_handler,
+);
+Utilities.show_memory_usage()</code></pre><h2 id="Restart-component-model-states-if-specified"><a class="docs-heading-anchor" href="#Restart-component-model-states-if-specified">Restart component model states if specified</a><a id="Restart-component-model-states-if-specified-1"></a><a class="docs-heading-anchor-permalink" href="#Restart-component-model-states-if-specified" title="Permalink"></a></h2><p>If a restart directory is specified and contains output files from the <code>checkpoint_cb</code> callback, the component model states are restarted from those files. The restart directory is specified in the <code>config_dict</code> dictionary. The <code>restart_t</code> field specifies the time step at which the restart is performed.</p><pre><code class="language-julia hljs">if !isnothing(restart_dir)
+    for sim in cs.model_sims
+        if Checkpointer.get_model_prog_state(sim) !== nothing
+            Checkpointer.restart_model_state!(sim, comms_ctx, restart_t; input_dir = restart_dir)
+        end
+    end
+end</code></pre><h2 id="Initialize-Component-Model-Exchange"><a class="docs-heading-anchor" href="#Initialize-Component-Model-Exchange">Initialize Component Model Exchange</a><a id="Initialize-Component-Model-Exchange-1"></a><a class="docs-heading-anchor-permalink" href="#Initialize-Component-Model-Exchange" title="Permalink"></a></h2><p>We need to ensure all models&#39; initial conditions are shared to enable the coupler to calculate the first instance of surface fluxes. Some auxiliary variables (namely surface humidity and radiation fluxes) depend on initial conditions of other component models than those in which the variables are calculated, which is why we need to step these models in time and/or reinitialize them. The concrete steps for proper initialization are:</p><p>1.coupler updates surface model area fractions</p><pre><code class="language-julia hljs">FieldExchanger.update_surface_fractions!(cs)</code></pre><p>2.surface density (<code>ρ_sfc</code>): calculated by the coupler by adiabatically extrapolating atmospheric thermal state to the surface. For this, we need to import surface and atmospheric fields. The model sims are then updated with the new surface density.</p><pre><code class="language-julia hljs">FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes)
+FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)</code></pre><p>3.surface vapor specific humidity (<code>q_sfc</code>): step surface models with the new surface density to calculate their respective <code>q_sfc</code> internally</p><pre><code class="language-julia hljs"># TODO: the q_sfc calculation follows the design of the bucket q_sfc, but it would be neater to abstract this from step! (#331)
+Interfacer.step!(land_sim, tspan[1] + Δt_cpl)
+Interfacer.step!(ocean_sim, tspan[1] + Δt_cpl)
+Interfacer.step!(ice_sim, tspan[1] + Δt_cpl)</code></pre><p>4.turbulent fluxes: now we have all information needed for calculating the initial turbulent surface fluxes using either the combined state or the partitioned state method</p><pre><code class="language-julia hljs">if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
+    # import the new surface properties into the coupler (note the atmos state was also imported in step 3.)
+    FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, albedo, z0, beta, q_sfc
+    # calculate turbulent fluxes inside the atmos cache based on the combined surface state in each grid box
+    FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the atmos thermo state, sfc_ts
+elseif cs.turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
+    # calculate turbulent fluxes in surface models and save the weighted average in coupler fields
+    FluxCalculator.partitioned_turbulent_fluxes!(
+        cs.model_sims,
+        cs.fields,
+        cs.boundary_space,
+        FluxCalculator.MoninObukhovScheme(),
+        cs.thermo_params,
+    )
+
+    # update atmos sfc_conditions for surface temperature
+    # TODO: this is hard coded and needs to be simplified (req. CA modification) (#479)
+    new_p = get_new_cache(atmos_sim, cs.fields)
+    CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) ## sets T_sfc (but SF calculation not necessary - requires split functionality in CA)
+    atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
+end</code></pre><p>5.reinitialize models + radiative flux: prognostic states and time are set to their initial conditions. For atmos, this also triggers the callbacks and sets a nonzero radiation flux (given the new sfc_conditions)</p><pre><code class="language-julia hljs">FieldExchanger.reinit_model_sims!(cs.model_sims)</code></pre><p>6.update all fluxes: coupler re-imports updated atmos fluxes (radiative fluxes for both <code>turbulent_fluxes</code> types and also turbulent fluxes if <code>turbulent_fluxes isa CombinedStateFluxesMOST</code>, and sends them to the surface component models. If <code>turbulent_fluxes isa PartitionedStateFluxes</code> atmos receives the turbulent fluxes from the coupler.</p><pre><code class="language-julia hljs">FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes)
+FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)</code></pre><h2 id="Coupling-Loop"><a class="docs-heading-anchor" href="#Coupling-Loop">Coupling Loop</a><a id="Coupling-Loop-1"></a><a class="docs-heading-anchor-permalink" href="#Coupling-Loop" title="Permalink"></a></h2><p>The coupling loop is the main part of the simulation. It runs the component models sequentially for one coupling timestep (<code>Δt_cpl</code>) at a time, and exchanges combined fields and calculates fluxes using the selected turbulent fluxes option. Note that we want to implement this in a dispatchable function to allow for other forms of timestepping (e.g. leapfrog).</p><pre><code class="language-julia hljs">function solve_coupler!(cs)
+    (; model_sims, Δt_cpl, tspan, comms_ctx) = cs
+    (; atmos_sim, land_sim, ocean_sim, ice_sim) = model_sims
+
+    @info(&quot;Starting coupling loop&quot;)
+    # step in time
+    for t in ((tspan[begin] + Δt_cpl):Δt_cpl:tspan[end])</code></pre><p>Update date</p><pre><code class="language-julia hljs">        cs.dates.date[] = TimeManager.current_date(cs, t)
+
+        if cs.mode.type &lt;: AMIPMode</code></pre><p>TODO: get_field with :co2 is not implemented, so this is a little awkward</p><pre><code class="language-julia hljs">            current_CO2 = zeros(boundary_space)
+            evaluate!(current_CO2, cs.mode.CO2_timevaryinginput, t)
+            Interfacer.update_field!(atmos_sim, Val(:co2), current_CO2)
+        end
+
+        # compute global energy and water conservation checks
+        # (only for slabplanet if tracking conservation is enabled)
+        !isnothing(cs.conservation_checks) &amp;&amp; ConservationChecker.check_conservation!(cs)
+        ClimaComms.barrier(comms_ctx)
+
+        # update water albedo from wind at dt_water_albedo
+        # (this will be extended to a radiation callback from the coupler)
+        TimeManager.maybe_trigger_callback(cs.callbacks.water_albedo, cs, t)
+
+        # update the surface fractions for surface models,
+        # and update all component model simulations with the current fluxes stored in the coupler
+        FieldExchanger.update_surface_fractions!(cs)
+        FieldExchanger.update_model_sims!(cs.model_sims, cs.fields, cs.turbulent_fluxes)
+
+        # step component model simulations sequentially for one coupling timestep (Δt_cpl)
+        FieldExchanger.step_model_sims!(cs.model_sims, t)
+
+        # update the coupler with the new surface properties and calculate the turbulent fluxes
+        FieldExchanger.import_combined_surface_fields!(cs.fields, cs.model_sims, cs.turbulent_fluxes) # i.e. T_sfc, surface_albedo, z0, beta
+        if cs.turbulent_fluxes isa FluxCalculator.CombinedStateFluxesMOST
+            FluxCalculator.combined_turbulent_fluxes!(cs.model_sims, cs.fields, cs.turbulent_fluxes) # this updates the surface thermo state, sfc_ts, in ClimaAtmos (but also unnecessarily calculates fluxes)
+        elseif cs.turbulent_fluxes isa FluxCalculator.PartitionedStateFluxes
+            # calculate turbulent fluxes in surfaces and save the weighted average in coupler fields
+            FluxCalculator.partitioned_turbulent_fluxes!(
+                cs.model_sims,
+                cs.fields,
+                cs.boundary_space,
+                FluxCalculator.MoninObukhovScheme(),
+                cs.thermo_params,
+            )
+
+            # update atmos sfc_conditions for surface temperature - TODO: this needs to be simplified (need CA modification)
+            new_p = get_new_cache(atmos_sim, cs.fields)
+            CA.SurfaceConditions.update_surface_conditions!(atmos_sim.integrator.u, new_p, atmos_sim.integrator.t) # to set T_sfc (but SF calculation not necessary - CA modification)
+            atmos_sim.integrator.p.precomputed.sfc_conditions .= new_p.precomputed.sfc_conditions
+        end
+
+        # update the coupler with the new atmospheric properties
+        FieldExchanger.import_atmos_fields!(cs.fields, cs.model_sims, cs.boundary_space, cs.turbulent_fluxes) # radiative and/or turbulent
+
+        # callback to checkpoint model state
+        TimeManager.maybe_trigger_callback(cs.callbacks.checkpoint, cs, t)
+
+        # compute/output AMIP diagnostics if scheduled for this timestep
+        # wrap the current CoupledSimulation fields and time in a NamedTuple to match the ClimaDiagnostics interface
+        cs_nt = (; u = cs.fields, p = nothing, t = t, step = round(t / Δt_cpl))
+        (cs.mode.type &lt;: AMIPMode &amp;&amp; !isnothing(cs.amip_diags_handler)) &amp;&amp;
+            CD.orchestrate_diagnostics(cs_nt, cs.amip_diags_handler)
+    end
+    return nothing
+end</code></pre><h2 id="Precompilation-of-Coupling-Loop"><a class="docs-heading-anchor" href="#Precompilation-of-Coupling-Loop">Precompilation of Coupling Loop</a><a id="Precompilation-of-Coupling-Loop-1"></a><a class="docs-heading-anchor-permalink" href="#Precompilation-of-Coupling-Loop" title="Permalink"></a></h2><p>Here we run the entire coupled simulation for two timesteps to precompile everything for accurate timing of the overall simulation. After these two steps, we update the beginning and end of the simulation timespan to the correct values.</p><pre><code class="language-julia hljs"># run the coupled simulation for two timesteps to precompile
+cs.tspan[2] = tspan[1] + Δt_cpl * 2
+solve_coupler!(cs)
+
+# update the timespan to the correct values
+cs.tspan[1] = tspan[1] + Δt_cpl * 2
+cs.tspan[2] = tspan[2]
+
+# Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
+GC.gc()</code></pre><h2 id="Solving-and-Timing-the-Full-Simulation"><a class="docs-heading-anchor" href="#Solving-and-Timing-the-Full-Simulation">Solving and Timing the Full Simulation</a><a id="Solving-and-Timing-the-Full-Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Solving-and-Timing-the-Full-Simulation" title="Permalink"></a></h2><p>This is where the full coupling loop, <code>solve_coupler!</code> is called for the full timespan of the simulation. We use the <code>ClimaComms.@elapsed</code> macro to time the simulation on both CPU and GPU, and use this value to calculate the simulated years per day (SYPD) of the simulation.</p><pre><code class="language-julia hljs">walltime = ClimaComms.@elapsed comms_ctx.device begin
+    s = CA.@timed_str begin
+        solve_coupler!(cs)
+    end
+end
+@info(walltime)
+
+# Use ClimaAtmos calculation to show the simulated years per day of the simulation (SYPD)
+es = CA.EfficiencyStats(tspan, walltime)
+sypd = CA.simulated_years_per_day(es)
+n_atmos_steps = atmos_sim.integrator.step
+walltime_per_atmos_step = es.walltime / n_atmos_steps
+@info &quot;SYPD: $sypd&quot;
+@info &quot;Walltime per Atmos step: $(walltime_per_atmos_step)&quot;
+
+# Save the SYPD and allocation information
+if ClimaComms.iamroot(comms_ctx)
+    open(joinpath(dir_paths.artifacts, &quot;sypd.txt&quot;), &quot;w&quot;) do sypd_filename
+        println(sypd_filename, &quot;$sypd&quot;)
+    end
+
+    open(joinpath(dir_paths.artifacts, &quot;walltime_per_atmos_step.txt&quot;), &quot;w&quot;) do walltime_per_atmos_step_filename
+        println(walltime_per_atmos_step_filename, &quot;$(walltime_per_atmos_step)&quot;)
+    end
+
+    open(joinpath(dir_paths.artifacts, &quot;max_rss_cpu.txt&quot;), &quot;w&quot;) do cpu_max_rss_filename
+        cpu_max_rss_GB = Utilities.show_memory_usage()
+        println(cpu_max_rss_filename, cpu_max_rss_GB)
+    end
+end</code></pre><h2 id="Postprocessing"><a class="docs-heading-anchor" href="#Postprocessing">Postprocessing</a><a id="Postprocessing-1"></a><a class="docs-heading-anchor-permalink" href="#Postprocessing" title="Permalink"></a></h2><p>All postprocessing is performed using the root process only, if applicable. Our postprocessing consists of outputting a number of plots to visualize the model output.</p><p>The postprocessing includes:</p><ul><li>Energy and water conservation checks (if running SlabPlanet with checks enabled)</li><li>Animations (if not running in MPI)</li><li>AMIP plots of the final state of the model</li><li>Error against observations</li><li>Optional additional atmosphere diagnostics plots</li><li>Plots of useful coupler and component model fields for debugging</li></ul><pre><code class="language-julia hljs">if ClimaComms.iamroot(comms_ctx)
+    postprocessing_vars = (;
+        plot_diagnostics,
+        use_coupler_diagnostics,
+        output_default_diagnostics,
+        t_end,
+        conservation_softfail,
+        atmos_output_dir,
+    )
+    postprocess_sim(cs.mode.type, cs, postprocessing_vars)
+end</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../sea_breeze/run/">« Coupled Sea Breeze</a><a class="docs-footer-nextpage" href="../../../checkpointer/">Checkpointer »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.25 on <span class="colophon-date" title="Thursday 30 January 2025 03:04">Thursday 30 January 2025</span>. Using Julia version 1.11.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

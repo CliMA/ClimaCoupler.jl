@@ -856,20 +856,21 @@ Base.eltype(::FakeOceanModel) = FT
     # scatter conserves the area integral, so every wet cell must reproduce the
     # single-column answer to roundoff.
     uniform(v) = (f = CC.Fields.zeros(boundary_space); f .= FT(v); f)
-    SW_d, LW_d, P_liq, P_snow = FT(300), FT(350), FT(-1e-5), FT(-2e-6)
-    csf = (;
-        SW_d = uniform(SW_d),
-        LW_d = uniform(LW_d),
-        P_liq = uniform(P_liq),
-        P_snow = uniform(P_snow),
-    )
+    SW_d, SW_d_diffuse, LW_d = FT(300), FT(120), FT(350)
+    P_liq, P_snow = FT(-1e-5), FT(-2e-6)
+    forcing = (; SW_d, SW_d_diffuse, LW_d, P_liq, P_snow)
+    # Only the fields the ocean averages over its timestep
+    names = FieldExchanger.accumulated_coupler_fields(sim)
+    csf = NamedTuple{names}(map(name -> uniform(forcing[name]), names))
     FieldExchanger.update_sim!(sim, csf)
 
     (; reference_density, heat_capacity, σ, C_to_K) = ocean_properties
-    α = FT(0.011) # `Val(:surface_direct_albedo)`
+    α_direct = FT(0.011) # `Val(:surface_direct_albedo)`
+    α_diffuse = FT(0.069) # `Val(:surface_diffuse_albedo)`
     ϵ = FT(0.97)  # `Val(:emissivity)`
+    SW_absorbed = (1 - α_direct) * (SW_d - SW_d_diffuse) + (1 - α_diffuse) * SW_d_diffuse
     expected_T =
-        (-(1 - α) * SW_d - ϵ * (LW_d - σ * (T_sfc + C_to_K)^4)) /
+        (-SW_absorbed - ϵ * (LW_d - σ * (T_sfc + C_to_K)^4)) /
         (reference_density * heat_capacity)
     expected_S = -S_sfc * (P_liq + P_snow) / reference_density
 

@@ -2501,7 +2501,7 @@ version = "1.11.0"
 deps = ["Adapt", "Artifacts", "ClimaComms", "PrecompileTools", "Serialization"]
 path = "../../../RRTMGP.jl-mod"
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
-version = "1.1.0"
+version = "1.1.1"
 weakdeps = ["CUDA", "ClimaParams", "NCDatasets"]
 
     [deps.RRTMGP.extensions]

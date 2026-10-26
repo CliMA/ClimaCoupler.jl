@@ -86,7 +86,8 @@ FT = Float32
     @test atmos.h == atmos_h_remapped
     #@test typeof(atmos.h) == typeof(atmos_h_remapped)
     @test atmos.gustiness == FT(1)
-    @test propertynames(atmos) == (:h, :gustiness)
+    # Newer ClimaLand versions also store the height `reference` convention
+    @test issubset((:h, :gustiness), propertynames(atmos))
 end
 
 @testset "ClimaLandSimulation flux calculations" begin
@@ -159,29 +160,13 @@ end
     # variables.
     Interfacer.set_cache!(land_sim, coupler_fields)
 
-    # Compute the turbulent fluxes for each sub-component
-    CL.turbulent_fluxes!(
-        land_sim.integrator.p.canopy.turbulent_fluxes,
-        land_sim.model.canopy.boundary_conditions.atmos,
-        land_sim.model.canopy,
-        land_sim.integrator.u,
+    # Compute the turbulent fluxes for each sub-component as the land model does,
+    # with the atmospheric height set by `set_cache!`; the soil and snow fluxes
+    # come from their skin temperature solves, not from `CL.turbulent_fluxes!`
+    update_boundary_fluxes! = CL.make_update_boundary_fluxes(land_sim.model)
+    update_boundary_fluxes!(
         land_sim.integrator.p,
-        land_sim.integrator.t,
-    )
-    CL.turbulent_fluxes!(
-        land_sim.integrator.p.soil.turbulent_fluxes,
-        land_sim.model.soil.boundary_conditions.top.atmos,
-        land_sim.model.soil,
         land_sim.integrator.u,
-        land_sim.integrator.p,
-        land_sim.integrator.t,
-    )
-    CL.turbulent_fluxes!(
-        land_sim.integrator.p.snow.turbulent_fluxes,
-        land_sim.model.snow.boundary_conditions.atmos,
-        land_sim.model.snow,
-        land_sim.integrator.u,
-        land_sim.integrator.p,
         land_sim.integrator.t,
     )
 

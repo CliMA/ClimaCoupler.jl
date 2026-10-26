@@ -8,6 +8,11 @@ ClimaCoupler.jl Release Notes
 New `ocean_float_type` (`Float64` by default) and `ocean_vertical_levels` (60 by default) options set the
 Oceananigans float type and number of levels.
 
+#### Reflect diffuse shortwave with the diffuse albedo over the Oceananigans ocean
+The ocean now imports the diffuse shortwave as the coupler field `SW_d_diffuse`, averaged with the 
+other radiation when the ocean steps more slowly than the coupler. Coupler checkpoints written before 
+this change have no `SW_d_diffuse` and cannot be restored.
+
 #### Separate output interval for 3D ocean diagnostics
 The new `ocean_3d_diagnostic_interval` option sets how often the 3D ocean fields (`ocean_fields.jld2`)
 are written, while `ocean_diagnostic_interval` sets the surface fields (`ocean_surface.jld2`). It defaults

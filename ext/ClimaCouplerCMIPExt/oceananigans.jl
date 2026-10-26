@@ -154,6 +154,7 @@ dispatch in coupling.
 - `simple_ocean`: Whether to use a simple ocean model setup (default: `false`)
 - `ocean_grid`: Horizontal grid for Oceananigans (`:one_deg_tripolar` or `:orca`, default: `:one_deg_tripolar`)
 - `depth`: Maximum ocean depth in metres (default: 5500 m for EN4 compatibility)
+- `Nz`: Number of vertical levels (default: 60)
 - `dt`: Time step (default: `1800.0` seconds, or 30 minutes)
 - `comms_ctx`: Communication context (default: `ClimaComms.context()`)
 - `FT_ocean`: Float type for the ocean simulation (default: `Float64`)
@@ -175,6 +176,7 @@ function OceananigansSimulation(
     ocean_grid = :one_deg_tripolar,
     use_intersection_grid = true,
     depth = 5500,
+    Nz = 60,
     dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     FT_ocean = Float64, # Use Float64 for the ocean to avoid precision issues
@@ -236,6 +238,7 @@ function OceananigansSimulation(
         simple_ocean,
         closure,
         depth,
+        Nz,
         # need to pass ρ₀ explicitly because it isn't in `Oceananigans.defaults`:
         reference_density = ocean_properties.reference_density,
     )

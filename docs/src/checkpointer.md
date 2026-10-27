@@ -58,6 +58,15 @@ module provides a straightforward way to add this feature.
 a `restart_t` and overwrites the content of the coupled simulation with what is
 in the checkpoint.
 
+[`Checkpointer.checkpoint_sims`](@ref) marks each checkpoint set as complete with a
+file `checkpoint_complete_<t>.txt`, which records the number of processes, once every
+process has written its files, and only then removes the previous set. When detecting
+checkpoints automatically, the complete set with the latest time is used; complete sets
+later than the start time of a run are unmarked when it starts, since they come from an
+earlier run in the same directory. Restarts must use the same number of processes as
+the run that wrote the checkpoint, which [`Checkpointer.check_checkpoint_nprocs`](@ref)
+verifies.
+
 ## Developer notes
 
 In theory, the state of the component models should fully determine the state of
@@ -207,5 +216,6 @@ This approach allows for a signficant reducation in the file size of the cache.
     Checkpointer.restart_flux_accumulators!
     Checkpointer.checkpoint_sims
     Checkpointer.t_start_from_checkpoint
+    Checkpointer.check_checkpoint_nprocs
     Checkpointer.restore!
 ```

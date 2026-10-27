@@ -35,6 +35,15 @@ This is a template function that should be implemented for each component model.
 get_model_cache(sim::Interfacer.AbstractComponentSimulation) = nothing
 
 """
+    checkpoint_marker_path(checkpoint_dir, t)
+
+Path of the file that `checkpoint_sims` writes once the full checkpoint set at
+time `t` (in seconds) is on disk.
+"""
+checkpoint_marker_path(checkpoint_dir, t) =
+    joinpath(checkpoint_dir, "checkpoint_complete_$(t).txt")
+
+"""
     checkpoint_model_state(
         sim::Interfacer.AbstractComponentSimulation,
         comms_ctx::ClimaComms.AbstractCommsContext,
@@ -229,6 +238,10 @@ end
 
 This is a callback function that checkpoints all simulations defined in the
 current coupled simulation.
+
+The previous checkpoint set is removed only after the new set has been fully
+written by all processes and marked complete (see `checkpoint_marker_path`), so
+that an interruption while checkpointing always leaves a complete set on disk.
 """
 function checkpoint_sims(cs::Interfacer.CoupledSimulation)
     time = Int(round(float(cs.t[])))
@@ -238,22 +251,17 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
     prev_checkpoint_t = cs.prev_checkpoint_t[]
     comms_ctx = ClimaComms.context(cs)
 
+    # A set at this time may exist from an earlier run: unmark it while it is overwritten
+    if ClimaComms.iamroot(comms_ctx)
+        rm(checkpoint_marker_path(output_dir, time), force = true)
+    end
+    ClimaComms.barrier(comms_ctx)
+
+    # Pass -1 as the previous time so that no file is removed until the set is complete
     for sim in cs.model_sims
-        Checkpointer.checkpoint_model_state(
-            sim,
-            comms_ctx,
-            time,
-            prev_checkpoint_t;
-            output_dir,
-        )
+        Checkpointer.checkpoint_model_state(sim, comms_ctx, time, -1; output_dir)
         if cs.save_cache
-            Checkpointer.checkpoint_model_cache(
-                sim,
-                comms_ctx,
-                time,
-                prev_checkpoint_t;
-                output_dir,
-            )
+            Checkpointer.checkpoint_model_cache(sim, comms_ctx, time, -1; output_dir)
         end
     end
 
@@ -263,11 +271,6 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
     output_file = joinpath(output_dir, "checkpoint_coupler_fields_$(pid)_$time.jld2")
     # Adapt to Array move fields to the CPU
     JLD2.jldsave(output_file, coupler_fields = CC.Adapt.adapt(Array, cs.fields))
-
-    # Remove previous Coupler fields checkpoint if it exists
-    prev_checkpoint_file =
-        joinpath(output_dir, "checkpoint_coupler_fields_$(pid)_$(prev_checkpoint_t).jld2")
-    remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
 
     # Checkpoint flux accumulators if present. Without this, a restart in the middle of a
     # slow-surface dt window would lose the partial sum and the next push to that surface
@@ -281,12 +284,17 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
             map(_accumulator_to_cpu_nt, values(cs.flux_accumulators)),
         )
         JLD2.jldsave(acc_output_file, flux_accumulators = accs_cpu)
+    end
 
-        prev_acc_file = joinpath(
-            output_dir,
-            "checkpoint_flux_accumulators_$(pid)_$(prev_checkpoint_t).jld2",
-        )
-        remove_checkpoint(prev_acc_file, prev_checkpoint_t, comms_ctx)
+    # Mark the set complete once all processes have written their files, then remove
+    # the previous set (including the per-process files of all processes)
+    ClimaComms.barrier(comms_ctx)
+    if ClimaComms.iamroot(comms_ctx)
+        # Record the number of processes, which restarts must match
+        nprocs = ClimaComms.nprocs(comms_ctx)
+        write(checkpoint_marker_path(output_dir, time), "$time $nprocs\n")
+        prev_checkpoint_t != time &&
+            remove_checkpoint_set(output_dir, prev_checkpoint_t, comms_ctx)
     end
 
     # Update previous checkpoint time stored in the coupled simulation
@@ -350,6 +358,26 @@ function restart!(cs, checkpoint_dir, checkpoint_t, restart_cache)
         restart_flux_accumulators!(cs, input_file_accs)
     end
     return true
+end
+
+"""
+    check_checkpoint_nprocs(checkpoint_dir, checkpoint_t, comms_ctx)
+
+Error if the checkpoint set at `checkpoint_t` was written by a different number of
+processes than in `comms_ctx`, since the per-process files cannot then be restored.
+Sets without a completion marker that records the number of processes are not checked.
+"""
+function check_checkpoint_nprocs(checkpoint_dir, checkpoint_t, comms_ctx)
+    marker = checkpoint_marker_path(checkpoint_dir, checkpoint_t)
+    content = isfile(marker) ? split(read(marker, String)) : []
+    length(content) == 2 || return nothing
+    nprocs_ckpt = parse(Int, content[2])
+    nprocs = ClimaComms.nprocs(comms_ctx)
+    nprocs_ckpt == nprocs || error(
+        "Checkpoint at t = $checkpoint_t in $checkpoint_dir was written by $nprocs_ckpt \
+        processes, but this run has $nprocs: restart with $nprocs_ckpt processes",
+    )
+    return nothing
 end
 
 """
@@ -452,14 +480,22 @@ end
 
 Look for restart files in `checkpoint_dir`, if found, return the time of the latest.
 If not found, return `nothing`.
+
+Checkpoint sets marked complete by `checkpoint_sims` take precedence, so that an
+incomplete set (e.g., from a job killed while checkpointing) is skipped; among them,
+the one with the largest time is chosen (file times are not preserved by copies).
+Directories without such markers fall back to the latest state file. To restart from
+an earlier time, set `restart_t`; complete sets later than the start time of a run are
+unmarked when it starts (see `unmark_later_checkpoints`).
 """
 function t_start_from_checkpoint(checkpoint_dir)
     isdir(checkpoint_dir) || return nothing
+    files = readdir(checkpoint_dir, join = true)
+    marker_rx = r"checkpoint_complete_(\d+)\.txt$"
+    markers = filter(f -> !isnothing(match(marker_rx, f)), files)
+    isempty(markers) || return maximum(f -> parse(Int, match(marker_rx, f)[1]), markers)
     restart_file_rx = r"checkpoint_(\w+)_(\d+).hdf5"
-    restarts = filter(
-        f -> !isnothing(match(restart_file_rx, f)),
-        readdir(checkpoint_dir, join = true),
-    )
+    restarts = filter(f -> !isnothing(match(restart_file_rx, f)), files)
     isempty(restarts) && return nothing
     latest_restart = last(sort_by_creation_time(restarts))
     return parse(Int, match(restart_file_rx, latest_restart)[2])
@@ -478,6 +514,44 @@ function remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
        isfile(prev_checkpoint_file)
         @info "Removing previous checkpoint file: $prev_checkpoint_file"
         rm(prev_checkpoint_file)
+    end
+    return nothing
+end
+
+"""
+    unmark_later_checkpoints(checkpoint_dir, t, comms_ctx)
+
+Remove, on the root process, the completion markers of the checkpoint sets in
+`checkpoint_dir` with times later than `t` (in seconds). Such sets come from an earlier
+run in the same directory, so later restarts must not pick them up.
+"""
+function unmark_later_checkpoints(checkpoint_dir, t, comms_ctx)
+    (ClimaComms.iamroot(comms_ctx) && isdir(checkpoint_dir)) || return nothing
+    for file in readdir(checkpoint_dir)
+        m = match(r"^checkpoint_complete_(\d+)\.txt$", file)
+        (isnothing(m) || parse(Int, m[1]) <= t) && continue
+        @warn "Unmarking checkpoint set at t = $(m[1]) s in $checkpoint_dir: it is \
+            later than t_start = $t s and comes from an earlier run"
+        rm(joinpath(checkpoint_dir, file))
+    end
+    return nothing
+end
+
+"""
+    remove_checkpoint_set(checkpoint_dir, t, comms_ctx)
+
+Delete, on the root process, the completion marker and all checkpoint files at time
+`t` (in seconds) in `checkpoint_dir`, including the per-process files of every
+process. A value of -1 for `t` is used to indicate that there is nothing to remove.
+"""
+function remove_checkpoint_set(checkpoint_dir, t, comms_ctx)
+    (t == -1 || !ClimaComms.iamroot(comms_ctx)) && return nothing
+    # Unmark first so that a partially removed set is never taken as complete
+    rm(checkpoint_marker_path(checkpoint_dir, t), force = true)
+    file_rx = Regex("^checkpoint_.+_$(t)\\.(hdf5|jld2)\$")
+    for file in filter(f -> occursin(file_rx, f), readdir(checkpoint_dir))
+        @info "Removing previous checkpoint file: $file"
+        rm(joinpath(checkpoint_dir, file))
     end
     return nothing
 end

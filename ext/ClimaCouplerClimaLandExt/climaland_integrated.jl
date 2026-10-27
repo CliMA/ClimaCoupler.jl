@@ -185,6 +185,7 @@ function ClimaLandSimulation(
             reduction_type = land_diagnostics_reduction,
             dt = float(dt),
         )
+        align_diagnostic_schedules!(diagnostics, start_date, float(tspan[1]))
     else
         output_writer = nothing
         diagnostics = nothing

@@ -666,10 +666,11 @@ function get_atmos_config_dict(
 )
     atmos_config = deepcopy(coupler_config)
 
-    # Ensure Atmos's own checkpoints are synced up with ClimaCoupler, so that we
-    # can pick up from where we have left. NOTE: This should not be needed, but
-    # there is no easy way to initialize ClimaAtmos with a different t_start
-    atmos_config["dt_save_state_to_disk"] = coupler_config["checkpoint_dt"]
+    # ClimaAtmos's own `dayD.S.hdf5` state files, which coupler restarts do not use
+    atmos_checkpoint_dt = get(coupler_config, "atmos_checkpoint_dt", nothing)
+    atmos_config["dt_save_state_to_disk"] =
+        isnothing(atmos_checkpoint_dt) ? coupler_config["checkpoint_dt"] :
+        atmos_checkpoint_dt
 
     # disable Atmos's progress logging
     atmos_config["log_progress"] = false

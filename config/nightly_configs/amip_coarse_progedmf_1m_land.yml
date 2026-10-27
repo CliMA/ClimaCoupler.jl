@@ -3,9 +3,9 @@ albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf_1m.yml"
 checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_progedmf_1m.toml"]
-h_elem: 12
-dt: "180secs"
-dt_cpl: "180secs"
+h_elem: 16
+dt: "120secs"
+dt_cpl: "120secs"
 energy_check: false
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta, cl, clw, cli]
@@ -28,13 +28,4 @@ t_end: "366days"
 topo_smoothing: true
 topography: "Earth"
 # Tapio's config
-cloud_ice_formation: "TemperatureDependentIceNumber"
-tq_correlation_model: "diagnosed"
-rain_terminal_velocity: "Fixed"
-snow_terminal_velocity: "Fixed"
-cloud_ice_terminal_velocity: "Fixed"
-cloud_liquid_rain_accretion: "KK2000Accretion"
-rain_autoconversion: "KK2000Autoconversion"
-sgs_distribution: "conditional"
-sgs_variance_curvature: true
 strict_params: false

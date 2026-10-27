@@ -24,7 +24,13 @@ import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import ClimaUtilities.TimeManager: ITime
 import ClimaCoupler.Utilities: @timed_log
 import ClimaCoupler:
-    Checkpointer, FieldExchanger, FluxCalculator, Interfacer, Utilities, Plotting
+    Checkpointer,
+    FieldExchanger,
+    FluxCalculator,
+    Interfacer,
+    Utilities,
+    Plotting,
+    TimeManager
 import ClimaTimeSteppers as CTS
 import ClimaDiagnostics as CD
 import ClimaUtilities.TimeManager: ITime

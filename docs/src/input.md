@@ -114,6 +114,7 @@ Note: the `mode_name` determines which Julia environment to use. Use `experiment
 | `--dt_ocean` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Ocean simulation time step (alternative to `dt`) |
 | `--dt_seaice` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Sea ice simulation time step (alternative to `dt`) |
 | `--checkpoint_dt` | String | `"90days"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Time interval for checkpointing |
+| `--atmos_checkpoint_dt` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Inf"` | Time interval for the ClimaAtmos `dayD.S.hdf5` state files, not used by coupler restarts (`nothing` uses `checkpoint_dt`) |
 | `--walltime_dt` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for walltime reporting. Defaults to a tenth of the simulation length, at most 30 days. Set to `"never"` to disable. |
 | `--walltime_debug` | Bool | `false` | `true`, `false` | Also report the walltime on every coupling step whose number is a power of two (1, 2, 4, 8, ...), in addition to the `walltime_dt` interval. If `walltime_dt` is `"never"`, this is the only reporting. |
 

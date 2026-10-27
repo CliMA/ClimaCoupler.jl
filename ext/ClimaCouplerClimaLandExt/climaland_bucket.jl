@@ -175,6 +175,7 @@ function BucketSimulation(
             reduction_type = land_diagnostics_reduction,
             dt = float(dt),
         )
+        align_diagnostic_schedules!(diagnostics, start_date, float(tspan[1]))
     else
         diagnostics = nothing
     end

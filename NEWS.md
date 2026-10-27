@@ -4,6 +4,15 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Make coupler checkpoints robust
+`checkpoint_sims` marks a checkpoint set complete only after all processes have written it, and
+then removes the previous set, including the files of every process (not only the root's).
+`t_start_from_checkpoint` picks the latest complete set, so a job killed while checkpointing restarts
+from the previous set. Restarting with a different number of processes now fails early with a clear
+error. The new option `atmos_checkpoint_dt` (default: `checkpoint_dt`; `"Inf"` disables) sets the
+interval of the ClimaAtmos `dayD.S.hdf5` files, which coupler restarts do not use. The ClimaLand
+diagnostics stay on their calendar boundaries after a restart.
+
 #### Reflect diffuse shortwave with the diffuse albedo over the Oceananigans ocean
 The ocean now imports the diffuse shortwave as the coupler field `SW_d_diffuse`, averaged with the 
 other radiation when the ocean steps more slowly than the coupler. Coupler checkpoints written before 

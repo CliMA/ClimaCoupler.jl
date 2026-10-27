@@ -359,3 +359,70 @@ end
     end
     @test isnothing(Checkpointer.t_start_from_checkpoint(mktempdir()))
 end
+
+@testset "t_start_from_checkpoint skips incomplete sets" begin
+    mktempdir() do dir
+        for t in (864000, 1728000)
+            touch(joinpath(dir, "checkpoint_ClimaAtmosSimulation_$(t).hdf5"))
+            sleep(1) # file timestamps can be as coarse as a second
+        end
+        # Only the older set is marked complete
+        touch(Checkpointer.checkpoint_marker_path(dir, 864000))
+        @test Checkpointer.t_start_from_checkpoint(dir) == 864000
+        # Among complete sets, the latest time wins regardless of file times
+        touch(Checkpointer.checkpoint_marker_path(dir, 1728000))
+        sleep(1)
+        touch(Checkpointer.checkpoint_marker_path(dir, 864000))
+        @test Checkpointer.t_start_from_checkpoint(dir) == 1728000
+    end
+end
+
+@testset "remove_checkpoint_set" begin
+    comms_ctx = ClimaComms.SingletonCommsContext()
+    mktempdir() do dir
+        kept = [
+            "checkpoint_ClimaAtmosSimulation_86400.hdf5",
+            "checkpoint_coupler_fields_400_86400.jld2",
+            "checkpoint_complete_86400.txt",
+        ]
+        removed = [
+            "checkpoint_ClimaAtmosSimulation_400.hdf5",
+            "checkpoint_coupler_fields_0_400.jld2",
+            "checkpoint_coupler_fields_1_400.jld2",
+            "checkpoint_cache_1_ClimaLandSimulation_400.jld2",
+            "checkpoint_complete_400.txt",
+        ]
+        foreach(f -> touch(joinpath(dir, f)), vcat(kept, removed))
+        Checkpointer.remove_checkpoint_set(dir, -1, comms_ctx)
+        @test length(readdir(dir)) == length(kept) + length(removed)
+        Checkpointer.remove_checkpoint_set(dir, 400, comms_ctx)
+        @test sort(readdir(dir)) == sort(kept)
+    end
+end
+
+@testset "check_checkpoint_nprocs" begin
+    comms_ctx = ClimaComms.SingletonCommsContext()
+    mktempdir() do dir
+        marker = Checkpointer.checkpoint_marker_path(dir, 400)
+        @test isnothing(Checkpointer.check_checkpoint_nprocs(dir, 400, comms_ctx))
+        write(marker, "400 1\n")
+        @test isnothing(Checkpointer.check_checkpoint_nprocs(dir, 400, comms_ctx))
+        write(marker, "400 4\n")
+        @test_throws ErrorException Checkpointer.check_checkpoint_nprocs(
+            dir,
+            400,
+            comms_ctx,
+        )
+    end
+end
+
+@testset "unmark_later_checkpoints" begin
+    comms_ctx = ClimaComms.SingletonCommsContext()
+    mktempdir() do dir
+        foreach(t -> touch(Checkpointer.checkpoint_marker_path(dir, t)), (400, 800, 1200))
+        Checkpointer.unmark_later_checkpoints(dir, 800.0, comms_ctx)
+        @test sort(readdir(dir)) ==
+              ["checkpoint_complete_400.txt", "checkpoint_complete_800.txt"]
+        @test Checkpointer.t_start_from_checkpoint(dir) == 800
+    end
+end

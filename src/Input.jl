@@ -123,6 +123,10 @@ function argparse_settings()
         help = "Time interval for checkpointing [\"90days\" (default)]"
         arg_type = String
         default = "90days"
+        "--atmos_checkpoint_dt"
+        help = "Time interval for the ClimaAtmos `dayD.S.hdf5` state files, which are not used by coupler restarts [nothing (default): `checkpoint_dt`; \"Inf\" to disable]"
+        arg_type = String
+        default = nothing
         "--walltime_dt"
         help = "Time interval for walltime reporting [nothing (default): a tenth of the simulation length, at most 1 day and at least one coupling step; allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
         arg_type = String

@@ -167,3 +167,22 @@ function _coupler_set_ic!(Y, p, t, model::CL.LandModel, T_sfc, surface_elevation
     p.T_sfc .= Y.canopy.energy.T
     p.ϵ_sfc .= 1
 end
+
+"""
+    align_diagnostic_schedules!(diagnostics, start_date, t_start)
+
+Seed the `EveryCalendarDtSchedule` output schedules of `diagnostics` with the last
+period boundary at or before `t_start`, as `TimeManager.calendar_dt_schedule` does.
+
+`CL.default_diagnostics` anchors these schedules at `start_date`, so on restarts they
+would fire on the first step and stay out of phase with the original run.
+"""
+function align_diagnostic_schedules!(diagnostics, start_date, t_start)
+    for diag in diagnostics
+        schedule = diag.output_schedule_func
+        schedule isa CD.Schedules.EveryCalendarDtSchedule || continue
+        aligned = TimeManager.calendar_dt_schedule(schedule.dt, start_date, t_start)
+        schedule.date_last[] = aligned.date_last[]
+    end
+    return diagnostics
+end

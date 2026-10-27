@@ -147,7 +147,7 @@ end
 Compute the heat flux at the sea ice-ocean interface using the three-equation formulation.
 
 Returns `(Q, Tᵦ, Sᵦ)` where:
-- `Q > 0` means heat flux from ocean to ice (ocean cooling)
+- `Q = ρᵒᶜ cᵒᶜ αₕ u★ (Tᵒᶜ - Tᵦ) ℵ` is the turbulent ocean-to-ice heat flux; `Q > 0` means ocean cooling
 - `Tᵦ, Sᵦ` are the interface temperature and salinity
 """
 @inline function compute_interface_heat_flux(
@@ -169,7 +169,7 @@ Returns `(Q, Tᵦ, Sᵦ)` where:
     αₕ = flux.heat_transfer_coefficient
     αₛ = flux.salt_transfer_coefficient
 
-    T★, S★, q = solve_interface_conditions(
+    T★, S★, _ = solve_interface_conditions(
         flux,
         Tᵒᶜ,
         Sᵒᶜ,
@@ -183,8 +183,9 @@ Returns `(Q, Tᵦ, Sᵦ)` where:
         liquidus,
     )
 
-    # Scale by ice concentration
-    Qᵢₒ = ℰ * q * ℵ
+    # Ocean-side turbulent flux only, scaled by ice concentration. Conduction through the ice
+    # reaches the ice model through its top surface flux, so it is excluded here.
+    Qᵢₒ = ρᵒᶜ * cᵒᶜ * αₕ * u★ * (Tᵒᶜ - T★) * ℵ
 
     return Qᵢₒ, T★, S★
 end

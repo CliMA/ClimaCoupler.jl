@@ -160,11 +160,13 @@ function BucketSimulation(
     # Add diagnostics
     if use_land_diagnostics
         global_attribs = Utilities.diagnostics_global_attribs(start_date)
+        # `init_time` starts the first averaging window at `t_start` on restarts
         output_writer = CD.Writers.NetCDFWriter(
             domain.space.subsurface,
             output_dir;
             start_date,
             global_attribs,
+            init_time = tspan[1],
         )
         diagnostics = CL.default_diagnostics(
             model,

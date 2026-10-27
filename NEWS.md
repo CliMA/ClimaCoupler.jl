@@ -4,6 +4,10 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Time stamps of the first coupler and land diagnostics after a restart
+The coupler and land NetCDF writers now get `init_time = t_start`, as the ClimaAtmos writer does,
+so the first averaged record after a restart covers `[t_start, t]` instead of `[0, t]`.
+
 #### Reflect diffuse shortwave with the diffuse albedo over the Oceananigans ocean
 The ocean now imports the diffuse shortwave as the coupler field `SW_d_diffuse`, averaged with the 
 other radiation when the ocean steps more slowly than the coupler. Coupler checkpoints written before 

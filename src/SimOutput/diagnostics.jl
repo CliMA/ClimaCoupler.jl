@@ -71,8 +71,14 @@ function diagnostics_setup(
     # Create output writer (shared across all diagnostics since they all live on the boundary space)
     boundary_space = axes(fields.F_lh)
     global_attribs = Utilities.diagnostics_global_attribs(start_date)
-    netcdf_writer =
-        CD.Writers.NetCDFWriter(boundary_space, output_dir; start_date, global_attribs)
+    # `init_time` starts the first averaging window at `t_start` on restarts
+    netcdf_writer = CD.Writers.NetCDFWriter(
+        boundary_space,
+        output_dir;
+        start_date,
+        global_attribs,
+        init_time = t_start,
+    )
 
     #### Turbulent energy fluxes diagnostic
 

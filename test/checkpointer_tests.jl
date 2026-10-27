@@ -359,3 +359,83 @@ end
     end
     @test isnothing(Checkpointer.t_start_from_checkpoint(mktempdir()))
 end
+
+@testset "t_start_from_checkpoint skips incomplete sets" begin
+    mktempdir() do dir
+        for t in (864000, 1728000)
+            touch(joinpath(dir, "checkpoint_ClimaAtmosSimulation_$(t).hdf5"))
+            sleep(1) # file timestamps can be as coarse as a second
+        end
+        # Only the older set is marked complete
+        touch(Checkpointer.checkpoint_marker_path(dir, 864000))
+        @test Checkpointer.t_start_from_checkpoint(dir) == 864000
+        # Among complete sets, the latest time wins regardless of file times
+        touch(Checkpointer.checkpoint_marker_path(dir, 1728000))
+        sleep(1)
+        touch(Checkpointer.checkpoint_marker_path(dir, 864000))
+        @test Checkpointer.t_start_from_checkpoint(dir) == 1728000
+    end
+end
+
+@testset "remove_checkpoint_set" begin
+    comms_ctx = ClimaComms.SingletonCommsContext()
+    mktempdir() do dir
+        kept = [
+            "checkpoint_ClimaAtmosSimulation_86400.hdf5",
+            "checkpoint_coupler_fields_400_86400.jld2",
+            "checkpoint_complete_86400.txt",
+        ]
+        removed = [
+            "checkpoint_ClimaAtmosSimulation_400.hdf5",
+            "checkpoint_coupler_fields_0_400.jld2",
+            "checkpoint_coupler_fields_1_400.jld2",
+            "checkpoint_cache_1_ClimaLandSimulation_400.jld2",
+            "checkpoint_complete_400.txt",
+        ]
+        foreach(f -> touch(joinpath(dir, f)), vcat(kept, removed))
+        Checkpointer.remove_checkpoint_set(dir, -1, comms_ctx)
+        @test length(readdir(dir)) == length(kept) + length(removed)
+        Checkpointer.remove_checkpoint_set(dir, 400, comms_ctx)
+        @test sort(readdir(dir)) == sort(kept)
+    end
+end
+
+@testset "check_checkpoint_nprocs" begin
+    comms_ctx = ClimaComms.SingletonCommsContext()
+    mktempdir() do dir
+        marker = Checkpointer.checkpoint_marker_path(dir, 400)
+        @test isnothing(Checkpointer.check_checkpoint_nprocs(dir, 400, comms_ctx))
+        write(marker, "400 1\n")
+        @test isnothing(Checkpointer.check_checkpoint_nprocs(dir, 400, comms_ctx))
+        write(marker, "400 4\n")
+        @test_throws ErrorException Checkpointer.check_checkpoint_nprocs(
+            dir,
+            400,
+            comms_ctx,
+        )
+    end
+end
+
+struct DummyYSimulation{S} <: Interfacer.AbstractAtmosSimulation
+    state::S
+end
+Checkpointer.get_model_prog_state(sim::DummyYSimulation) = sim.state
+Checkpointer.state_dataset_name(::DummyYSimulation) = "Y"
+
+@testset "state_dataset_name, with fallback for older checkpoints" begin
+    comms_ctx = ClimaComms.context(space_checkpointer)
+    mktempdir() do dir
+        sim = DummyYSimulation(CC.Fields.FieldVector(T = ones(space_checkpointer)))
+        Checkpointer.checkpoint_model_state(sim, comms_ctx, 1, -1, output_dir = dir)
+        file = Checkpointer.state_checkpoint_path(dir, nameof(sim), 1)
+        @test Checkpointer.has_state_dataset(file, "Y", comms_ctx)
+        @test !Checkpointer.has_state_dataset(file, "model_state", comms_ctx)
+
+        # A checkpoint written under the default name is still read
+        legacy = DummySimulation(CC.Fields.FieldVector(T = 2 .* ones(space_checkpointer)))
+        Checkpointer.checkpoint_model_state(legacy, comms_ctx, 1, -1, output_dir = dir)
+        legacy_file = Checkpointer.state_checkpoint_path(dir, nameof(legacy), 1)
+        Checkpointer.restart_model_state!(sim, legacy_file, comms_ctx)
+        @test sim.state.T == legacy.state.T
+    end
+end

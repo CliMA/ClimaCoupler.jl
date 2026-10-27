@@ -283,6 +283,20 @@ function _build_coupled_simulation(config_dict::AbstractDict)
     tspan = (t_start, t_end)
     @info "Starting from t_start $(t_start)"
 
+    ## Detect restart files, if specified
+    if detect_restart_files
+        isnothing(restart_t) &&
+            (restart_t = Checkpointer.t_start_from_checkpoint(dir_paths.checkpoints_dir))
+        isnothing(restart_dir) && (restart_dir = dir_paths.checkpoints_dir)
+    end
+    should_restart = !isnothing(restart_t) && !isnothing(restart_dir)
+    should_restart &&
+        Checkpointer.check_checkpoint_nprocs(restart_dir, restart_t, comms_ctx)
+    # Passed to the component models that initialize themselves from the checkpoint
+    restart_kwargs =
+        should_restart ? (; restart_dir, restart_t) :
+        (; restart_dir = nothing, restart_t = nothing)
+
     #=
     ## Component Model Initialization
     Each component model is required to have an `init` function that
@@ -295,6 +309,7 @@ function _build_coupled_simulation(config_dict::AbstractDict)
         atmos_output_dir = dir_paths.atmos_output_dir,
         coupled_param_dict,
         comms_ctx,
+        restart_kwargs...,
     )
 
     #=
@@ -362,6 +377,7 @@ function _build_coupled_simulation(config_dict::AbstractDict)
         land_ic_path,
         lai_source,
         dt_drivers = ITime(Utilities.time_to_seconds(config_dict["dt_rad"])),
+        restart_kwargs...,
     )
 
     ocean_sim = @timed_log "Initialized ocean simulation" Interfacer.OceanSimulation(
@@ -538,7 +554,10 @@ function _build_coupled_simulation(config_dict::AbstractDict)
     end
 
     ## Build the CoupledSimulation struct
-    prev_checkpoint_t = Ref(-1)
+    # When restarting from this run's own checkpoints, the restart set is removed once the
+    # first new set is complete, as any previous set
+    restart_in_place = should_restart && samefile(restart_dir, dir_paths.checkpoints_dir)
+    prev_checkpoint_t = Ref(restart_in_place ? Int(float(restart_t)) : -1)
     cs = Interfacer.CoupledSimulation{FT}(
         start_date,
         coupler_fields,
@@ -558,12 +577,6 @@ function _build_coupled_simulation(config_dict::AbstractDict)
     )
 
     ## Restart component model states if specified
-    if detect_restart_files
-        isnothing(restart_t) &&
-            (restart_t = Checkpointer.t_start_from_checkpoint(dir_paths.checkpoints_dir))
-        isnothing(restart_dir) && (restart_dir = dir_paths.checkpoints_dir)
-    end
-    should_restart = !isnothing(restart_t) && !isnothing(restart_dir)
     should_restart && @timed_log "Restarted from checkpoint" Checkpointer.restart!(
         cs,
         restart_dir,

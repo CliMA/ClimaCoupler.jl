@@ -4,6 +4,21 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Restarts continue from the checkpointed state
+- ClimaAtmos is built from the coupler's atmosphere checkpoint (now written under the dataset name `Y`,
+  as ClimaAtmos does). Its cache, callbacks (radiation, gravity waves) and diagnostics therefore start
+  from the restored state, not from the initial condition. The integrated land reads its checkpoint
+  before building its cache and diagnostics, and its diagnostic schedules stay on calendar boundaries.
+  Atmosphere checkpoints written before this change still restart, with the previous behavior.
+- `checkpoint_sims` marks each complete checkpoint set and records the number of processes. It removes
+  the previous set, including every process's files, only after the new set is complete.
+  `t_start_from_checkpoint` picks the latest complete set. A restart with a different number of
+  processes fails early with a clear error.
+- New option `atmos_checkpoint_dt` (default: `checkpoint_dt`) sets the interval of the ClimaAtmos
+  `dayD.S.hdf5` files, which coupler restarts do not use; `"Inf"` disables them.
+- Multi-process restarts need a ClimaAtmos release whose `get_state_restart` closes its `HDF5Reader`
+  (ClimaAtmos PR "Close restart HDF5Reader in get_state_restart"); with older releases they can hang.
+
 #### Time stamps of the first coupler and land diagnostics after a restart
 The coupler and land NetCDF writers now get `init_time = t_start`, as the ClimaAtmos writer does,
 so the first averaged record after a restart covers `[t_start, t]` instead of `[0, t]`.

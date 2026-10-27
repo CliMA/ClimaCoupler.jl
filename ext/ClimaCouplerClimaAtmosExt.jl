@@ -38,12 +38,15 @@ import ClimaComms
 ###
 ### Functions required by ClimaCoupler.jl for an AbstractAtmosSimulation
 ###
-struct ClimaAtmosSimulation{P, D, I, OW} <: Interfacer.AbstractAtmosSimulation
+struct ClimaAtmosSimulation{P, D, I, OW, RF} <: Interfacer.AbstractAtmosSimulation
     params::P
     domain::D
     integrator::I
     output_writers::OW
+    restart_file::RF # state file ClimaAtmos was initialized from, or `nothing`
 end
+ClimaAtmosSimulation(params, domain, integrator, output_writers) =
+    ClimaAtmosSimulation(params, domain, integrator, output_writers, nothing)
 
 function hasradiation(integrator)
     return !isnothing(integrator.p.atmos.radiation_mode)
@@ -60,6 +63,9 @@ Extension of the generic AtmosSimulation constructor for ClimaAtmos.
 
 Note that this is currently the only atmosphere model supported by
 ClimaCoupler.jl.
+
+If `restart_dir` and `restart_t` are provided, the atmosphere is initialized
+from the coupler checkpoint of the atmosphere at `restart_t` in `restart_dir`.
 """
 function Interfacer.AtmosSimulation(
     ::Val{:climaatmos};
@@ -67,12 +73,22 @@ function Interfacer.AtmosSimulation(
     atmos_output_dir,
     coupled_param_dict,
     comms_ctx,
+    restart_dir = nothing,
+    restart_t = nothing,
 )
+    restart_file =
+        isnothing(restart_t) ? nothing :
+        Checkpointer.state_checkpoint_path(
+            restart_dir,
+            nameof(ClimaAtmosSimulation),
+            restart_t,
+        )
     return ClimaAtmosSimulation(
         config_dict,
         atmos_output_dir,
         coupled_param_dict,
-        comms_ctx,
+        comms_ctx;
+        restart_file,
     )
 end
 
@@ -80,10 +96,16 @@ function ClimaAtmosSimulation(
     config_dict::Dict,
     atmos_output_dir,
     coupled_param_dict::CP.ParamDict,
-    comms_ctx,
+    comms_ctx;
+    restart_file = nothing,
 )
-    atmos_config =
-        get_atmos_config_dict(config_dict, atmos_output_dir, coupled_param_dict, comms_ctx)
+    atmos_config = get_atmos_config_dict(
+        config_dict,
+        atmos_output_dir,
+        coupled_param_dict,
+        comms_ctx;
+        restart_file,
+    )
     return ClimaAtmosSimulation(atmos_config)
 end
 
@@ -121,7 +143,14 @@ function ClimaAtmosSimulation(atmos_config)
         @. ᶠradiation_flux = CC.Geometry.WVector(FT(0))
     end
 
-    sim = ClimaAtmosSimulation(integrator.p.params, spaces, integrator, output_writers)
+    restart_file = get(atmos_config.parsed_args, "restart_file", nothing)
+    sim = ClimaAtmosSimulation(
+        integrator.p.params,
+        spaces,
+        integrator,
+        output_writers,
+        restart_file,
+    )
 
     # DSS state to ensure we have continuous fields
     @timed_log "ClimaAtmos: zeroed fluxes and applied DSS to the state" dss_state!(sim)
@@ -149,6 +178,17 @@ end
 
 function Checkpointer.get_model_cache(sim::ClimaAtmosSimulation)
     return sim.integrator.p
+end
+
+# Write the state as ClimaAtmos does, so that ClimaAtmos can restart from the checkpoint
+Checkpointer.state_dataset_name(::ClimaAtmosSimulation) = "Y"
+
+# Skip reading the state again if ClimaAtmos was initialized from the same file
+function Checkpointer.restart_model_state!(sim::ClimaAtmosSimulation, input_file, comms_ctx)
+    restarted = !isnothing(sim.restart_file) && samefile(sim.restart_file, input_file)
+    restarted && return nothing
+    Checkpointer.read_model_state!(sim.integrator.u, input_file, comms_ctx, "Y")
+    return nothing
 end
 
 """
@@ -634,7 +674,13 @@ end
 ### ClimaAtmos.jl model-specific functions (not explicitly required by ClimaCoupler.jl)
 ###
 """
-    get_atmos_config_dict(coupler_config::Dict, atmos_output_dir)
+    get_atmos_config_dict(
+        coupler_config::Dict,
+        atmos_output_dir,
+        coupled_param_dict,
+        comms_ctx;
+        restart_file = nothing,
+    )
 
 Returns the specified atmospheric configuration (`atmos_config`) overwitten by arguments
 in the coupler dictionary (`coupler_config`).
@@ -650,6 +696,9 @@ This function makes the following changes to `coupler_config` when creating `atm
 - Setting the atmos output directory to the provided `atmos_output_dir`
 - Adding extra atmosphere diagnostics
 - Manually setting the restart file suffix
+- Setting the restart file to `restart_file` (a coupler checkpoint of the atmosphere
+  state), if provided, so that the atmosphere cache, callbacks, and diagnostics are
+  initialized from the restored state rather than from the initial condition
 
 The TOML parameter file to use is chosen using the following priority:
 If a coupler TOML file is provided, it is used.
@@ -662,14 +711,16 @@ function get_atmos_config_dict(
     coupler_config::Dict,
     atmos_output_dir,
     coupled_param_dict::CP.ParamDict,
-    comms_ctx,
+    comms_ctx;
+    restart_file = nothing,
 )
     atmos_config = deepcopy(coupler_config)
 
-    # Ensure Atmos's own checkpoints are synced up with ClimaCoupler, so that we
-    # can pick up from where we have left. NOTE: This should not be needed, but
-    # there is no easy way to initialize ClimaAtmos with a different t_start
-    atmos_config["dt_save_state_to_disk"] = coupler_config["checkpoint_dt"]
+    # ClimaAtmos's own `dayD.S.hdf5` state files, which coupler restarts do not use
+    atmos_checkpoint_dt = get(coupler_config, "atmos_checkpoint_dt", nothing)
+    atmos_config["dt_save_state_to_disk"] =
+        isnothing(atmos_checkpoint_dt) ? coupler_config["checkpoint_dt"] :
+        atmos_checkpoint_dt
 
     # disable Atmos's progress logging
     atmos_config["log_progress"] = false
@@ -718,6 +769,15 @@ function get_atmos_config_dict(
     if !isnothing(atmos_config["restart_file"])
         atmos_config["restart_file"] =
             replace(atmos_config["restart_file"], "active" => "0000")
+    end
+    if !isnothing(restart_file)
+        if Checkpointer.has_state_dataset(restart_file, "Y", comms_ctx)
+            atmos_config["restart_file"] = restart_file
+        else
+            @warn "Atmos checkpoint $restart_file predates ClimaAtmos-readable \
+            checkpoints: the atmosphere cache and diagnostics are initialized from the \
+            initial condition before the state is restored"
+        end
     end
 
     # Construct the AtmosConfig object

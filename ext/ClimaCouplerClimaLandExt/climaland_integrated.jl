@@ -48,10 +48,16 @@ end
         lai_source::String = "modis_monthly",
         gustiness::FT = FT(1),
         dt_drivers::ITime = ITime(3600),
+        restart_dir = nothing,
+        restart_t = nothing,
     ) where {FT, TT <: Union{Float64, ITime}}
 
 Creates a ClimaLandSimulation object containing a land domain,
 a ClimaLand.LandModel, and an integrator.
+
+If `restart_dir` and `restart_t` are provided, the initial state is overwritten
+with the coupler checkpoint of the land state at `restart_t` in `restart_dir`
+before the cache and the diagnostics are initialized.
 
 This type of model contains a canopy model, soil model, snow model, and
 soil CO2 model. Specific details about the complexity of the model
@@ -89,6 +95,8 @@ function ClimaLandSimulation(
     lai_source::String = "modis_monthly",
     gustiness::FT = FT(1),
     dt_drivers::ITime = ITime(3600),
+    restart_dir = nothing,
+    restart_t = nothing,
     extra_kwargs...,
 ) where {FT, TT <: Union{Float64, ITime}}
     # Get default land parameters from ClimaLand.LandParameters
@@ -187,6 +195,15 @@ function ClimaLandSimulation(
             reduction_type = land_diagnostics_reduction,
             dt = float(dt),
         )
+        # `default_diagnostics` anchors the output schedules at `start_date`; on restarts,
+        # seed them with the last period boundary before `t_start`, as for the coupler
+        for diag in diagnostics
+            schedule = diag.output_schedule_func
+            schedule isa CD.Schedules.EveryCalendarDtSchedule || continue
+            aligned =
+                TimeManager.calendar_dt_schedule(schedule.dt, start_date, float(tspan[1]))
+            schedule.date_last[] = aligned.date_last[]
+        end
     else
         output_writer = nothing
         diagnostics = nothing
@@ -222,9 +239,23 @@ function ClimaLandSimulation(
             CL.Simulations.make_set_initial_state_from_atmos_and_parameters(model)
         surface_T = initial_T
     end
+    restart_file =
+        isnothing(restart_t) ? nothing :
+        Checkpointer.state_checkpoint_path(
+            restart_dir,
+            nameof(ClimaLandSimulation),
+            restart_t,
+        )
     set_ic! =
-        (Y, p, t, model) ->
+        (Y, p, t, model) -> begin
             _coupler_set_ic!(Y, p, t, model, surface_T, surface_elevation, set_ic_land!)
+            # On restarts, use the checkpointed state for the initial cache and diagnostics
+            isnothing(restart_file) || Checkpointer.read_model_state!(
+                Y,
+                restart_file,
+                ClimaComms.context(surface_space),
+            )
+        end
     # Convert start_date and stop_date to ITime if using ITime
     if dt isa ITime
         start_date = tspan[1]

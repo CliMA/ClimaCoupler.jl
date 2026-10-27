@@ -51,6 +51,13 @@ time. If the model you are running supports writing checkpoints via command-line
 argument, it will probably also support reading them. In this case, the
 arguments `restart_dir` and `restart_t` identify the path of the top level
 directory containing all the checkpoint files and the simulated times in second.
+When detecting checkpoints automatically, the complete set (as marked by
+[`Checkpointer.checkpoint_sims`](@ref)) with the latest time is used. Restarts
+must use the same number of processes as the run that wrote the checkpoint.
+
+ClimaAtmos and the integrated ClimaLand model are built directly from their
+checkpointed states, so that their caches, callbacks, and diagnostics start from
+the restored state rather than from the initial conditions.
 
 If the model does not support directly reading a checkpoint, the `Checkpointer`
 module provides a straightforward way to add this feature.
@@ -207,5 +214,7 @@ This approach allows for a signficant reducation in the file size of the cache.
     Checkpointer.restart_flux_accumulators!
     Checkpointer.checkpoint_sims
     Checkpointer.t_start_from_checkpoint
+    Checkpointer.state_dataset_name
+    Checkpointer.read_model_state!
     Checkpointer.restore!
 ```

@@ -81,6 +81,7 @@ function control_volume_weights(cv::ControlVolumes, space, elem, polygon)
     ]
     reference_polygon = GI.Polygon([GI.LinearRing(vertices)])
     edge(edges, i) = i == 1 ? -2.0 : i == Nq + 1 ? 2.0 : edges[i]
+    WJ = CC.Spaces.weighted_jacobian(space)
     B = zeros(Nq, Nq)
     for j in 1:Nq, i in 1:Nq
         ξ0, ξ1 = edge(view(cv.ξ, :, j, elem), i), edge(view(cv.ξ, :, j, elem), i + 1)
@@ -94,7 +95,7 @@ function control_volume_weights(cv::ControlVolumes, space, elem, polygon)
             for (λ, w) in zip(bary, wq)
                 ξ = λ[1] * t[1][1] + λ[2] * t[2][1] + λ[3] * t[3][1]
                 η = λ[1] * t[1][2] + λ[2] * t[2][2] + λ[3] * t[3][2]
-                B[i, j] += 2A * w * CRExt.element_jacobian_at(space, elem, ξ, η)
+                B[i, j] += 2A * w * CRExt.element_jacobian_at(space, WJ, elem, ξ, η)
             end
         end
     end

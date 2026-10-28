@@ -300,11 +300,13 @@ end
 """
     step_model!(oc_sim, clock, Δt)
 
-Advance the Oceananigans-backed simulation this rank holds by `Δt`, or only
-its `clock` on a rank that holds none.
+Advance the Oceananigans-backed simulation by `Δt`, which advances `clock`.
 """
 step_model!(oc_sim::OC.Simulation, clock, Δt) = OC.time_step!(oc_sim, Δt)
-step_model!(::Nothing, clock, Δt) = OC.TimeSteppers.tick!(clock, Δt)
+
+# Under MPI each process checkpoints its own slab, in a file named with its rank.
+rank_suffix(comms_ctx) =
+    ClimaComms.nprocs(comms_ctx) == 1 ? "" : "_rank$(ClimaComms.mypid(comms_ctx) - 1)"
 
 """
     Checkpointer.checkpoint_model_state(sim, comms_ctx, t, prev_checkpoint_t; output_dir)
@@ -314,6 +316,7 @@ Save the state of an Oceananigans-backed simulation to a JLD2 file at time `t`
 
 If a previous checkpoint exists, it is removed to avoid accumulating files.
 A value of -1 for `prev_checkpoint_t` indicates there is no previous checkpoint.
+Under MPI every process writes and removes the file of its own slab.
 """
 function Checkpointer.checkpoint_model_state(
     sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
@@ -322,14 +325,14 @@ function Checkpointer.checkpoint_model_state(
     prev_checkpoint_t::Int;
     output_dir = "output",
 )
-    isnothing(get_oc_sim(sim)) && return nothing
     day = floor(Int, t / (60 * 60 * 24))
     sec = floor(Int, t % (60 * 60 * 24))
     @info "Saving checkpoint $(nameof(sim)) model state to JLD2 on day $day second $sec"
-    output_file = joinpath(output_dir, "checkpoint_$(nameof(sim))_$t.jld2")
+    rank = rank_suffix(comms_ctx)
+    output_file = joinpath(output_dir, "checkpoint_$(nameof(sim))_$(t)$(rank).jld2")
     prev_checkpoint_file =
-        joinpath(output_dir, "checkpoint_$(nameof(sim))_$(prev_checkpoint_t).jld2")
-    Checkpointer.remove_checkpoint(prev_checkpoint_file, prev_checkpoint_t, comms_ctx)
+        joinpath(output_dir, "checkpoint_$(nameof(sim))_$(prev_checkpoint_t)$(rank).jld2")
+    prev_checkpoint_t == -1 || rm(prev_checkpoint_file; force = true)
     OC.checkpoint(get_oc_sim(sim); filepath = output_file)
     return nothing
 end
@@ -341,15 +344,15 @@ Restore the state of an Oceananigans-backed simulation from a JLD2 checkpoint
 file using `Oceananigans.set!`.
 
 The coupler constructs `input_file` with a `.hdf5` extension; this method
-replaces it with `.jld2` to match the format written by `checkpoint_model_state`.
+replaces it with `.jld2`, and under MPI appends the rank, to match the file
+written by `checkpoint_model_state`.
 """
 function Checkpointer.restart_model_state!(
     sim::Union{OceananigansSimulation, ClimaSeaIceSimulation},
     input_file,
     comms_ctx,
 )
-    isnothing(get_oc_sim(sim)) && return nothing
-    jld2_file = replace(input_file, ".hdf5" => ".jld2")
+    jld2_file = replace(input_file, ".hdf5" => "$(rank_suffix(comms_ctx)).jld2")
     ispath(jld2_file) || error("Oceananigans checkpoint file not found: $jld2_file")
     OC.set!(get_oc_sim(sim); checkpoint = jld2_file)
     return nothing

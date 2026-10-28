@@ -45,8 +45,8 @@ get_ConservativeRegriddingOCExt() =
 # Exchange-grid geometry/weights and per-polygon flux machinery, used by the
 # ocean and sea-ice models below
 include("ClimaCouplerCMIPExt/control_volumes.jl")
+include("ClimaCouplerCMIPExt/cell_exchange.jl")
 include("ClimaCouplerCMIPExt/exchange_grid.jl")
-include("ClimaCouplerCMIPExt/exchange_space.jl")
 include("ClimaCouplerCMIPExt/exchange_fluxes.jl")
 
 # Data readers first: the model files call into them during construction

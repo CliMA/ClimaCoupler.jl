@@ -234,6 +234,12 @@ default_coriolis(ocean::Nothing) =
 ocean_surface_height(::Nothing, FT) = OC.Fields.ZeroField(FT)
 ocean_surface_height(ocean::OC.Simulation, FT) = ocean.model.free_surface.displacement
 
+# The split-explicit solver's halo is `2 substeps + 3` rows deep, which on a
+# distributed grid must fit in the smallest latitude slab.
+sea_ice_substeps(grid) = 100
+sea_ice_substeps(grid::OC.DistributedComputations.DistributedGrid) =
+    min(100, all_reduce(min, (size(grid, 2) - 3) ÷ 2, architecture(grid)))
+
 function sea_ice_dynamics(
     grid,
     ocean = nothing;
@@ -241,7 +247,7 @@ function sea_ice_dynamics(
     rheology = CSI.ElastoViscoPlasticRheology(),
     coriolis = default_coriolis(ocean),
     free_drift = nothing,
-    solver = CSI.SplitExplicitSolver(grid; substeps = 100),
+    solver = CSI.SplitExplicitSolver(grid; substeps = sea_ice_substeps(grid)),
 )
 
     FT = eltype(grid)

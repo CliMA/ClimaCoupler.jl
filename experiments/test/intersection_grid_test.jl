@@ -52,7 +52,7 @@ tripolar_grid_on(arch) = OC.TripolarGrid(
     southernmost_latitude = -80,
     north_poles_latitude = 55,
     first_pole_longitude = 70,
-    fold_topology = OC.RightCenterFolded,
+    fold_topology = OC.CenterFolded,
     z = (-100.0, 0.0),
     halo = (4, 4, 4),
 )
@@ -969,13 +969,6 @@ end
         weight_cov_scratch = CC.Fields.zeros(boundary_space),
         downward_flux_scratch = CC.Fields.zeros(boundary_space),
         flux_dss_buffer = Utilities.init_dss_buffer(CC.Fields.zeros(boundary_space)),
-        exchange_fields = (;
-            SW_d = CC.Fields.zeros(boundary_space),
-            LW_d = CC.Fields.zeros(boundary_space),
-            P_liq = CC.Fields.zeros(boundary_space),
-            P_snow = CC.Fields.zeros(boundary_space),
-            scalar_temp = CC.Fields.zeros(boundary_space),
-        ),
     )
     sim = CMIPExt.OceananigansSimulation(
         (; model),
@@ -1071,12 +1064,6 @@ Base.eltype(::FakeIceModel) = FT
         weight_cov_scratch = CC.Fields.zeros(boundary_space),
         downward_flux_scratch = CC.Fields.zeros(boundary_space),
         flux_dss_buffer = Utilities.init_dss_buffer(CC.Fields.zeros(boundary_space)),
-        exchange_fields = (;
-            SW_d = CC.Fields.zeros(boundary_space),
-            LW_d = CC.Fields.zeros(boundary_space),
-            P_snow = CC.Fields.zeros(boundary_space),
-            scalar_temp = CC.Fields.zeros(boundary_space),
-        ),
     )
     sim = CMIPExt.ClimaSeaIceSimulation(
         (; model),

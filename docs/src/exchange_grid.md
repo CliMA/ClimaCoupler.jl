@@ -132,8 +132,9 @@ the ocean/ice retains full polygon resolution.
 The exchange grid requires a `SpectralElementSpace2D` boundary space; the
 column (`PointSpace`) setup and `use_intersection_grid: false` fall back to
 the regridder-based boundary-space flux path and the legacy fraction update,
-which run on a single process only. On several MPI ranks the exchange grid
-lives on the root rank; see [Multi-GPU coupled runs](@ref).
+which run on a single process only. On several MPI ranks each rank holds the
+polygons of its own elements and a latitude slab of the ocean and sea ice;
+see [Multi-GPU coupled runs](@ref).
 
 ## API
 

@@ -104,9 +104,12 @@ end
 Interpolate `dataset` from its native grid onto `target_field`.
 
 Since the source data has no gaps, this is plain interpolation with no masking.
+Under MPI every process holds the whole native grid and interpolates onto its slab.
 """
 function interpolate_onto!(target_field, dataset)
-    arch = OC.Architectures.architecture(target_field.grid)
+    arch = OC.Architectures.child_architecture(
+        OC.Architectures.architecture(target_field.grid),
+    )
     OC.Fields.interpolate!(target_field, source_field(dataset, arch))
     return target_field
 end
@@ -191,8 +194,12 @@ function tripolar_bottom_height(
             error("$path was generated with $name = $baked, but $requested was requested")
     end
 
-    size(bottom_height) == (grid.Nx, grid.Ny) || error(
-        "The tripolar bathymetry artifact is $(size(bottom_height)) but the grid is ($(grid.Nx), $(grid.Ny))",
+    arch = OC.architecture(grid)
+    grid_size =
+        arch isa OC.Distributed ? OC.DistributedComputations.global_size(arch, size(grid)) :
+        size(grid)
+    size(bottom_height) == grid_size[1:2] || error(
+        "The tripolar bathymetry artifact is $(size(bottom_height)) but the grid is $(grid_size[1:2])",
     )
 
     bottom_field = OC.Field{OC.Center, OC.Center, Nothing}(grid)

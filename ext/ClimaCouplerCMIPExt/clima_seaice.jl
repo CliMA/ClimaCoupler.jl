@@ -634,8 +634,8 @@ NVTX.@annotate function compute_ice_exchange_fluxes!(
     # Atmospheric state, including the downwelling radiation entering the
     # skin-temperature balance.
     gather_atmos_state_to_polys!(fs, eg, csf, remapping.temp_uv_vec, remapping.uv_basis)
-    gather_nodes_to_polys!(fs.SW_d, eg, se_nodal_vec(csf.SW_d))
-    gather_nodes_to_polys!(fs.LW_d, eg, se_nodal_vec(csf.LW_d))
+    gather_downward_flux!(fs.SW_d, remapping, csf.SW_d)
+    gather_downward_flux!(fs.LW_d, remapping, csf.LW_d)
 
     # Ice state from the owning cells. Conductive resistance
     # R = h_ice/k_ice + h_snow/k_snow (series; reduces to h_ice/k_ice with no
@@ -896,8 +896,8 @@ NVTX.@annotate function push_exchange_radiation_to_ice!(sim::ClimaSeaIceSimulati
     # Absorbed radiative part of Jᵃ (upward positive): −(1−α)SW↓ − ϵLW↓, weighted to a cell mean.
     si_flux_heat = sim.ice.model.external_heat_fluxes.top
     if si_flux_heat isa OC.Field
-        gather_nodes_to_polys!(fs.SW_d, eg, se_nodal_vec(csf.SW_d))
-        gather_nodes_to_polys!(fs.LW_d, eg, se_nodal_vec(csf.LW_d))
+        gather_downward_flux!(fs.SW_d, remapping, csf.SW_d)
+        gather_downward_flux!(fs.LW_d, remapping, csf.LW_d)
         @. fs.scratch1 = fs.sic * (-(1 - α) * fs.SW_d - ϵ * fs.LW_d)
         heat_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
         scatter_polys_to_cells!(heat_cells, eg, fs.scratch1)
@@ -910,7 +910,7 @@ NVTX.@annotate function push_exchange_radiation_to_ice!(sim::ClimaSeaIceSimulati
     # atmospheric mass flux to positive `snowfall`).
     snowfall = sim.ice.model.snowfall
     if snowfall isa OC.Field
-        gather_nodes_to_polys!(fs.P_snow, eg, se_nodal_vec(csf.P_snow))
+        gather_downward_flux!(fs.P_snow, remapping, csf.P_snow)
         @. fs.scratch1 = (fs.sic > 0) * -fs.P_snow
         snow_cells = vec(OC.interior(remapping.scratch_field_oc1, :, :, 1))
         scatter_polys_to_cells!(snow_cells, eg, fs.scratch1)

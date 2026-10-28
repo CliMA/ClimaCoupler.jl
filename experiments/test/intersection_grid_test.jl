@@ -760,17 +760,38 @@ end
         flux_scratch,
         flux_dss_buffer = Utilities.init_dss_buffer(flux_scratch.F_sh),
         weight_cov_scratch = CC.Fields.zeros(boundary_space),
+        downward_flux_scratch = CC.Fields.zeros(boundary_space),
         temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space),
         uv_basis,
         exchange_grid = eg_d,
     )
     coverage = CC.Fields.zeros(boundary_space)
 
+    # The downward-flux gather preserves constants and stays within the range of
+    # the nodal values.
+    g_field = CC.Fields.ones(boundary_space)
+    poly_d = on_exchange_device(zeros(FT, eg.n_poly))
+    CMIPExt.gather_downward_flux!(poly_d, remapping, g_field)
+    @test all(v -> isapprox(v, 1, atol = 1e-12), to_cpu(poly_d))
+    CRExt.vec_to_se_field!(g_field, on_exchange_device(2 .* rand(rng, FT, eg.n_nodes) .- 1))
+    CMIPExt.gather_downward_flux!(poly_d, remapping, g_field)
+    @test all(v -> -1 - 1e-12 <= v <= 1 + 1e-12, to_cpu(poly_d))
+
     for weight in (1 .- fs.sic, copy(fs.sic)) # open water, sea ice
         weight_d = on_exchange_device(weight)
         CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg_d, fs_d, weight_d)
         α = to_cpu(CRExt.se_field_to_vec(remapping.weight_cov_scratch))
         @test all(a -> 0 <= a <= 1 + 1e-8, α)
+
+        # A downward flux whose element copies of a shared node disagree, as the
+        # atmosphere's radiation can, still reaches the polygons as exactly the
+        # atmosphere's share Σ_n WJ_n α_n g_n.
+        g = rand(rng, FT, eg.n_nodes)
+        g_field = CC.Fields.zeros(boundary_space)
+        CRExt.vec_to_se_field!(g_field, on_exchange_device(g))
+        poly_d = on_exchange_device(zeros(FT, eg.n_poly))
+        CMIPExt.gather_downward_flux!(poly_d, remapping, g_field)
+        @test sum(eg.b_area .* weight .* to_cpu(poly_d)) ≈ sum(WJ .* α .* g) rtol = 1e-12
 
         for (name, F_poly) in
             ((:F_sh, fs.F_sh), (:F_lh, fs.F_lh), (:F_turb_moisture, fs.F_moisture))
@@ -924,6 +945,8 @@ end
         exchange_grid = eg,
         ocean_flux_state = CMIPExt.ExchangeFluxState{FT}(ocean_arch, eg_cpu.n_poly),
         scratch_field_oc3 = surface_field(),
+        downward_flux_scratch = CC.Fields.zeros(boundary_space),
+        flux_dss_buffer = Utilities.init_dss_buffer(CC.Fields.zeros(boundary_space)),
     )
     sim = CMIPExt.OceananigansSimulation(
         (; model),
@@ -1000,6 +1023,8 @@ Base.eltype(::FakeIceModel) = FT
         exchange_grid = eg,
         ice_flux_state = CMIPExt.IceExchangeState{FT}(ice_arch, eg_cpu.n_poly),
         scratch_field_oc1 = surface_field(),
+        downward_flux_scratch = CC.Fields.zeros(boundary_space),
+        flux_dss_buffer = Utilities.init_dss_buffer(CC.Fields.zeros(boundary_space)),
     )
     sim = CMIPExt.ClimaSeaIceSimulation(
         (; model),

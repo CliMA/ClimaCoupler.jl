@@ -8,6 +8,9 @@ ClimaCoupler.jl Release Notes
 - [#2160](https://github.com/CliMA/ClimaCoupler.jl/pull/2160): Fluxes into ocean and sea-ice
   cells are divided by the ocean's cell area, so the step from the polygons to the cells
   conserves their global integral.
+- [#2173](https://github.com/CliMA/ClimaCoupler.jl/pull/2173): Radiation and precipitation
+  reach the polygons through the transpose of the scatter weights, after a DSS, so they also
+  conserve from the atmosphere to the cells.
 
 #### Prescribed sea ice: melt-dependent albedo, 0 °C surface melting point, and hemispheric thickness
 - [#2217](https://github.com/CliMA/ClimaCoupler.jl/pull/2217): `PrescribedIceSimulation`

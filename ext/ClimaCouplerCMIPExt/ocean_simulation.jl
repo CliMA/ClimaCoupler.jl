@@ -167,7 +167,7 @@ ocean_surface_salinity(::Nothing) = 0
 
 function ocean_surface_salinity(ocean::OC.Simulation{<:OC.HydrostaticFreeSurfaceModel})
     kᴺ = size(ocean.model.grid, 3)
-    return view(parent(ocean.model.tracers.S), :, :, kᴺ:kᴺ)
+    return view(ocean.model.tracers.S.data, :, :, kᴺ:kᴺ)
 end
 
 ocean_surface_velocities(::Nothing) = (OC.Fields.ZeroField(), OC.Fields.ZeroField())

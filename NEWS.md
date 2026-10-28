@@ -4,6 +4,11 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Non-negative control-volume weights for exchange-grid fluxes (contd.)
+- [#2160](https://github.com/CliMA/ClimaCoupler.jl/pull/2160): Fluxes into ocean and sea-ice
+  cells are divided by the ocean's cell area, so the step from the polygons to the cells
+  conserves their global integral.
+
 #### Prescribed sea ice: melt-dependent albedo, 0 °C surface melting point, and hemispheric thickness
 - [#2217](https://github.com/CliMA/ClimaCoupler.jl/pull/2217): `PrescribedIceSimulation`
   changes its physics and its `IceSlabParameters` API.

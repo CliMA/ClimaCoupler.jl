@@ -96,7 +96,7 @@ function argparse_settings()
         arg_type = String
         default = "0secs"
         "--start_date"
-        help = "Start date of the simulation, in format \"YYYYMMDD\" or \"YYYYMMDD-HHMM\" [\"20100101\" (default)]"
+        help = "Start date of the simulation, in format \"YYYYMMDD\" or \"YYYYMMDD-HHMM\" [\"20000101\" (default)]"
         arg_type = String
         default = "20000101"
         "--dt_cpl"
@@ -124,7 +124,7 @@ function argparse_settings()
         arg_type = String
         default = "90days"
         "--walltime_dt"
-        help = "Time interval for walltime reporting [nothing (default): a tenth of the simulation length, at most 1 day and at least one coupling step; allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
+        help = "Time interval for walltime reporting [nothing (default): a tenth of the simulation length, at most 30 days and at least one coupling step; allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\", \"never\"]"
         arg_type = String
         default = nothing
         "--walltime_debug"

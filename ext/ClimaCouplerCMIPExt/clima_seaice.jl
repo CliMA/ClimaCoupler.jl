@@ -571,6 +571,25 @@ function _update_ice_turbulent_fluxes_boundary!(sim::ClimaSeaIceSimulation, fiel
 end
 
 """
+    exchange_ice_fraction!(ice_fraction, remapping, sim::ClimaSeaIceSimulation)
+
+Sea-ice area fraction on the boundary space: the exchange-grid coverage of
+the per-polygon ice concentration. Uses the ocean flux state's `scratch1` as
+per-polygon scratch.
+"""
+function exchange_ice_fraction!(ice_fraction, remapping, sim::ClimaSeaIceSimulation)
+    eg = remapping.exchange_grid
+    sic = remapping.ocean_flux_state.scratch1
+    gather_cells_to_polys!(
+        sic,
+        eg,
+        vec(OC.interior(sim.ice.model.ice_concentration, :, :, 1)),
+    )
+    flux_weight_coverage!(ice_fraction, eg, sic, remapping.flux_dss_buffer)
+    return ice_fraction
+end
+
+"""
     compute_ice_exchange_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim,
                                  thermo_params, accumulator = nothing)
 

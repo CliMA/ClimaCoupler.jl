@@ -4,6 +4,14 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Route land runoff to the ocean
+`FieldExchanger.route_runoff!` integrates runoff leaving the integrated land model (surface plus
+subsurface) over the land area each coupling step and spreads it uniformly over the ocean
+surface as the coupler field `F_runoff`. `OceananigansSimulation` applies this as a freshwater
+flux alongside rain. Land models provide runoff through `Interfacer.get_field(sim, Val(:runoff))`,
+which defaults to `nothing` (no routing). Coupler checkpoints written before this change have no
+`F_runoff` and cannot be restored.
+
 #### Average ClimaAtmos precipitation over the atmosphere steps of a coupling step
 The `liquid_precipitation` and `snow_precipitation` that `ClimaAtmosSimulation` passes to the surfaces
 are the mean over the atmosphere steps taken in one coupling step, not just the last value.

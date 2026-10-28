@@ -4,6 +4,14 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Route land runoff to the ocean
+`FieldExchanger.route_runoff!` integrates runoff leaving the integrated land model (surface plus
+subsurface) over the land area each coupling step and spreads it uniformly over the ocean 
+surface as the coupler field `F_runoff`. `OceananigansSimulation` applies this as a freshwater 
+flux alongside rain. Land models provide runoff through `Interfacer.get_field(sim, Val(:runoff))`, 
+which defaults to `nothing` (no routing). Coupler checkpoints written before this change have no 
+`F_runoff` and cannot be restored.
+
 #### Non-negative control-volume weights for exchange-grid fluxes
 - [#2152](https://github.com/CliMA/ClimaCoupler.jl/pull/2152): The polygon → SE-node scatter
   weights each polygon by its area inside control volumes around the nodes, so masked flux

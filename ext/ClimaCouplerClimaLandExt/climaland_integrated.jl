@@ -275,6 +275,11 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water}) =
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature}) =
     sim.integrator.p.T_sfc
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:roughness_model}) = :constant
+# Surface plus subsurface runoff, converted from m s⁻¹ to kg m⁻² s⁻¹
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:runoff})
+    ρ_liq = LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set)
+    return ρ_liq .* (sim.integrator.p.soil.R_s .+ sim.integrator.p.soil.R_ss)
+end
 
 # Update fields stored in land drivers
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:diffuse_fraction}, field)

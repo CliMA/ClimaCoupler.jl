@@ -944,8 +944,8 @@ end
     # cell receives the single-column answer times its `cell_area_ratio`.
     uniform(v) = (f = CC.Fields.zeros(boundary_space); f .= FT(v); f)
     SW_d, SW_d_diffuse, LW_d = FT(300), FT(120), FT(350)
-    P_liq, P_snow = FT(-1e-5), FT(-2e-6)
-    forcing = (; SW_d, SW_d_diffuse, LW_d, P_liq, P_snow)
+    P_liq, P_snow, F_runoff = FT(-1e-5), FT(-2e-6), FT(3e-6)
+    forcing = (; SW_d, SW_d_diffuse, LW_d, P_liq, P_snow, F_runoff)
     # Only the fields the ocean averages over its timestep
     names = FieldExchanger.accumulated_coupler_fields(sim)
     csf = NamedTuple{names}(map(name -> uniform(forcing[name]), names))
@@ -959,7 +959,7 @@ end
     expected_T =
         (-SW_absorbed - ϵ * (LW_d - σ * (T_sfc + C_to_K)^4)) /
         (reference_density * heat_capacity)
-    expected_S = -S_sfc * (P_liq + P_snow) / reference_density
+    expected_S = -S_sfc * (P_liq + P_snow - F_runoff) / reference_density
 
     cell_values(f) = vec(OC.interior(OC.on_architecture(OC.CPU(), f), :, :, 1))
     flux_T = cell_values(CMIPExt.surface_flux(model.tracers.T))

@@ -16,6 +16,7 @@ export update_sim!,
     update_model_sims!,
     step_model_sims!,
     exchange!,
+    route_runoff!,
     set_caches!,
     update_surface_fractions!,
     resolve_area_fractions!,
@@ -444,11 +445,37 @@ function combine_surfaces!(csf, sims, ::Val{:surface_temperature})
 end
 
 """
+    route_runoff!(csf, model_sims)
+
+Deliver the land runoff to the ocean as `csf.F_runoff`, a freshwater flux per unit
+ocean area [kg m⁻² s⁻¹], positive into the ocean. The total runoff over land,
+`∫ runoff × land_area_fraction dA`, is (for now) spread uniformly over the ocean surface 
+(open water and sea ice), `∫ (1 - land_area_fraction) dA`.
+
+Does nothing unless the ocean model added `F_runoff` to the coupler fields and the
+land model provides `runoff`.
+"""
+function route_runoff!(csf, model_sims)
+    (hasproperty(csf, :F_runoff) && haskey(model_sims, :land_sim)) || return nothing
+    runoff = Interfacer.get_field(model_sims.land_sim, Val(:runoff))
+    isnothing(runoff) && return nothing
+
+    land_fraction = csf.land_area_fraction
+    Interfacer.remap!(csf.scalar_temp1, runoff)
+    @. csf.scalar_temp1 *= land_fraction
+    @. csf.scalar_temp2 = 1 - land_fraction
+    csf.F_runoff .=
+        Utilities.integral(csf.scalar_temp1) / Utilities.integral(csf.scalar_temp2)
+    return nothing
+end
+
+"""
     exchange!(cs::Interfacer.CoupledSimulation)
 
 Exchange fields between the surface and atmosphere models.
 This is done in 2 steps:
-1. Import the atmosphere fields and surface fields into the coupler.
+1. Import the atmosphere fields and surface fields into the coupler, and route the
+   land runoff to the ocean.
 2. Update the component model simulations with the coupler fields.
 
 The order of these steps is important, as importing the surface fields requires
@@ -458,6 +485,7 @@ function exchange!(cs::Interfacer.CoupledSimulation)
     # Import the atmosphere fields and surface fields into the coupler
     import_atmos_fields!(cs.fields, cs.model_sims)
     import_combined_surface_fields!(cs.fields, cs.model_sims)
+    route_runoff!(cs.fields, cs.model_sims)
 
     # Update the component model simulations with the coupler fields
     update_model_sims!(cs.model_sims, cs.fields, cs.flux_accumulators)

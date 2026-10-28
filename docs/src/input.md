@@ -187,16 +187,28 @@ specific timesteps should be specified, rather than only `dt`.
 
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
-| `--ice_model` | String | `"prescribed"` | `prescribed`, `clima_seaice` | Sea ice model to use |
+| `--ice_model` | String | `"prescribed"` | `prescribed`, `clima_seaice`, `nothing` | Sea ice model to use. `clima_seaice` requires `ocean_model = "oceananigans"` |
 | `--seaice_progress_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for printing sea-ice progress information (ClimaSeaIce only). Set to `"never"` to disable. |
+| `--seaice_diagnostic_interval` | String | `"1days"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"` | Time interval between sea-ice diagnostic outputs (ClimaSeaIce only) |
+| `--seaice_diagnostic_mode` | String | `"average"` | `average`, `instantaneous` | Reduction mode for sea-ice diagnostic outputs. `average` uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval` |
 
 
 #### Ocean model specific
 
 | Argument | Type | Default | Valid Options | Description |
 |----------|------|---------|---------------|-------------|
+| `--ocean_model` | String | `"prescribed"` | `prescribed`, `oceananigans`, `slab`, `nothing` | Ocean model to use |
 | `--evolving_ocean` | Bool | `true` | `true`, `false` | Whether to use a dynamic slab ocean model, as opposed to constant surface temperatures |
+| `--simple_ocean` | Bool | `false` | `true`, `false` | Whether to use a simpler ocean model setup with Oceananigans |
+| `--ocean_grid` | String | `"one_deg_tripolar"` | `one_deg_tripolar`, `orca` | Horizontal grid for the Oceananigans ocean model |
+| `--ocean_float_type` | String | `"Float64"` | `Float64`, `Float32` | Float type of the Oceananigans ocean model |
+| `--ocean_vertical_levels` | Int | `60` | Any positive integer | Number of vertical levels of the Oceananigans ocean model |
+| `--use_intersection_grid` | Bool | `true` | `true`, `false` | Whether to use the atmosphere-ocean intersection (exchange) grid for surface fractions and ocean/sea-ice fluxes with Oceananigans. Automatically disabled for column runs and distributed (MPI) runs |
+| `--sst_adjustment` | Float64 | `0.0` | Any real number | Adjustment added to the prescribed SST after conversion to Kelvin |
 | `--ocean_progress_interval` | String | `"never"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"`, `"never"` | Time interval for printing ocean progress information. Set to `"never"` to disable. |
+| `--ocean_diagnostic_interval` | String | `"1days"` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"` | Time interval between ocean surface diagnostic outputs (Oceananigans only) |
+| `--ocean_3d_diagnostic_interval` | String | `nothing` | `"Nsecs"`, `"Nmins"`, `"Nhours"`, `"Ndays"`, `"Nmonths"` | Time interval between 3D ocean diagnostic outputs (Oceananigans only). Defaults to `ocean_diagnostic_interval` |
+| `--ocean_diagnostic_mode` | String | `"average"` | `average`, `instantaneous` | Reduction mode for ocean diagnostic outputs. `average` uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval` |
 
 #### Single-column model (SCM) settings
 

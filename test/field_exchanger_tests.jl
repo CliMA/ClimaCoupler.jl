@@ -681,3 +681,32 @@ end
         @test fast_sim.update_count == 1
     end
 end
+
+struct RunoffLandSimulation{F} <: Interfacer.AbstractSurfaceSimulation
+    runoff::F
+end
+Interfacer.get_field(sim::RunoffLandSimulation, ::Val{:runoff}) = sim.runoff
+
+@testset "route_runoff! delivers all land runoff to the ocean" begin
+    for FT in (Float32, Float64)
+        boundary_space = CC.CommonSpaces.CubedSphereSpace(
+            FT;
+            radius = FT(6.371e6),
+            n_quad_points = 4,
+            h_elem = 4,
+        )
+        csf = Interfacer.init_coupler_fields(
+            FT,
+            [Interfacer.default_coupler_fields()..., :F_runoff],
+            boundary_space,
+        )
+        coords = CC.Fields.coordinate_field(boundary_space)
+        @. csf.land_area_fraction = (1 + sind(coords.lat)) / 2
+        runoff = @. FT(1e-5) * (1 + cosd(coords.long))
+
+        FieldExchanger.route_runoff!(csf, (; land_sim = RunoffLandSimulation(runoff)))
+
+        @test sum(runoff .* csf.land_area_fraction) ≈
+              sum(csf.F_runoff .* (1 .- csf.land_area_fraction))
+    end
+end

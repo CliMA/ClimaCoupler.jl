@@ -19,6 +19,9 @@ steps:
   # To run CI with other versions of upstream packages, set UPSTREAM_PACKAGES,
   # e.g. `UPSTREAM_PACKAGES="ClimaAtmos#my_branch ClimaCore"`. See
   # .buildkite/add_upstream_packages.jl.
+  # To skip steps that aren't needed when testing upstream changes, set
+  # DOWNSTREAM_CI. Any non-empty value skips them and is shown as the skip
+  # reason.
   - label: "init environment :computer:"
     key: "init_cpu_env"
     command:
@@ -73,6 +76,7 @@ steps:
   - wait
 
   - group: "Unit Tests"
+    skip: "${DOWNSTREAM_CI:-}"
     steps:
 
       - label: "MPI Utilities unit tests"
@@ -101,6 +105,7 @@ steps:
           slurm_mem: 16GB
 
   - group: "GPU: unit tests"
+    skip: "${DOWNSTREAM_CI:-}"
     steps:
       - label: "GPU runtests"
         command: "julia -O0 --color=yes --project=test/ test/runtests.jl"
@@ -113,6 +118,7 @@ steps:
           slurm_mem: 24GB
 
   - group: "Experiment unit tests"
+    skip: "${DOWNSTREAM_CI:-}"
     steps:
       - label: "Experiments runtests"
         command: "julia -O0 --color=yes --project=experiments/AMIP/ experiments/test/runtests.jl"
@@ -163,6 +169,7 @@ steps:
           slurm_mem: 32GB
 
   - group: "Integration Tests (single column)"
+    skip: "${DOWNSTREAM_CI:-}"
     steps:
       - label: "SCM: slabplanet aqua (atmos + slab ocean column)"
         key: "scm_slabplanet_aqua"
@@ -217,6 +224,7 @@ steps:
       #   - diagnostics: check and plot energy conservation, output plots after 9 days
       - label: "Slabplanet: default"
         key: "slabplanet_default"
+        skip: "${DOWNSTREAM_CI:-}"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_default.yml --job_id slabplanet_default"
         retry: *retry_policy
         artifact_paths: "output/slabplanet_default/artifacts/*"
@@ -225,6 +233,7 @@ steps:
 
       - label: "Slabplanet: dry, no radiation, fixed ocean T"
         key: "slabplanet_dry_norad"
+        skip: "${DOWNSTREAM_CI:-}"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_dry_norad.yml --job_id slabplanet_dry_norad"
         retry: *retry_policy
         artifact_paths: "output/slabplanet_dry_norad/artifacts/*"
@@ -233,6 +242,7 @@ steps:
 
       - label: "Slabplanet: extra atmos diagnostics"
         key: "slabplanet_atmos_diags"
+        skip: "${DOWNSTREAM_CI:-}"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_atmos_diags.yml --job_id slabplanet_atmos_diags"
         retry: *retry_policy
         artifact_paths: "output/slabplanet_atmos_diags/artifacts/*"
@@ -241,6 +251,7 @@ steps:
 
       - label: "Slabplanet terra: atmos and bucket"
         key: "slabplanet_terra"
+        skip: "${DOWNSTREAM_CI:-}"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_terra.yml --job_id slabplanet_terra"
         retry: *retry_policy
         artifact_paths: "output/slabplanet_terra/artifacts/*"
@@ -249,6 +260,7 @@ steps:
 
       - label: "Slabplanet aqua: atmos and slab ocean"
         key: "slabplanet_aqua"
+        skip: "${DOWNSTREAM_CI:-}"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_aqua.yml --job_id slabplanet_aqua"
         retry: *retry_policy
         artifact_paths: "output/slabplanet_aqua/artifacts/*"
@@ -283,6 +295,7 @@ steps:
           slurm_mem: 20GB
 
       - label: "MPI AMIP"
+        skip: "${DOWNSTREAM_CI:-}"
         command: "srun julia -O0 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_mpi.yml --job_id amip_coarse_mpi"
         retry: *retry_policy
         artifact_paths: "output/amip_coarse_mpi/artifacts/*"
@@ -299,6 +312,7 @@ steps:
 
       - label: "GPU Slabplanet: albedo from function"
         key: "gpu_slabplanet_albedo_function"
+        skip: "${DOWNSTREAM_CI:-}"
         command: "julia --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/slabplanet_albedo_function.yml --job_id gpu_slabplanet_albedo_function"
         artifact_paths: "output/gpu_slabplanet_albedo_function/artifacts/*"
         env:
@@ -336,6 +350,7 @@ steps:
     steps:
       - label: "CPU sea-ice top heat flux exchange"
         key: "cmip_sea_ice_fluxes"
+        skip: "${DOWNSTREAM_CI:-}"
         command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/test/sea_ice_fluxes_test.jl"
         retry: *retry_policy
         agents:
@@ -343,6 +358,7 @@ steps:
 
       - label: "CPU sea-ice skin temperature solver"
         key: "cmip_skin_temperature"
+        skip: "${DOWNSTREAM_CI:-}"
         command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/test/skin_temperature_test.jl"
         retry: *retry_policy
         agents:
@@ -388,6 +404,7 @@ steps:
           slurm_gpus: 1
 
   - group: "Calibration"
+    skip: "${DOWNSTREAM_CI:-}"
     steps:
       - label: "AMIP calibration pipeline with emulated diagnostics"
         key: "amip_test_calibration"

@@ -55,9 +55,11 @@ to monitor stability of coarse AMIP and CMIP simulations and to catch potential 
 early. This pipeline is scheduled, but it can also be used to test out configuration changes
 in a smaller test case before running higher resolution global AMIP runs.
 
-A build environment variable makes a cheaper run:
-- `NEW_T_END`: set `t_end` of the coarse AMIPs and CMIP, e.g. `96mins`. To use
-  this, set this to a valid `t_end`.
+Two build environment variables are used for downstream testing:
+- `DOWNSTREAM_CI`: run only the AMIP at 16 horizontal elements, e.g. to test
+  upstream changes. To use this, set this to an non-empty string.
+- `NEW_T_END`: set `t_end` of the coarse nightly AMIPs and CMIP, e.g. `96mins`.
+  To use this, set this to a valid `t_end`.
 
 > _Note:_  This configuration is under development and frequently changing.
 

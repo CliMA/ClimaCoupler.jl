@@ -20,6 +20,8 @@ env:
   # `UPSTREAM_PACKAGES="ClimaAtmos SurfaceFluxes@1.1.0", then the main branch
   # of ClimaAtmos and SurfaceFluxes v1.1.0 will be used.
   UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore ClimaTimeSteppers Thermodynamics ClimaLand SurfaceFluxes RRTMGP CloudMicrophysics}"
+  # Set NEW_T_END (e.g. "96mins") to set t_end of the coarse AMIPs and CMIP.
+  # Format: <integer>secs|mins|hours|days.
 
 timeout_in_minutes: 900
 
@@ -27,6 +29,11 @@ steps:
   - label: "init :GPU:"
     key: "init_gpu_env"
     command:
+      - |
+        if [ -n "$${NEW_T_END:-}" ]; then
+          echo "--- Set t_end to $$NEW_T_END"
+          bash .buildkite/nightly/set_t_end.sh "$$NEW_T_END" $$CONFIG_PATH/amip_coarse_progedmf_land.yml $$CONFIG_PATH/amip_coarse_progedmf_1m_land.yml $$LONGRUN_CONFIG_PATH/cmip_progedmf_land.yml $$BENCHMARK_CONFIG_PATH/amip_progedmf_1m_land_he16.yml
+        fi
       - "echo $$JULIA_DEPOT_PATH"
 
       # For this pipeline, use the main branches of certain upstream packages

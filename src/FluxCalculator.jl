@@ -441,8 +441,8 @@ NVTX.@annotate function compute_surface_fluxes!(
     gustiness_spec = SF.ConstantGustinessSpec(FT(1))
     config = @lazy SF.SurfaceFluxConfig.(roughness_params, gustiness_spec)
 
-    # Set surface velocity to zero for now
-    uv_sfc = @lazy @. (uv_int * FT(0))
+    # Surface velocity, so the fluxes depend on the wind relative to the surface
+    uv_sfc = get_surface_velocity(csf, sim, uv_int)
     fluxes = FluxCalculator.get_surface_fluxes.(
         surface_fluxes_params,
         uv_int,
@@ -524,6 +524,15 @@ function update_flux_fields!(
 
     return nothing
 end
+
+"""
+    get_surface_velocity(csf, sim, uv_int)
+
+Return the surface velocity of `sim` in the same (local CT1/CT2) basis as the
+atmospheric wind `uv_int`, so that fluxes are computed from the wind relative
+to the surface. Defaults to zero (a stationary surface).
+"""
+get_surface_velocity(csf, sim, uv_int) = @lazy @. zero(uv_int)
 
 """
     get_roughness_params(csf, sim)

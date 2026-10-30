@@ -140,6 +140,44 @@ Fields to Face/Center and Center/Face coordinates, respectively.
 end
 
 """
+    extrinsic_surface_velocity!(u_cc, v_cc, grid, u, v)
+
+Interpolate the top-level velocities `u` (Face, Center) and `v` (Center, Face)
+to cell centers and rotate them from the intrinsic to the extrinsic
+(east/north) coordinate system, storing them in the `Center, Center` reduced
+fields `u_cc` and `v_cc`.
+"""
+function extrinsic_surface_velocity!(u_cc, v_cc, grid, u, v)
+    arch = OC.Architectures.architecture(grid)
+    kᴺ = size(grid, 3)
+    OC.Utils.launch!(
+        arch,
+        grid,
+        :xy,
+        _extrinsic_surface_velocity!,
+        u_cc,
+        v_cc,
+        grid,
+        u,
+        v,
+        kᴺ,
+    )
+    return nothing
+end
+
+@kernel function _extrinsic_surface_velocity!(u_cc, v_cc, grid, u, v, kᴺ)
+    i, j = @index(Global, NTuple)
+    uᶜᶜ = OC.Operators.ℑxᶜᵃᵃ(i, j, kᴺ, grid, u)
+    vᶜᶜ = OC.Operators.ℑyᵃᶜᵃ(i, j, kᴺ, grid, v)
+    uₑ, vₑ = OC.Operators.extrinsic_vector(i, j, kᴺ, grid, uᶜᶜ, vᶜᶜ)
+    # Use `k = 1` to index into the reduced Fields
+    @inbounds begin
+        u_cc[i, j, 1] = uₑ
+        v_cc[i, j, 1] = vₑ
+    end
+end
+
+"""
     contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz, uv_basis)
     contravariant_to_cartesian!(ρτ_flux_uv, ρτxz, ρτyz)
 

@@ -623,7 +623,7 @@ function FieldExchanger.import_atmos_fields!(csf, ::OceananigansSimulation, atmo
 end
 
 Interfacer.add_coupler_fields!(coupler_field_names, ::OceananigansSimulation) =
-    push!(coupler_field_names, :SW_d_diffuse)
+    push!(coupler_field_names, :SW_d_diffuse, :u_sfc, :v_sfc)
 
 FieldExchanger.accumulated_coupler_fields(::OceananigansSimulation) =
     (:SW_d, :SW_d_diffuse, :LW_d, :P_liq, :P_snow)
@@ -740,9 +740,9 @@ end
 
 Compute atmosphere-ocean turbulent fluxes on the exchange (intersection)
 grid: one SurfaceFluxes evaluation per polygon, with the atmospheric state
-gathered from the SE nodes and the SST read directly from the owning ocean
-cell. The per-polygon fluxes are aggregated to the boundary space (see
-`scatter_poly_fluxes_to_boundary!`) and handed to
+gathered from the SE nodes and the SST and surface velocity read directly
+from the owning ocean cell. The per-polygon fluxes are aggregated to the
+boundary space (see `scatter_poly_fluxes_to_boundary!`) and handed to
 `FluxCalculator.update_flux_fields!`, which applies the (exchange-grid
 derived) area-fraction weighting for the coupler sums and triggers the
 ocean-side push or the accumulator.
@@ -792,6 +792,15 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     fs.T_sfc .+= FT(sim.ocean_properties.C_to_K)
     gather_cells_to_polys!(fs.sic, eg, vec(OC.interior(sim.ice_concentration, :, :, 1)))
 
+    # Ocean surface velocity (UV basis), so the fluxes see the wind relative
+    # to the surface current
+    u_cc = remapping.scratch_field_oc1
+    v_cc = remapping.scratch_field_oc2
+    (; u, v) = sim.ocean.model.velocities
+    extrinsic_surface_velocity!(u_cc, v_cc, sim.ocean.model.grid, u, v)
+    gather_cells_to_polys!(fs.u_sfc, eg, vec(OC.interior(u_cc, :, :, 1)))
+    gather_cells_to_polys!(fs.v_sfc, eg, vec(OC.interior(v_cc, :, :, 1)))
+
     # Roughness is spatially uniform, so the whole flux configuration is a
     # scalar kernel argument.
     roughness_model = Interfacer.get_field(sim, Val(:roughness_model))
@@ -806,6 +815,33 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     scatter_poly_fluxes_to_boundary!(remapping, eg, fs, fs.scratch2)
     FluxCalculator.update_flux_fields!(csf, sim, remapping.flux_scratch, accumulator)
     return nothing
+end
+
+"""
+    FluxCalculator.get_surface_velocity(csf, sim::OceananigansSimulation, uv_int)
+
+Return the ocean surface velocity on the boundary space, in the local CT1/CT2
+basis of `uv_int`, for the boundary-space flux computation: rotate the C-grid
+surface velocity to cell-centered UV components, remap them to the boundary
+space, and convert to CT1/CT2. Stored in `csf.u_sfc`/`csf.v_sfc`.
+"""
+function FluxCalculator.get_surface_velocity(csf, sim::OceananigansSimulation, uv_int)
+    remapping = sim.remapping
+    u_cc = remapping.scratch_field_oc1
+    v_cc = remapping.scratch_field_oc2
+    (; u, v) = sim.ocean.model.velocities
+    extrinsic_surface_velocity!(u_cc, v_cc, sim.ocean.model.grid, u, v)
+    Interfacer.remap!(csf.u_sfc, u_cc, remapping)
+    Interfacer.remap!(csf.v_sfc, v_cc, remapping)
+    parent(remapping.temp_uv_vec.components.data.:1) .= parent(csf.u_sfc)
+    parent(remapping.temp_uv_vec.components.data.:2) .= parent(csf.v_sfc)
+    cartesian_to_contravariant!(
+        csf.u_sfc,
+        csf.v_sfc,
+        remapping.temp_uv_vec,
+        remapping.uv_basis,
+    )
+    return StaticArrays.SVector.(csf.u_sfc, csf.v_sfc)
 end
 
 """

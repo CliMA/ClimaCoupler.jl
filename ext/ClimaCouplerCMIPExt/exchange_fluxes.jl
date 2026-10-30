@@ -25,8 +25,9 @@ import ClimaComms
 
 Device-resident per-polygon scratch for the exchange-grid flux computation of
 one surface model (one instance for the ocean, one for sea ice): the gathered
-atmospheric and surface state (momentum in the UV basis; downwelling
-radiation `SW_d`/`LW_d` and precipitation `P_liq`/`P_snow`; `T_sfc` in [K]),
+atmospheric and surface state (atmospheric wind `u/v_atmos` and surface
+velocity `u/v_sfc` in the UV basis; downwelling radiation `SW_d`/`LW_d` and
+precipitation `P_liq`/`P_snow`; `T_sfc` in [K]),
 the flux outputs (`F_*`), running time accumulators for the slow-surface path
 (`acc_*`, with `n_acc` counting contributions), and two generic scratch
 vectors.
@@ -39,6 +40,8 @@ struct ExchangeFluxState{FT, VF <: AbstractVector{FT}}
     ρ_atmos::VF
     u_atmos::VF
     v_atmos::VF
+    u_sfc::VF
+    v_sfc::VF
     height_int::VF
     height_sfc::VF
     SW_d::VF
@@ -163,8 +166,8 @@ end
 
 # SurfaceFluxes evaluation for one polygon. Mirrors the nodal computation in
 # `FluxCalculator.compute_surface_fluxes!` (surface density and saturation
-# humidity from the atmospheric state, zero surface velocity, zero
-# displacement height), but with scalar inputs so it can run inside a kernel.
+# humidity from the atmospheric state, wind relative to the surface velocity,
+# zero displacement height), but with scalar inputs so it can run inside a kernel.
 @inline function _polygon_surface_fluxes(
     surface_fluxes_params,
     thermo_params,
@@ -176,6 +179,8 @@ end
     ρ_atmos,
     u_atmos,
     v_atmos,
+    u_sfc,
+    v_sfc,
     height_int,
     height_sfc,
     T_sfc,
@@ -202,7 +207,7 @@ end
         q_ice,
         ρ_atmos,
         height_int,
-        zero(uv_int), # u_sfc
+        StaticArrays.SVector(u_sfc, v_sfc),
         T_sfc,
         q_sfc,
         height_sfc,
@@ -221,6 +226,8 @@ end
     fs.ρ_atmos,
     fs.u_atmos,
     fs.v_atmos,
+    fs.u_sfc,
+    fs.v_sfc,
     fs.height_int,
     fs.height_sfc,
     fs.T_sfc,
@@ -271,6 +278,8 @@ end
         fs.ρ_atmos[k],
         fs.u_atmos[k],
         fs.v_atmos[k],
+        fs.u_sfc[k],
+        fs.v_sfc[k],
         fs.height_int[k],
         fs.height_sfc[k],
         fs.T_sfc[k],

@@ -64,9 +64,11 @@ For the ocean and for sea ice, `FluxCalculator.compute_surface_fluxes!` runs
 one `SurfaceFluxes.surface_fluxes` evaluation per polygon (the ice version
 includes the skin-temperature diagnosis; ice-free polygons short-circuit).
 Atmospheric inputs are gathered from the SE nodes with velocities converted
-to the global UV (east/north) basis; surface inputs (SST, sea-ice
-concentration, ice thickness, interface temperature) are read directly from
-the owning FV cell.
+to the global UV (east/north) basis; surface inputs (SST, ocean surface
+velocity rotated to the UV basis, sea-ice concentration, ice thickness,
+interface temperature) are read directly from the owning FV cell. Ocean
+fluxes use the wind relative to the ocean surface current; ice fluxes
+assume a stationary ice surface.
 
 Aggregation:
 

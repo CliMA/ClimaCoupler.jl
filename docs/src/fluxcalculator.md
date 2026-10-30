@@ -111,6 +111,7 @@ Oceananigans to ClimaSeaIce so that shared cadence exists.
     FluxCalculator.get_surface_fluxes
     FluxCalculator.update_turbulent_fluxes!
     FluxCalculator.update_flux_fields!
+    FluxCalculator.get_surface_velocity
     FluxCalculator.get_roughness_params
     FluxCalculator.FluxAccumulator
     FluxCalculator.accumulate!

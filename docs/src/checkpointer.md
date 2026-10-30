@@ -126,6 +126,25 @@ The same file carries the accumulated coupler fluxes (see
 filled window rather than averaging a different number of contributions than the
 original run.
 
+### Overlapped slow surfaces
+
+When `overlap_slow_surfaces` is set, an ocean/sea ice step may be in flight when
+a checkpoint falls due. [`Checkpointer.checkpoint_sims`](@ref) joins it before
+reading any component state, so a checkpoint never captures a half-stepped
+ocean.
+
+The join completes whatever step was running, so a checkpoint taken part-way
+through a slow-surface window saves the slow group already advanced to the end
+of that window. The ocean and sea ice in a checkpoint are therefore generally at
+a *later* model time than the coupler and the other components. On restart the
+schedule follows from the component clocks themselves, which the checkpoint
+restores, rather than from a count of coupling steps -- `cs.step[]` starts again
+at zero while those clocks do not.
+
+Their diagnostics carry their own clocks for the same reason, so those files lead
+coupler time. See [Concurrent component stepping](@ref) for the stepping scheme
+these follow from.
+
 ### Adding checkpointing to a new component model
 
 There are two ways to add checkpoint/restart support for a new component model:

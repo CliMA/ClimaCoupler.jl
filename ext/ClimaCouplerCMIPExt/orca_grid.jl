@@ -6,7 +6,7 @@ using Oceananigans.BoundaryConditions:
     FPivotZipperBoundaryCondition,
     NoFluxBoundaryCondition,
     FieldBoundaryConditions
-using Oceananigans.Grids: RightFaceFolded, generate_coordinate
+using Oceananigans.Grids: FaceFolded, RightFaceFolded, generate_coordinate
 using Oceananigans.OrthogonalSphericalShellGrids: Tripolar
 
 const orca_topology = (OC.Periodic, RightFaceFolded, OC.Bounded)
@@ -172,7 +172,7 @@ function ORCAOneGrid(
             mesh.north_poles_latitude,
             mesh.first_pole_longitude,
             mesh.southernmost_latitude,
-            RightFaceFolded,
+            FaceFolded,
         ),
     )
 

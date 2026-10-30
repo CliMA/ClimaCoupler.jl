@@ -20,18 +20,69 @@ import ClimaUtilities.TimeManager: ITime
 push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
 
 """
+    Observable{F}
+
+One loss field of a calibration. See the `Observable` constructor.
+"""
+struct Observable{F}
+    "Short name of the field, as in `default_data_loader` and `model_var`"
+    name::String
+
+    "Function from an `OutputVar` to an `OutputVar`, applied to the observation and the
+    model output alike"
+    reduce::F
+
+    "Model error as a fraction of the observed mean, for a field that keeps latitude"
+    model_error_fraction::Union{Nothing, Float64}
+
+    "Standard deviation of independent noise in the field's units, for a field reduced to
+    one value per date"
+    noise_sd::Union{Nothing, Float64}
+end
+
+"""
+    Observable(; name, reduce, model_error_fraction = nothing, noise_sd = nothing)
+
+One loss field of a calibration, for example
+
+    Observable(name = "swcre", reduce = zonal_average, model_error_fraction = 0.3)
+    Observable(name = "rtmt", reduce = global_mean, noise_sd = 0.2)
+
+`name` is the short name of the field. `reduce` is a function from an `OutputVar` to an
+`OutputVar`, applied identically to the observations and the model output, after the
+regridding and coverage masking both sides share. Compose it with `seasonal_average` to
+compare seasonal means, e.g. `seasonal_average ∘ zonal_average`, and set `extend` to match.
+
+Give exactly one of `model_error_fraction` and `noise_sd`. A field that keeps latitude
+takes `model_error_fraction`, the model error as a fraction of the observed mean
+(`noise_model.jl`). A field reduced to one value per date takes `noise_sd`, independent
+noise in its own units, whose value sets its weight against the other fields.
+"""
+function Observable(; name, reduce, model_error_fraction = nothing, noise_sd = nothing)
+    isnothing(model_error_fraction) == isnothing(noise_sd) &&
+        error("Observable $name needs exactly one of model_error_fraction and noise_sd")
+    to_float(x) = isnothing(x) ? nothing : Float64(x)
+    return Observable(
+        String(name),
+        reduce,
+        to_float(model_error_fraction),
+        to_float(noise_sd),
+    )
+end
+
+"""
     struct CalibrateConfig{SPINUP <: Dates.Period, EXTEND <: Dates.Period}
 
 A configuration struct for keeping track of multiple fields that are of interest
 to a user running calibration, or that are needed in multiple places (e.g., for
 ensemble members and generating observations).
 """
-struct CalibrateConfig{SPINUP <: Dates.Period, EXTEND <: Dates.Period, OBS, PRIORS}
+struct CalibrateConfig{SPINUP <: Dates.Period, EXTEND <: Dates.Period, PRIORS}
     "Configuration file to use for ClimaCoupler simulation"
     config_file::String
 
-    "The loss fields, one named tuple each (see the constructor)"
-    observables::OBS
+    "The loss fields"
+    observables::Vector{Observable}
 
     "Pressure levels (Pa) kept from fields on pressure levels"
     pressure_levels::Vector{Float64}
@@ -67,32 +118,9 @@ struct CalibrateConfig{SPINUP <: Dates.Period, EXTEND <: Dates.Period, OBS, PRIO
 end
 
 """
-    check_priors(priors)
-
-Error if any prior is a unit normal over its bounds. EKP's `constrained_gaussian` returns
-its unit-normal starting point unchanged for parameters below about 1e-2, so the prior
-silently ignores the requested mean and spread, and that exact unit normal is its
-signature. `priors` is an EKP `ParameterDistribution`. It is inspected by its fields, so
-ClimaCoupler does not depend on EKP.
-"""
-function check_priors(priors)
-    for (name, d) in zip(priors.name, priors.distribution)
-        hasproperty(d, :distribution) || continue
-        dist = d.distribution
-        nameof(typeof(dist)) == :Normal &&
-            dist.μ == 0 &&
-            dist.σ == 1 &&
-            error("The prior of $name is a unit normal over its bounds, the sign of \
-                  constrained_gaussian failing on a small parameter. Build it from the \
-                  unconstrained normal directly.")
-    end
-    return nothing
-end
-
-"""
     CalibrateConfig(;
         config_file,
-        observables = [],
+        observables = Observable[],
         pressure_levels = 100.0 .* [200.0, 500.0, 850.0],
         n_iterations::Integer,
         sample_date_ranges,
@@ -112,21 +140,9 @@ Keyword arguments
 
 - `config_file`: Configuration file to use for ClimaCoupler simulation.
 
-- `observables`: The loss fields, one named tuple each, for example
-
-      (name = "swcre", reduce = zonal_average, model_error_fraction = 0.3)
-      (name = "rtmt", reduce = global_mean, noise_sd = 0.2)
-
-  `name` is the short name of the field. `reduce` is a function from an `OutputVar` to an
-  `OutputVar`, applied identically to the observations and the model output. Compose it with
-  `seasonal_average` to compare seasonal means, e.g. `seasonal_average ∘ zonal_average`,
-  and set `extend` to match. A field that
-  keeps latitude takes `model_error_fraction`, the model error as a fraction of the observed
-  mean. A field reduced to one value per date takes `noise_sd`, independent noise in its own
-  units, whose value sets its weight. Required to generate observations.
-
-  A field's observation comes from `default_data_loader()` and its model output from
-  `model_var`.
+- `observables`: The loss fields, one `Observable` each. Required to generate
+  observations. A field's observation comes from `default_data_loader()` and its model
+  output from `model_var`.
 
 - `pressure_levels`: Pressure levels (Pa) kept from fields on pressure levels.
 
@@ -155,16 +171,14 @@ Keyword arguments
   are the same.
 
 - `priors`: The prior distribution of the calibrated parameters, as built by
-  `EnsembleKalmanProcesses.combine_distributions`. Required to run a calibration. Each
-  prior is checked for the unit normal `constrained_gaussian` returns when it fails on a
-  small parameter.
+  `EnsembleKalmanProcesses.combine_distributions`. Required to run a calibration.
 
 - `worker_walltime`: Walltime of each worker job, in minutes. It must cover
   `n_iterations` member runs.
 """
 function CalibrateConfig(;
     config_file,
-    observables = [],
+    observables = Observable[],
     pressure_levels = 100.0 .* [200.0, 500.0, 850.0],
     n_iterations::Integer,
     sample_date_ranges,
@@ -200,21 +214,12 @@ function CalibrateConfig(;
         )
     end
 
-    for o in observables
-        haskey(o, :name) && haskey(o, :reduce) ||
-            error("Observable $o needs a name and a reduce function")
-        haskey(o, :model_error_fraction) == haskey(o, :noise_sd) && error(
-            "Observable $(o.name) needs exactly one of model_error_fraction and noise_sd",
-        )
-    end
     names = [o.name for o in observables]
     allunique(names) || error("Observables repeat a name: $names")
 
-    isnothing(priors) || check_priors(priors)
-
     return CalibrateConfig(
         config_file,
-        observables,
+        Vector{Observable}(observables),
         Float64.(pressure_levels),
         n_iterations,
         sample_date_ranges,
@@ -1000,17 +1005,32 @@ end
 monthly_mean(simdir, name) =
     get(simdir; short_name = name, reduction = "average", period = "1M")
 
-function toa_flux(var, short_name)
+"""
+    radiative_flux_combination(var, short_name)
+
+`var`, a sum or difference of radiative fluxes such as `rsutcs - rsut`, named
+`short_name`, as a one-element vector. Arithmetic on `OutputVar`s keeps the units only when
+every input has the same units, so this errors unless all of the fluxes were in W m^-2.
+"""
+function radiative_flux_combination(var, short_name)
+    units = ClimaAnalysis.units(var)
+    units == "W m^-2" ||
+        error("$short_name is made from fluxes not all in W m^-2 (got units \"$units\")")
     ClimaAnalysis.set_short_name!(var, short_name)
-    return [ClimaAnalysis.set_units(var, "W m^-2")]
+    return [var]
 end
 
-model_var(simdir, ::Val{:swcre}) =
-    toa_flux(monthly_mean(simdir, "rsutcs") - monthly_mean(simdir, "rsut"), "swcre")
-model_var(simdir, ::Val{:lwcre}) =
-    toa_flux(monthly_mean(simdir, "rlutcs") - monthly_mean(simdir, "rlut"), "lwcre")
+# These are fluxes at the top of the atmosphere, so they have no vertical coordinate.
+model_var(simdir, ::Val{:swcre}) = radiative_flux_combination(
+    monthly_mean(simdir, "rsutcs") - monthly_mean(simdir, "rsut"),
+    "swcre",
+)
+model_var(simdir, ::Val{:lwcre}) = radiative_flux_combination(
+    monthly_mean(simdir, "rlutcs") - monthly_mean(simdir, "rlut"),
+    "lwcre",
+)
 # Net downward radiation at the top of the atmosphere.
-model_var(simdir, ::Val{:rtmt}) = toa_flux(
+model_var(simdir, ::Val{:rtmt}) = radiative_flux_combination(
     monthly_mean(simdir, "rsdt") - monthly_mean(simdir, "rsut") -
     monthly_mean(simdir, "rlut"),
     "rtmt",
@@ -1020,8 +1040,11 @@ model_var(simdir, ::Val{:rtmt}) = toa_flux(
 # model's sign convention, so only the magnitude is converted.
 function model_var(simdir, ::Val{:pr})
     pr = monthly_mean(simdir, "pr")
-    pr = ClimaAnalysis.remake(pr; data = pr.data .* 86400)
-    return [ClimaAnalysis.set_units(pr, "mm/day")]
+    units = ClimaAnalysis.units(pr)
+    units == "kg m^-2 s^-1" || error("Expected pr in kg m^-2 s^-1, got \"$units\"")
+    pr.data .*= 86400
+    ClimaAnalysis.set_units!(pr, "mm/day")
+    return [pr]
 end
 
 """

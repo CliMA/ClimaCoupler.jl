@@ -15,14 +15,26 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
         "amip_configs",
         "amip_calibration.yml",
     ),
-    # One line per loss field. The model errors (32% and 19% of the observed mean) were set
-    # for 10-degree cells, where the flagship scores about 1.3 per point; re-derive them for
-    # zonal means before relying on this config. rtmt is one value, so its noise sets its
-    # weight: 0.2 W m^-2 is about one run's spread, and a 2 W m^-2 miss costs 100.
+    # beta = model_error_fraction^2 is estimated from previous runs: it is chosen so that a
+    # reference run's misfit is about one per entry, which makes the model-error noise about
+    # the size of the model's current bias. It depends on the resolution and reduction.
+    # noise_sd for rtmt is about the run-to-run spread of the global-mean net flux.
     observables = [
-        (name = "swcre", reduce = seasonal_zonal, model_error_fraction = 0.316),
-        (name = "lwcre", reduce = seasonal_zonal, model_error_fraction = 0.187),
-        (name = "rtmt", reduce = seasonal_global, noise_sd = 0.2),
+        CalibrationTools.Observable(
+            name = "swcre",
+            reduce = seasonal_zonal,
+            model_error_fraction = 0.316,
+        ),
+        CalibrationTools.Observable(
+            name = "lwcre",
+            reduce = seasonal_zonal,
+            model_error_fraction = 0.187,
+        ),
+        CalibrationTools.Observable(
+            name = "rtmt",
+            reduce = seasonal_global,
+            noise_sd = 0.2,
+        ),
     ],
     # The SON 2010 calibration converged after two updates, and two 5.5 h iterations fit the
     # default 12 h worker walltime. A season is dated by its first month.

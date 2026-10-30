@@ -13,8 +13,12 @@ push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
     valid_config_args = (;
         config_file,
         observables = [
-            (name = "pr", reduce = identity, model_error_fraction = 0.1),
-            (name = "rtmt", reduce = identity, noise_sd = 0.2),
+            CalibrationTools.Observable(
+                name = "pr",
+                reduce = identity,
+                model_error_fraction = 0.1,
+            ),
+            CalibrationTools.Observable(name = "rtmt", reduce = identity, noise_sd = 0.2),
         ],
         n_iterations = 3,
         sample_date_ranges = [["2010-01", "2010-01"], ["2011-01", "2011-01"]],
@@ -49,26 +53,23 @@ push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
 
     @test_throws ErrorException make_calibrate_config(n_iterations = -1)
 
-    # Each observable needs a reduce function and exactly one of model_error_fraction and
-    # noise_sd, and names may not repeat.
-    @test_throws ErrorException make_calibrate_config(
-        observables = [(name = "pr", model_error_fraction = 0.1)],
+    # Each observable needs a name, a reduce function and exactly one of
+    # model_error_fraction and noise_sd, and names may not repeat.
+    @test_throws UndefKeywordError CalibrationTools.Observable(
+        name = "pr",
+        model_error_fraction = 0.1,
     )
-    @test_throws ErrorException make_calibrate_config(
-        observables = [(name = "pr", reduce = identity)],
-    )
-    @test_throws ErrorException make_calibrate_config(
-        observables = [(
-            name = "pr",
-            reduce = identity,
-            model_error_fraction = 0.1,
-            noise_sd = 0.2,
-        )],
+    @test_throws ErrorException CalibrationTools.Observable(name = "pr", reduce = identity)
+    @test_throws ErrorException CalibrationTools.Observable(
+        name = "pr",
+        reduce = identity,
+        model_error_fraction = 0.1,
+        noise_sd = 0.2,
     )
     @test_throws ErrorException make_calibrate_config(
         observables = [
-            (name = "pr", reduce = identity, noise_sd = 0.2),
-            (name = "pr", reduce = identity, noise_sd = 0.1),
+            CalibrationTools.Observable(name = "pr", reduce = identity, noise_sd = 0.2),
+            CalibrationTools.Observable(name = "pr", reduce = identity, noise_sd = 0.1),
         ],
     )
 end

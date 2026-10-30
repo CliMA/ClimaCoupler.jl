@@ -12,8 +12,14 @@ push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
     config_file = joinpath(pkgdir(ClimaCoupler), "experiments", "test", "amip_test.jl")
     valid_config_args = (;
         config_file,
-        short_names = ["pr"],
-        minibatch_size = 2,
+        observables = [
+            CalibrationTools.Observable(
+                name = "pr",
+                reduce = identity,
+                model_error_fraction = 0.1,
+            ),
+            CalibrationTools.Observable(name = "rtmt", reduce = identity, noise_sd = 0.2),
+        ],
         n_iterations = 3,
         sample_date_ranges = [["2010-01", "2010-01"], ["2011-01", "2011-01"]],
         extend = Dates.Week(1),
@@ -23,6 +29,10 @@ push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
     )
     config = CalibrationTools.CalibrateConfig(; valid_config_args...)
 
+    # The targets are used in order, one per iteration plus one.
+    @test config.sample_date_ranges ==
+          [(Dates.DateTime(y, 1), Dates.DateTime(y, 1)) for y in (2010, 2011, 2010, 2011)]
+
     function make_calibrate_config(; kwargs...)
         CalibrationTools.CalibrateConfig(; valid_config_args..., kwargs...)
     end
@@ -30,8 +40,6 @@ push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
     @test_throws ErrorException make_calibrate_config(
         config_file = "this_does_not_exist.yml",
     )
-
-    @test_throws ErrorException make_calibrate_config(short_names = String[])
 
     @test_throws ErrorException make_calibrate_config(sample_date_ranges = [])
 
@@ -43,18 +51,26 @@ push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
         sample_date_ranges = [["2010-02", "2010-01"], ["2011-02", "2011-01"]],
     )
 
-    @test_throws ErrorException make_calibrate_config(minibatch_size = -1)
-
     @test_throws ErrorException make_calibrate_config(n_iterations = -1)
 
-    @test_throws ErrorException make_calibrate_config(
-        minibatch_size = 3,
-        sample_date_ranges = [["2010-01", "2010-01"] for _ in 1:2],
+    # Each observable needs a name, a reduce function and exactly one of
+    # model_error_fraction and noise_sd, and names may not repeat.
+    @test_throws UndefKeywordError CalibrationTools.Observable(
+        name = "pr",
+        model_error_fraction = 0.1,
     )
-
-    @test_logs (:warn, r"Number of samples is not divisible by the minibatch size") make_calibrate_config(
-        minibatch_size = 3,
-        sample_date_ranges = [["2010-01", "2010-01"] for _ in 1:7],
+    @test_throws ErrorException CalibrationTools.Observable(name = "pr", reduce = identity)
+    @test_throws ErrorException CalibrationTools.Observable(
+        name = "pr",
+        reduce = identity,
+        model_error_fraction = 0.1,
+        noise_sd = 0.2,
+    )
+    @test_throws ErrorException make_calibrate_config(
+        observables = [
+            CalibrationTools.Observable(name = "pr", reduce = identity, noise_sd = 0.2),
+            CalibrationTools.Observable(name = "pr", reduce = identity, noise_sd = 0.1),
+        ],
     )
 end
 

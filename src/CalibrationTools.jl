@@ -20,36 +20,87 @@ import ClimaUtilities.TimeManager: ITime
 push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
 
 """
+    Observable{F}
+
+One loss field of a calibration. See the `Observable` constructor.
+"""
+struct Observable{F}
+    "Short name of the field, as in `default_data_loader` and `model_var`"
+    name::String
+
+    "Function from an `OutputVar` to an `OutputVar`, applied to the observation and the
+    model output alike"
+    reduce::F
+
+    "Model error as a fraction of the observed mean, for a field that keeps latitude"
+    model_error_fraction::Union{Nothing, Float64}
+
+    "Standard deviation of independent noise in the field's units, for a field reduced to
+    one value per date"
+    noise_sd::Union{Nothing, Float64}
+end
+
+"""
+    Observable(; name, reduce, model_error_fraction = nothing, noise_sd = nothing)
+
+One loss field of a calibration, for example
+
+    Observable(name = "swcre", reduce = zonal_average, model_error_fraction = 0.3)
+    Observable(name = "rtmt", reduce = global_mean, noise_sd = 0.2)
+
+`name` is the short name of the field. `reduce` is a function from an `OutputVar` to an
+`OutputVar`, applied identically to the observations and the model output, after the
+regridding and coverage masking both sides share. Compose it with `seasonal_average` to
+compare seasonal means, e.g. `seasonal_average ∘ zonal_average`, and set `extend` to match.
+
+Give exactly one of `model_error_fraction` and `noise_sd`. A field that keeps latitude
+takes `model_error_fraction`, the model error as a fraction of the observed mean
+(`noise_model.jl`). A field reduced to one value per date takes `noise_sd`, independent
+noise in its own units, whose value sets its weight against the other fields.
+"""
+function Observable(; name, reduce, model_error_fraction = nothing, noise_sd = nothing)
+    isnothing(model_error_fraction) == isnothing(noise_sd) &&
+        error("Observable $name needs exactly one of model_error_fraction and noise_sd")
+    to_float(x) = isnothing(x) ? nothing : Float64(x)
+    return Observable(
+        String(name),
+        reduce,
+        to_float(model_error_fraction),
+        to_float(noise_sd),
+    )
+end
+
+"""
     struct CalibrateConfig{SPINUP <: Dates.Period, EXTEND <: Dates.Period}
 
 A configuration struct for keeping track of multiple fields that are of interest
 to a user running calibration, or that are needed in multiple places (e.g., for
 ensemble members and generating observations).
 """
-struct CalibrateConfig{SPINUP <: Dates.Period, EXTEND <: Dates.Period}
+struct CalibrateConfig{SPINUP <: Dates.Period, EXTEND <: Dates.Period, PRIORS}
     "Configuration file to use for ClimaCoupler simulation"
     config_file::String
 
-    "The short names of the observations used for calibration. The short names
-    should match the same names used for the diagnostics."
-    short_names::Vector{String}
+    "The loss fields"
+    observables::Vector{Observable}
 
-    "The size of the minibatch for each iteration"
-    minibatch_size::Int64
+    "Pressure levels (Pa) kept from fields on pressure levels"
+    pressure_levels::Vector{Float64}
 
     "The number of iterations to run the calibration for"
     n_iterations::Int64
 
-    "The date ranges of the samples for calibration and used to determine the
-    start and end dates of a simulation for each iteration of calibration"
+    "The target date range of each iteration (`n_iterations + 1` entries), which also sets
+    the start and end dates of its simulations"
     sample_date_ranges::Vector{NTuple{2, Dates.DateTime}}
 
-    "The amount of time to run a simulation after the last date of the
-    minibatch"
+    "The date ranges whose observations estimate the noise covariance"
+    covariance_date_ranges::Vector{NTuple{2, Dates.DateTime}}
+
+    "The amount of time to run a simulation after the end of its target date range"
     extend::EXTEND
 
-    "The amount of time to run a simulation before the first date of the
-    minibatch"
+    "The amount of time to run a simulation before the start of its target date range"
     spinup::SPINUP
 
     "The directory to store the iterations and members of the calibration."
@@ -58,37 +109,53 @@ struct CalibrateConfig{SPINUP <: Dates.Period, EXTEND <: Dates.Period}
     "An integer value for ensuring calibrations are the same between multiple
     calibrations with the same settings"
     rng_seed::Int64
+
+    "The prior distribution of the calibrated parameters"
+    priors::PRIORS
+
+    "Walltime of each worker job, in minutes"
+    worker_walltime::Int64
 end
 
 """
     CalibrateConfig(;
         config_file,
-        short_names::Vector{String},
-        minibatch_size::Integer,
+        observables = Observable[],
+        pressure_levels = 100.0 .* [200.0, 500.0, 850.0],
         n_iterations::Integer,
         sample_date_ranges,
+        covariance_date_ranges = [],
         extend::Dates.Period,
         spinup::Dates.Period,
         output_dir,
         rng_seed = 42,
+        priors = nothing,
+        worker_walltime = 350,
     )
 
-Initializes a `CalibrateConfig` which contains values needed in multiple places
-during calibration.
+Initializes a `CalibrateConfig`, which holds everything a calibration experiment needs.
 
 Keyword arguments
 =====================
 
 - `config_file`: Configuration file to use for ClimaCoupler simulation.
 
-- `short_names`: Short names of the observations.
+- `observables`: The loss fields, one `Observable` each. Required to generate
+  observations. A field's observation comes from `default_data_loader()` and its model
+  output from `model_var`.
 
-- `minibatch_size`: The size of the minibatch for each iteration.
+- `pressure_levels`: Pressure levels (Pa) kept from fields on pressure levels.
 
 - `n_iterations`: The number of iterations to run the calibration for.
 
-- `sample_date_ranges`: The date ranges for each sample. The dates should be the
-  same as found in the time series data of the observations.
+- `sample_date_ranges`: The target date ranges, each once. Iterations cycle through them in
+  order, one per iteration. The dates should be the same as found in the time series data
+  of the observations after the `reduce` functions, e.g. `(DateTime(2010, 9, 1),
+  DateTime(2010, 9, 1))` for SON 2010 seasonal means.
+
+- `covariance_date_ranges`: The date ranges whose observations estimate the noise
+  covariance, typically the same season in about ten years. Required to generate
+  observations.
 
 - `extend`: The amount of time to run the simulation after the end date
   determined by `sample_date_ranges`. For seasonal averages, `extend` should be
@@ -102,60 +169,67 @@ Keyword arguments
 
 - `rng_seed`: An integer to ensure that calibration runs with the same settings
   are the same.
+
+- `priors`: The prior distribution of the calibrated parameters, as built by
+  `EnsembleKalmanProcesses.combine_distributions`. Required to run a calibration.
+
+- `worker_walltime`: Walltime of each worker job, in minutes. It must cover
+  `n_iterations` member runs.
 """
 function CalibrateConfig(;
     config_file,
-    short_names::Vector{String},
-    minibatch_size::Integer,
+    observables = Observable[],
+    pressure_levels = 100.0 .* [200.0, 500.0, 850.0],
     n_iterations::Integer,
     sample_date_ranges,
+    covariance_date_ranges = [],
     extend::Dates.Period,
     spinup::Dates.Period,
     output_dir,
     rng_seed = 42,
+    priors = nothing,
+    worker_walltime = 350,
 )
     isfile(config_file) || error("Configuration file ($config_file) does not exist")
-    isempty(short_names) && error("Cannot run calibration with no observation short names")
     isempty(sample_date_ranges) &&
         error("Cannot run calibration with no date ranges for the samples")
 
     sign(extend) == -1 && error("The period to extend ($extend) by should be positive")
     sign(spinup) == -1 && error("The period to spin up ($spinup) by should be positive")
 
-    sample_date_ranges = [
-        (Dates.DateTime(date_pair[1]), Dates.DateTime(date_pair[2])) for
-        date_pair in sample_date_ranges
-    ]
+    n_iterations > 0 || error("The number of iterations ($n_iterations) should be positive")
 
-    for (start_date, stop_date) in sample_date_ranges
+    # Typed, so that an empty list (no covariance dates) still matches the field type.
+    to_datetimes(ranges) = NTuple{2, Dates.DateTime}[
+        (Dates.DateTime(first(r)), Dates.DateTime(last(r))) for r in ranges
+    ]
+    targets = to_datetimes(sample_date_ranges)
+    # The calibration reads one entry per iteration plus one.
+    sample_date_ranges = [targets[mod1(i, length(targets))] for i in 1:(n_iterations + 1)]
+    covariance_date_ranges = to_datetimes(covariance_date_ranges)
+
+    for (start_date, stop_date) in vcat(sample_date_ranges, covariance_date_ranges)
         start_date <= stop_date || error(
             "The start date ($start_date) should be before the stop date ($stop_date)",
         )
     end
 
-    minibatch_size > 0 || error("The minibatch size ($minibatch_size) should be positive")
-    n_iterations > 0 || error("The number of iterations ($n_iterations) should be positive")
-
-    num_samples = length(sample_date_ranges)
-    minibatch_size > num_samples && error(
-        "The minibatch size is $minibatch_size, but the number of samples is $num_samples",
-    )
-
-    remaining = num_samples % minibatch_size
-    remaining == 0 || @warn(
-        "Number of samples is not divisible by the minibatch size; the last $remaining samples may be missing when running the calibration"
-    )
+    names = [o.name for o in observables]
+    allunique(names) || error("Observables repeat a name: $names")
 
     return CalibrateConfig(
         config_file,
-        short_names,
-        minibatch_size,
+        Vector{Observable}(observables),
+        Float64.(pressure_levels),
         n_iterations,
         sample_date_ranges,
+        covariance_date_ranges,
         extend,
         spinup,
         output_dir,
         rng_seed,
+        priors,
+        worker_walltime,
     )
 
 end
@@ -417,6 +491,7 @@ const CERES_TO_CLIMA_NAMES = [
     "toa_sw_clr_t_mon" => "rsutcs",
     "toa_lw_all_mon" => "rlut",
     "toa_lw_clr_t_mon" => "rlutcs",
+    "toa_net_all_mon" => "rtmt",
 ]
 const CERES_DERIVED_VARS = Set(["swcre", "lwcre"])
 
@@ -501,6 +576,7 @@ preprocess(::CERESDataLoader, var, ::Val{:rsut}) = _preprocess_var(var)
 preprocess(::CERESDataLoader, var, ::Val{:rsutcs}) = _preprocess_var(var)
 preprocess(::CERESDataLoader, var, ::Val{:rlut}) = _preprocess_var(var)
 preprocess(::CERESDataLoader, var, ::Val{:rlutcs}) = _preprocess_var(var)
+preprocess(::CERESDataLoader, var, ::Val{:rtmt}) = _preprocess_var(var)
 # These variables don't require more postprocessing so we return them as it
 preprocess(::CERESDataLoader, var, ::Val{:swcre}) = var
 preprocess(::CERESDataLoader, var, ::Val{:lwcre}) = var
@@ -874,6 +950,101 @@ function drop_empty_times(var; max_nan_frac = 0.99)
     )
     @info "Dropping $(n_times - length(keep)) empty time(s) from $(ClimaAnalysis.short_name(var))"
     return ClimaAnalysis.select(var; by = ClimaAnalysis.Index(), time = keep)
+end
+
+"""
+    default_data_loader()
+
+One loader for every observation a calibration can use, by short name: ERA5 pressure-level
+`ta`, `hus`, `hur`; ERA5 surface `hfls`, `hfss`, `rsus`, `rlus`; CERES `rsut`, `rlut`, their
+clear-sky versions, `swcre`, `lwcre` and `rtmt`; MODIS `clivi`; MAC `lwp`; GPCP `pr`.
+To add an observation, add its loader here. Each field needs a model counterpart in
+`model_var`.
+"""
+function default_data_loader()
+    mac = MACDataLoader()
+    return CompositeDataLoader(
+        ERA5PressureLevelDataLoader(),
+        ERA5DataLoader(),
+        CERESDataLoader(),
+        ModisDataLoader(),
+        mac,
+        GPCPDataLoader();
+        # MODIS also provides `lwp`; MAC's is the one used.
+        varname_to_loader = Dict("lwp" => mac),
+    )
+end
+
+"""
+    model_var(simdir, short_name)
+
+The model's monthly means of `short_name` from the diagnostics in `simdir`, as a vector of
+`OutputVar`s, in the units and sign convention of the observation of the same name in
+`default_data_loader`. A field output on both pressure and altitude coordinates gives one
+`OutputVar` for each.
+
+Fields the model does not output directly, or outputs in other units, have their own method
+on `Val(Symbol(short_name))`: add one alongside the observation's loader for a new field.
+"""
+model_var(simdir, short_name::String) = model_var(simdir, Val(Symbol(short_name)))
+
+function model_var(simdir, ::Val{short_name}) where {short_name}
+    name = string(short_name)
+    coord_types = ClimaAnalysis.available_coord_types(
+        simdir;
+        short_name = name,
+        reduction = "average",
+        period = "1M",
+    )
+    return [
+        get(simdir; short_name = name, reduction = "average", period = "1M", coord_type) for
+        coord_type in coord_types
+    ]
+end
+
+monthly_mean(simdir, name) =
+    get(simdir; short_name = name, reduction = "average", period = "1M")
+
+"""
+    radiative_flux_combination(var, short_name)
+
+`var`, a sum or difference of radiative fluxes such as `rsutcs - rsut`, named
+`short_name`, as a one-element vector. Arithmetic on `OutputVar`s keeps the units only when
+every input has the same units, so this errors unless all of the fluxes were in W m^-2.
+"""
+function radiative_flux_combination(var, short_name)
+    units = ClimaAnalysis.units(var)
+    units == "W m^-2" ||
+        error("$short_name is made from fluxes not all in W m^-2 (got units \"$units\")")
+    ClimaAnalysis.set_short_name!(var, short_name)
+    return [var]
+end
+
+# These are fluxes at the top of the atmosphere, so they have no vertical coordinate.
+model_var(simdir, ::Val{:swcre}) = radiative_flux_combination(
+    monthly_mean(simdir, "rsutcs") - monthly_mean(simdir, "rsut"),
+    "swcre",
+)
+model_var(simdir, ::Val{:lwcre}) = radiative_flux_combination(
+    monthly_mean(simdir, "rlutcs") - monthly_mean(simdir, "rlut"),
+    "lwcre",
+)
+# Net downward radiation at the top of the atmosphere.
+model_var(simdir, ::Val{:rtmt}) = radiative_flux_combination(
+    monthly_mean(simdir, "rsdt") - monthly_mean(simdir, "rsut") -
+    monthly_mean(simdir, "rlut"),
+    "rtmt",
+)
+
+# The model's precipitation is kg m^-2 s^-1. GPCP is mm/day, and its loader gives it the
+# model's sign convention, so only the magnitude is converted.
+function model_var(simdir, ::Val{:pr})
+    pr = monthly_mean(simdir, "pr")
+    units = ClimaAnalysis.units(pr)
+    units == "kg m^-2 s^-1" || error("Expected pr in kg m^-2 s^-1, got \"$units\"")
+    pr.data .*= 86400
+    ClimaAnalysis.set_units!(pr, "mm/day")
+    return [pr]
 end
 
 """

@@ -19,7 +19,7 @@ include(model_interface_filepath)
 
 # Choose which calibration config to use
 config_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "amip", "config")
-default_config_path = joinpath(config_dir, "zonal_cloud.jl")
+default_config_path = joinpath(config_dir, "son2010_cre_toa.jl")
 
 test_calibration_config_path = joinpath(config_dir, "pipeline_test.jl")
 const TEST_CALIBRATION = haskey(ENV, "TEST_CALIBRATION")
@@ -33,19 +33,13 @@ include(config_path)
 isdir(output_dir) || mkdir(output_dir)
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    observation_vector_filepath = joinpath(
-        pkgdir(ClimaCoupler),
-        "experiments",
-        "calibration",
-        "amip",
-        "observation_vec.jld2",
-    )
+    observation_vector_filepath = observation_vector_path(output_dir)
     isfile(observation_vector_filepath) || error(
-        "Filepath to observation vector is not valid. Update the filepath or generate the observations using generate_observations.jl",
+        "No observations at $observation_vector_filepath. Generate them for this config with generate_observations.jl",
     )
     observation_vector = JLD2.load_object(observation_vector_filepath)
 
-    (; sample_date_ranges, minibatch_size) = CALIBRATE_CONFIG
+    (; sample_date_ranges) = CALIBRATE_CONFIG
     obs_series = EKP.ObservationSeries(
         Dict(
             "observations" => observation_vector,
@@ -53,19 +47,19 @@ if abspath(PROGRAM_FILE) == @__FILE__
                 string(Dates.year(start_date)) for
                 (start_date, stop_date) in sample_date_ranges
             ],
-            "minibatcher" => ClimaCalibrate.minibatcher_over_samples(
-                length(observation_vector),
-                minibatch_size,
-            ),
+            # One target per iteration, in order.
+            "minibatcher" =>
+                ClimaCalibrate.minibatcher_over_samples(length(observation_vector), 1),
         ),
     )
 
-    (; rng_seed) = CALIBRATE_CONFIG
+    (; rng_seed, priors) = CALIBRATE_CONFIG
+    isnothing(priors) && error("The config has no priors")
     rng = Random.MersenneTwister(rng_seed)
 
     ekp = EKP.EnsembleKalmanProcess(
         obs_series,
-        EKP.TransformUnscented(PRIORS, impose_prior = true);
+        EKP.TransformUnscented(priors, impose_prior = true);
         verbose = true,
         rng,
         scheduler = EKP.DataMisfitController(terminate_at = 1000000),
@@ -79,7 +73,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # The smoke test runs on CPU within an existing allocation, while a full
     # calibration puts one ensemble member on each GPU.
     device = TEST_CALIBRATION ? :cpu : :gpu
-    walltime = @isdefined(WORKER_WALLTIME) ? WORKER_WALLTIME : TEST_CALIBRATION ? 60 : 720
+    walltime = CALIBRATE_CONFIG.worker_walltime
     env_vars = [
         "CLIMACOMMS_CONTEXT" => "SINGLETON",
         "CLIMACOMMS_DEVICE" => TEST_CALIBRATION ? "CPU" : "CUDA",
@@ -99,7 +93,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ekp,
         coupler_model_interface,
         n_iterations,
-        PRIORS,
+        priors,
         output_dir,
     )
 end

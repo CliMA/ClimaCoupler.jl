@@ -97,8 +97,7 @@ Plotting.debug(cs, "debug_output")
 # Produces: debug_output/debug_coupler.png, debug_output/debug_<ModelName>.png, etc.
 ```
 
-You can also plot individual ClimaCore fields with `ClimaCore.Visualize`:
-directly
+You can also plot individual ClimaCore fields directly with `ClimaCore.Visualize`:
 
 ```julia
 import ClimaCore as CC
@@ -118,14 +117,14 @@ For 3D fields (e.g. from the atmosphere), extract a level first:
 ```julia
 import ClimaCore as CC
 
-field_3d = cs.model_sims.atmos.integrator.u.c.ρe_tot  # example 3D field
-field_sfc = CC.Fields.level(field_3d, 1)               # bottom level
+field_3d = cs.model_sims.atmos_sim.integrator.u.c.ρe_tot  # example 3D field
+field_sfc = CC.Fields.level(field_3d, 1)                   # bottom level
 
 fig = Figure()
 ax = Axis(fig[1, 1], title = "ρe_tot (level 1)")
-hm = fieldheatmap!(ax, field_sfc)
+hm = CC.Visualize.fieldheatmap!(ax, field_sfc)
 Colorbar(fig[:, end+1], hm)
-save("rhoe_sfc.png", fig)
+Makie.save("rhoe_sfc.png", fig)
 ```
 
 ### Plotting Oceananigans fields

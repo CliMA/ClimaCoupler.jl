@@ -130,12 +130,6 @@ function ClimaCalibrate.observation_map(interface::CouplerModelInterface, iterat
         @info "Processing member $m: $simdir_path"
         try
             process_member_data!(g_ens_builder, simdir_path, m, config)
-            # A member that stopped early (for example on a NaN) leaves output that loads
-            # without error but does not reach the sample dates, so its column stays
-            # incomplete. Treat it as failed, like a member that wrote nothing.
-            missing_names = EnsembleBuilder.missing_short_names(g_ens_builder, m)
-            isempty(missing_names) ||
-                error("member $m output does not cover the sample dates for $missing_names")
         catch e
             @error "Ensemble member $m failed" exception = (e, catch_backtrace())
             # Fill failed member column with NaN so EKP can handle the failure

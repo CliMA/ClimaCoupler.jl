@@ -24,10 +24,7 @@ default_config_path = joinpath(config_dir, "son2010_cre_toa.jl")
 test_calibration_config_path = joinpath(config_dir, "pipeline_test.jl")
 const TEST_CALIBRATION = haskey(ENV, "TEST_CALIBRATION")
 
-# CALIBRATION_CONFIG selects another config file without editing this one.
-config_path =
-    TEST_CALIBRATION ? test_calibration_config_path :
-    get(ENV, "CALIBRATION_CONFIG", default_config_path)
+config_path = TEST_CALIBRATION ? test_calibration_config_path : default_config_path
 
 @info "Using calibration configuration in: $config_path"
 include(config_path)

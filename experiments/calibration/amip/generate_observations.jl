@@ -5,7 +5,6 @@ import ClimaCalibrate: ObservationRecipe, SampleBuilder
 import ClimaCoupler
 import ClimaCoupler: CalibrationTools
 import JLD2
-import LinearAlgebra
 
 include(
     joinpath(
@@ -46,20 +45,23 @@ include(
 Make a vector of `EKP.Observation`s with an `SVDplusD` covariance matrix, one for each
 sample corresponding to the dates in `sample_date_ranges`.
 
-Variables named in `independent_noise_sd`, one value per target date such as global means,
-are left out of the `SVDplusD` covariance and form a second block of the observation, with
-independent noise of the given standard deviation. It sets how strongly the calibration holds
-such a value, for example the energy balance, against the maps in the first block.
-
 The covariance is the `Gamma` of `noise_model.jl`, estimated from one sample per date
 range in `covariance_date_ranges`, so it is the interannual spread of the observation
 across those dates. Give it enough date ranges to estimate that spread: `rank` modes need
 appreciably more than `rank` samples, and identical date ranges produce a singular
-covariance. The calibration targets in `sample_date_ranges` may repeat, and may be a
-subset of the covariance dates, since the model only needs initial conditions for those.
+covariance. Each target in `sample_date_ranges` must be one of the covariance date ranges,
+and targets may repeat.
 
-`beta` accepts one value for all variables or one per variable, in the order of `vars`
-without those in `independent_noise_sd`.
+`beta` is the model-error part of `Gamma`, `beta * mean^2` at each point, with `mean` the
+observed mean over the covariance dates: it is a variance scale, the square of the model
+error as a fraction of the observed mean, so `beta = 0.05^2` is a 5% model error. It accepts
+one value for all variables or one per variable, in the order of `vars` without those in
+`independent_noise_sd`.
+
+Variables named in `independent_noise_sd`, one value per target date such as global means,
+are left out of the `SVDplusD` covariance and form a second block of the observation, with
+independent noise of the given standard deviation. It sets how strongly the calibration
+holds such a value, for example the energy balance, against the maps in the first block.
 """
 function make_svdplusd_observation_vector(
     vars,
@@ -80,56 +82,33 @@ function make_svdplusd_observation_vector(
     covar_estimator =
         noise_covariance_estimator(; beta, rank, sigma2, use_latitude_weights, min_cosd_lat)
 
-    covariance_samples =
-        SampleBuilder.build_samples_by_times(vars, covariance_date_ranges; FT)
-    @info "Built covariance samples" covariance_samples
-    covar = ObservationRecipe.covariance(covar_estimator, covariance_samples)
-
-    target_samples = SampleBuilder.build_samples_by_times(vars, sample_date_ranges; FT)
-    @info "Built target samples" target_samples
-    n_cov = size(SampleBuilder.get_samples(covariance_samples), 1)
-    n_target = size(SampleBuilder.get_samples(target_samples), 1)
-    n_cov == n_target || error(
-        "The covariance samples ($n_cov values) and the targets ($n_target values) have different lengths",
-    )
-
-    # The same assembly as ObservationRecipe.observation, with the covariance supplied.
-    obs_vec = map(1:SampleBuilder.num_samples(target_samples)) do i
-        sample = collect(view(SampleBuilder.get_samples(target_samples), :, i))
-        metadata = collect(view(SampleBuilder.get_metadata(target_samples), :, i))
-        name = join(ClimaAnalysis.short_name.(metadata), ";")
-        EKP.Observation(
-            Dict(
-                "samples" => sample,
-                "covariances" => covar,
-                "names" => name,
-                "metadata" => metadata,
-            ),
+    # The targets are samples of this collection, so every observation's covariance is
+    # estimated from all of its samples.
+    samples = SampleBuilder.build_samples_by_times(vars, covariance_date_ranges; FT)
+    @info "Built covariance samples" samples
+    return map(sample_date_ranges) do date_range
+        i = findfirst(==(date_range), covariance_date_ranges)
+        isnothing(i) && error(
+            "The target $date_range is not one of the covariance_date_ranges, which the \
+            observation is taken from",
         )
-    end
-    isempty(independent_vars) && return obs_vec
+        obs = ObservationRecipe.observation(covar_estimator, samples, i)
+        isempty(independent_vars) && return obs
 
-    # A second block, one value per global mean, with independent noise.
-    independent_samples =
-        SampleBuilder.build_samples_by_times(independent_vars, sample_date_ranges; FT)
-    @info "Global means with independent noise" independent_noise_sd
-    return map(enumerate(obs_vec)) do (i, obs)
-        metadata = collect(view(SampleBuilder.get_metadata(independent_samples), :, i))
-        sample = collect(view(SampleBuilder.get_samples(independent_samples), :, i))
-        sd = [FT(independent_noise_sd[ClimaAnalysis.short_name(m)]) for m in metadata]
-        length(sd) == length(sample) ||
-            error("A global mean must be one value per target date")
-        EKP.Observation(
-            Dict(
-                "samples" => [EKP.get_obs(obs), sample],
-                "covariances" => [covar, LinearAlgebra.Diagonal(sd .^ 2)],
-                "names" => [
-                    only(EKP.get_names(obs)),
-                    join(ClimaAnalysis.short_name.(metadata), ";"),
-                ],
-                "metadata" => vcat(EKP.get_metadata(obs), metadata),
-            ),
-        )
+        # A second block per global mean, with independent noise.
+        blocks = map(independent_vars) do var
+            sd = independent_noise_sd[ClimaAnalysis.short_name(var)]
+            block_samples =
+                SampleBuilder.build_samples_by_times([var], [date_range]; FT)
+            length(SampleBuilder.get_samples(block_samples)) == 1 ||
+                error("A global mean must be one value per target date")
+            ObservationRecipe.observation(
+                ObservationRecipe.ScalarCovariance(scalar = sd^2),
+                block_samples,
+                1,
+            )
+        end
+        return EKP.combine_observations([obs; blocks])
     end
 end
 
@@ -177,7 +156,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     vars = loss_values(vars, coverage_masks, config)
     check_extend(vars, config)
     for (var, o) in zip(vars, observables)
-        haskey(o, :model_error_fraction) &&
+        !isnothing(o.model_error_fraction) &&
             !ClimaAnalysis.has_latitude(var) &&
             error(
                 "$(o.name) has no latitude after its reduction, so give it noise_sd instead of model_error_fraction",
@@ -201,14 +180,14 @@ if abspath(PROGRAM_FILE) == @__FILE__
         covariance_date_ranges,
         beta = [
             o.model_error_fraction^2 for
-            o in observables if haskey(o, :model_error_fraction)
+            o in observables if !isnothing(o.model_error_fraction)
         ],
         rank = 2,
         sigma2 = 1e-6,
         use_latitude_weights = true,
         min_cosd_lat = 0.1,
         independent_noise_sd = Dict{String, Float64}(
-            o.name => o.noise_sd for o in observables if haskey(o, :noise_sd)
+            o.name => o.noise_sd for o in observables if !isnothing(o.noise_sd)
         ),
     )
 

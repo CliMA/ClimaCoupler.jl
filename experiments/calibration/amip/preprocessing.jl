@@ -162,9 +162,13 @@ the model's cloud.
 Restricted to `date_ranges` on purpose. A record spanning decades, unioned over
 every slice, drops any point that is missing in any single month.
 
-Give it every month the reduced values are made from (each target date to the end of its
-`extend`), not only the first. Every masked date then has the same covered points, so
-averaging over time and over longitude give the same result in either order.
+Pass every month that goes into a reduced value, from each target date to the end of its
+`extend`, not only the target dates. For SON, a point the observation misses in November
+but not in September would otherwise stay unmasked. The averages ignore `NaN`, so the
+observation's seasonal mean there would use September and October only while the model's
+uses all three months, and a zonal mean of the season would differ from a seasonal mean of
+the zonal means. With one coverage for every month, both sides average the same points in
+every month, in either order.
 
 Longitude and latitude only. A masked product with another dimension, such as a
 cloud fraction on levels, errors here rather than guessing how to collapse it.

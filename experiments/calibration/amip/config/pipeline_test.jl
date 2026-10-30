@@ -19,8 +19,16 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
     ),
     # Pressure-level fields need model output with pressure_coordinates: true in the yml.
     observables = [
-        (name = "ta", reduce = zonal_average, model_error_fraction = 0.05),
-        (name = "hur", reduce = zonal_average, model_error_fraction = 0.05),
+        CalibrationTools.Observable(
+            name = "ta",
+            reduce = zonal_average,
+            model_error_fraction = 0.05,
+        ),
+        CalibrationTools.Observable(
+            name = "hur",
+            reduce = zonal_average,
+            model_error_fraction = 0.05,
+        ),
     ],
     pressure_levels = 100.0 .* [200.0, 500.0, 850.0],  # Pa
     n_iterations = 1,

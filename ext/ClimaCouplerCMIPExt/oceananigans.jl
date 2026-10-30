@@ -216,10 +216,9 @@ function OceananigansSimulation(
     end
 
 
-    # Precompute COARE3 roughness parameters
-    # (These live on the coupler's exchange grid, so they must use `FT`)
-    coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
-    coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
+    # COARE3 roughness parameters are spatially uniform, so a single scalar
+    # (in the coupler's `FT`) is shared by the boundary-space and exchange-grid flux paths
+    coare3_roughness_params = SF.COARE3RoughnessParams{FT}()
 
     # Get some ocean properties and parameters (including COARE3 roughness params)
     ocean_properties = (;
@@ -793,10 +792,11 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     fs.T_sfc .+= FT(sim.ocean_properties.C_to_K)
     gather_cells_to_polys!(fs.sic, eg, vec(OC.interior(sim.ice_concentration, :, :, 1)))
 
-    # COARE3 roughness is spatially uniform, so the whole flux configuration
-    # is a scalar kernel argument.
+    # Roughness is spatially uniform, so the whole flux configuration is a
+    # scalar kernel argument.
+    roughness_model = Interfacer.get_field(sim, Val(:roughness_model))
     config = SF.SurfaceFluxConfig(
-        SF.COARE3RoughnessParams{FT}(),
+        exchange_roughness_params(sim, FT, Val(roughness_model)),
         SF.ConstantGustinessSpec(FT(1)),
     )
     compute_ocean_polygon_fluxes!(fs, surface_fluxes_params, thermo_params, config)
@@ -807,6 +807,22 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
     FluxCalculator.update_flux_fields!(csf, sim, remapping.flux_scratch, accumulator)
     return nothing
 end
+
+"""
+    exchange_roughness_params(sim::OceananigansSimulation, FT, ::Val{roughness_model})
+
+Return scalar roughness parameters for the exchange-grid flux kernel, matching
+what `FluxCalculator.get_roughness_params` provides on the boundary space.
+"""
+exchange_roughness_params(sim::OceananigansSimulation, FT, ::Val{:coare3}) =
+    Interfacer.get_field(sim, Val(:coare3_roughness_params))
+exchange_roughness_params(sim::OceananigansSimulation, FT, ::Val{:constant}) =
+    SF.ConstantRoughnessParams(
+        FT(Interfacer.get_field(sim, Val(:roughness_momentum))),
+        FT(Interfacer.get_field(sim, Val(:roughness_buoyancy))),
+    )
+exchange_roughness_params(sim::OceananigansSimulation, FT, roughness_model) =
+    error("Unknown roughness_model: $roughness_model. Must be :coare3 or :constant")
 
 """
     push_exchange_fluxes_to_ocean!(sim::OceananigansSimulation)

@@ -20,6 +20,11 @@ env:
   # `UPSTREAM_PACKAGES="ClimaAtmos SurfaceFluxes@1.1.0", then the main branch
   # of ClimaAtmos and SurfaceFluxes v1.1.0 will be used.
   UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore ClimaTimeSteppers Thermodynamics ClimaLand SurfaceFluxes RRTMGP CloudMicrophysics}"
+  # Set DOWNSTREAM_CI to run only the flagship AMIP when testing upstream
+  # changes. Any non-empty value skips the other runs and is shown as the skip
+  # reason.
+  # Set NEW_T_END (e.g. "96mins") to set t_end of the coarse AMIPs and CMIP.
+  # Format: <integer>secs|mins|hours|days.
 
 timeout_in_minutes: 900
 
@@ -27,6 +32,11 @@ steps:
   - label: "init :GPU:"
     key: "init_gpu_env"
     command:
+      - |
+        if [ -n "$${NEW_T_END:-}" ]; then
+          echo "--- Set t_end to $$NEW_T_END"
+          bash .buildkite/nightly/set_t_end.sh "$$NEW_T_END" $$CONFIG_PATH/amip_coarse_progedmf_land.yml $$CONFIG_PATH/amip_coarse_progedmf_1m_land.yml $$LONGRUN_CONFIG_PATH/cmip_progedmf_land.yml $$BENCHMARK_CONFIG_PATH/amip_progedmf_1m_land_he16.yml
+        fi
       - "echo $$JULIA_DEPOT_PATH"
 
       # For this pipeline, use the main branches of certain upstream packages
@@ -56,6 +66,7 @@ steps:
     steps:
       - label: "Coarse current AMIP: progedmf + 0M + integrated land"
         key: "amip_progedmf_land"
+        skip: "${DOWNSTREAM_CI:-}"
         command:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_progedmf_land.yml --job_id amip_coarse_progedmf_land"
@@ -71,6 +82,7 @@ steps:
 
       - label: "Coarse current AMIP: progedmf + 1M + integrated land"
         key: "amip_progedmf_1m_land"
+        skip: "${DOWNSTREAM_CI:-}"
         command:
           - echo "--- Run simulation"
           - "julia --threads=3 --color=yes --project=experiments/AMIP/ experiments/AMIP/run_simulation.jl --config_file $CONFIG_PATH/amip_coarse_progedmf_1m_land.yml --job_id amip_coarse_progedmf_1m_land"
@@ -97,6 +109,7 @@ steps:
           slurm_mem: 16GB
 
   - group: "CMIP"
+    skip: "${DOWNSTREAM_CI:-}"
 
     steps:
       # Shares its config with the longrun pipeline; edits there also affect this run

@@ -4,6 +4,10 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Add ocean config options
+New `ocean_float_type` (`Float64` by default) and `ocean_vertical_levels` (60 by default) options set the
+Oceananigans float type and number of levels.
+
 #### Reflect diffuse shortwave with the diffuse albedo over the Oceananigans ocean
 The ocean now imports the diffuse shortwave as the coupler field `SW_d_diffuse`, averaged with the 
 other radiation when the ocean steps more slowly than the coupler. Coupler checkpoints written before 

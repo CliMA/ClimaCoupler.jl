@@ -106,6 +106,8 @@ end
         "simple_ocean" => false,
         "use_intersection_grid" => true,
         "ocean_grid" => "one_deg_tripolar",
+        "ocean_float_type" => "Float64",
+        "ocean_vertical_levels" => 60,
         "sst_adjustment" => 2.0,
         "ice_model" => "prescribed",
         "ocean_progress_interval" => "1days",

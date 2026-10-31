@@ -33,6 +33,8 @@ export CoupledSimulation,
     step!,
     sim_dt,
     will_step,
+    is_overlapped,
+    progress_snapshot,
     set_cache!,
     remap,
     remap!,
@@ -72,6 +74,10 @@ struct CoupledSimulation{
     TP,
     DH,
     SC <: Bool,
+    SCC <: Bool,
+    OSS <: Bool,
+    STK,
+    SPG,
     NTFA <: NamedTuple,
 }
     start_date::D
@@ -88,10 +94,67 @@ struct CoupledSimulation{
     thermo_params::TP
     diags_handler::DH
     save_cache::SC
+    step_concurrently::SCC
+    overlap_slow_surfaces::OSS
+    "`(; task, target)` for an in-flight asynchronous ice/ocean step, or `nothing`. See `FieldExchanger.launch_slow_sims!`."
+    slow_task::STK
+    "Progress scalars gathered at the end of the last completed slow step. See `Interfacer.progress_snapshot`."
+    slow_progress::SPG
     flux_accumulators::NTFA
 end
 
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args)...}(args...)
+
+"""
+    CoupledSimulation{FT}(start_date, ..., flux_accumulators; step_concurrently, ...)
+
+Construct a `CoupledSimulation`. The concurrent-stepping fields
+`step_concurrently`, `overlap_slow_surfaces`, `slow_task` and `slow_progress`
+are keyword arguments that are off by default.
+"""
+function CoupledSimulation{FT}(
+    start_date,
+    fields,
+    conservation_checks,
+    tspan,
+    Δt_cpl,
+    t,
+    step,
+    prev_checkpoint_t,
+    model_sims,
+    callbacks,
+    dir_paths,
+    thermo_params,
+    diags_handler,
+    save_cache,
+    flux_accumulators;
+    step_concurrently = false,
+    overlap_slow_surfaces = false,
+    slow_task = Ref{Any}(nothing),
+    slow_progress = Ref{Any}(nothing),
+) where {FT}
+    return CoupledSimulation{FT}(
+        start_date,
+        fields,
+        conservation_checks,
+        tspan,
+        Δt_cpl,
+        t,
+        step,
+        prev_checkpoint_t,
+        model_sims,
+        callbacks,
+        dir_paths,
+        thermo_params,
+        diags_handler,
+        save_cache,
+        step_concurrently,
+        overlap_slow_surfaces,
+        slow_task,
+        slow_progress,
+        flux_accumulators,
+    )
+end
 
 function Base.show(io::IO, sim::CoupledSimulation)
     device_type = nameof(typeof(ClimaComms.device(sim)))
@@ -174,6 +237,27 @@ default_coupler_fields() = [
 ]
 
 """
+    overlap_cache_fields()
+
+Coupler fields that hold the ocean/sea ice contribution to each blended surface
+quantity, carried across an overlapped slow-surface step.
+
+`:slow_LW_up` holds the area- and emissivity-weighted sum of `T^4`, which is
+what is accumulated before converting back to a temperature.
+"""
+overlap_cache_fields() = [
+    :slow_emissivity,
+    :slow_LW_up,
+    :slow_direct_albedo,
+    :slow_diffuse_albedo,
+    :slow_F_turb_ρτxz,
+    :slow_F_turb_ρτyz,
+    :slow_F_lh,
+    :slow_F_sh,
+    :slow_F_turb_moisture,
+]
+
+"""
     init_coupler_fields(FT, coupler_field_names, boundary_space)
 
 Allocate a Field of NamedTuples on the provided boundary space to store
@@ -215,6 +299,17 @@ abstract type AbstractSurfaceSimulation <: AbstractComponentSimulation end
 abstract type AbstractSeaIceSimulation <: AbstractSurfaceSimulation end
 abstract type AbstractLandSimulation <: AbstractSurfaceSimulation end
 abstract type AbstractOceanSimulation <: AbstractSurfaceSimulation end
+
+"""
+    is_overlapped(sim)
+
+Whether `sim` belongs to the group that is stepped asynchronously across several
+coupling steps when `overlap_slow_surfaces` is set. Ocean and sea ice step
+together in that group, to properly pass the frazil heat flux.
+
+Defaults to `false`; concrete surface types opt in.
+"""
+is_overlapped(::AbstractComponentSimulation) = false
 
 """
     AbstractImplicitFluxSimulation
@@ -496,6 +591,24 @@ function progress(sim::AbstractComponentSimulation, _cs)
         1
     return nothing
 end
+
+"""
+    progress_snapshot(sim)
+
+Gather the scalars `progress` reports into a `NamedTuple`, without printing, so
+the reduction can run inside the task that owns the model's state.
+
+Returns `nothing` for models that have not extended it.
+"""
+progress_snapshot(::AbstractComponentSimulation) = nothing
+
+"""
+    progress(sim, cs, snapshot)
+
+Print a progress report from a previously gathered [`progress_snapshot`](@ref).
+Falls back to the live report when a model has no snapshot method.
+"""
+progress(sim::AbstractComponentSimulation, cs, ::Nothing) = progress(sim, cs)
 
 """
     close_output_writers(sim::AbstractComponentSimulation)

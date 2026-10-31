@@ -37,6 +37,22 @@ the atmosphere and each surface model.
     FieldExchanger.set_caches!
 ```
 
+### Concurrent stepping
+
+These are used when `step_concurrently` or `overlap_slow_surfaces` is set. See
+[Concurrent component stepping](@ref).
+
+```@docs
+    FieldExchanger.step_slow_sims!
+    FieldExchanger.launch_slow_sims!
+    FieldExchanger.wait_slow_sims!
+    FieldExchanger.slow_step_in_flight
+    FieldExchanger.slow_step_target
+    FieldExchanger.slow_launch_target
+    FieldExchanger.slow_sim_dt
+    FieldExchanger.slow_progress_snapshot
+```
+
 ## FieldExchanger Internal Functions
 
 ```@docs

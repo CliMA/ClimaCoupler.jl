@@ -392,7 +392,7 @@ steps:
           slurm_mem: 20GB
           slurm_gpus: 1
 
-      - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce"
+      - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce (concurrent stepping)"
         key: "gpu_cmip_oceananigans_climaseaice"
         command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice.yml --job_id gpu_cmip_oceananigans_climaseaice"
         artifact_paths: "output/gpu_cmip_oceananigans_climaseaice/artifacts/*"

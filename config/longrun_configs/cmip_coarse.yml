@@ -12,6 +12,7 @@ time_varying_trace_gases: []
 non_orographic_gravity_wave: false
 orographic_gravity_wave: ~
 land_model: "integrated"
+lai_source: "modis_monthly_climatology"
 ice_model: "clima_seaice"
 ocean_model: "oceananigans"
 ocean_grid: "orca"

@@ -262,6 +262,8 @@ import Random
         # Gather: rows sum to 1, so a constant nodal field is exact.
         CMIPExt.gather_nodes_to_polys!(poly_scratch, eg, ones(FT, eg.n_nodes))
         @test all(v -> isapprox(v, 1, atol = 1e-12), poly_scratch)
+        CMIPExt.gather_nodes_to_polys!(poly_scratch, eg, ones(FT, eg.n_nodes), eg.tweight)
+        @test all(v -> isapprox(v, 1, atol = 1e-12), poly_scratch)
 
         # Raw scatter of a constant reproduces the nodal wet coverage.
         CMIPExt.scatter_polys_to_nodes!(nodal_scratch, eg, ones(FT, eg.n_poly))
@@ -332,6 +334,14 @@ import Random
 
         # And the control-volume areas agree with the geometric areas.
         @test sum(eg.b_area) ≈ sum(eg.area) rtol = 1e-3
+
+        # Transpose gather: weighted by any w, the polygons receive the
+        # atmosphere's share Σ_n WJ_n α_n g_n, with α the scatter of w.
+        g, w = rand(rng, FT, eg.n_nodes), rand(rng, FT, eg.n_poly)
+        CMIPExt.gather_nodes_to_polys!(poly_scratch, eg, g, eg.tweight)
+        CMIPExt.scatter_polys_to_nodes!(nodal_scratch, eg, w)
+        atmosphere_share = sum(WJ .* nodal_scratch .* g)
+        @test sum(eg.b_area .* w .* poly_scratch) ≈ atmosphere_share rtol = 1e-12
     end
 
     @testset "bounded normalized scatter" begin
@@ -349,6 +359,11 @@ import Random
             n -> den[n] == 0 || -1 - 1e-12 <= num[n] / den[n] <= 1 + 1e-12,
             1:(eg.n_nodes),
         )
+
+        # The transpose gather is a convex combination of nodal values.
+        g = 2 .* rand(rng, FT, eg.n_nodes) .- 1
+        CMIPExt.gather_nodes_to_polys!(poly_scratch, eg, g, eg.tweight)
+        @test all(v -> -1 - 1e-12 <= v <= 1 + 1e-12, poly_scratch)
     end
 
     @testset "no O(n) allocations (CPU)" begin
@@ -766,6 +781,7 @@ end
         flux_scratch,
         flux_dss_buffer = Utilities.init_dss_buffer(flux_scratch.F_sh),
         weight_cov_scratch = CC.Fields.zeros(boundary_space),
+        downward_flux_scratch = CC.Fields.zeros(boundary_space),
         temp_uv_vec = CC.Fields.Field(CC.Geometry.UVVector{FT}, boundary_space),
         uv_basis,
         exchange_grid = eg_d,
@@ -777,6 +793,16 @@ end
         CMIPExt.scatter_poly_fluxes_to_boundary!(remapping, eg_d, fs_d, weight_d)
         α = to_cpu(CRExt.se_field_to_vec(remapping.weight_cov_scratch))
         @test all(a -> 0 <= a <= 1 + 1e-8, α)
+
+        # A downward flux whose element copies of a shared node disagree, as the
+        # atmosphere's radiation can, still reaches the polygons as exactly the
+        # atmosphere's share Σ_n WJ_n α_n g_n.
+        g = rand(rng, FT, eg.n_nodes)
+        g_field = CC.Fields.zeros(boundary_space)
+        CRExt.vec_to_se_field!(g_field, on_exchange_device(g))
+        poly_d = on_exchange_device(zeros(FT, eg.n_poly))
+        CMIPExt.gather_downward_flux!(poly_d, remapping, g_field)
+        @test sum(eg.b_area .* weight .* to_cpu(poly_d)) ≈ sum(WJ .* α .* g) rtol = 1e-12
 
         for (name, F_poly) in
             ((:F_sh, fs.F_sh), (:F_lh, fs.F_lh), (:F_turb_moisture, fs.F_moisture))
@@ -930,6 +956,8 @@ end
         exchange_grid = eg,
         ocean_flux_state = CMIPExt.ExchangeFluxState{FT}(ocean_arch, eg_cpu.n_poly),
         scratch_field_oc3 = surface_field(),
+        downward_flux_scratch = CC.Fields.zeros(boundary_space),
+        flux_dss_buffer = Utilities.init_dss_buffer(CC.Fields.zeros(boundary_space)),
     )
     sim = CMIPExt.OceananigansSimulation(
         (; model),
@@ -1006,6 +1034,8 @@ Base.eltype(::FakeIceModel) = FT
         exchange_grid = eg,
         ice_flux_state = CMIPExt.IceExchangeState{FT}(ice_arch, eg_cpu.n_poly),
         scratch_field_oc1 = surface_field(),
+        downward_flux_scratch = CC.Fields.zeros(boundary_space),
+        flux_dss_buffer = Utilities.init_dss_buffer(CC.Fields.zeros(boundary_space)),
     )
     sim = CMIPExt.ClimaSeaIceSimulation(
         (; model),

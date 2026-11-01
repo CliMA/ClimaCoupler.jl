@@ -9,6 +9,9 @@ ClimaCoupler.jl Release Notes
   weights each polygon by its area inside control volumes around the nodes, so masked flux
   transfers stay bounded without the flux clamp or `cov_cutoff`. The wet, sea-ice and
   open-ocean area fractions are the DSS'd coverages of these weights.
+- [#2160](https://github.com/CliMA/ClimaCoupler.jl/pull/2160): Fluxes into ocean and sea-ice
+  cells are divided by the ocean's cell area, so the step from the polygons to the cells
+  conserves their global integral.
 
 #### Add ocean config options
 New `ocean_float_type` (`Float64` by default) and `ocean_vertical_levels` (60 by default) options set the

@@ -278,9 +278,15 @@ import Random
             end
         end
 
-        # Cell scatter of a constant is exact on wet cells, 0 on dry/shadow
-        # cells; the fold mirror then fills shadow partners.
-        CMIPExt.scatter_polys_to_cells!(cell_scratch, eg, ones(FT, eg.n_poly))
+        # Area-weighted cell mean of a constant is exact on wet cells, 0 on
+        # dry/shadow cells; the fold mirror then fills shadow partners.
+        CMIPExt.scatter_polys_to_cells!(
+            cell_scratch,
+            eg,
+            ones(FT, eg.n_poly),
+            eg.area,
+            eg.oc_wet_area,
+        )
         for c in 1:(eg.n_oc)
             if eg.oc_wet_area[c] > 0
                 @test cell_scratch[c] ≈ 1 rtol = 1e-12
@@ -309,9 +315,15 @@ import Random
     @testset "conservation" begin
         F = rand(rng, FT, eg.n_poly)
 
-        # FV side: the scatter preserves the area integral exactly.
+        # FV side: integrated with the FV grid's own cell areas, the scatter
+        # gives the SE-side integral exactly.
         CMIPExt.scatter_polys_to_cells!(cell_scratch, eg, F)
-        @test sum(eg.area .* F) ≈ sum(eg.oc_wet_area .* cell_scratch) rtol = 1e-12
+        grid_cpu = OC.on_architecture(OC.CPU(), coastal_grid.underlying_grid)
+        Az = [
+            OC.Operators.Azᶜᶜᶜ(mod1(c, Nx), (c - 1) ÷ Nx + 1, Nz, grid_cpu) for
+            c in 1:(eg.n_oc)
+        ]
+        @test sum(Az .* cell_scratch) ≈ sum(eg.b_area .* F) rtol = 1e-12
 
         # SE side: the scatter preserves the integral over the control-volume
         # areas exactly (before DSS).
@@ -869,6 +881,20 @@ struct FakeOceanModel{G, T}
 end
 Base.eltype(::FakeOceanModel) = FT
 
+# Σ_{k ∈ c} b_area_k / Az_c with the grid's own cell area: the factor the cell
+# scatter applies to a uniform flux.
+function cell_area_ratio(eg, grid)
+    grid_cpu = OC.on_architecture(OC.CPU(), grid.underlying_grid)
+    ratio = zeros(FT, eg.n_oc)
+    for k in 1:(eg.n_poly)
+        ratio[eg.oc_of_poly[k]] += eg.b_area[k]
+    end
+    for c in 1:(eg.n_oc)
+        ratio[c] /= OC.Operators.Azᶜᶜᶜ(mod1(c, Nx), (c - 1) ÷ Nx + 1, Nz, grid_cpu)
+    end
+    return ratio
+end
+
 @testset "Exchange-grid radiation and precipitation" begin
     # Make sure both the boundary space and the ocean grid are on the same device
     ocean_arch = exchange_arch()
@@ -914,9 +940,8 @@ Base.eltype(::FakeOceanModel) = FT
         nothing,
     )
 
-    # Uniform forcing: the node gather preserves constants exactly and the cell
-    # scatter conserves the area integral, so every wet cell must reproduce the
-    # single-column answer to roundoff.
+    # Uniform forcing: the node gather preserves constants exactly, so each wet
+    # cell receives the single-column answer times its `cell_area_ratio`.
     uniform(v) = (f = CC.Fields.zeros(boundary_space); f .= FT(v); f)
     SW_d, SW_d_diffuse, LW_d = FT(300), FT(120), FT(350)
     P_liq, P_snow = FT(-1e-5), FT(-2e-6)
@@ -939,14 +964,15 @@ Base.eltype(::FakeOceanModel) = FT
     cell_values(f) = vec(OC.interior(OC.on_architecture(OC.CPU(), f), :, :, 1))
     flux_T = cell_values(CMIPExt.surface_flux(model.tracers.T))
     flux_S = cell_values(CMIPExt.surface_flux(model.tracers.S))
+    r = cell_area_ratio(eg_cpu, grid)
     n_wet = 0
     # Skip the fold row, whose shadow cells are filled by mirroring rather than
     # by the scatter.
     for c in 1:((Ny - 1) * Nx)
         if eg_cpu.oc_wet_area[c] > 0
             n_wet += 1
-            @test flux_T[c] ≈ expected_T rtol = 1e-12
-            @test flux_S[c] ≈ expected_S rtol = 1e-12
+            @test flux_T[c] ≈ expected_T * r[c] rtol = 1e-12
+            @test flux_S[c] ≈ expected_S * r[c] rtol = 1e-12
         else
             # Dry cells receive nothing: the property this path exists for.
             @test flux_T[c] == 0
@@ -997,17 +1023,19 @@ Base.eltype(::FakeIceModel) = FT
     FieldExchanger.update_sim!(sim, csf)
 
     # Wet cells with ice receive the absorbed radiation as a cell mean and the
-    # downward snow flux as positive snowfall; all other cells receive neither.
+    # downward snow flux as positive snowfall, each times the cell's
+    # `cell_area_ratio`; all other cells receive neither.
     α = FT(0.7) # `Val(:surface_direct_albedo)`
     ϵ = FT(1)   # `Val(:emissivity)`
     cell_values(f) = vec(OC.interior(OC.on_architecture(OC.CPU(), f), :, :, 1))
     ℵ, heat, snow = cell_values(ice_concentration), cell_values(top), cell_values(snowfall)
+    r = cell_area_ratio(eg_cpu, grid)
     n_icy = 0
     for c in 1:((Ny - 1) * Nx) # Skip the fold row
         if eg_cpu.oc_wet_area[c] > 0 && ℵ[c] > 0
             n_icy += 1
-            @test heat[c] ≈ ℵ[c] * (-(1 - α) * SW_d - ϵ * LW_d) rtol = 1e-12
-            @test snow[c] ≈ -P_snow rtol = 1e-12
+            @test heat[c] ≈ ℵ[c] * (-(1 - α) * SW_d - ϵ * LW_d) * r[c] rtol = 1e-12
+            @test snow[c] ≈ -P_snow * r[c] rtol = 1e-12
         else
             @test heat[c] == 0
             @test snow[c] == 0

@@ -842,8 +842,10 @@ end
 Preprocess `var` with short name `varname`.
 """
 function preprocess(::CalipsoDataLoader, var, ::Val{:cl})
-    # Select "All cases" doop (first index)
-    var = ClimaAnalysis.slice(var; doop = 1, by = ClimaAnalysis.Index())
+    # Select "All cases" doop. The axis is ["DO-OP observable", "All cases"], so this is
+    # index 2. Index 1 is the daylight-only subset, which reads 0.05-0.08 lower than All
+    # cases, while the model's `cl` covers the full diurnal cycle.
+    var = ClimaAnalysis.slice(var; doop = 2, by = ClimaAnalysis.Index())
     var = _preprocess_var(var)
     # Convert from percentage (0–100) to fraction (0–1)
     var = ClimaAnalysis.convert_units(var, "unitless"; conversion_function = x -> x / 100)

@@ -23,7 +23,7 @@ See [Available component models](@ref Models) for details on each component mode
 CMIP (Coupled Model Intercomparison Project) is the most complex simulation type
 supported by ClimaCoupler.jl. In addition to the prognostic atmosphere and land
 models, the ocean evolves prognostically in response to atmospheric forcing,
-and sea ice is thermodynamically active.
+and sea ice evolves through both thermodynamics and dynamics.
 
 **Component models:**
 - Atmosphere: `ClimaAtmosSimulation`
@@ -35,13 +35,6 @@ and sea ice is thermodynamically active.
     The CMIP configuration is computationally expensive due to the complexity of all
     component models. Running on a GPU is strongly recommended; see
     the `device` option in [Input](@ref) for how to select the compute device.
-
-!!! note "Behavior at the poles"
-    The Oceananigans and ClimaSeaIce models currently run on a capped latitude-longitude
-    grid spanning 80°S to 80°N. To avoid a gap at the poles, the selected land model is
-    used to fill the polar regions. As a result, the land model cannot be started from saved
-    initial conditions in this configuration. This will change in the future when the models
-    switch to a tripolar grid.
 
 CMIP mode is enabled by setting `mode_name: "cmip"`.
 

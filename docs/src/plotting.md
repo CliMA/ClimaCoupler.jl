@@ -117,7 +117,7 @@ using Makie, GeoMakie, CairoMakie, Poppler_jll, Printf
 using Oceananigans
 ```
 
-The `ClimaCouplerCMIPExt` extension adds support for:
+The `ClimaCouplerCMIPMakieExt` extension adds support for:
 
 - **Oceananigans field plotting**: Extends `Plotting.debug_plot!` to handle `Oceananigans.Field`
   and `Oceananigans.AbstractOperations.AbstractOperation` types, allowing debug plots to visualize
@@ -129,8 +129,8 @@ The `ClimaCouplerCMIPExt` extension adds support for:
 These extensions enable the debug plotting system to automatically handle Oceananigans fields
 when they are encountered in coupled simulations, without requiring any special handling in user code.
 
-For example, here are the debug plots generation for the Oceananigans component:
-![Øceananigans debug plots](assets/shortrun-28Feb2026-debug-ocean.png)
+For example, here are the debug plots generated for the Oceananigans component:
+![Oceananigans debug plots](assets/shortrun-28Feb2026-debug-ocean.png)
 
 ## Plotting API
 

@@ -199,7 +199,7 @@ specific timesteps should be specified, rather than only `dt`.
 |----------|------|---------|---------------|-------------|
 | `--ocean_model` | String | `"prescribed"` | `prescribed`, `oceananigans`, `slab`, `nothing` | Ocean model to use |
 | `--evolving_ocean` | Bool | `true` | `true`, `false` | Whether to use a dynamic slab ocean model, as opposed to constant surface temperatures |
-| `--simple_ocean` | Bool | `false` | `true`, `false` | Whether to use a simpler ocean model setup with Oceananigans |
+| `--simple_ocean` | Bool | `false` | `true`, `false` | Whether to use a cheaper Oceananigans setup (simplified closure, fixed vertical coordinate, fewer free-surface substeps); intended for software testing only |
 | `--ocean_grid` | String | `"one_deg_tripolar"` | `one_deg_tripolar`, `orca` | Horizontal grid for the Oceananigans ocean model |
 | `--ocean_float_type` | String | `"Float64"` | `Float64`, `Float32` | Float type of the Oceananigans ocean model |
 | `--ocean_vertical_levels` | Int | `60` | Any positive integer | Number of vertical levels of the Oceananigans ocean model |

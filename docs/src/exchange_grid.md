@@ -4,9 +4,9 @@ When the coupled simulation uses an Oceananigans ocean (the CMIP
 configuration), ClimaCoupler can compute atmosphere-ocean and atmosphere-ice
 turbulent fluxes on the *exchange grid*: the set of polygons formed where the
 elements of the ClimaCore cubed-sphere spectral-element (SE) boundary space
-intersect the finite-volume (FV) cells of the ocean's `TripolarGrid`. This is
-enabled by default and controlled by the `use_intersection_grid` configuration
-option.
+intersect the finite-volume (FV) cells of the ocean grid (a `TripolarGrid` or
+the eORCA1 grid). This is enabled by default and controlled by the
+`use_intersection_grid` configuration option.
 
 ## Why
 
@@ -23,18 +23,18 @@ areas define
 
 ## Geometry and weights
 
-For a more in-depth derivation of the regridding operations, see [the 
+For a more in-depth derivation of the regridding operations, see [the
 ConservativeRegridding.jl documentation](https://juliageo.org/ConservativeRegridding.jl/stable/extensions/climacore/).
 `build_exchange_grid` constructs the polygons once on the CPU (in `Float64`)
 via ConservativeRegridding.jl's intersection-operator API, with polygons over
-dry (immersed) cells dropped. For each polygon ``\\Omega_k`` in SE element
-``e``, the SEM basis integrals ``B_{kn} = \\int_{\\Omega_k} \\phi_n \\, dA``
+dry (immersed) cells dropped. For each polygon ``\Omega_k`` in SE element
+``e``, the SEM basis integrals ``B_{kn} = \int_{\Omega_k} \phi_n \, dA``
 provide:
 
-- a **gather** (SE nodes → FV polygons): ``\\bar f_k = \\sum_n (B_{kn}/\\sum_n
+- a **gather** (SE nodes → FV polygons): ``\bar f_k = \sum_n (B_{kn}/\sum_n
   B_{kn}) f_n`` — rows sum to 1, constants preserved exactly;
 - a **scatter** (FV polygons → SE nodes): the per-element L2 projection
-  ``F_n = \\sum_k (B_{kn}/(Jw)_n) F_k``, followed by `weighted_dss!`;
+  ``F_n = \sum_k (B_{kn}/(Jw)_n) F_k``, followed by `weighted_dss!`;
 - **wet and total nodal coverage**, `node_cov` and `node_cov_total`.
   At each SE node, `node_cov` is how much nearby area lies over wet ocean,
   and `node_cov_total` is how much lies over any ocean cell (wet or dry).
@@ -47,7 +47,6 @@ reads and scatters are area-weighted averages.
 
 ## Surface fractions
 
-
 Each coupling step, `FieldExchanger.align_surface_fractions!` composes
 
 ```
@@ -56,7 +55,7 @@ ocean = wet - ice
 land  = 1 - wet
 ```
 
-which sum to 1 identically (asserted at runtime)
+which sum to 1 identically (asserted at runtime).
 
 ## Per-polygon fluxes
 
@@ -96,5 +95,5 @@ update, as does `use_intersection_grid: false`.
 ## API
 
 ```@docs
-    FieldExchanger.align_surface_fractions!
+FieldExchanger.align_surface_fractions!
 ```

@@ -166,11 +166,12 @@ This extension is loaded when [Oceananigans.jl](https://github.com/CliMA/Oceanan
 ConservativeRegridding.jl, KernelAbstractions.jl, and Adapt.jl are available. It provides:
 
 - **`OceananigansSimulation`**: A full ocean circulation model implemented in Oceananigans.jl and
-  initialized from EN4 or ECCO reanalysis data. The ocean evolves
+  initialized from the EN4 ocean state estimate. The ocean evolves
   prognostically in response to atmospheric fluxes. For details on the ocean model physics, see
   the [Oceananigans.jl documentation](https://clima.github.io/OceananigansDocumentation/stable/).
 
-- **`ClimaSeaIceSimulation`**: A thermodynamic sea ice model implemented in ClimaSeaIce.jl. Sea ice
+- **`ClimaSeaIceSimulation`**: A sea ice model implemented in ClimaSeaIce.jl, with thermodynamics
+  and elasto-viscous-plastic (EVP) rheology dynamics, initialized from ECCO4 monthly data. Sea ice
   concentration and thickness evolve prognostically, with ice-ocean heat fluxes computed at the
   ocean-ice interface at each coupling step.
 
@@ -204,8 +205,10 @@ and dynamics. This is the only atmosphere model currently supported by ClimaCoup
   [Cohen et al. 2020](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2020MS002162),
   [Lopez-Gomez et al. 2020](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2020MS002161))
 - Microphysics: 0-moment scheme — cloud condensate removed in-situ with a constant timescale; 1-moment scheme
-- Surface fluxes: Monin-Obukhov similarity theory with constant roughness lengths over land
-  and ocean
+- Surface fluxes: Monin-Obukhov similarity theory, computed by the coupler (see [FluxCalculator](@ref)).
+  Each surface model supplies its roughness: COARE3 over ocean (prescribed, slab, and Oceananigans),
+  constant roughness lengths over sea ice and the bucket land model. The integrated land model
+  computes its own fluxes within ClimaLand.
 
 ## Model Selection
 
@@ -223,7 +226,7 @@ a different set of simulation modes:
 
 Use this environment for `amip`, `slabplanet`, `slabplanet_aqua`, `slabplanet_terra`,
 and `subseasonal` modes. It omits the Oceananigans-related dependencies (`Oceananigans`,
-`ClimaSeaIce`, `KernelAbstractions`), resulting in a lighter environment
+`ClimaSeaIce`, `KernelAbstractions`, `ConservativeRegridding`, `Adapt`), resulting in a lighter environment
 with faster precompilation.
 
 ```bash

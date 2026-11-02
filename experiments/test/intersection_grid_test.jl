@@ -52,7 +52,7 @@ tripolar_grid_on(arch) = OC.TripolarGrid(
     southernmost_latitude = -80,
     north_poles_latitude = 55,
     first_pole_longitude = 70,
-    fold_topology = OC.RightCenterFolded,
+    fold_topology = OC.CenterFolded,
     z = (-100.0, 0.0),
     halo = (4, 4, 4),
 )

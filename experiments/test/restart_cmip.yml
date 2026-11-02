@@ -11,6 +11,7 @@ dt_ocean: "240secs"
 dt_seaice: "240secs"
 dt_rad: "120secs"
 dz_bottom: 100.0
+dz_top: 9600.0
 energy_check: false
 h_elem: 4
 checkpoint_dt: "480secs"

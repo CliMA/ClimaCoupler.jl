@@ -20,6 +20,7 @@ import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
 import Insolation
 import Insolation.Parameters: InsolationParameters
+import Dates
 import LinearAlgebra
 import Statistics
 import ClimaCoupler.Utilities: @timed_log
@@ -818,6 +819,15 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ρe_tot}) = sim.integrato
 Plotting.debug_plot_fields(sim::ClimaAtmosSimulation) =
     (:w, :ρq_tot, :ρe_tot, :liquid_precipitation, :snow_precipitation)
 
+Models.ocean_albedo_model(::Type{FT}, R_sub::FT = FT(0.007)) where {FT <: AbstractFloat} =
+    CA.RegressionFunctionAlbedo{FT}(; R_sub)
+
+function ocean_cos_zenith(current_date, lat::FT, lon::FT, insolation_params) where {FT}
+    (; μ) = Insolation.insolation(current_date, lat, lon, insolation_params)
+    # Clamp cosine of solar zenith angle above zero so fluxes_test remains well-defined at night
+    return max(μ, eps(FT))
+end
+
 """
     Interfacer.set_albedos!(sim::Models.PrescribedOceanSimulation, t)
 
@@ -828,38 +838,35 @@ is dependent on running with `ClimaAtmosSimulation` as the atmosphere simulation
 """
 function Interfacer.set_albedos!(sim::Models.PrescribedOceanSimulation, t)
     p = sim.cache
-    FT = CC.Spaces.undertype(axes(sim.cache.T_sfc))
-
-    # Compute the current date
+    FT = CC.Spaces.undertype(axes(p.T_sfc))
     current_date = t isa ITime ? date(t) : p.start_date + Dates.Second(t)
+    insolation_params = p.insolation_params
+    surface_coords = CC.Fields.coordinate_field(axes(p.T_sfc))
+    λ = FT(0)
 
-    insolation_params = InsolationParameters(FT)
+    α_model = p.albedo_model
+    α_dir_fn = CA.surface_albedo_direct(α_model)
+    α_dif_fn = CA.surface_albedo_diffuse(α_model)
 
-    # Get the atmospheric wind vector and the cosine of the zenith angle
-    surface_coords = CC.Fields.coordinate_field(axes(sim.cache.T_sfc))
-    insolation_tuple = Insolation.insolation.(
-        current_date,
-        surface_coords.lat,
-        surface_coords.long,
-        insolation_params,
+    @. p.α_direct = α_dir_fn(
+        λ,
+        ocean_cos_zenith(
+            $((current_date,)),
+            surface_coords.lat,
+            surface_coords.long,
+            insolation_params,
+        ),
+        LinearAlgebra.norm(CC.Geometry.Covariant12Vector(p.u_int, p.v_int)),
     )
-    cos_zenith_angle = insolation_tuple.μ
-    wind_atmos = LinearAlgebra.norm.(CC.Geometry.Covariant12Vector.(p.u_int, p.v_int)) # wind vector from components
-    λ = FT(0) # spectral wavelength (not used for now)
-    # TODO: We shouldn't need this, but without this the fluxes_test fail.
-    cos_zenith = @. max(cos_zenith_angle, eps(FT))
-
-    # Use the albedo model from ClimaAtmos
-    α_model = CA.RegressionFunctionAlbedo{FT}()
-    Interfacer.update_field!(
-        sim,
-        Val(:surface_direct_albedo),
-        CA.surface_albedo_direct(α_model).(λ, cos_zenith, wind_atmos), # this allocates
-    )
-    Interfacer.update_field!(
-        sim,
-        Val(:surface_diffuse_albedo),
-        CA.surface_albedo_diffuse(α_model).(λ, cos_zenith, wind_atmos), # this allocates
+    @. p.α_diffuse = α_dif_fn(
+        λ,
+        ocean_cos_zenith(
+            $((current_date,)),
+            surface_coords.lat,
+            surface_coords.long,
+            insolation_params,
+        ),
+        LinearAlgebra.norm(CC.Geometry.Covariant12Vector(p.u_int, p.v_int)),
     )
 
     return nothing

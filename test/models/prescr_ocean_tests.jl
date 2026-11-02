@@ -8,6 +8,8 @@ import ClimaCoupler.Interfacer
 import ClimaUtilities.TimeVaryingInputs: TimeVaryingInput, evaluate!
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
 import Thermodynamics as TD
+import Insolation
+import ClimaAtmos
 import ClimaCoupler.Models
 
 FT = Float32
@@ -78,7 +80,27 @@ end
     @test sim.cache.area_fraction == area_fraction
     @test sim.cache.phase == TD.Liquid()
     @test sim.cache.thermo_params == thermo_params
+    @test sim.cache.insolation_params ==
+          Insolation.Parameters.InsolationParameters(coupled_param_dict)
+    @test sim.cache.albedo_model ==
+          ClimaAtmos.RegressionFunctionAlbedo{FT}(; R_sub = FT(0.007))
     @test !isnothing(sim.cache.SST_timevaryinginput)
+
+    # Test that custom coupled_param_dict solar constant and ocean_subsurface_reflectance propagate into cache
+    custom_param_dict = CP.create_toml_dict(FT)
+    custom_param_dict.data["total_solar_irradiance"]["value"] = FT(1365.0)
+    sim_custom = Models.PrescribedOceanSimulation(
+        FT;
+        boundary_space = space,
+        start_date,
+        tspan,
+        coupled_param_dict = custom_param_dict,
+        thermo_params,
+        comms_ctx,
+        ocean_subsurface_reflectance = FT(0.005),
+    )
+    @test sim_custom.cache.insolation_params.tot_solar_irrad == FT(1365.0)
+    @test sim_custom.cache.albedo_model.R_sub == FT(0.005)
 
     # Test `Interfacer.get_field` function
     @test Interfacer.get_field(sim, Val(:area_fraction)) == sim.cache.area_fraction
@@ -102,4 +124,11 @@ end
     )
     @test !restarted_sim.cache.SST_schedule((; t = day + 120))
     @test restarted_sim.cache.SST_schedule((; t = 2 * day))
+
+    # Test `Interfacer.set_albedos!` and verify zero CPU heap allocations via @noinline wrapper
+    @noinline call_set_albedos!(s, t) = (Interfacer.set_albedos!(s, t); nothing)
+    call_set_albedos!(sim, 0.0)
+    @test (@allocated call_set_albedos!(sim, 0.0)) == 0
+    @test all(x -> zero(FT) <= x <= one(FT), Array(parent(sim.cache.α_direct)))
+    @test all(x -> zero(FT) <= x <= one(FT), Array(parent(sim.cache.α_diffuse)))
 end

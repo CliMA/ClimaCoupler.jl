@@ -42,17 +42,22 @@ Base.@kwdef struct IceSlabParameters{FT <: AbstractFloat}
     z0b::FT                 # roughness length for tracers [m]
     T_freeze::FT            # freezing temperature of sea water [K]
     k_ice::FT               # thermal conductivity of sea ice [W / m / K] (less in HM71)
-    α::FT                   # albedo of sea ice, roughly tuned to match observations
+    α_cold::FT              # cold snow-covered sea-ice albedo
+    α_melt::FT              # melting ponded sea-ice albedo at T_freeze
+    ΔT_melt::FT             # temperature range below T_freeze over which albedo ramps [K]
     ϵ::FT                   # emissivity of sea ice
     σ::FT                   # Stefan-Boltzmann constant [W / m2 / K4]
     T_sfc_min::FT           # minimum allowed surface temperature [K]
 end
 
+Base.broadcastable(p::IceSlabParameters) = tuple(p)
+
 """
     IceSlabParameters{FT}(coupled_param_dict; h = FT(2), ρ = FT(900), c = FT(2100),
                           T_base = FT(271.2), z0m = FT(1e-4), z0b = FT(1e-4),
-                          T_freeze = FT(271.2), k_ice = FT(2), α = FT(0.65), ϵ = FT(1),
-                          T_sfc_min = FT(200))
+                          T_freeze = FT(271.2), k_ice = FT(2),
+                          α_cold = FT(0.78), α_melt = FT(0.55), ΔT_melt = FT(3),
+                          ϵ = FT(1), T_sfc_min = FT(200))
 
 Initialize the `IceSlabParameters` object with the coupled parameters.
 
@@ -66,7 +71,9 @@ Initialize the `IceSlabParameters` object with the coupled parameters.
 - `z0b`: roughness length for tracers [m] (default: 1e-4)
 - `T_freeze`: freezing temperature of sea water [K] (default: 271.2)
 - `k_ice`: thermal conductivity of sea ice [W / m / K] (default: 2)
-- `α`: albedo of sea ice (default: 0.65)
+- `α_cold`: cold snow-covered sea-ice albedo for `T_sfc ≤ T_freeze - ΔT_melt` (default: 0.78)
+- `α_melt`: melting ponded sea-ice albedo at `T_sfc = T_freeze` (default: 0.55)
+- `ΔT_melt`: melt-ramp width below `T_freeze` [K] (default: 3)
 - `ϵ`: emissivity of sea ice (default: 1)
 - `T_sfc_min`: minimum allowed surface temperature [K] (default: 200)
 
@@ -83,7 +90,9 @@ function IceSlabParameters{FT}(
     z0b = FT(1e-4),
     T_freeze = FT(271.2),
     k_ice = FT(2),
-    α = FT(0.65),
+    α_cold = FT(0.78),
+    α_melt = FT(0.55),
+    ΔT_melt = FT(3),
     ϵ = FT(1),
     T_sfc_min = FT(200),
 ) where {FT}
@@ -96,7 +105,9 @@ function IceSlabParameters{FT}(
         z0b,
         T_freeze,
         k_ice,
-        α,
+        α_cold,
+        α_melt,
+        ΔT_melt,
         ϵ,
         σ = coupled_param_dict["stefan_boltzmann_constant"],
         T_sfc_min,
@@ -288,6 +299,7 @@ function PrescribedIceSimulation(
         F_turb_energy = CC.Fields.zeros(boundary_space),
         SW_d = CC.Fields.zeros(boundary_space),
         LW_d = CC.Fields.zeros(boundary_space),
+        α_ice = CC.Fields.zeros(boundary_space),
         area_fraction = ice_fraction,
         SIC_timevaryinginput = SIC_timevaryinginput,
         land_fraction = land_fraction,
@@ -330,6 +342,7 @@ function PrescribedIceSimulation(
 
     # DSS state to ensure we have continuous fields
     dss_state!(sim)
+    update_sea_ice_albedo!(sim)
     return sim
 end
 
@@ -341,6 +354,69 @@ This function is intended to be used within a callback.
 """
 function read_sic_data!(integrator)
     evaluate!(integrator.p.area_fraction, integrator.p.SIC_timevaryinginput, integrator.t)
+end
+
+"""
+    ice_surface_albedo(T_sfc, T_freeze, ΔT_melt, α_cold, α_melt)
+
+Sea-ice broadband surface albedo as a continuous linear ramp between cold snow-covered
+sea ice (`α_cold` for `T_sfc ≤ T_freeze - ΔT_melt`) and melting ponded summer ice
+(`α_melt` at `T_sfc = T_freeze`).
+"""
+function ice_surface_albedo(
+    T_sfc::FT,
+    T_freeze::FT,
+    ΔT_melt::FT,
+    α_cold::FT,
+    α_melt::FT,
+) where {FT}
+    return ifelse(
+        T_sfc >= T_freeze,
+        α_melt,
+        ifelse(
+            T_sfc <= T_freeze - ΔT_melt,
+            α_cold,
+            α_melt +
+            (α_cold - α_melt) * clamp((T_freeze - T_sfc) / ΔT_melt, zero(FT), one(FT)),
+        ),
+    )
+end
+
+"""
+    update_sea_ice_albedo!(sim::PrescribedIceSimulation)
+
+Update the cached sea-ice surface albedo field `sim.integrator.p.α_ice` from the
+current bulk temperature state at coupling-step boundaries.
+"""
+function update_sea_ice_albedo!(sim::PrescribedIceSimulation)
+    (; T_base, T_sfc_min, T_freeze, ΔT_melt, α_cold, α_melt) = sim.integrator.p.params
+    @. sim.integrator.p.α_ice = ice_surface_albedo(
+        ice_surface_temperature(sim.integrator.u.T_bulk, T_base, T_sfc_min, T_freeze),
+        T_freeze,
+        ΔT_melt,
+        α_cold,
+        α_melt,
+    )
+    return nothing
+end
+
+"""
+    Interfacer.step!(sim::PrescribedIceSimulation, t)
+
+Advance the prescribed sea-ice slab integrator to time `t` via the generic
+`AbstractComponentSimulation` stepping method and refresh the cached surface
+albedo `sim.integrator.p.α_ice` at the coupling-step boundary so that all
+Runge-Kutta stages within a step read the same albedo as the coupler exchange.
+"""
+function Interfacer.step!(sim::PrescribedIceSimulation, t::Float64)
+    invoke(Interfacer.step!, Tuple{Interfacer.AbstractComponentSimulation, Float64}, sim, t)
+    update_sea_ice_albedo!(sim)
+    return nothing
+end
+function Interfacer.step!(sim::PrescribedIceSimulation, t::ITime)
+    invoke(Interfacer.step!, Tuple{Interfacer.AbstractComponentSimulation, ITime}, sim, t)
+    update_sea_ice_albedo!(sim)
+    return nothing
 end
 
 # extensions required by Interfacer
@@ -357,7 +433,7 @@ Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_momentum}) =
 Interfacer.get_field(
     sim::PrescribedIceSimulation,
     ::Union{Val{:surface_direct_albedo}, Val{:surface_diffuse_albedo}},
-) = sim.integrator.p.params.α
+) = sim.integrator.p.α_ice
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:roughness_model}) = :constant
 Interfacer.get_field(sim::PrescribedIceSimulation, ::Val{:surface_temperature}) =
     ice_surface_temperature.(
@@ -437,6 +513,41 @@ end
 ###
 
 """
+    ice_energy_balance_tendency(T_bulk, area_fraction, F_turb_energy, SW_d, LW_d, α_ice, params, dt)
+
+Pointwise slab sea-ice bulk temperature tendency [K/s] from the surface and basal
+energy balance, masked to zero in ice-free grid cells and bounded so `T_bulk` does
+not exceed `T_freeze` over `dt`. Because ice thickness is prescribed rather than
+prognosed, the `T_freeze` cap discards surplus melt energy (and a lower `α_melt`
+increases the absorbed solar energy discarded at the cap).
+"""
+function ice_energy_balance_tendency(
+    T_bulk::FT,
+    area_fraction::FT,
+    F_turb_energy::FT,
+    SW_d::FT,
+    LW_d::FT,
+    α_ice::FT,
+    params::IceSlabParameters{FT},
+    dt::FT,
+) where {FT}
+    (; k_ice, h, T_base, ρ, c, ϵ, T_freeze, σ, T_sfc_min) = params
+    T_sfc = ice_surface_temperature(T_bulk, T_base, T_sfc_min, T_freeze)
+    F_conductive = (k_ice / h) * (T_base - T_sfc)
+    rhs =
+        (
+            -F_turb_energy +
+            (one(FT) - α_ice) * SW_d +
+            ϵ * (LW_d - σ * T_sfc^4) +
+            F_conductive
+        ) / (h * ρ * c)
+    # zero tendency where there is no ice
+    rhs_masked = ifelse(area_fraction ≈ zero(FT), zero(FT), rhs)
+    # cap at freezing
+    return min(rhs_masked, (T_freeze - T_bulk) / dt)
+end
+
+"""
     ice_rhs!(dY, Y, p, t)
 
 Rhs method in the form as required by `ClimeTimeSteppers`, with the tendency vector `dY`,
@@ -444,46 +555,47 @@ the state vector `Y`, the parameter vector `p`, and the simulation time `t` as i
 
 This sea-ice energy formulation follows [Holloway and Manabe 1971](https://journals.ametsoc.org/view/journals/mwre/99/5/1520-0493_1971_099_0335_socbag_2_3_co_2.xml?tab_body=pdf),
 where sea-ice concentrations and thicknes are prescribed, and the model solves
-for temperature (curbed at the freezing point).
+for temperature (curbed at the freezing point, which discards surplus melt energy).
 """
 function ice_rhs!(dY, Y, p, t)
     FT = eltype(Y)
-    (; k_ice, h, T_base, ρ, c, ϵ, α, T_freeze, σ) = p.params
+    params = p.params
 
     # Update the cached area fraction with the current SIC
     if p.domain_type == "column"
         @. p.area_fraction = FT(1)
     else
-        @. p.area_fraction = ifelse(isfinite(p.area_fraction), p.area_fraction, FT(0))
-        # binary ice fraction (threshold at 0.5)
-        if p.binary_area_fraction
-            @. p.area_fraction = ifelse(p.area_fraction > FT(0.5), FT(1), FT(0))
-        end
-
-        # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
-        #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-        @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_fraction), FT(0))
+        binary = p.binary_area_fraction
+        # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
+        @. p.area_fraction = max(
+            min(
+                ifelse(
+                    isfinite(p.area_fraction),
+                    ifelse(
+                        binary,
+                        ifelse(p.area_fraction > FT(0.5), FT(1), FT(0)),
+                        p.area_fraction,
+                    ),
+                    FT(0),
+                ),
+                FT(1) - p.land_fraction,
+            ),
+            FT(0),
+        )
     end
 
-    # Calculate the conductive flux (positive when upward)
-    (; T_sfc_min) = p.params
-    F_conductive = @. k_ice / h *
-       (T_base - ice_surface_temperature(Y.T_bulk, T_base, T_sfc_min, T_freeze))
-
-    # Compute the energy balance RHS
-    rhs = @. (
-        -p.F_turb_energy +
-        (1 - α) * p.SW_d +
-        ϵ * (
-            p.LW_d - σ * ice_surface_temperature(Y.T_bulk, T_base, T_sfc_min, T_freeze)^4
-        ) +
-        F_conductive
-    ) / (h * ρ * c)
-    # Zero out tendencies where there is no ice, so that ice temperature remains constant there
-    @. rhs = ifelse(p.area_fraction ≈ 0, zero(rhs), rhs)
-
-    # If tendencies lead to temperature above freezing, set temperature to freezing
-    @. dY.T_bulk = min(rhs, (T_freeze - Y.T_bulk) / float(p.dt))
+    dt_ft = FT(p.dt)
+    @. dY.T_bulk = ice_energy_balance_tendency(
+        Y.T_bulk,
+        p.area_fraction,
+        p.F_turb_energy,
+        p.SW_d,
+        p.LW_d,
+        p.α_ice,
+        params,
+        dt_ft,
+    )
+    return nothing
 end
 
 """

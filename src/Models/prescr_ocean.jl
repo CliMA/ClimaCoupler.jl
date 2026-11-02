@@ -31,6 +31,8 @@ The cache is expected to contain the following variables:
 - `area_fraction` (fraction of the grid cell covered by the ocean)
 - `phase` (phase of the water used to calculate surface humidity)
 - `thermo_params` (thermodynamic parameters)
+- `insolation_params` (insolation parameters constructed from `coupled_param_dict`)
+- `albedo_model` (cached `ClimaAtmos.RegressionFunctionAlbedo` instance)
 - `SST_timevaryinginput` (TimeVaryingInput object containing SST data)
 - `t` (the current time)
 - `coare3_roughness_params` (COARE3 roughness params Field, allocated once for reuse)
@@ -71,6 +73,7 @@ and reading in prescribed SST data.
 - `beta`: Beta parameter (default: `FT(1)`)
 - `α_direct_val`: Direct albedo value (default: `FT(0.06)`)
 - `α_diffuse_val`: Diffuse albedo value (default: `FT(0.06)`)
+- `ocean_subsurface_reflectance`: Subsurface volume reflectance `R_sub` for `RegressionFunctionAlbedo` (default: `FT(0.007)`)
 - `sst_path::Union{Nothing, String}`: Path to SST data file (default: `nothing`)
 - `sst_adjustment`: Adjustment to add to SST after conversion to Kelvin (default: `FT(0)`)
 
@@ -89,6 +92,7 @@ function PrescribedOceanSimulation(
     z0b = FT(5.8e-5),
     α_direct_val = FT(0.06),
     α_diffuse_val = FT(0.06),
+    ocean_subsurface_reflectance = FT(0.007),
     sst_path::Union{Nothing, String} = nothing,
     sst_adjustment = FT(0),
     extra_kwargs...,
@@ -133,6 +137,9 @@ function PrescribedOceanSimulation(
     coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)
     coare3_roughness_params .= SF.COARE3RoughnessParams{FT}()
 
+    insolation_params = Insolation.Parameters.InsolationParameters(coupled_param_dict)
+    albedo_model = ocean_albedo_model(FT, FT(ocean_subsurface_reflectance))
+
     # Create the cache
     cache = (;
         T_sfc = SST_init,
@@ -145,6 +152,8 @@ function PrescribedOceanSimulation(
         area_fraction = ones(boundary_space),
         phase = TD.Liquid(),
         thermo_params,
+        insolation_params,
+        albedo_model,
         SST_timevaryinginput,
         SST_schedule,
         start_date,
@@ -153,6 +162,9 @@ function PrescribedOceanSimulation(
     )
     return PrescribedOceanSimulation(cache)
 end
+
+# Fallback using varargs so ClimaCouplerClimaAtmosExt adds a more specific method without method overwriting
+ocean_albedo_model(_...) = nothing
 
 ## Extensions of Interfacer and FieldExchanger functions
 

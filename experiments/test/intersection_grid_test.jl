@@ -856,20 +856,21 @@ Base.eltype(::FakeOceanModel) = FT
     # scatter conserves the area integral, so every wet cell must reproduce the
     # single-column answer to roundoff.
     uniform(v) = (f = CC.Fields.zeros(boundary_space); f .= FT(v); f)
-    SW_d, LW_d, P_liq, P_snow = FT(300), FT(350), FT(-1e-5), FT(-2e-6)
-    csf = (;
-        SW_d = uniform(SW_d),
-        LW_d = uniform(LW_d),
-        P_liq = uniform(P_liq),
-        P_snow = uniform(P_snow),
-    )
+    SW_d, SW_d_diffuse, LW_d = FT(300), FT(120), FT(350)
+    P_liq, P_snow = FT(-1e-5), FT(-2e-6)
+    forcing = (; SW_d, SW_d_diffuse, LW_d, P_liq, P_snow)
+    # Only the fields the ocean averages over its timestep
+    names = FieldExchanger.accumulated_coupler_fields(sim)
+    csf = NamedTuple{names}(map(name -> uniform(forcing[name]), names))
     FieldExchanger.update_sim!(sim, csf)
 
     (; reference_density, heat_capacity, σ, C_to_K) = ocean_properties
-    α = FT(0.011) # `Val(:surface_direct_albedo)`
+    α_direct = FT(0.06) # `Val(:surface_direct_albedo)`
+    α_diffuse = FT(0.06) # `Val(:surface_diffuse_albedo)`
     ϵ = FT(0.97)  # `Val(:emissivity)`
+    SW_absorbed = (1 - α_direct) * (SW_d - SW_d_diffuse) + (1 - α_diffuse) * SW_d_diffuse
     expected_T =
-        (-(1 - α) * SW_d - ϵ * (LW_d - σ * (T_sfc + C_to_K)^4)) /
+        (-SW_absorbed - ϵ * (LW_d - σ * (T_sfc + C_to_K)^4)) /
         (reference_density * heat_capacity)
     expected_S = -S_sfc * (P_liq + P_snow) / reference_density
 
@@ -891,4 +892,64 @@ Base.eltype(::FakeOceanModel) = FT
         end
     end
     @test n_wet > 0
+end
+
+# Stand-in for a ClimaSeaIce model in the `update_sim!` exchange-grid path
+struct FakeIceModel{G, C, H, S}
+    grid::G
+    ice_concentration::C
+    external_heat_fluxes::H
+    snowfall::S
+end
+Base.eltype(::FakeIceModel) = FT
+
+@testset "Exchange-grid radiation and snowfall on sea ice" begin
+    ice_arch = exchange_arch()
+    grid = coastal_grid_on(ice_arch)
+    eg_cpu = CMIPExt.build_exchange_grid(boundary_space, grid)
+    eg = on_exchange_device(eg_cpu)
+
+    surface_field() = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    ice_concentration, top, snowfall = surface_field(), surface_field(), surface_field()
+    OC.set!(ice_concentration, (λ, φ) -> φ < 0 ? FT(0.8) : FT(0))
+    model = FakeIceModel(grid, ice_concentration, (; top), snowfall)
+    remapping = (;
+        use_exchange_grid = true,
+        exchange_grid = eg,
+        ice_flux_state = CMIPExt.IceExchangeState{FT}(ice_arch, eg_cpu.n_poly),
+        scratch_field_oc1 = surface_field(),
+    )
+    sim = CMIPExt.ClimaSeaIceSimulation(
+        (; model),
+        nothing,
+        remapping,
+        nothing,
+        nothing,
+        nothing,
+        nothing,
+    )
+
+    uniform(v) = (f = CC.Fields.zeros(boundary_space); f .= FT(v); f)
+    SW_d, LW_d, P_snow = FT(300), FT(250), FT(-2e-6) # P_snow is downward
+    csf = (; SW_d = uniform(SW_d), LW_d = uniform(LW_d), P_snow = uniform(P_snow))
+    FieldExchanger.update_sim!(sim, csf)
+
+    # Wet cells with ice receive the absorbed radiation as a cell mean and the
+    # downward snow flux as positive snowfall; all other cells receive neither.
+    α = FT(0.7) # `Val(:surface_direct_albedo)`
+    ϵ = FT(1)   # `Val(:emissivity)`
+    cell_values(f) = vec(OC.interior(OC.on_architecture(OC.CPU(), f), :, :, 1))
+    ℵ, heat, snow = cell_values(ice_concentration), cell_values(top), cell_values(snowfall)
+    n_icy = 0
+    for c in 1:((Ny - 1) * Nx) # Skip the fold row
+        if eg_cpu.oc_wet_area[c] > 0 && ℵ[c] > 0
+            n_icy += 1
+            @test heat[c] ≈ ℵ[c] * (-(1 - α) * SW_d - ϵ * LW_d) rtol = 1e-12
+            @test snow[c] ≈ -P_snow rtol = 1e-12
+        else
+            @test heat[c] == 0
+            @test snow[c] == 0
+        end
+    end
+    @test n_icy > 0
 end

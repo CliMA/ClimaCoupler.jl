@@ -154,11 +154,13 @@ dispatch in coupling.
 - `simple_ocean`: Whether to use a simple ocean model setup (default: `false`)
 - `ocean_grid`: Horizontal grid for Oceananigans (`:one_deg_tripolar` or `:orca`, default: `:one_deg_tripolar`)
 - `depth`: Maximum ocean depth in metres (default: 5500 m for EN4 compatibility)
+- `Nz`: Number of vertical levels (default: 60)
 - `dt`: Time step (default: `1800.0` seconds, or 30 minutes)
 - `comms_ctx`: Communication context (default: `ClimaComms.context()`)
 - `FT_ocean`: Float type for the ocean simulation (default: `Float64`)
 - `coupled_param_dict`: Coupled parameter dictionary (default: created from `ClimaParams.create_toml_dict(FT)`)
-- `ocean_diagnostic_interval`: Interval for ocean diagnostics (default: `"1days"`)
+- `ocean_diagnostic_interval`: Interval for ocean surface diagnostics (default: `"1days"`)
+- `ocean_3d_diagnostic_interval`: Interval for 3D ocean diagnostics (default: `ocean_diagnostic_interval`)
 - `ocean_diagnostic_mode`: Mode for ocean diagnostics (default: `:average`)
 
 Specific details about the default model configuration
@@ -174,11 +176,13 @@ function OceananigansSimulation(
     ocean_grid = :one_deg_tripolar,
     use_intersection_grid = true,
     depth = 5500,
+    Nz = 60,
     dt = 1800.0, # 30 minutes
     comms_ctx = ClimaComms.context(),
     FT_ocean = Float64, # Use Float64 for the ocean to avoid precision issues
     coupled_param_dict = CP.create_toml_dict(FT_ocean),
     ocean_diagnostic_interval = "1days",
+    ocean_3d_diagnostic_interval = ocean_diagnostic_interval,
     ocean_diagnostic_mode = :average,
     extra_kwargs...,
 ) where {FT}
@@ -234,6 +238,7 @@ function OceananigansSimulation(
         simple_ocean,
         closure,
         depth,
+        Nz,
         # need to pass ρ₀ explicitly because it isn't in `Oceananigans.defaults`:
         reference_density = ocean_properties.reference_density,
     )
@@ -266,6 +271,7 @@ function OceananigansSimulation(
         sim;
         output_dir,
         interval = TimeManager.time_to_period(ocean_diagnostic_interval),
+        interval_3d = TimeManager.time_to_period(ocean_3d_diagnostic_interval),
         mode = ocean_diagnostic_mode,
     )
 
@@ -617,9 +623,27 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) =
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:emissivity}) =
     eltype(sim.ocean.model)(0.97)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) =
-    eltype(sim.ocean.model)(0.011)
+    eltype(sim.ocean.model)(0.06)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) =
-    eltype(sim.ocean.model)(0.069)
+    eltype(sim.ocean.model)(0.06)
+
+"""
+    FieldExchanger.import_atmos_fields!(csf, sim::OceananigansSimulation, atmos_sim)
+
+Import `csf.SW_d_diffuse` [W m⁻²], the diffuse part of the downwelling shortwave
+`csf.SW_d`, which open water reflects with its diffuse albedo.
+"""
+function FieldExchanger.import_atmos_fields!(csf, ::OceananigansSimulation, atmos_sim)
+    Interfacer.get_field!(csf.SW_d_diffuse, atmos_sim, Val(:diffuse_fraction))
+    csf.SW_d_diffuse .*= csf.SW_d
+    return nothing
+end
+
+Interfacer.add_coupler_fields!(coupler_field_names, ::OceananigansSimulation) =
+    push!(coupler_field_names, :SW_d_diffuse)
+
+FieldExchanger.accumulated_coupler_fields(::OceananigansSimulation) =
+    (:SW_d, :SW_d_diffuse, :LW_d, :P_liq, :P_snow)
 
 # NOTE: This is 3D, but it will be remapped to 2D
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
@@ -932,9 +956,19 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
         return push_exchange_radiation_to_ocean!(sim, csf)
     end
 
-    # Remap shortwave and longwave onto separate scratch fields
+    # Remap the shortwave and its diffuse part, then overwrite the shortwave with the part
+    # open water absorbs: the direct beam is reflected with the direct albedo and the
+    # diffuse part with the diffuse albedo
+    α_direct = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
+    α_diffuse = Interfacer.get_field(sim, Val(:surface_diffuse_albedo)) # scalar
     Interfacer.remap!(sim.remapping.scratch_field_oc3, csf.SW_d, sim.remapping)
+    Interfacer.remap!(sim.remapping.scratch_field_oc2, csf.SW_d_diffuse, sim.remapping)
     remapped_SW_d = OC.interior(sim.remapping.scratch_field_oc3, :, :, 1)
+    remapped_SW_d_diffuse = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
+    remapped_SW_absorbed = remapped_SW_d # overwritten in place
+    remapped_SW_absorbed .=
+        (1 - α_direct) .* (remapped_SW_d .- remapped_SW_d_diffuse) .+
+        (1 - α_diffuse) .* remapped_SW_d_diffuse
 
     Interfacer.remap!(sim.remapping.scratch_field_oc2, csf.LW_d, sim.remapping)
     remapped_LW_d = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
@@ -942,14 +976,13 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     # Update only the part due to radiative fluxes. For the full update, the component due
     # to latent and sensible heat is missing and will be updated in update_turbulent_fluxes.
     (; σ, C_to_K) = sim.ocean_properties
-    α = Interfacer.get_field(sim, Val(:surface_direct_albedo)) # scalar
     ϵ = Interfacer.get_field(sim, Val(:emissivity)) # scalar
 
     # Compute radiative contribution.
     rad_T_flux = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
     rad_T_flux .=
         (1.0 .- ice_concentration) .* (
-            -(1 - α) .* remapped_SW_d .-
+            .-remapped_SW_absorbed .-
             ϵ * (
                 remapped_LW_d .-
                 σ .* (C_to_K .+ OC.interior(sim.ocean.model.tracers.T, :, :, Nz)) .^ 4
@@ -995,7 +1028,8 @@ NVTX.@annotate function push_exchange_radiation_to_ocean!(sim::OceananigansSimul
     c_p = FT(sim.ocean_properties.heat_capacity)
     σ = FT(sim.ocean_properties.σ)
     C_to_K = FT(sim.ocean_properties.C_to_K)
-    α = FT(Interfacer.get_field(sim, Val(:surface_direct_albedo))) # scalar
+    α_direct = FT(Interfacer.get_field(sim, Val(:surface_direct_albedo))) # scalar
+    α_diffuse = FT(Interfacer.get_field(sim, Val(:surface_diffuse_albedo))) # scalar
     ϵ = FT(Interfacer.get_field(sim, Val(:emissivity))) # scalar
 
     # `update_sim!` runs before `compute_surface_fluxes!` in a coupling step,
@@ -1008,14 +1042,21 @@ NVTX.@annotate function push_exchange_radiation_to_ocean!(sim::OceananigansSimul
     fs.T_sfc .+= C_to_K
     gather_cells_to_polys!(fs.sic, eg, vec(OC.interior(sim.ice_concentration, :, :, 1)))
     gather_nodes_to_polys!(fs.SW_d, eg, se_nodal_vec(csf.SW_d))
+    SW_d_diffuse = fs.scratch2
+    gather_nodes_to_polys!(SW_d_diffuse, eg, se_nodal_vec(csf.SW_d_diffuse))
     gather_nodes_to_polys!(fs.LW_d, eg, se_nodal_vec(csf.LW_d))
     gather_nodes_to_polys!(fs.P_liq, eg, se_nodal_vec(csf.P_liq))
     gather_nodes_to_polys!(fs.P_snow, eg, se_nodal_vec(csf.P_snow))
 
     # TODO: Note, SW radiation penetrates the surface. Right now, we just put
     # everything on the surface, but later we will need to account for this.
+    # The direct beam is reflected with the direct albedo and the diffuse part with the
+    # diffuse albedo.
     @. fs.scratch1 =
-        (1 - fs.sic) * (-(1 - α) * fs.SW_d - ϵ * (fs.LW_d - σ * fs.T_sfc^4)) / (ρ_ref * c_p)
+        (1 - fs.sic) * (
+            -(1 - α_direct) * (fs.SW_d - SW_d_diffuse) - (1 - α_diffuse) * SW_d_diffuse -
+            ϵ * (fs.LW_d - σ * fs.T_sfc^4)
+        ) / (ρ_ref * c_p)
     rad_cells = vec(OC.interior(remapping.scratch_field_oc3, :, :, 1))
     scatter_polys_to_cells!(rad_cells, eg, fs.scratch1)
     mirror_fold_partners!(rad_cells, grid)

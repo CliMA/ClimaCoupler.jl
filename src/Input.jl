@@ -281,6 +281,14 @@ function argparse_settings()
         help = "Horizontal grid for Oceananigans ocean model. [`one_deg_tripolar` (default), `orca`]"
         arg_type = String
         default = "one_deg_tripolar"
+        "--ocean_float_type"
+        help = "Float type of the Oceananigans ocean model. [`Float64` (default), `Float32`]"
+        arg_type = String
+        default = "Float64"
+        "--ocean_vertical_levels"
+        help = "Number of vertical levels of the Oceananigans ocean model. [`60` (default)]"
+        arg_type = Int
+        default = 60
         "--use_intersection_grid"
         help = "Boolean flag indicating whether to use the atmosphere-ocean intersection (exchange) grid for surface fractions and ocean/sea-ice fluxes with Oceananigans. Automatically disabled for unsupported setups (column mode, distributed runs). [`true` (default), `false`]"
         arg_type = Bool
@@ -294,9 +302,13 @@ function argparse_settings()
         arg_type = String
         default = "never"
         "--ocean_diagnostic_interval"
-        help = "Time interval between ocean diagnostic outputs [\"1days\" (default), allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\"]"
+        help = "Time interval between ocean surface diagnostic outputs [\"1days\" (default), allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Nmonths\"]"
         arg_type = String
         default = "1days"
+        "--ocean_3d_diagnostic_interval"
+        help = "Time interval between 3D ocean diagnostic outputs [`ocean_diagnostic_interval` (default), same formats]"
+        arg_type = String
+        default = nothing
         "--ocean_diagnostic_mode"
         help = "Reduction mode for ocean diagnostic outputs. [`average` (default) uses `AveragedTimeInterval`, `instantaneous` uses `TimeInterval`]"
         arg_type = String
@@ -605,10 +617,14 @@ function get_coupler_args(config_dict::Dict)
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
     simple_ocean = config_dict["simple_ocean"]
     ocean_grid = Symbol(lowercase(config_dict["ocean_grid"]))
+    ocean_float_type = config_dict["ocean_float_type"] == "Float64" ? Float64 : Float32
+    ocean_vertical_levels = config_dict["ocean_vertical_levels"]
     use_intersection_grid = config_dict["use_intersection_grid"]
     sst_adjustment = FT(config_dict["sst_adjustment"])
     ocean_progress_interval = config_dict["ocean_progress_interval"]
     ocean_diagnostic_interval = config_dict["ocean_diagnostic_interval"]
+    ocean_3d_diagnostic_interval =
+        something(config_dict["ocean_3d_diagnostic_interval"], ocean_diagnostic_interval)
     ocean_diagnostic_mode = Symbol(config_dict["ocean_diagnostic_mode"])
 
     # Ice model-specific information
@@ -697,10 +713,13 @@ function get_coupler_args(config_dict::Dict)
         ocean_model,
         simple_ocean,
         ocean_grid,
+        ocean_float_type,
+        ocean_vertical_levels,
         use_intersection_grid,
         sst_adjustment,
         ocean_progress_interval,
         ocean_diagnostic_interval,
+        ocean_3d_diagnostic_interval,
         ocean_diagnostic_mode,
         ice_model,
         seaice_diagnostic_interval,

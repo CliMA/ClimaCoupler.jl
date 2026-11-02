@@ -82,11 +82,7 @@ value = 100
 type = "float"
 
 [sgs_variance_horizontal_scale_factor]
-value = 1.5
-type = "float"
-
-[sgs_variance_vertical_scale_factor]
-value = 0.5
+value = 1.8
 type = "float"
 
 [condensation_evaporation_timescale]

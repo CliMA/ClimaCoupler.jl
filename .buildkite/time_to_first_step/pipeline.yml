@@ -1,0 +1,52 @@
+agents:
+  queue: clima
+  slurm_time: 04:00:00
+  modules: climacommon/2025_05_15
+
+env:
+  JULIA_MAX_NUM_PRECOMPILE_FILES: 100
+  SLURM_KILL_BAD_EXIT: 1
+
+# Time to first step for the flagship AMIP simulation. See .buildkite/README.md.
+
+steps:
+  - label: "Time to first step: flagship AMIP"
+    key: "ttfs_amip"
+    command:
+      - "bash .buildkite/time_to_first_step/measure.sh ttfs_amip"
+      - "buildkite-agent annotate --style info --context ttfs_amip < output/ttfs_amip/artifacts/time_to_first_step.md"
+    artifact_paths:
+      - "output/ttfs_amip/artifacts/*"
+      - "experiments/AMIP_ttfs_amip/Manifest*.toml"
+    env: &ttfs_env
+      CLIMACOMMS_DEVICE: "CUDA"
+      JULIA_NUM_PRECOMPILE_TASKS: 8
+    agents: &ttfs_agents
+      slurm_gpus_per_task: 1
+      slurm_cpus_per_task: 8
+      slurm_ntasks: 1
+      slurm_mem: 30GB
+
+  - label: "Time to first step: flagship AMIP, upstream main"
+    key: "ttfs_amip_baseline"
+    if: build.env("UPSTREAM_PACKAGES") != null
+    command: "bash .buildkite/time_to_first_step/measure.sh ttfs_amip_baseline --main"
+    artifact_paths:
+      - "output/ttfs_amip_baseline/artifacts/*"
+      - "experiments/AMIP_ttfs_amip_baseline/Manifest*.toml"
+    env: *ttfs_env
+    agents: *ttfs_agents
+
+  - label: "Compare time to first step with upstream main"
+    if: build.env("UPSTREAM_PACKAGES") != null
+    depends_on:
+      - "ttfs_amip"
+      - "ttfs_amip_baseline"
+    command: |
+      buildkite-agent artifact download "output/ttfs_amip*/artifacts/time_to_first_step.csv" .
+      status=0
+      julia --startup-file=no .buildkite/time_to_first_step/compare.jl output/ttfs_amip_baseline/artifacts/time_to_first_step.csv output/ttfs_amip/artifacts/time_to_first_step.csv comparison.md || status=$$?
+      style=$$([ $$status -eq 0 ] && echo info || echo error)
+      buildkite-agent annotate --style $$style --context ttfs_amip < comparison.md
+      exit $$status
+    artifact_paths: "comparison.md"

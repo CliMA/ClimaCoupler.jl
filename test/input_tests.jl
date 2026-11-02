@@ -100,6 +100,7 @@ end
         "era5_initial_condition_dir" => nothing,
         "ocean_model" => "prescribed",
         "ocean_diagnostic_interval" => "1days",
+        "ocean_3d_diagnostic_interval" => nothing,
         "ocean_diagnostic_mode" => "average",
         "seaice_diagnostic_interval" => "1days",
         "seaice_diagnostic_mode" => "average",
@@ -107,6 +108,8 @@ end
         "simple_ocean" => false,
         "use_intersection_grid" => true,
         "ocean_grid" => "one_deg_tripolar",
+        "ocean_float_type" => "Float64",
+        "ocean_vertical_levels" => 60,
         "sst_adjustment" => 2.0,
         "ice_model" => "prescribed",
         "ocean_progress_interval" => "1days",
@@ -168,6 +171,9 @@ end
     config_dict["walltime_dt"] = "never"
     @test Input.get_coupler_args(config_dict).walltime_dt == "never"
     delete!(config_dict, "walltime_dt") # undo
+
+    # If unspecified, ocean_3d_diagnostic_interval falls back to ocean_diagnostic_interval
+    @test args.ocean_3d_diagnostic_interval == "1days"
 
     # walltime_debug is off by default and passed through when set
     @test args.walltime_debug == false

@@ -259,6 +259,33 @@ function Interfacer.get_field(sim::BucketSimulation, ::Val{:water})
     return sim.integrator.p.bucket.total_water .* ρ_cloud_liq # kg water / m2
 end
 
+"""
+    Interfacer.progress(land_sim::BucketSimulation, cs)
+
+Extension of `Interfacer.progress` for the bucket land model.
+
+Output some useful stats with a frequency determined by the `land_progress_interval`
+config option.
+"""
+function Interfacer.progress(land_sim::BucketSimulation, cs)
+    (; u, p) = land_sim.integrator
+    F_turb = p.bucket.turbulent_fluxes.lhf .+ p.bucket.turbulent_fluxes.shf
+
+    (T_sfc_min, T_sfc_max) = (minimum(p.bucket.T_sfc), maximum(p.bucket.T_sfc))
+    (W_min, W_max) = (minimum(u.bucket.W), maximum(u.bucket.W))
+    σS_max = maximum(u.bucket.σS)
+    (F_turb_min, F_turb_max) = (minimum(F_turb), maximum(F_turb))
+
+    if ClimaComms.iamroot(ClimaComms.context(cs))
+        @info "Land | time: $(Interfacer.current_date(cs, land_sim.integrator.t)), iteration: $(land_sim.integrator.step), " *
+              "extrema(T_sfc): ($(round(T_sfc_min, digits = 2)), $(round(T_sfc_max, digits = 2))) K, " *
+              "extrema(W): ($(round(W_min, sigdigits = 3)), $(round(W_max, sigdigits = 3))) m, " *
+              "maximum(σS): $(round(σS_max, sigdigits = 3)) m, " *
+              "extrema(F_turb): ($(round(F_turb_min, sigdigits = 3)), $(round(F_turb_max, sigdigits = 3))) W/m²"
+    end
+    return nothing
+end
+
 function Interfacer.update_field!(
     sim::BucketSimulation,
     ::Val{:liquid_precipitation},

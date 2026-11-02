@@ -10,7 +10,6 @@ import Insolation
 import StaticArrays as SA
 import Dates
 import ClimaComms
-import ClimaDiagnostics as CD
 import ..Checkpointer, ..FieldExchanger, ..Interfacer, ..TimeManager
 
 """
@@ -128,10 +127,7 @@ function PrescribedOceanSimulation(
 
     # Create a schedule to update the SST daily. The data provides monthly
     # averages, so it doesn't make sense to update the SST more frequently than daily.
-    SST_schedule = CD.Schedules.EveryCalendarDtSchedule(
-        TimeManager.time_to_period("1days");
-        start_date,
-    )
+    SST_schedule = TimeManager.calendar_dt_schedule("1days", start_date, t_start)
 
     # COARE3 roughness params (allocated once, reused each timestep)
     coare3_roughness_params = CC.Fields.Field(SF.COARE3RoughnessParams{FT}, boundary_space)

@@ -2,7 +2,7 @@
 
 julia_version = "1.10.11"
 manifest_format = "2.0"
-project_hash = "eda230be9b4e2e56ebf52df858ccb023d375f72c"
+project_hash = "3ee5832b99d1f9ad9d3c98966e2f25d0a00a0900"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -479,7 +479,7 @@ weakdeps = ["CUDA", "Krylov", "Makie", "RecipesBase"]
 deps = ["ArgParse", "ClimaAnalysis", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaInitialConditions", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "Insolation", "Interpolations", "JLD2", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "Random", "SparseArrays", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "YAML"]
 path = "../.."
 uuid = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
-version = "0.2.3"
+version = "0.3.0"
 weakdeps = ["Adapt", "CairoMakie", "ClimaAtmos", "ClimaLand", "ClimaSeaIce", "ConservativeRegridding", "GeoMakie", "KernelAbstractions", "Makie", "Oceananigans", "Poppler_jll", "Printf"]
 
     [deps.ClimaCoupler.extensions]

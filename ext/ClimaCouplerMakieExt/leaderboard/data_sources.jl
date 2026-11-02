@@ -1,6 +1,5 @@
 import ClimaAnalysis
 import ClimaUtilities.ClimaArtifacts: @clima_artifact
-import ClimaDiagnostics as CD
 
 """
     get_compare_vars_biases_groups()
@@ -141,12 +140,6 @@ function get_sim_var_in_pfull_dict(diagnostics_folder_path)
                     (ClimaAnalysis.units(sim_var) == "kg kg^-1") &&
                         (sim_var = ClimaAnalysis.set_units(sim_var, "unitless"))
 
-                    # For ClimaDiagnostics v0.3 and later, the dates are saved at
-                    # the start of the reduction period
-                    pkgversion(CD) < v"0.3" && (
-                        sim_var =
-                            ClimaAnalysis.shift_to_start_of_previous_month(sim_var)
-                    )
                     return sim_var
                 end
         )

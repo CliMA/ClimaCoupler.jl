@@ -109,3 +109,11 @@ git-tree-sha1 = "bc3ca2024cc0f2f918fd2685615a9382908fbbe4"
     [[tripolar_one_degree_bathymetry.download]]
     sha256 = "4ead74da0626f260ded7e2b9797af810d11e6cd774ca4bd25668f6a1f2059c89"
     url = "https://caltech.box.com/shared/static/1e4cvzlyqglursxsh8ca2km1v04eolvg.gz"
+
+[era5_atmos_initial_conditions_2010_01]
+git-tree-sha1 = "e662fc4393c0bd0cb688337896dcf4467e77a437"
+lazy = true
+
+    [[era5_atmos_initial_conditions_2010_01.download]]
+    sha256 = "c0d4781aab640b8703a78b4aa8fa71962dd998f9aa77241a4f49351b7d4191cc"
+    url = "https://caltech.box.com/shared/static/wb3a4ms9dsw0ma6ck95x4oxrj42nnj79.gz"

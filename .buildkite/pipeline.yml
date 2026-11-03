@@ -63,7 +63,7 @@ steps:
       - "julia -O0 --project=test/ -e 'using Pkg; Pkg.status()'"
 
     concurrency: 1
-    concurrency_group: 'depot/climacoupler-ci'
+    concurrency_group: 'depot/${BUILDKITE_PIPELINE_SLUG}'
     agents:
       slurm_cpus_per_task: 12
       slurm_gpus: 1

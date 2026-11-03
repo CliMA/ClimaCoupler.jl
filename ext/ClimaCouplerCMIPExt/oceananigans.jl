@@ -607,9 +607,9 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) =
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:emissivity}) =
     eltype(sim.ocean.model)(0.97)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) =
-    eltype(sim.ocean.model)(0.011)
+    eltype(sim.ocean.model)(0.06)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) =
-    eltype(sim.ocean.model)(0.069)
+    eltype(sim.ocean.model)(0.06)
 
 """
     FieldExchanger.import_atmos_fields!(csf, sim::OceananigansSimulation, atmos_sim)

@@ -71,7 +71,7 @@ value = 0.0
 value = 1.8
 
 [condensation_evaporation_timescale]
-value = 100
+value = 10
 
 [sublimation_deposition_timescale]
 value = 3600

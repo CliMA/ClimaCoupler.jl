@@ -3,6 +3,7 @@ atmos_progress_interval: "200secs"
 conservation_softfail: true
 dt: "200secs"
 dt_cpl: "200secs"
+dz_top: 6350.0
 energy_check: true
 evolving_ocean: false
 h_elem: 4

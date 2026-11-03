@@ -865,8 +865,8 @@ Base.eltype(::FakeOceanModel) = FT
     FieldExchanger.update_sim!(sim, csf)
 
     (; reference_density, heat_capacity, σ, C_to_K) = ocean_properties
-    α_direct = FT(0.011) # `Val(:surface_direct_albedo)`
-    α_diffuse = FT(0.069) # `Val(:surface_diffuse_albedo)`
+    α_direct = FT(0.06) # `Val(:surface_direct_albedo)`
+    α_diffuse = FT(0.06) # `Val(:surface_diffuse_albedo)`
     ϵ = FT(0.97)  # `Val(:emissivity)`
     SW_absorbed = (1 - α_direct) * (SW_d - SW_d_diffuse) + (1 - α_diffuse) * SW_d_diffuse
     expected_T =

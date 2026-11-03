@@ -5,6 +5,7 @@ coupler_toml: ["toml/amip_edonly.toml"]
 dt: "180secs"
 dt_cpl: "180secs"
 dz_bottom: 100.0
+dz_top: 4300.0
 energy_check: false
 h_elem: 4
 checkpoint_dt: "720hours"

@@ -1,6 +1,5 @@
 aerosol_radiation: true
 approximate_linear_solve_iters: 2
-cloud_liquid_formation: ImplicitCloudLiquidFormation
 cloud_model: "quadrature"
 dt: "120secs"
 dt_cloud_fraction: "1hours"

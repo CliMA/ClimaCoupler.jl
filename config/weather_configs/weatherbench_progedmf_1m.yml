@@ -15,6 +15,7 @@ dt_seaice: "50secs"
 energy_check: false
 h_elem: 30
 dz_bottom: 30.0
+dz_top: 1500.0
 z_elem: 130
 z_max: 70000.0
 

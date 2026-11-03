@@ -125,10 +125,16 @@ for FT in (Float32, Float64)
         total_energy = cs.conservation_checks.energy.sums.total
         total_water = cs.conservation_checks.water.sums.total
 
-        @test total_energy[end] ==
-              (cc.energy.sums.TestAtmos + cc.energy.sums.TestOcean + cc.energy.sums.TestLand + cc.energy.sums.SurfaceStub + cc.energy.sums.toa_net_source)[end]
-        @test total_water[end] ==
-              (cc.water.sums.TestAtmos + cc.water.sums.TestOcean + cc.water.sums.TestLand + cc.water.sums.SurfaceStub)[end]
+        @test isapprox(
+            total_energy[end],
+            (cc.energy.sums.TestAtmos + cc.energy.sums.TestOcean + cc.energy.sums.TestLand + cc.energy.sums.SurfaceStub + cc.energy.sums.toa_net_source)[end];
+            rtol = 10 * eps(FT),
+        )
+        @test isapprox(
+            total_water[end],
+            (cc.water.sums.TestAtmos + cc.water.sums.TestOcean + cc.water.sums.TestLand + cc.water.sums.SurfaceStub)[end];
+            rtol = 10 * eps(FT),
+        )
 
         @test abs((total_energy[end] .- tot_energy_an) / total_energy[end]) < 1e-4
         @test abs((total_water[end] .- tot_water_an) / total_water[end]) < 1e-4

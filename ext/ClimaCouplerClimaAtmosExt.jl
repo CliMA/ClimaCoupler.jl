@@ -33,6 +33,8 @@ import ClimaCoupler:
     Input,
     Models
 import ClimaUtilities.TimeManager: ITime, date
+import ClimaUtilities.ClimaArtifacts: @clima_artifact
+import LazyArtifacts
 import ClimaComms
 
 ###
@@ -650,6 +652,8 @@ This function makes the following changes to `coupler_config` when creating `atm
 - Setting the atmos output directory to the provided `atmos_output_dir`
 - Adding extra atmosphere diagnostics
 - Manually setting the restart file suffix
+- Reading a `WeatherModel` initial condition for 2010-01-01 00:00 UTC from the downloadable
+  `era5_atmos_initial_conditions_2010_01` artifact when no `era5_initial_condition_dir` is given
 
 The TOML parameter file to use is chosen using the following priority:
 If a coupler TOML file is provided, it is used.
@@ -718,6 +722,13 @@ function get_atmos_config_dict(
     if !isnothing(atmos_config["restart_file"])
         atmos_config["restart_file"] =
             replace(atmos_config["restart_file"], "active" => "0000")
+    end
+
+    if get(atmos_config, "initial_condition", nothing) == "WeatherModel" &&
+       isnothing(atmos_config["era5_initial_condition_dir"]) &&
+       CA.parse_date(atmos_config["start_date"]) == CA.parse_date("20100101")
+        atmos_config["era5_initial_condition_dir"] =
+            @clima_artifact("era5_atmos_initial_conditions_2010_01", comms_ctx)
     end
 
     # Construct the AtmosConfig object

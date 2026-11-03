@@ -4,6 +4,11 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Downloadable ERA5 initial condition for 2010-01-01
+A `WeatherModel` atmosphere initial condition starting at 2010-01-01 00:00 UTC now reads the downloadable
+`era5_atmos_initial_conditions_2010_01` artifact when no `era5_initial_condition_dir` is given. It holds the same
+data as the file of the same name in `wxquest_initial_conditions`, which cannot be downloaded.
+
 #### Set `dz_top` for the stretched atmosphere grids
 ClimaAtmos stretches vertical grids with ClimaCore's two-scale
 `BoundaryLayerHyperbolicTangentStretching` (CliMA/ClimaAtmos.jl#4949), which admits a range of

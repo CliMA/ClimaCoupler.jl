@@ -4,6 +4,20 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Set `dz_top` for the stretched atmosphere grids
+ClimaAtmos stretches vertical grids with ClimaCore's two-scale
+`BoundaryLayerHyperbolicTangentStretching` (CliMA/ClimaAtmos.jl#4949), which admits a range of
+`z_elem` set by `dz_bottom`, `dz_top` (3000 m by default), `z_pbl`, and `z_max`. The configs whose
+grids lie outside that range for the default `dz_top` now set `dz_top` just above the top spacing
+the single-scale stretching gives them, which keeps their grids close to their current spacing.
+ClimaAtmos versions without the two-scale stretching ignore the key.
+
+#### Non-negative control-volume weights for exchange-grid fluxes
+- [#2152](https://github.com/CliMA/ClimaCoupler.jl/pull/2152): The polygon → SE-node scatter
+  weights each polygon by its area inside control volumes around the nodes, so masked flux
+  transfers stay bounded without the flux clamp or `cov_cutoff`. The wet, sea-ice and
+  open-ocean area fractions are the DSS'd coverages of these weights.
+
 #### Add ocean config options
 New `ocean_float_type` (`Float64` by default) and `ocean_vertical_levels` (60 by default) options set the
 Oceananigans float type and number of levels.

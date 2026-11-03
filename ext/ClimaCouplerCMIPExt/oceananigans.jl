@@ -619,10 +619,10 @@ function FieldExchanger.import_atmos_fields!(csf, ::OceananigansSimulation, atmo
 end
 
 Interfacer.add_coupler_fields!(coupler_field_names, ::OceananigansSimulation) =
-    push!(coupler_field_names, :SW_d_diffuse)
+    push!(coupler_field_names, :SW_d_diffuse, :F_runoff)
 
 FieldExchanger.accumulated_coupler_fields(::OceananigansSimulation) =
-    (:SW_d, :SW_d_diffuse, :LW_d, :P_liq, :P_snow)
+    (:SW_d, :SW_d_diffuse, :LW_d, :P_liq, :P_snow, :F_runoff)
 
 # NOTE: This is 3D, but it will be remapped to 2D
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
@@ -902,8 +902,8 @@ end
 Update the ocean simulation with the provided fields, which have been filled in
 by the coupler.
 
-Update the portion of the surface_fluxes for T and S that is due to radiation and
-precipitation. The rest will be updated in `update_turbulent_fluxes!`.
+Update the portion of the surface_fluxes for T and S that is due to radiation,
+precipitation, and land runoff. The rest will be updated in `update_turbulent_fluxes!`.
 
 This function sets the surface fluxes directly, overwriting any previous values.
 Additional contributions will be made in `update_turbulent_fluxes!` and `ocean_seaice_fluxes!`.
@@ -976,12 +976,17 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     Interfacer.remap!(sim.remapping.scratch_field_oc2, csf.P_snow, sim.remapping) # snow precipitation
     remapped_P_snow = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
 
-    # Rain drains through ice while snow can accumulate there (see the sea-ice `update_sim!`)
-    ocean_precipitation = remapped_P_liq .+ (1.0 .- ice_concentration) .* remapped_P_snow
+    Interfacer.remap!(sim.remapping.scratch_field_oc3, csf.F_runoff, sim.remapping) # runoff
+    remapped_runoff = OC.interior(sim.remapping.scratch_field_oc3, :, :, 1)
+
+    # Rain and runoff drain through ice while snow can accumulate there. Runoff is
+    # positive into the ocean, precipitation negative.
+    freshwater_flux =
+        remapped_P_liq .+ (1.0 .- ice_concentration) .* remapped_P_snow .- remapped_runoff
 
     # Note the negative sign here to account for the sign change from precipitation to salinity flux
     OC.interior(oc_flux_S, :, :, 1) .-=
-        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* ocean_precipitation ./
+        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* freshwater_flux ./
         reference_density
     return nothing
 end
@@ -990,9 +995,10 @@ end
     push_exchange_radiation_to_ocean!(sim::OceananigansSimulation, csf)
 
 Exchange-grid form of the radiative and freshwater part of
-[`FieldExchanger.update_sim!`](@ref): gather the downwelling radiation and
-precipitation onto the polygons, weight them by the open-water fraction
-`(1 - SIC)` *per polygon*, and scatter the result onto the tracer flux BCs.
+[`FieldExchanger.update_sim!`](@ref): gather the downwelling radiation,
+precipitation, and runoff onto the polygons, weight radiation and snow by the
+open-water fraction `(1 - SIC)` *per polygon*, and scatter the result onto the
+tracer flux BCs.
 Only wet polygons exist, so dry cells receive exactly nothing. Assumes the 
 tracer flux BCs have just been zeroed.
 """
@@ -1042,10 +1048,13 @@ NVTX.@annotate function push_exchange_radiation_to_ocean!(sim::OceananigansSimul
     oc_flux_T = surface_flux(sim.ocean.model.tracers.T)
     OC.interior(oc_flux_T, :, :, 1) .+= OC.interior(remapping.scratch_field_oc3, :, :, 1)
 
-    # Rain drains through ice while snow can accumulate there (see the sea-ice
-    # `update_sim!`). Note the negative sign below to account for the sign
-    # change from precipitation to salinity flux.
-    @. fs.scratch1 = (fs.P_liq + (1 - fs.sic) * fs.P_snow) / ρ_ref
+    runoff = fs.scratch2
+    gather_nodes_to_polys!(runoff, eg, se_nodal_vec(csf.F_runoff))
+
+    # Rain and runoff drain through ice while snow can accumulate there. Runoff is
+    # positive into the ocean, precipitation negative. Note the negative sign below
+    # to account for the sign change from precipitation to salinity flux.
+    @. fs.scratch1 = (fs.P_liq + (1 - fs.sic) * fs.P_snow - runoff) / ρ_ref
     precip_cells = vec(OC.interior(remapping.scratch_field_oc3, :, :, 1))
     scatter_polys_to_cells!(precip_cells, eg, fs.scratch1)
     mirror_fold_partners!(precip_cells, grid)

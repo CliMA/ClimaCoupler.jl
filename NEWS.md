@@ -4,16 +4,19 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
-#### Temperature-dependent sea-ice surface albedo and zero-allocation surface albedo updates
-`PrescribedIceSimulation` diagnoses its broadband surface albedo `p.α_ice` at coupling-step
-boundaries from a linear melt-pond temperature ramp (`ice_surface_albedo`) between cold snow-covered
-sea ice (`α_cold = 0.78` for `T_sfc ≤ T_freeze - ΔT_melt`, `ΔT_melt = 3 K`) and melting ponded summer
-ice (`α_melt = 0.55` at `T_sfc = T_freeze`), replacing the constant `IceSlabParameters.α` field. Both
-`ice_rhs!` and `Interfacer.get_field` for `:surface_direct_albedo` and `:surface_diffuse_albedo` read
-the cached `p.α_ice` field so the slab energy balance and coupler exchange use the same albedo across
-all Runge-Kutta stages. `PrescribedOceanSimulation` caches `insolation_params` from `coupled_param_dict`
-and a `ClimaAtmos.RegressionFunctionAlbedo{FT}(; R_sub)` instance (`ocean_subsurface_reflectance = 0.007`
-by default), and `ice_rhs!` and `Interfacer.set_albedos!(::PrescribedOceanSimulation, t)` fuse their
+#### Temperature-dependent sea-ice albedo and zero-allocation albedo updates
+`PrescribedIceSimulation` diagnoses its broadband surface albedo `p.α_ice` at
+coupling-step boundaries from a linear melt-pond temperature ramp
+(`ice_surface_albedo`) between cold snow-covered sea ice (`α_cold = 0.78` for
+`T_sfc ≤ T_freeze - ΔT_melt`, `ΔT_melt = 3 K`) and melting ponded summer ice
+(`α_melt = 0.55` at `T_sfc = T_freeze`). Both `ice_rhs!` and
+`Interfacer.get_field` for `:surface_direct_albedo` and
+`:surface_diffuse_albedo` read the cached `p.α_ice` field so the slab energy
+balance and coupler exchange use the same albedo across all Runge-Kutta stages.
+`PrescribedOceanSimulation` caches `insolation_params` from
+`coupled_param_dict` and a `ClimaAtmos.RegressionFunctionAlbedo{FT}(; R_sub)`
+instance (`ocean_subsurface_reflectance = 0.007` by default), and `ice_rhs!`
+and `Interfacer.set_albedos!(::PrescribedOceanSimulation, t)` fuse their
 broadcasts in-place with zero heap allocations.
 
 #### Set `dz_top` for the stretched atmosphere grids

@@ -245,12 +245,12 @@ for FT in (Float32, Float64)
         α_before_step = copy(Array(parent(sim.integrator.p.α_ice)))
         T_before_step = copy(Array(parent(sim.integrator.u.T_bulk)))
 
-        # Stepping the ODE integrator directly runs all RK4 stages; p.α_ice must remain invariant
+        # Direct ODE step runs all RK4 stages; p.α_ice remains invariant
         CTS.step!(sim.integrator, 50.0, true)
         @test Array(parent(sim.integrator.u.T_bulk)) != T_before_step
         @test Array(parent(sim.integrator.p.α_ice)) == α_before_step
 
-        # Stepping through Interfacer.step! refreshes p.α_ice at the coupling-step boundary
+        # Interfacer.step! refreshes p.α_ice at the coupling-step boundary
         Interfacer.step!(sim, 100.0)
         @test Array(parent(sim.integrator.p.α_ice)) != α_before_step
         expected_α = Models.ice_surface_albedo.(

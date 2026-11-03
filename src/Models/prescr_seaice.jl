@@ -71,7 +71,8 @@ Initialize the `IceSlabParameters` object with the coupled parameters.
 - `z0b`: roughness length for tracers [m] (default: 1e-4)
 - `T_freeze`: freezing temperature of sea water [K] (default: 271.2)
 - `k_ice`: thermal conductivity of sea ice [W / m / K] (default: 2)
-- `α_cold`: cold snow-covered sea-ice albedo for `T_sfc ≤ T_freeze - ΔT_melt` (default: 0.78)
+- `α_cold`: cold snow-covered sea-ice albedo for `T_sfc ≤ T_freeze - ΔT_melt`
+  (default: 0.78)
 - `α_melt`: melting ponded sea-ice albedo at `T_sfc = T_freeze` (default: 0.55)
 - `ΔT_melt`: melt-ramp width below `T_freeze` [K] (default: 3)
 - `ϵ`: emissivity of sea ice (default: 1)
@@ -359,9 +360,9 @@ end
 """
     ice_surface_albedo(T_sfc, T_freeze, ΔT_melt, α_cold, α_melt)
 
-Sea-ice broadband surface albedo as a continuous linear ramp between cold snow-covered
-sea ice (`α_cold` for `T_sfc ≤ T_freeze - ΔT_melt`) and melting ponded summer ice
-(`α_melt` at `T_sfc = T_freeze`).
+Sea-ice broadband surface albedo as a continuous linear ramp between cold
+snow-covered sea ice (`α_cold` for `T_sfc ≤ T_freeze - ΔT_melt`) and melting
+ponded summer ice (`α_melt` at `T_sfc = T_freeze`).
 """
 function ice_surface_albedo(
     T_sfc::FT,
@@ -513,13 +514,15 @@ end
 ###
 
 """
-    ice_energy_balance_tendency(T_bulk, area_fraction, F_turb_energy, SW_d, LW_d, α_ice, params, dt)
+    ice_energy_balance_tendency(
+        T_bulk, area_fraction, F_turb_energy, SW_d, LW_d, α_ice, params, dt,
+    )
 
-Pointwise slab sea-ice bulk temperature tendency [K/s] from the surface and basal
-energy balance, masked to zero in ice-free grid cells and bounded so `T_bulk` does
-not exceed `T_freeze` over `dt`. Because ice thickness is prescribed rather than
-prognosed, the `T_freeze` cap discards surplus melt energy (and a lower `α_melt`
-increases the absorbed solar energy discarded at the cap).
+Pointwise slab sea-ice bulk temperature tendency [K/s] from the surface and
+basal energy balance, masked to zero in ice-free grid cells and bounded so
+`T_bulk` does not exceed `T_freeze` over `dt`. Because ice thickness is
+prescribed, the `T_freeze` cap discards surplus melt energy (and a lower
+`α_melt` increases the absorbed solar energy discarded at the cap).
 """
 function ice_energy_balance_tendency(
     T_bulk::FT,
@@ -554,8 +557,8 @@ Rhs method in the form as required by `ClimeTimeSteppers`, with the tendency vec
 the state vector `Y`, the parameter vector `p`, and the simulation time `t` as input arguments.
 
 This sea-ice energy formulation follows [Holloway and Manabe 1971](https://journals.ametsoc.org/view/journals/mwre/99/5/1520-0493_1971_099_0335_socbag_2_3_co_2.xml?tab_body=pdf),
-where sea-ice concentrations and thicknes are prescribed, and the model solves
-for temperature (curbed at the freezing point, which discards surplus melt energy).
+where sea-ice concentrations and thickness are prescribed, and the model solves
+for temperature (curbed at the freezing point, discarding surplus melt energy).
 """
 function ice_rhs!(dY, Y, p, t)
     FT = eltype(Y)

@@ -824,7 +824,7 @@ Models.ocean_albedo_model(::Type{FT}, R_sub::FT = FT(0.007)) where {FT <: Abstra
 
 function ocean_cos_zenith(current_date, lat::FT, lon::FT, insolation_params) where {FT}
     (; μ) = Insolation.insolation(current_date, lat, lon, insolation_params)
-    # Clamp cosine of solar zenith angle above zero so fluxes_test remains well-defined at night
+    # Clamp cos(zenith) above zero so fluxes_test stays well-defined at night
     return max(μ, eps(FT))
 end
 

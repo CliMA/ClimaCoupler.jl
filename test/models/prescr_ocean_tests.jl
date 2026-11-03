@@ -86,7 +86,7 @@ end
           ClimaAtmos.RegressionFunctionAlbedo{FT}(; R_sub = FT(0.007))
     @test !isnothing(sim.cache.SST_timevaryinginput)
 
-    # Test that custom coupled_param_dict solar constant and ocean_subsurface_reflectance propagate into cache
+    # Custom solar constant and ocean_subsurface_reflectance propagate to cache
     custom_param_dict = CP.create_toml_dict(FT)
     custom_param_dict.data["total_solar_irradiance"]["value"] = FT(1365.0)
     sim_custom = Models.PrescribedOceanSimulation(
@@ -125,7 +125,7 @@ end
     @test !restarted_sim.cache.SST_schedule((; t = day + 120))
     @test restarted_sim.cache.SST_schedule((; t = 2 * day))
 
-    # Test `Interfacer.set_albedos!` and verify zero CPU heap allocations via @noinline wrapper
+    # Test `Interfacer.set_albedos!` and zero CPU allocations via @noinline
     @noinline call_set_albedos!(s, t) = (Interfacer.set_albedos!(s, t); nothing)
     call_set_albedos!(sim, 0.0)
     @test (@allocated call_set_albedos!(sim, 0.0)) == 0

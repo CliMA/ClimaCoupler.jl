@@ -1,8 +1,14 @@
-# Resolution-aware subgrid variance (default 1/12) weakened for the thick levels of the coarse atmosphere
+# Resolution-aware subgrid variance (default 1/12) 
 [sgs_variance_geometric_coeff]
 value = 0.0026041666666666665
 type = "float"
 
+# Velocity of the unresolved vertical motions in the subgrid variance (default 1.08 m/s at 120 km)
+[sgs_variance_vertical_velocity_floor]
+value = 0.2
+type = "float"
+
+# Cloud droplet number (default 100e6)
 [prescribed_cloud_droplet_number_concentration]
-value = 150e6
+value = 300e6
 type = "float"

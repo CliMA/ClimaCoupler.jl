@@ -11,6 +11,7 @@ dz_top: 6350.0
 hyperdiff: "CAM_SE"
 tracer_nonnegativity_method: "vertical_water_borrowing"
 rad: "allsky"
+cloud_inhomogeneity_in_sw_radiation: false
 prescribed_aerosols: []
 aerosol_radiation: false
 time_varying_trace_gases: []

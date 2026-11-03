@@ -31,11 +31,12 @@ config_file = Input.parse_commandline(Input.argparse_settings())["config_file"]
 cs = CoupledSimulation(config_file)
 
 # Run two steps to trigger precompilation, then profile three steps
-step!(cs);
-step!(cs);
+for _ in 1:18
+    step!(cs)
+end
 GC.gc()
 CUDA.@profile external = true begin
-    for _ in 1:3
+    for _ in 1:7
         step!(cs)
     end
 end

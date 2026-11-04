@@ -183,7 +183,7 @@ function Plotting.compute_leaderboard(
             )
         end
     end
-    print_rmses(rmse_var_dict)
+    write_rmses(joinpath(leaderboard_base_path, "leaderboard_rmse.csv"), rmse_var_dict)
 
     # Plot box plots
     fig_leaderboard =
@@ -211,33 +211,42 @@ function Plotting.compute_leaderboard(
 end
 
 """
-    print_rmses(rmse_var_dict)
+    write_rmses(path, rmse_var_dict)
 
-Print the global RMSE of CliMA and the median and best RMSE of the other models for each
-variable and season in `rmse_var_dict`, so the numbers behind the leaderboard plot can be
-tracked over time from the logs.
+Write the global RMSE of CliMA and the median and best RMSE of the other models for each
+variable and season in `rmse_var_dict` to the CSV file `path`, so the numbers behind the
+leaderboard plot can be followed as a time series across runs.
 
-Each line starts with `LEADERBOARD` followed by `key=value` pairs, e.g.,
-`LEADERBOARD short_name=pr season=ANN rmse=1.2 other_models_median_rmse=1.4
-other_models_best_rmse=0.9 n_other_models=40 units="mm / day"` (on one line). RMSEs that
-weren't computed are `NaN`.
+The columns are `short_name`, `season`, `rmse`, `other_models_median_rmse`,
+`other_models_best_rmse`, `n_other_models`, and `units`. The median and best are over the
+other models only. RMSEs that weren't computed are `NaN`.
 """
-function print_rmses(rmse_var_dict)
-    for short_name in sort(collect(keys(rmse_var_dict)))
-        rmse_var = rmse_var_dict[short_name]
-        others = filter(!=("CliMA"), ClimaAnalysis.model_names(rmse_var))
-        units = get(ClimaAnalysis.rmse_units(rmse_var), "CliMA", "")
-        for season in ClimaAnalysis.category_names(rmse_var)
-            other_rmses = filter(!isnan, [rmse_var[model, season] for model in others])
-            median_rmse = isempty(other_rmses) ? NaN : Statistics.median(other_rmses)
-            best_rmse = isempty(other_rmses) ? NaN : minimum(other_rmses)
-            println(
-                "LEADERBOARD short_name=$short_name season=$season ",
-                "rmse=$(rmse_var["CliMA", season]) ",
-                "other_models_median_rmse=$median_rmse ",
-                "other_models_best_rmse=$best_rmse ",
-                "n_other_models=$(length(other_rmses)) units=\"$units\"",
-            )
+function write_rmses(path, rmse_var_dict)
+    open(path, "w") do io
+        println(
+            io,
+            "short_name,season,rmse,other_models_median_rmse,",
+            "other_models_best_rmse,n_other_models,units",
+        )
+        for short_name in sort(collect(keys(rmse_var_dict)))
+            rmse_var = rmse_var_dict[short_name]
+            others = filter(!=("CliMA"), ClimaAnalysis.model_names(rmse_var))
+            units = get(ClimaAnalysis.rmse_units(rmse_var), "CliMA", "")
+            for season in ClimaAnalysis.category_names(rmse_var)
+                other_rmses = filter(!isnan, [rmse_var[model, season] for model in others])
+                median_rmse = isempty(other_rmses) ? NaN : Statistics.median(other_rmses)
+                best_rmse = isempty(other_rmses) ? NaN : minimum(other_rmses)
+                row = (
+                    short_name,
+                    season,
+                    rmse_var["CliMA", season],
+                    median_rmse,
+                    best_rmse,
+                    length(other_rmses),
+                    "\"$units\"",
+                )
+                println(io, join(row, ","))
+            end
         end
     end
     return nothing

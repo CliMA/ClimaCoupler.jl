@@ -2,6 +2,7 @@ import ClimaAnalysis
 import GeoMakie
 import CairoMakie
 import Dates
+import Statistics
 import ClimaCoupler: SimOutput
 
 """
@@ -182,6 +183,7 @@ function Plotting.compute_leaderboard(
             )
         end
     end
+    print_rmses(rmse_var_dict)
 
     # Plot box plots
     fig_leaderboard =
@@ -206,6 +208,39 @@ function Plotting.compute_leaderboard(
         joinpath(leaderboard_base_path, "bias_leaderboard.png"),
         fig_leaderboard,
     )
+end
+
+"""
+    print_rmses(rmse_var_dict)
+
+Print the global RMSE of CliMA and the median and best RMSE of the other models for each
+variable and season in `rmse_var_dict`, so the numbers behind the leaderboard plot can be
+tracked over time from the logs.
+
+Each line starts with `LEADERBOARD` followed by `key=value` pairs, e.g.,
+`LEADERBOARD short_name=pr season=ANN rmse=1.2 other_models_median_rmse=1.4
+other_models_best_rmse=0.9 n_other_models=40 units="mm / day"` (on one line). RMSEs that
+weren't computed are `NaN`.
+"""
+function print_rmses(rmse_var_dict)
+    for short_name in sort(collect(keys(rmse_var_dict)))
+        rmse_var = rmse_var_dict[short_name]
+        others = filter(!=("CliMA"), ClimaAnalysis.model_names(rmse_var))
+        units = get(ClimaAnalysis.rmse_units(rmse_var), "CliMA", "")
+        for season in ClimaAnalysis.category_names(rmse_var)
+            other_rmses = filter(!isnan, [rmse_var[model, season] for model in others])
+            median_rmse = isempty(other_rmses) ? NaN : Statistics.median(other_rmses)
+            best_rmse = isempty(other_rmses) ? NaN : minimum(other_rmses)
+            println(
+                "LEADERBOARD short_name=$short_name season=$season ",
+                "rmse=$(rmse_var["CliMA", season]) ",
+                "other_models_median_rmse=$median_rmse ",
+                "other_models_best_rmse=$best_rmse ",
+                "n_other_models=$(length(other_rmses)) units=\"$units\"",
+            )
+        end
+    end
+    return nothing
 end
 
 """

@@ -17,6 +17,34 @@ ClimaCoupler together with the packages that trigger its extensions:
 The CMIP script additionally loads Oceananigans, ClimaSeaIce, KernelAbstractions,
 ConservativeRegridding, and Adapt, which trigger the CMIP extensions.
 
+## Setting up the environment
+
+Clone the repository and run all commands on this page from its root directory: config
+file paths and the `output/` directory are resolved relative to the directory Julia is
+started from.
+
+```bash
+git clone https://github.com/CliMA/ClimaCoupler.jl.git
+cd ClimaCoupler.jl
+```
+
+Use Julia 1.10 or 1.11. Each experiment environment ships manifests pinned to those versions
+(`Manifest.toml` for 1.10, `Manifest-v1.11.toml` for 1.11); other Julia versions fall back
+to the 1.10 manifest and may need to re-resolve it. With
+[juliaup](https://github.com/JuliaLang/juliaup), `juliaup add 1.11` installs a matching
+version and `julia +1.11` selects it.
+
+Install the packages of the environment you will use, once and again after pulling changes
+to its manifest:
+
+```bash
+julia --project=experiments/AMIP -e 'using Pkg; Pkg.instantiate()'
+julia --project=experiments/CMIP -e 'using Pkg; Pkg.instantiate()'  # only for CMIP
+```
+
+The first simulation also downloads its input data (land-sea masks, SST and sea-ice data,
+etc.) as Julia artifacts.
+
 ## From the command line
 
 The simplest way to launch an AMIP simulation is from a shell in the root of the
@@ -82,6 +110,30 @@ cs = CoupledSimulation(config_file)
 run!(cs)
 postprocess(cs)
 ```
+
+## Running on GPU or with MPI
+
+Both experiment environments include CUDA.jl and MPI.jl, and `code_loading.jl` loads them
+through `ClimaComms.@import_required_backends` when these environment variables request them:
+
+```bash
+export CLIMACOMMS_DEVICE="CUDA"   # run on an NVIDIA GPU
+export CLIMACOMMS_CONTEXT="MPI"   # run distributed, with one Julia process per MPI rank
+```
+
+The macro reads the variables when it runs, so in the REPL set them with `ENV` *before*
+including `code_loading.jl`:
+
+```julia
+ENV["CLIMACOMMS_DEVICE"] = "CUDA"
+include("experiments/AMIP/code_loading.jl")
+```
+
+Keep the `device` configuration option at its default, `"auto"`, so that
+`CLIMACOMMS_DEVICE` selects the device. If a single-process run crashes with an MPI error
+(common in interactive SLURM sessions), set `CLIMACOMMS_CONTEXT="SINGLETON"`. For CUDA
+driver compatibility and how to verify that a run is on the GPU, see
+[Running a CliMA Model on GPU](https://github.com/CliMA/DeveloperGuides/blob/main/workflow/running_on_gpu.md).
 
 ## Modifying configuration interactively
 

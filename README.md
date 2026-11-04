@@ -46,44 +46,79 @@ so it supports simpler slabplanet-type setups as well.
 
 ## Running AMIP
 
-Here we will focus on the AMIP experiment, which uses the environment in the `experiments/AMIP/` subdirectory of ClimaCoupler.jl
-The first step to do this is to install all required packages for the environment using the following Julia command:
+### Setting up
+
+Clone the repository and run every command below from its root directory. Config file paths
+and the `output/` directory are resolved relative to the directory Julia is started from.
+```bash
+git clone https://github.com/CliMA/ClimaCoupler.jl.git
+cd ClimaCoupler.jl
+```
+
+Use Julia 1.10 or 1.11. The experiment environments ship manifests pinned to those versions
+(`Manifest.toml` for 1.10, `Manifest-v1.11.toml` for 1.11); other Julia versions fall back to
+the 1.10 manifest and may need to re-resolve it. With [juliaup](https://github.com/JuliaLang/juliaup),
+`juliaup add 1.11` installs a matching version and `julia +1.11` selects it.
+
+AMIP, slabplanet, and subseasonal runs use the environment in `experiments/AMIP/`. Install its
+packages once, and again after pulling changes to its manifest:
 ```julia
 julia --project=experiments/AMIP -E "using Pkg; Pkg.instantiate(); Pkg.build()"
 ```
 
-Now you're ready to run the experiment, which uses the `run_simulation.jl` driver. To run interactively:
-```
-julia --project=experiments/AMIP
-julia> include("experiments/AMIP/run_simulation.jl")
-```
+The first simulation also downloads its input data (land-sea masks, SST and sea-ice data, etc.)
+as Julia artifacts.
 
-Or to run from the terminal:
-```julia
+### Running from the terminal
+
+```bash
 julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl
 ```
 
-When running from the terminal, you can also specify a configuration file to use for the simulation setup, and a job ID to keep track of this run's output.
-Existing configuration files are specified in the `config/` directory within ClimaCoupler.jl.
-For example, to run the default AMIP configuration, you could use the following command:
+This runs `config/ci_configs/amip_default.yml`, a short test configuration, and saves output to
+`output/amip_default/`. To choose a configuration and a job ID for the output folder:
+```bash
+julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl --config_file config/ci_configs/amip_default.yml --job_id my_amip_run
+```
+
+Output is saved in `output/<job_id>/`; the job ID defaults to the config file name.
+Ready-to-use configuration files are in `config/ci_configs/`, and all configuration options
+are listed on the [Input](https://CliMA.github.io/ClimaCoupler.jl/dev/input/) docs page.
+Most of the run time of a first launch is compilation.
+
+### Running from the REPL
+
+Start Julia from the repository root with `julia --project=experiments/AMIP`, then load the
+packages and pass a configuration file to `CoupledSimulation`:
 ```julia
-julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl --config_file config/ci_configs/amip_default.yml --job_id amip_default
+include("experiments/AMIP/code_loading.jl")
+
+cs = CoupledSimulation("config/ci_configs/amip_default.yml")
+run!(cs)
+postprocess(cs)
 ```
 
-Output from your run will be saved in the folder `output/<job_id>/`.
-If no configuration file is specified, the default
-`amip_default.yml` will be used, and output will be saved in `output/amip_default/`.
+To change the setup, write your own YAML file in `config/`, or load an existing one into a
+dictionary, edit it, and pass the dictionary instead:
+```julia
+config_dict = Input.get_coupler_config_dict("config/ci_configs/amip_default.yml")
+config_dict["t_end"] = "1days"
 
-The output will take up approximately 1GB of space, and the simulation will take around 10 minutes to run on a single CPU, or less time on multiple CPUs or GPU.
-
-Note: If you want to set the configuration file to something other than the default
-while running the driver interactively, you'll need to
-manually set the value for `config_file`.
-
-For example, to use the configuration file found at `config/ci_configs/amip_default.yml`, you would set `config_file`
-as follows in the `run_simulation.jl` driver:
+cs = CoupledSimulation(config_dict)
+run!(cs)
+postprocess(cs)
 ```
-config_file = "config/ci_configs/amip_default.yml"
+
+The [Running a Simulation](https://CliMA.github.io/ClimaCoupler.jl/dev/running/) docs page also
+covers stepping a simulation manually and using ClimaCoupler as an installed package.
+
+### Running CMIP
+
+CMIP runs use their own environment, `experiments/CMIP/`, which adds Oceananigans and
+ClimaSeaIce, and must be given a CMIP configuration file:
+```bash
+julia --project=experiments/CMIP -e 'using Pkg; Pkg.instantiate()'
+julia --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file config/ci_configs/cmip_oceananigans_climaseaice.yml
 ```
 
 ### A Note about ClimaComms and MPI
@@ -103,14 +138,23 @@ Sometimes this happens when you are running in an interactive SLURM session.
 
 ### Running on GPU or with MPI
 
-#### Environment variables
-Additionally, there are some environment variables we must set in these cases.
+Both experiment environments already include CUDA.jl and MPI.jl; `code_loading.jl` loads them
+through `ClimaComms.@import_required_backends` when the environment variables below request them.
+Set the variables before starting Julia, or with `ENV` _before_ including `code_loading.jl`:
+```bash
+export CLIMACOMMS_DEVICE="CUDA"   # run on an NVIDIA GPU
+export CLIMACOMMS_CONTEXT="MPI"   # run distributed, with one Julia process per MPI rank
+```
+or, in the REPL:
+```julia
+ENV["CLIMACOMMS_DEVICE"] = "CUDA"
+ENV["CLIMACOMMS_CONTEXT"] = "MPI"
+include("experiments/AMIP/code_loading.jl")
+```
 
-To run on GPU, we need to run `export CLIMACOMMS_DEVICE="CUDA"` in the terminal, or
-`ENV["CLIMACOMMS_DEVICE"]="CUDA"` within the Julia environment _before_ running the experiment.
-
-To run with MPI, we need to run `export CLIMACOMMS_CONTEXT="MPI"` in the terminal, or
-`ENV["CLIMACOMMS_CONTEXT"]="MPI"` within the Julia environment _before_ running the experiment.
+Keep the `device` configuration option at its default, `"auto"`, so that `CLIMACOMMS_DEVICE`
+selects the device. For CUDA driver compatibility and checking that a run is really on the GPU,
+see [running_on_gpu.md](docs/dev-guides/workflow/running_on_gpu.md).
 
 ### Caltech users: Running AMIP remotely
 The main difference between running code locally vs running remotely is

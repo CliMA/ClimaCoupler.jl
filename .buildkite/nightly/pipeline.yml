@@ -19,7 +19,7 @@ env:
   # UPSTREAM_PACKAGES environment variable. For example, if you pass
   # `UPSTREAM_PACKAGES="ClimaAtmos SurfaceFluxes@1.1.0", then the main branch
   # of ClimaAtmos and SurfaceFluxes v1.1.0 will be used.
-  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore ClimaTimeSteppers Thermodynamics ClimaLand SurfaceFluxes RRTMGP CloudMicrophysics}"
+  UPSTREAM_PACKAGES: "${UPSTREAM_PACKAGES:-ClimaAtmos ClimaCore ClimaTimeSteppers Thermodynamics ClimaLand SurfaceFluxes RRTMGP CloudMicrophysics@0.47.0}"
   # Set DOWNSTREAM_CI to run only the flagship AMIP when testing upstream
   # changes. Any non-empty value skips the other runs and is shown as the skip
   # reason.
@@ -121,7 +121,7 @@ steps:
         env:
           CLIMACOMMS_DEVICE: "CUDA"
           JULIA_NVTX_CALLBACKS: "gc,alloc,free,inference"
-          # CLIMA_NAME_CUDA_KERNELS_FROM_STACK_TRACE: "true"
+          CLIMA_NAME_CUDA_KERNELS_FROM_STACK_TRACE: "true"
         agents:
           slurm_gpus_per_task: 1
           slurm_cpus_per_task: 4

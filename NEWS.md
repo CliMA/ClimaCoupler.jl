@@ -4,11 +4,6 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
-#### Print leaderboard RMSEs to the log
-`compute_leaderboard` prints one `LEADERBOARD` line per variable and season with CliMA's
-global RMSE and the median and best RMSE of the other models, so the numbers in
-`bias_leaderboard.png` can be tracked across runs from the Buildkite logs.
-
 #### Set `dz_top` for the stretched atmosphere grids
 ClimaAtmos stretches vertical grids with ClimaCore's two-scale
 `BoundaryLayerHyperbolicTangentStretching` (CliMA/ClimaAtmos.jl#4949), which admits a range of

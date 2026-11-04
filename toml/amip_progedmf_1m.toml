@@ -97,8 +97,5 @@ value = 3000.0
 [cloud_fraction_steepness_scale]
 value = 1.2
 
-[cloud_fraction_eps_rel]
-value = 0.05
-
 [snow_apparent_density]
 value = 200.0

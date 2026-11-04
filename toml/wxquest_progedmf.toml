@@ -120,7 +120,3 @@ type = "float"
 [cloud_fraction_steepness_scale]
 value = 1.5
 type = "float"
-
-[cloud_fraction_eps_rel]
-value = 0.05
-type = "float"

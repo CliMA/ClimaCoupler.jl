@@ -22,6 +22,16 @@ ClimaAtmos versions without the two-scale stretching ignore the key.
   transfers stay bounded without the flux clamp or `cov_cutoff`. The wet, sea-ice and
   open-ocean area fractions are the DSS'd coverages of these weights.
 
+#### Update to ClimaDiagnostics v0.4
+Time-reduced diagnostics no longer include the initial state, so the first window of the coupler and
+atmosphere diagnostics is no longer `NaN` for fields such as shortwave fluxes. NetCDF diagnostics no
+longer have `date` and `date_bnds`, and `time` is in seconds since `start_date`. `DictWriter` and
+`HDF5Writer` save time-reduced diagnostics at the start of their window.
+
+#### Fix land restarts
+Restarted runs with a ClimaLand model now start the land model at the restart time instead of
+`t = 0` when not using `ITime`.
+
 #### Add ocean config options
 New `ocean_float_type` (`Float64` by default) and `ocean_vertical_levels` (60 by default) options set the
 Oceananigans float type and number of levels.

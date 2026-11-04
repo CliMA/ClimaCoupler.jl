@@ -10,7 +10,7 @@ import Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities:
 @inline henyey_diffusivity(x, y, z, t) = max(2e-6, 3e-5 * abs(sind(y)))
 
 @inline ν_step_simple(x, y, z, t) = ifelse(z >= -100, 1e-2, 1e-4)
-@inline κ_step_simple(x, y, z, t) = z >= -10 ? 5e-2 : z >= -100 ? 1e-2 : 1e-5
+@inline κ_step_simple(x, y, z, t) = z >= -10 ? 5e-2 : z >= -100 ? 1e-3 : 1e-5
 
 function default_ocean_closure(FT = OC.defaults.FloatType)
     mixing_length = CATKEMixingLength(Cᵇ = 0.01)
@@ -26,8 +26,10 @@ end
 """
     simplified_ocean_closure(FT=Oceananigans.defaults.FloatType)
 
-A minimal closure suitable for testing on memory-limited GPUs (e.g. P100). Uses `ConvectiveAdjustmentVerticalDiffusivity` with a background
-vertical diffusivity and viscosity, avoiding the large parameter space of CATKE + Gent-McWilliams + biharmonic closures.
+A minimal closure for coarse vertical grids and for testing. 
+Uses `ConvectiveAdjustmentVerticalDiffusivity` with a background
+vertical diffusivity and viscosity, avoiding the large parameter space of 
+CATKE + Gent-McWilliams + biharmonic closures.
 """
 function simplified_ocean_closure(FT = OC.defaults.FloatType)
     horizontal_viscosity = OC.HorizontalScalarBiharmonicDiffusivity(

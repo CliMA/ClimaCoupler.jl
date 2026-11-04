@@ -1,0 +1,8 @@
+# Resolution-aware subgrid variance (default 1/12) weakened for the thick levels of the coarse atmosphere
+[sgs_variance_geometric_coeff]
+value = 0.0026041666666666665
+type = "float"
+
+[prescribed_cloud_droplet_number_concentration]
+value = 150e6
+type = "float"

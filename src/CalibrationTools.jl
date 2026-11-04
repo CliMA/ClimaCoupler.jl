@@ -120,7 +120,7 @@ end
 """
     CalibrateConfig(;
         config_file,
-        observables = Observable[],
+        observables,
         pressure_levels = 100.0 .* [200.0, 500.0, 850.0],
         n_iterations::Integer,
         sample_date_ranges,
@@ -129,7 +129,7 @@ end
         spinup::Dates.Period,
         output_dir,
         rng_seed = 42,
-        priors = nothing,
+        priors,
         worker_walltime = 350,
     )
 
@@ -140,9 +140,8 @@ Keyword arguments
 
 - `config_file`: Configuration file to use for ClimaCoupler simulation.
 
-- `observables`: The loss fields, one `Observable` each. Required to generate
-  observations. A field's observation comes from `default_data_loader()` and its model
-  output from `model_var`.
+- `observables`: The loss fields, one `Observable` each, at least one. A field's observation
+  comes from `default_data_loader()` and its model output from `model_var`.
 
 - `pressure_levels`: Pressure levels (Pa) kept from fields on pressure levels.
 
@@ -171,14 +170,14 @@ Keyword arguments
   are the same.
 
 - `priors`: The prior distribution of the calibrated parameters, as built by
-  `EnsembleKalmanProcesses.combine_distributions`. Required to run a calibration.
+  `EnsembleKalmanProcesses.combine_distributions`.
 
 - `worker_walltime`: Walltime of each worker job, in minutes. It must cover
   `n_iterations` member runs.
 """
 function CalibrateConfig(;
     config_file,
-    observables = Observable[],
+    observables,
     pressure_levels = 100.0 .* [200.0, 500.0, 850.0],
     n_iterations::Integer,
     sample_date_ranges,
@@ -187,10 +186,12 @@ function CalibrateConfig(;
     spinup::Dates.Period,
     output_dir,
     rng_seed = 42,
-    priors = nothing,
+    priors,
     worker_walltime = 350,
 )
     isfile(config_file) || error("Configuration file ($config_file) does not exist")
+    isempty(observables) && error("The config needs at least one observable")
+    isnothing(priors) && error("The config needs priors")
     isempty(sample_date_ranges) &&
         error("Cannot run calibration with no date ranges for the samples")
 
@@ -980,10 +981,13 @@ end
 """
     model_var(simdir, short_name)
 
-The model's monthly means of `short_name` from the diagnostics in `simdir`, as a vector of
+The model's time averages of `short_name` from the diagnostics in `simdir`, as a vector of
 `OutputVar`s, in the units and sign convention of the observation of the same name in
 `default_data_loader`. A field output on both pressure and altitude coordinates gives one
 `OutputVar` for each.
+
+The averaging period is the one the model configuration sets for the field (see
+[`average_period`](@ref)), and it has to match the time resolution of the observations.
 
 Fields the model does not output directly, or outputs in other units, have their own method
 on `Val(Symbol(short_name))`: add one alongside the observation's loader for a new field.
@@ -992,20 +996,41 @@ model_var(simdir, short_name::String) = model_var(simdir, Val(Symbol(short_name)
 
 function model_var(simdir, ::Val{short_name}) where {short_name}
     name = string(short_name)
+    period = average_period(simdir, name)
     coord_types = ClimaAnalysis.available_coord_types(
         simdir;
         short_name = name,
         reduction = "average",
-        period = "1M",
+        period,
     )
     return [
-        get(simdir; short_name = name, reduction = "average", period = "1M", coord_type) for
+        get(simdir; short_name = name, reduction = "average", period, coord_type) for
         coord_type in coord_types
     ]
 end
 
-monthly_mean(simdir, name) =
-    get(simdir; short_name = name, reduction = "average", period = "1M")
+"""
+    average_period(simdir, short_name)
+
+The period over which the diagnostics in `simdir` average `short_name`, for example `"1M"`.
+Errors unless there is exactly one. Set the period in the model configuration: by default,
+simulations shorter than 90 days average over less than a month.
+"""
+function average_period(simdir, short_name)
+    periods = ClimaAnalysis.available_periods(simdir; short_name, reduction = "average")
+    length(periods) == 1 || error(
+        "The diagnostics average $short_name over multiple periods $periods. The calibration \
+        can not assume which one to use, so set it in the model configuration.",
+    )
+    return only(periods)
+end
+
+time_average(simdir, name) = get(
+    simdir;
+    short_name = name,
+    reduction = "average",
+    period = average_period(simdir, name),
+)
 
 """
     radiative_flux_combination(var, short_name)
@@ -1024,24 +1049,24 @@ end
 
 # These are fluxes at the top of the atmosphere, so they have no vertical coordinate.
 model_var(simdir, ::Val{:swcre}) = radiative_flux_combination(
-    monthly_mean(simdir, "rsutcs") - monthly_mean(simdir, "rsut"),
+    time_average(simdir, "rsutcs") - time_average(simdir, "rsut"),
     "swcre",
 )
 model_var(simdir, ::Val{:lwcre}) = radiative_flux_combination(
-    monthly_mean(simdir, "rlutcs") - monthly_mean(simdir, "rlut"),
+    time_average(simdir, "rlutcs") - time_average(simdir, "rlut"),
     "lwcre",
 )
 # Net downward radiation at the top of the atmosphere.
 model_var(simdir, ::Val{:rtmt}) = radiative_flux_combination(
-    monthly_mean(simdir, "rsdt") - monthly_mean(simdir, "rsut") -
-    monthly_mean(simdir, "rlut"),
+    time_average(simdir, "rsdt") - time_average(simdir, "rsut") -
+    time_average(simdir, "rlut"),
     "rtmt",
 )
 
 # The model's precipitation is kg m^-2 s^-1. GPCP is mm/day, and its loader gives it the
 # model's sign convention, so only the magnitude is converted.
 function model_var(simdir, ::Val{:pr})
-    pr = monthly_mean(simdir, "pr")
+    pr = time_average(simdir, "pr")
     units = ClimaAnalysis.units(pr)
     units == "kg m^-2 s^-1" || error("Expected pr in kg m^-2 s^-1, got \"$units\"")
     pr.data .*= 86400

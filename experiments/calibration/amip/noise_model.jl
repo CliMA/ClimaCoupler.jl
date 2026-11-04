@@ -1,6 +1,6 @@
 # The observation noise model used by the AMIP calibrations:
 #
-#     Gamma = C_y + D_y + beta * max(D_mean, sigma2 * s^2)
+#     Gamma = C_y + D_y + beta * max.(D_mean, sigma2 * s^2)
 #
 #   C_y      rank-`rank` truncated-SVD sample covariance of the observation years, supplied
 #            by `SVDplusDCovariance`. Only one or two modes are reliably estimated from

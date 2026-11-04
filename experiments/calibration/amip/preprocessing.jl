@@ -45,7 +45,8 @@ end
 """
     global_mean(var)
 
-The area-weighted global mean of `var`, ignoring `NaN`s, as a function of time.
+The area-weighted global mean of `var`, ignoring `NaN`s. For an `OutputVar` on time,
+latitude and longitude, this is a function of time.
 """
 global_mean(var) = ClimaAnalysis.average_lonlat(var; ignore_nan = true, weighted = true)
 
@@ -53,8 +54,9 @@ global_mean(var) = ClimaAnalysis.average_lonlat(var; ignore_nan = true, weighted
     seasonal_average(var)
 
 Average `var` over each meteorological season (DJF, MAM, JJA, SON) of each year. A season is
-dated by its first month, so a calibration targets SON 2010 with the sample date range
-`(DateTime(2010, 9, 1), DateTime(2010, 9, 1))` and `extend = Dates.Month(3)`. The
+dated by its first month, so to target SON 2010, set the `CalibrateConfig`'s
+`sample_date_ranges` to `[(DateTime(2010, 9, 1), DateTime(2010, 9, 1))]` and its `extend` to
+`Dates.Month(3)`. The
 simulation's spinup months form their own season, which no sample date selects.
 """
 function seasonal_average(var)
@@ -74,11 +76,12 @@ function observable(config, name)
 end
 
 """
-    loss_values(vars, coverage_masks, config)
+    mask_and_reduce(vars, coverage_masks, config)
 
-The values the loss compares, computed identically for the observations
-(`generate_observations.jl`) and the model output (`observation_map.jl`). Change the loss here
-and both sides change. For each field:
+Mask each field to its observation's coverage and apply its observable's `reduce`. The
+observations (`generate_observations.jl`) and the model output (`observation_map.jl`) both
+go through this function, so the loss compares the same quantities on both sides. For each
+field:
 
 1. Restrict it to the points its observation covers (`coverage_masks`, see `coverage_mask`).
    A satellite retrieval is not global (MAC `lwp` is ocean only) and the averages ignore
@@ -86,7 +89,7 @@ and both sides change. For each field:
    For `lwp` that changed the area-weighted bias by a factor of four.
 2. Apply the observable's `reduce` function.
 """
-function loss_values(vars, coverage_masks, config)
+function mask_and_reduce(vars, coverage_masks, config)
     return map(vars) do var
         name = ClimaAnalysis.short_name(var)
         mask = get(coverage_masks, name, nothing)

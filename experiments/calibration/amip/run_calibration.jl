@@ -54,7 +54,6 @@ if abspath(PROGRAM_FILE) == @__FILE__
     )
 
     (; rng_seed, priors) = CALIBRATE_CONFIG
-    isnothing(priors) && error("The config has no priors")
     rng = Random.MersenneTwister(rng_seed)
 
     ekp = EKP.EnsembleKalmanProcess(

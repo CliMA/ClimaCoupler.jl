@@ -3,8 +3,7 @@
 The `amip` experiment calibrates parameters of the coupled AMIP model against
 satellite observations. A config file builds one
 `CalibrationTools.CalibrateConfig` named `CALIBRATE_CONFIG`, which holds the
-whole experiment: the model yml, the loss fields, the dates, the priors and the
-run settings. The loss fields are one `CalibrationTools.Observable` each:
+whole experiment: the model YAML file, the loss fields, the dates, the priors and the run settings. The loss fields are one `CalibrationTools.Observable` each:
 
 ```julia
 observables = [
@@ -22,7 +21,7 @@ observables = [
 ```
 
 `reduce` is any function from an `OutputVar` to an `OutputVar`, applied to the
-observations and the model output alike (`loss_values` in `preprocessing.jl`):
+observations and the model output alike (`mask_and_reduce` in `preprocessing.jl`):
 `zonal_average`, `global_mean`, your own, or a composition such as
 `seasonal_average ∘ zonal_average` for seasonal means. Maps take
 `model_error_fraction`, the model error as a fraction of the observed mean

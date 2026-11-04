@@ -26,6 +26,8 @@ push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
         spinup = Dates.Week(1),
         output_dir = ".",
         rng_seed = 42,
+        # CalibrateConfig only checks that priors are given.
+        priors = :test_priors,
     )
     config = CalibrationTools.CalibrateConfig(; valid_config_args...)
 
@@ -42,6 +44,8 @@ push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
     )
 
     @test_throws ErrorException make_calibrate_config(sample_date_ranges = [])
+    @test_throws ErrorException make_calibrate_config(observables = [])
+    @test_throws ErrorException make_calibrate_config(priors = nothing)
 
     @test_throws ErrorException make_calibrate_config(extend = -Dates.Week(1))
 

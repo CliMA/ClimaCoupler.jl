@@ -49,7 +49,7 @@ function preprocess_sim_vars(vars, config)
 over points the observation does not cover. Regenerate the observations to create \
 them." coverage_fp
 
-    vars = loss_values(vars, coverage_masks, config)
+    vars = mask_and_reduce(vars, coverage_masks, config)
 
     # Note: We also do not process the time dimension either since we can rely
     # on GEnsembleBuilder to pick out the right times for us

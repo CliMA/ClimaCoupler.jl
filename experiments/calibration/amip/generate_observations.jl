@@ -29,7 +29,7 @@ include(
 )
 
 """
-    make_svdplusd_observation_vector(
+    make_observation_vector(
         vars,
         sample_date_ranges;
         covariance_date_ranges = sample_date_ranges,
@@ -42,8 +42,9 @@ include(
         FT = Float32,
     )
 
-Make a vector of `EKP.Observation`s with an `SVDplusD` covariance matrix, one for each
-sample corresponding to the dates in `sample_date_ranges`.
+Make a vector of `EKP.Observation`s, one for each sample corresponding to the dates in
+`sample_date_ranges`. The fields in `independent_noise_sd` get independent noise of the
+given standard deviation, and the other fields share an `SVDplusD` covariance matrix.
 
 The covariance is the `Gamma` of `noise_model.jl`, estimated from one sample per date
 range in `covariance_date_ranges`, so it is the interannual spread of the observation
@@ -54,16 +55,16 @@ and targets may repeat.
 
 `beta` is the model-error part of `Gamma`, `beta * mean^2` at each point, with `mean` the
 observed mean over the covariance dates: it is a variance scale, the square of the model
-error as a fraction of the observed mean, so `beta = 0.05^2` is a 5% model error. It accepts
-one value for all variables or one per variable, in the order of `vars` without those in
-`independent_noise_sd`.
+error as a fraction of the observed mean, so `beta = 0.05^2` is a 5% model error. Give one
+value for all variables, or a `Dict` from short name to value with an entry for every
+variable not in `independent_noise_sd`.
 
 Variables named in `independent_noise_sd`, one value per target date such as global means,
 are left out of the `SVDplusD` covariance and form a second block of the observation, with
 independent noise of the given standard deviation. It sets how strongly the calibration
 holds such a value, for example the energy balance, against the maps in the first block.
 """
-function make_svdplusd_observation_vector(
+function make_observation_vector(
     vars,
     sample_date_ranges;
     covariance_date_ranges = sample_date_ranges,
@@ -78,6 +79,12 @@ function make_svdplusd_observation_vector(
     independent(v) = haskey(independent_noise_sd, ClimaAnalysis.short_name(v))
     independent_vars = filter(independent, vars)
     vars = filter(!independent, vars)
+    if beta isa AbstractDict
+        missing_beta = [n for n in ClimaAnalysis.short_name.(vars) if !haskey(beta, n)]
+        isempty(missing_beta) ||
+            error("No beta for $missing_beta, and they are not in independent_noise_sd")
+        beta = [beta[ClimaAnalysis.short_name(v)] for v in vars]
+    end
     @info "Using SVDplusD covariance matrix with" beta rank sigma2 use_latitude_weights min_cosd_lat
     covar_estimator =
         noise_covariance_estimator(; beta, rank, sigma2, use_latitude_weights, min_cosd_lat)
@@ -119,7 +126,6 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     config = CALIBRATE_CONFIG
     (; observables, sample_date_ranges, covariance_date_ranges, output_dir) = config
-    isempty(observables) && error("The config has no observables")
     length(unique(covariance_date_ranges)) >= 3 ||
         error("The config needs at least 3 distinct covariance_date_ranges")
 
@@ -140,7 +146,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     # Record where each observation has data over the dates in use, while longitude still
     # exists. A globally covered product gets no mask. `observation_map.jl` loads the same
-    # masks, and `loss_values` applies them on both sides.
+    # masks, and `mask_and_reduce` applies them on both sides.
     # A target is dated by its first month, and its reduced value is made from the months
     # up to the end of `extend`, so the mask covers all of them.
     mask_date_ranges = unique([
@@ -153,7 +159,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         isnothing(mask) || (coverage_masks[ClimaAnalysis.short_name(var)] = mask)
     end
 
-    vars = loss_values(vars, coverage_masks, config)
+    vars = mask_and_reduce(vars, coverage_masks, config)
     check_extend(vars, config)
     for (var, o) in zip(vars, observables)
         !isnothing(o.model_error_fraction) &&
@@ -172,16 +178,17 @@ if abspath(PROGRAM_FILE) == @__FILE__
     JLD2.save_object(coverage_mask_path(output_dir), coverage_masks)
 
     # Create the observation vector, in physical units: the noise model's model-error term
-    # is a fraction of the observed mean. `beta` is the model-error variance, the square of
-    # each map's model_error_fraction.
-    observation_vec = make_svdplusd_observation_vector(
+    # is a fraction of the observed mean. Each field's `beta`, the model-error variance, is
+    # the square of its model_error_fraction. Fields with noise_sd instead get independent
+    # noise.
+    observation_vec = make_observation_vector(
         vars,
         sample_date_ranges;
         covariance_date_ranges,
-        beta = [
-            o.model_error_fraction^2 for
+        beta = Dict(
+            o.name => o.model_error_fraction^2 for
             o in observables if !isnothing(o.model_error_fraction)
-        ],
+        ),
         rank = 2,
         sigma2 = 1e-6,
         use_latitude_weights = true,

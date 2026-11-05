@@ -27,7 +27,7 @@ Key functionality of ClimaCoupler.jl includes:
 ClimaCoupler.jl is developed as part of the
 [Climate Modeling Alliance (CliMA)](https://clima.caltech.edu/) project.
 
-| ![Coupler Scheme](images/cplsetup.png) |
+| ![The CliMA software stack](images/clima_stack_v4.png) |
 |:--:|
 | *ClimaCoupler.jl allows for independent development of interchangeable component models.* |
 

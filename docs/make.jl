@@ -36,6 +36,7 @@ example_pages = [
         s -> "generated/amip/$(s)",
         readdir(joinpath(@__DIR__, "src/generated/amip")),
     ),
+    "Coarse CMIP" => "coarse_cmip.md",
 ]
 interface_pages = [
     "interfacer.md",

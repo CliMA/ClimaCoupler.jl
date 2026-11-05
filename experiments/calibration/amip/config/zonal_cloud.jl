@@ -44,7 +44,6 @@ const NORMALIZATION_STATS_FP =
 const NOISE_BETA = [0.10, 0.074, 0.074]
 
 const CALIBRATION_PRIORS = [
-    PD.constrained_gaussian("cloud_fraction_eps_rel", 0.05, 0.02, 0.001, 0.2),
     PD.constrained_gaussian("entr_coeff", 0.3, 0.15, 0.02, 1.0),
     PD.constrained_gaussian("cloud_liquid_rain_collision_efficiency", 0.8, 0.15, 0.1, 1.0),
     PD.constrained_gaussian("rain_autoconversion_timescale", 1800, 300, 300, 3600),

@@ -20,17 +20,20 @@ julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl
 
 ## Configuration
 You can also specify a custom configuration file to run the coupled simulation
-in a different setup. The configuration file should be a TOML file that overwrites
+in a different setup. The configuration file is a YAML file that overwrites
 the input fields specified in the ClimaCoupler Input module.
 A set of example configuration files can be found in the `config/ci_configs/` directory.
 
 For example, to run the coupled simulation with a different configuration file:
 ```bash
-julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl --config_file="path/to/config.toml"
+julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl --config_file="path/to/config.yml"
 ```
 
-To run the coupled simulation interactively with a different configuration file,
-set the `config_file` variable in this script to be the path to that file.
+To run the coupled simulation interactively, start Julia from the root directory with
+`julia --project=experiments/AMIP`, run `include("experiments/AMIP/code_loading.jl")`,
+and pass a configuration file path to `CoupledSimulation`. To change settings, edit a YAML
+file, or load one with `Input.get_coupler_config_dict`, modify the returned dictionary,
+and pass the dictionary to `CoupledSimulation`.
 
 For more details about running a coupled simulation, including how to run in a
 Slabplanet configuration, please see our documentation.
@@ -39,7 +42,7 @@ Slabplanet configuration, please see our documentation.
 # Load the necessary modules to run the coupled simulation
 include("code_loading.jl")
 
-# Get the configuration file from the command line (or manually set it here)
+# Get the configuration file from the command line
 config_file = Input.parse_commandline(Input.argparse_settings())["config_file"]
 
 # Set up and run the coupled simulation

@@ -522,6 +522,8 @@ end
             AbstractTimeVaryingInput,
             ClimaComms.AbstractCommsContext,
             ClimaComms.AbstractDevice,
+            CC.Spaces.AbstractSpace,
+            CC.Grids.AbstractGrid,
             UnionAll,
             DataType,
         },
@@ -529,6 +531,8 @@ end
             AbstractTimeVaryingInput,
             ClimaComms.AbstractCommsContext,
             ClimaComms.AbstractDevice,
+            CC.Spaces.AbstractSpace,
+            CC.Grids.AbstractGrid,
             UnionAll,
             DataType,
         },
@@ -537,7 +541,7 @@ end
         ignore = Set(),
     )
 
-Ignore certain types that don't need to be restored.
+Ignore certain types that don't need to be restored, such as devices and grids.
 `UnionAll` and `DataType` are infinitely recursive, so we also ignore those.
 """
 function restore!(
@@ -545,6 +549,8 @@ function restore!(
         AbstractTimeVaryingInput,
         ClimaComms.AbstractCommsContext,
         ClimaComms.AbstractDevice,
+        CC.Spaces.AbstractSpace,
+        CC.Grids.AbstractGrid,
         UnionAll,
         DataType,
     },
@@ -552,6 +558,8 @@ function restore!(
         AbstractTimeVaryingInput,
         ClimaComms.AbstractCommsContext,
         ClimaComms.AbstractDevice,
+        CC.Spaces.AbstractSpace,
+        CC.Grids.AbstractGrid,
         UnionAll,
         DataType,
     },
@@ -764,13 +772,16 @@ Returns `true` to stop recursing at the given object and `false` to continue
 recursing through the fields of the object.
 
 This function is used by `CacheIterator`. This is useful to stop recursing and
-not return the object.
+not return the object. ClimaCore spaces and grids are not saved, since they are built
+with the simulation rather than evolved by it (see `restore!`).
 """
 function stop(
     ::Union{
         AbstractTimeVaryingInput,
         ClimaComms.AbstractCommsContext,
         ClimaComms.AbstractDevice,
+        CC.Spaces.AbstractSpace,
+        CC.Grids.AbstractGrid,
         UnionAll,
         DataType,
     },

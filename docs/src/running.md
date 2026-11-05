@@ -6,8 +6,44 @@ ClimaCoupler.jl. For a full description of all available configuration options, 
 
 The setup for other simulation types (slabplanet, CMIP, etc) is the same.
 The only pieces that need to change are the selected configuration file and the
-Julia environment. AMIP and slabplanet simulations use `experiments/AMIP/`,
-while CMIP, which requires more packages, uses `experiments/CMIP/`.
+Julia environment. Each environment has a `code_loading.jl` script that loads
+ClimaCoupler together with the packages that trigger its extensions:
+
+| Simulation type     | Julia environment   | Package loading script             |
+| ------------------- | ------------------- | ---------------------------------- |
+| AMIP, slabplanet    | `experiments/AMIP/` | `experiments/AMIP/code_loading.jl` |
+| CMIP                | `experiments/CMIP/` | `experiments/CMIP/code_loading.jl` |
+
+The CMIP script additionally loads Oceananigans, ClimaSeaIce, KernelAbstractions,
+ConservativeRegridding, and Adapt, which trigger the CMIP extensions.
+
+## Setting up the environment
+
+Clone the repository and run all commands on this page from its root directory: config
+file paths and the `output/` directory are resolved relative to the directory Julia is
+started from.
+
+```bash
+git clone https://github.com/CliMA/ClimaCoupler.jl.git
+cd ClimaCoupler.jl
+```
+
+Use Julia 1.10 or 1.11. Each experiment environment ships manifests pinned to those versions
+(`Manifest.toml` for 1.10, `Manifest-v1.11.toml` for 1.11); other Julia versions fall back
+to the 1.10 manifest and may need to re-resolve it. With
+[juliaup](https://github.com/JuliaLang/juliaup), `juliaup add 1.11` installs a matching
+version and `julia +1.11` selects it.
+
+Install the packages of the environment you will use, once and again after pulling changes
+to its manifest:
+
+```bash
+julia --project=experiments/AMIP -e 'using Pkg; Pkg.instantiate()'
+julia --project=experiments/CMIP -e 'using Pkg; Pkg.instantiate()'  # only for CMIP
+```
+
+The first simulation also downloads its input data (land-sea masks, SST and sea-ice data,
+etc.) as Julia artifacts.
 
 ## From the command line
 
@@ -25,6 +61,13 @@ different config file, pass the relative path via `--config_file`:
 julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl --config_file="config/ci_configs/amip_default.yml"
 ```
 
+CMIP simulations use the CMIP environment and driver, and must be given a CMIP config
+file explicitly, since the default config is an AMIP setup:
+
+```bash
+julia --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file="config/ci_configs/cmip_oceananigans_climaseaice.yml"
+```
+
 A collection of ready-to-use config files for common setups can be found in
 `config/ci_configs/`. Note that many of these simulations have a very short
 run time as they're primarily used for software testing. This can be changed by editing
@@ -37,11 +80,17 @@ A list of all available configuration options and their defaults can be found on
 
 To run a simulation interactively, start Julia using the AMIP project
 and include the package loading script, which imports all required packages and triggers
-all extensions:
+the extensions needed for AMIP and slabplanet runs:
 
 !!! note "Working directory"
     All REPL examples below assume Julia was started from the **repository root**
     directory, e.g. `julia --project=experiments/AMIP`.
+
+!!! note "CMIP"
+    For CMIP simulations, start Julia with `julia --project=experiments/CMIP`,
+    replace `experiments/AMIP/code_loading.jl` with `experiments/CMIP/code_loading.jl`,
+    and pass a CMIP config file such as
+    `config/ci_configs/cmip_oceananigans_climaseaice.yml` to `CoupledSimulation`.
 
 ```julia
 include("experiments/AMIP/code_loading.jl")
@@ -61,6 +110,30 @@ cs = CoupledSimulation(config_file)
 run!(cs)
 postprocess(cs)
 ```
+
+## Running on GPU or with MPI
+
+Both experiment environments include CUDA.jl and MPI.jl, and `code_loading.jl` loads them
+through `ClimaComms.@import_required_backends` when these environment variables request them:
+
+```bash
+export CLIMACOMMS_DEVICE="CUDA"   # run on an NVIDIA GPU
+export CLIMACOMMS_CONTEXT="MPI"   # run distributed, with one Julia process per MPI rank
+```
+
+The macro reads the variables when it runs, so in the REPL set them with `ENV` *before*
+including `code_loading.jl`:
+
+```julia
+ENV["CLIMACOMMS_DEVICE"] = "CUDA"
+include("experiments/AMIP/code_loading.jl")
+```
+
+Keep the `device` configuration option at its default, `"auto"`, so that
+`CLIMACOMMS_DEVICE` selects the device. If a single-process run crashes with an MPI error
+(common in interactive SLURM sessions), set `CLIMACOMMS_CONTEXT="SINGLETON"`. For CUDA
+driver compatibility and how to verify that a run is on the GPU, see
+[Running a CliMA Model on GPU](https://github.com/CliMA/DeveloperGuides/blob/main/workflow/running_on_gpu.md).
 
 ## Modifying configuration interactively
 
@@ -87,22 +160,29 @@ The dictionary uses the same key names as the YAML config file and the CLI flags
 
 If you are using ClimaCoupler.jl as a package dependency rather than working inside a
 clone of the repository, you just need to load ClimaCoupler and trigger the required
-extensions — the equivalent of what `code_loading.jl` does:
+extensions — the equivalent of what `code_loading.jl` does. These trigger packages are
+weak dependencies of ClimaCoupler, so they must be added to your own environment
+(e.g. with `Pkg.add`):
 
 ```julia
 using ClimaCoupler
 
-# Trigger the Makie plotting extension
-using Makie, GeoMakie, CairoMakie, NCDatasets, Poppler_jll
+# Trigger ClimaCouplerMakieExt (plotting)
+using CairoMakie, GeoMakie, Makie, Poppler_jll, Printf
 
-# Trigger the CMIP extension (only needed for CMIP simulations)
+# Trigger ClimaCouplerCMIPExt (only needed for CMIP simulations).
+# Together with the Makie packages above, Oceananigans also triggers ClimaCouplerCMIPMakieExt.
 import Oceananigans, ClimaSeaIce, KernelAbstractions, ConservativeRegridding, Adapt
 
-# Trigger the ClimaLand extension
+# Trigger ClimaCouplerClimaLandExt
 import ClimaLand
 
-# Trigger the ClimaAtmos extension
+# Trigger ClimaCouplerClimaAtmosExt (also required by ClimaCouplerCMIPExt)
 import ClimaAtmos
+
+# Load the backends (e.g. CUDA, MPI) required by the current ClimaComms context
+import ClimaComms
+ClimaComms.@import_required_backends
 ```
 
 Once the packages are loaded, construct and run the simulation using a config file:

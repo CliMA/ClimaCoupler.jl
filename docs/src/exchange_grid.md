@@ -118,6 +118,10 @@ Aggregation:
   are `(1 - sic)`-weighted averages and ice fluxes `sic`-weighted ones.
   Momentum is converted back to the local CT1/CT2 components only at the end
   (the UV basis is global, so its components are DSS-safe scalars).
+- **Surface temperature for radiation**: the ocean and sea-ice temperatures
+  from which the atmosphere computes the surface emission are sent up the
+  same way using the weighted average of ``T^4``. At each exchange, the emitted 
+  longwave the atmosphere computes then integrates to what the ocean and sea ice emit.
 
 Slow surfaces time-average on per-polygon accumulators
 (`FluxCalculator.push_and_reset!` overrides), so the averaged flux pushed to

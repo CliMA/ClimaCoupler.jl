@@ -7,8 +7,8 @@ h_elem: 16
 z_elem: 79
 z_max: 60000.0
 dz_bottom: 28.0
-dt: "180secs"
-dt_cpl: "180secs"
+dt: "120secs"
+dt_cpl: "120secs"
 energy_check: false
 extra_atmos_diagnostics:
   - short_name: [hur, hus, ta, cl, clw, cli]

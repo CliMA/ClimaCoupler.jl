@@ -10,7 +10,7 @@ since it has fewer dependencies and faster precompilation.
 
 ## Running
 
-Run these commands from the repository root with Julia 1.10 or 1.11, the versions
+Run these commands from the repository root with Julia 1.10 or 1.13, the versions
 this environment's manifests are pinned to. Install the environment once:
 
 ```bash

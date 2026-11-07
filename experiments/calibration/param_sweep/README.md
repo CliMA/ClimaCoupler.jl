@@ -22,7 +22,7 @@ for `i in 1:prior_points`, so the default of 3 points gives the 25th,
 3. From the repository root:
 
 ```
-module purge && module load climacommon/2025_02_25
+module purge && module load climacommon/2026_10_30-1.13.3
 julia --project=experiments/AMIP -e 'using Pkg; Pkg.instantiate()'
 julia --project=experiments/AMIP \
     experiments/calibration/param_sweep/run_sweep.jl my_sweep.jl

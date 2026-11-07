@@ -1,6 +1,6 @@
 agents:
   queue: derecho
-  modules: climacommon/2025_02_25
+  modules: climacommon/2026_10_30-1.13.3
   pbs_l_select: "1:ncpus=1:ngpus=1"
 
 steps:

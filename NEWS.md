@@ -4,6 +4,9 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Update CI to use Julia 1.13 PR[#2212](https://github.com/CliMA/ClimaCoupler.jl/pull/2212)
+All Buildkite pipelines and GitHub Actions now run on Julia 1.13.3.
+
 #### Checkpoints do not save or restore ClimaCore spaces
 Cache checkpoints skip ClimaCore spaces and grids, which remain unchanged during
 simulations, so they no longer store the local geometry of every field's space.

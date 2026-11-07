@@ -407,9 +407,9 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "Artifacts", "AtmosphericProfilesLibrary", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaInitialConditions", "ClimaInterpolations", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "Flux", "ForwardDiff", "Insolation", "Interpolations", "JLD2", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SparseMatrixColorings", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "7d433fd61fe06d54a74e37236862487c29f23f60"
+git-tree-sha1 = "d0daaa941cd000d5c6b8e802a8b86036382e0bbf"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
-version = "0.42.17"
+version = "0.42.18"
 
     [deps.ClimaAtmos.extensions]
     ClimaAtmosMusica = "Musica"
@@ -508,9 +508,9 @@ weakdeps = ["CUDA"]
 
 [[deps.ClimaLand]]
 deps = ["ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "Dates", "DocStringExtensions", "Insolation", "Interpolations", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "NCDatasets", "NVTX", "RootSolvers", "StaticArrays", "SurfaceFluxes", "Thermodynamics"]
-git-tree-sha1 = "e95dbf34609dbc2dc0a5f1f079ef2960699b5c23"
+git-tree-sha1 = "cf5bcb98447ac98f519474594ca4e33829ab1384"
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
-version = "1.14.1"
+version = "1.15.0"
 
     [deps.ClimaLand.extensions]
     ConstrainedNeuralModelExt = ["Adapt", "Flux", "JLD2", "InteractiveUtils"]
@@ -572,9 +572,9 @@ version = "0.1.35"
 
 [[deps.CloudMicrophysics]]
 deps = ["ClimaParams", "DocStringExtensions", "FastGaussQuadrature", "ForwardDiff", "InteractiveUtils", "LazyArtifacts", "LogExpFunctions", "RootSolvers", "SpecialFunctions", "StaticArrays", "Thermodynamics", "UnrolledUtilities"]
-git-tree-sha1 = "a6d029c16b4a984dd307ad1d360dac1a29770ba7"
+git-tree-sha1 = "5b7b81a03a03671972d8c74fcdcee4bb9d8671c7"
 uuid = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
-version = "0.47.0"
+version = "0.48.0"
 
     [deps.CloudMicrophysics.extensions]
     EmulatorModelsExt = ["DataFrames", "MLJ"]
@@ -3191,9 +3191,9 @@ version = "1.5.7+1"
 
 [[deps.Zygote]]
 deps = ["AbstractFFTs", "ChainRules", "ChainRulesCore", "DiffRules", "Distributed", "FillArrays", "ForwardDiff", "GPUArraysCore", "IRTools", "InteractiveUtils", "LinearAlgebra", "LogExpFunctions", "MacroTools", "NaNMath", "PrecompileTools", "Random", "SparseArrays", "SpecialFunctions", "Statistics", "ZygoteRules"]
-git-tree-sha1 = "b6bb65f9d868585a33d76917cf81a222c69f1d30"
+git-tree-sha1 = "2da80a46522b8e4152deb4b6596d4f3eca0b0111"
 uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
-version = "0.7.15"
+version = "0.7.16"
 
     [deps.Zygote.extensions]
     ZygoteAtomExt = "Atom"

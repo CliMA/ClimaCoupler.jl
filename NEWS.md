@@ -4,6 +4,10 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Move CI and the experiment environments to Julia 1.13 and CUDA 6
+Buildkite runs Julia 1.13.3, and the experiment environments ship `Manifest-v1.13.toml` instead of
+`Manifest-v1.11.toml`. The AMIP and CMIP environments require CUDA 6.
+
 #### Checkpoints do not save or restore ClimaCore spaces
 Cache checkpoints skip ClimaCore spaces and grids, which remain unchanged during
 simulations, so they no longer store the local geometry of every field's space.

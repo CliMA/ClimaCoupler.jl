@@ -4,6 +4,7 @@ import Dates
 import ClimaCoupler
 import ClimaCoupler: CalibrationTools
 import ClimaAnalysis
+import OrderedCollections: OrderedDict
 
 # TODO: Remove this once the name is added to ClimaAnalysis
 push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
@@ -192,8 +193,9 @@ end
     z_i = [0.0, 1000.0, 2000.0, 3000.0, 4000.0]
     # data: cloud fraction = 0.5 everywhere
     data = fill(0.5f0, length(lons), length(z_i))
-    dims = Dict("z" => z_i, "longitude" => lons)
-    dim_attribs = Dict("z" => Dict{String, Any}(), "longitude" => Dict{String, Any}())
+    dims = OrderedDict("longitude" => lons, "z" => z_i)
+    dim_attribs =
+        OrderedDict("longitude" => Dict{String, Any}(), "z" => Dict{String, Any}())
     attribs = Dict{String, Any}("short_name" => "cl", "units" => "unitless")
     obs_var = ClimaAnalysis.OutputVar(attribs, dims, dim_attribs, data)
 

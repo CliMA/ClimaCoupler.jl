@@ -15,9 +15,9 @@ A model interface struct for running the AMIP calibration pipeline.
 See the ClimaCalibrate.jl documentation for the methods that
 `CouplerModelInterface` should implement.
 """
-struct CouplerModelInterface <: ClimaCalibrate.AbstractModelInterface
+struct CouplerModelInterface{C} <: ClimaCalibrate.AbstractModelInterface
     "The calibration configuration"
-    config::CalibrationTools.CalibrateConfig
+    config::C
 
     "Whether the `forward_model` emulates the diagnostics instead of running the
     simulation. The diagnostics have the correct metadata, but the values may be

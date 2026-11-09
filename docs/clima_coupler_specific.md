@@ -62,7 +62,7 @@ Mapped to the architectural layers in
 
 ## Running experiments
 
-Run from the repository root with Julia 1.10 or 1.11, the versions the experiment
+Run from the repository root with Julia 1.10 or 1.13, the versions the experiment
 manifests are pinned to. See [docs/src/running.md](src/running.md) for the full guide.
 
 ### AMIP
@@ -133,7 +133,7 @@ julia --project=test test/runtests.jl
 | `mpi_tests/` | Shell scripts for MPI-parallel coupling checks (not in `runtests.jl`) |
 | `cess_climate_sensitivity.jl` | Cess climate sensitivity analysis (exists in `test/` but **not** in `runtests.jl`) |
 
-CI is managed by Buildkite. The GitHub Actions matrix (`.github/workflows/ci.yml`) runs Julia 1.10 and 1.12 on Ubuntu, Windows, and macOS (macOS only on push to `main`).
+CI is managed by Buildkite. The GitHub Actions matrix (`.github/workflows/ci.yml`) runs Julia 1.10 and 1.13 on Ubuntu, Windows, and macOS (macOS only on push to `main`).
 
 ## Repo-specific conventions
 

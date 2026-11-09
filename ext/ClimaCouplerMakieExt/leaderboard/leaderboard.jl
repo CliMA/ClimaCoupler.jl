@@ -220,22 +220,14 @@ leaderboard plot can be followed as a time series across runs.
 The columns are `short_name`, `season`, `rmse`, `other_models_median_rmse`,
 `other_models_best_rmse`, `n_other_models`, and `units`. The median and best are over the
 other models only. RMSEs that weren't computed are `NaN`.
-
-Each row is also logged on one line as `Leaderboard RMSE: column=value ...`, with the same
-column names, so the values can be read back from the job log as well as the file.
 """
 function write_rmses(path, rmse_var_dict)
-    columns = (
-        "short_name",
-        "season",
-        "rmse",
-        "other_models_median_rmse",
-        "other_models_best_rmse",
-        "n_other_models",
-        "units",
-    )
     open(path, "w") do io
-        println(io, join(columns, ","))
+        println(
+            io,
+            "short_name,season,rmse,other_models_median_rmse,",
+            "other_models_best_rmse,n_other_models,units",
+        )
         for short_name in sort(collect(keys(rmse_var_dict)))
             rmse_var = rmse_var_dict[short_name]
             others = filter(!=("CliMA"), ClimaAnalysis.model_names(rmse_var))
@@ -254,12 +246,9 @@ function write_rmses(path, rmse_var_dict)
                     "\"$units\"",
                 )
                 println(io, join(row, ","))
-                @info "Leaderboard RMSE: " *
-                      join(("$column=$value" for (column, value) in zip(columns, row)), " ")
             end
         end
     end
-    @info "Wrote leaderboard RMSEs to $path"
     return nothing
 end
 

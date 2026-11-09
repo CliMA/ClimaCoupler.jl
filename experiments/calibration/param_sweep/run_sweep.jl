@@ -210,21 +210,15 @@ function design(experiment_path)
 
     # One week of spin-up, then the sampled month.
     sample_date = Dates.DateTime(_get(:sample_date, "2010-10-01"))
-    config = CalibrationTools.CalibrateConfig(;
+    run_settings = (;
         config_file,
-        # `CalibrateConfig` requires `short_names` because a calibration needs
-        # observations to compare against, but these are never used in the sweep.
-        short_names = ["ta"],
-        minibatch_size = 1,
-        n_iterations = 1,
-        sample_date_ranges = [(sample_date, sample_date)],
-        extend = Dates.Month(1),
-        spinup = Dates.Day(_get(:spinup_days, 7)),
         output_dir,
-        rng_seed = _get(:rng_seed, 42),
+        sample_date_ranges = [(sample_date, sample_date)],
+        spinup = Dates.Day(_get(:spinup_days, 7)),
+        extend = Dates.Month(1),
     )
     return (;
-        interface = CouplerModelInterface(config),
+        interface = CouplerModelInterface(run_settings),
         members,
         n_workers = _get(:n_workers, length(members)),
         worker_options = _get(:worker_options, DEFAULT_WORKER_OPTIONS),

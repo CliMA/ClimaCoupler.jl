@@ -57,6 +57,13 @@ longer have `date` and `date_bnds`, and `time` is in seconds since `start_date`.
 Restarted runs with a ClimaLand model now start the land model at the restart time instead of
 `t = 0` when not using `ITime`.
 
+#### Fix restart time when restart options are set after loading the config
+`CoupledSimulation(config_dict)` now updates `t_start` from `restart_t` (or the latest checkpoint
+when `detect_restart_files` is set), so restart options set after `get_coupler_config_dict` no
+longer restart the checkpointed state at the original `t_start`. `Checkpointer.restart!` errors if
+the coupled simulation does not start at the checkpoint time. Non-`ITime` runs with a prescribed
+ocean no longer error with `UndefVarError: Dates`.
+
 #### Add ocean config options
 New `ocean_float_type` (`Float64` by default) and `ocean_vertical_levels` (60 by default) options set the
 Oceananigans float type and number of levels.

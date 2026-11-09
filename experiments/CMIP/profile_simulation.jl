@@ -17,6 +17,9 @@ nsys profile --start-later=true --capture-range=cudaProfilerApi \
 Two coupling steps are run first to trigger precompilation. The Nsight profiler
 then starts capturing at the `CUDA.@profile` boundary, so that compilation and
 initialization are excluded from the profile.
+
+The number of profiled coupling steps can be set with the `PROFILE_STEPS`
+environment variable (default: 3).
 =#
 
 # Load the necessary modules to run the coupled simulation
@@ -27,15 +30,18 @@ import CUDA
 # Get the configuration file from the command line (or manually set it here)
 config_file = Input.parse_commandline(Input.argparse_settings())["config_file"]
 
+# Number of coupling steps to profile, set via the PROFILE_STEPS environment variable
+profile_steps = parse(Int, get(ENV, "PROFILE_STEPS", "3"))
+
 # Set up the coupled simulation
 cs = CoupledSimulation(config_file)
 
-# Run two steps to trigger precompilation, then profile three steps
+# Run two steps to trigger precompilation, then profile `profile_steps` steps
 step!(cs);
 step!(cs);
 GC.gc()
 CUDA.@profile external = true begin
-    for _ in 1:3
+    for _ in 1:profile_steps
         step!(cs)
     end
 end

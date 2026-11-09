@@ -4,7 +4,7 @@ import Dates
 import ClimaCoupler
 import ClimaCoupler: CalibrationTools
 import ClimaAnalysis
-import OrderedCollections: OrderedDict
+import ClimaAnalysis: Template
 
 # TODO: Remove this once the name is added to ClimaAnalysis
 push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
@@ -208,16 +208,18 @@ end
 @testset "regrid_to_model_levels" begin
 
     # Construct a simple synthetic OutputVar with an altitude dimension
-    # dims: (altitude=5, lon=2)
+    # dims: (lon=2, altitude=5)
     lons = [0.0, 1.0]
     z_i = [0.0, 1000.0, 2000.0, 3000.0, 4000.0]
     # data: cloud fraction = 0.5 everywhere
     data = fill(0.5f0, length(lons), length(z_i))
-    dims = OrderedDict("longitude" => lons, "z" => z_i)
-    dim_attribs =
-        OrderedDict("longitude" => Dict{String, Any}(), "z" => Dict{String, Any}())
-    attribs = Dict{String, Any}("short_name" => "cl", "units" => "unitless")
-    obs_var = ClimaAnalysis.OutputVar(attribs, dims, dim_attribs, data)
+    obs_var =
+        Template.TemplateVar() |>
+        Template.add_attribs(short_name = "cl", units = "unitless") |>
+        Template.add_lon_dim(dim = lons) |>
+        Template.add_z_dim(dim = z_i) |>
+        Template.add_data(data = data) |>
+        Template.initialize
 
     # Regrid to 3 model levels
     model_alts = [500.0, 2000.0, 3500.0]

@@ -18,6 +18,12 @@
 #
 # Exits non-zero if any package is unusable, so it can gate a CI step.
 
+#   * An image that built cleanly and cached almost nothing. A workload can run, report
+#     success and still produce a near-empty image if the mechanism that serializes
+#     *externally-owned* code is not active -- which is what PrecompileTools 1.2 does on
+#     Julia >= 1.12. Observed: AtmosWarmupExplicit at 2 MiB where it should be ~1200 MiB,
+#     with `status = ok`. Hence the minimum sizes below.
+
 const PACKAGES = [
     "AtmosWarmupSetup",
     "AtmosWarmupExplicit",
@@ -27,6 +33,20 @@ const PACKAGES = [
     "SeaIceWarmup",
     "CMIPWarmup",
 ]
+
+# A floor, not an expectation: roughly a quarter of what each package measured on the
+# stack it was developed against. Sizes legitimately move with Julia and dependency
+# versions, so this is set loose enough not to need updating for ordinary drift, and tight
+# enough to catch an image that cached nothing.
+const MIN_MIB = Dict(
+    "AtmosWarmupSetup" => 300,
+    "AtmosWarmupExplicit" => 300,
+    "AtmosWarmupStep" => 200,
+    "OceanWarmup" => 300,
+    "LandWarmup" => 300,
+    "SeaIceWarmup" => 25,
+    "CMIPWarmup" => 400,
+)
 
 "Newest package image for `pkg`, or `nothing`."
 function image_path(pkg)
@@ -64,8 +84,15 @@ for pkg in PACKAGES
     mib = round(filesize(so) / 2^20, digits = 0)
     # A stale image means the link failed after the workload ran: the old image survives.
     fresh = mtime(so) >= source_mtime(pkg)
+    floor_mib = get(MIN_MIB, pkg, 0)
+    big_enough = mib >= floor_mib
     println(rpad(pkg, 24), rpad("$(Int(mib)) MiB", 12), rpad(fresh ? "yes" : "STALE", 8), status)
     fresh || push!(failures, "$pkg: image older than its sources/configs -- link likely failed")
+    big_enough || push!(
+        failures,
+        "$pkg: image is $(Int(mib)) MiB, under the $(floor_mib) MiB floor -- the workload " *
+        "ran but cached little or nothing (check PrecompileTools >= 1.3)",
+    )
     occursin("status = ok", status) ||
         push!(failures, "$pkg: workload did not succeed -- $status")
 end

@@ -99,10 +99,18 @@ A cheap low-resolution warmup looks like it should work. Three constraints rule 
 ### Building on a small GPU
 
 The coupled workloads hold the atmosphere, ocean and sea ice on the device at once, which
-at production `z_elem` exceeds a 15 GB card. `WARMUP_Z_ELEM` lowers it so such a machine
-can build the stack at all -- but by the first point above, the resulting images serve only
-runs at that same `z_elem`. It is for a self-consistent local measurement, never for
-building images a production run will use. The value is recorded in `workload_report.txt`.
+at production resolution exceeds a 15 GB card. `WARMUP_H_ELEM` lowers the *horizontal*
+resolution, which cuts memory without costing cache validity, since `h_elem` is not part of
+the type. Images built at `h_elem = 8` serve a production run at 16.
+
+```bash
+CLIMACOMMS_DEVICE=CUDA JULIA_NUM_PRECOMPILE_TASKS=1 WARMUP_H_ELEM=8 \
+  julia --project=experiments/warmup -e 'using Pkg; Pkg.precompile()'
+```
+
+There is deliberately no equivalent for `z_elem`: it is the `Nv` type parameter, so
+lowering it produces images no production run can use. The value is recorded in
+`workload_report.txt`.
 
 So the configuration here is production's, at production resolution, run briefly via `run!`
 with every cadence shortened enough to fire. Periods are safe to shorten: `time_to_period`

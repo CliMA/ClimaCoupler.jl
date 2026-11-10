@@ -40,7 +40,6 @@ include_dependency(joinpath(WARMUP_DIR, "configs", "atmos_warmup.yml"))
 
 const REPORT = joinpath(@__DIR__, "..", "workload_report.txt")
 
-"Load the warmup config with repository-relative paths resolved and output redirected."
 """
     small_gpu_atmos_config(path, outdir)
 
@@ -70,6 +69,7 @@ function small_gpu_atmos_config(path, outdir)
     return out
 end
 
+"Load the warmup config with repository-relative paths resolved and output redirected."
 function warmup_config(outdir)
     cfg = YAML.load_file(CONFIG)
     cfg["coupler_output_dir"] = outdir

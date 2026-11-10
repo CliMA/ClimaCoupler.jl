@@ -21,6 +21,15 @@ import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
 import ClimaComms
 
+# Production loads the Makie stack before it builds anything -- `experiments/CMIP/code_loading.jl`
+# does so to trigger `ClimaCouplerMakieExt`. Loading it *after* this workload's code has been
+# compiled invalidates that code, so the cache has to be built in the same world the run uses.
+# Measured: with the stack absent from the workload, `ClimaAtmos.get_simulation` compiled 0.2 s
+# in a session without Makie and 227.1 s in one with it, and coupled setup went 4.4 s -> 1153.1 s.
+# These imports are load-bearing even though nothing here calls them.
+import CairoMakie, GeoMakie, Makie, Poppler_jll, Printf
+
+
 export prologue, check_matches_coupled
 
 """

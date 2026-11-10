@@ -193,7 +193,7 @@ uuid = "a1b2c3d4-0002-4000-8000-000000000002"
 version = "0.1.0"
 
 [[deps.AtmosWarmupSetup]]
-deps = ["CUDA", "ClimaAtmos", "ClimaComms", "ClimaTimeSteppers", "MPI", "PrecompileTools", "YAML"]
+deps = ["CUDA", "CairoMakie", "ClimaAtmos", "ClimaComms", "ClimaTimeSteppers", "GeoMakie", "MPI", "Makie", "Poppler_jll", "PrecompileTools", "Printf", "YAML"]
 path = "AtmosWarmupSetup"
 uuid = "a1b2c3d4-0001-4000-8000-000000000001"
 version = "0.1.0"
@@ -888,7 +888,7 @@ uuid = "a38c48d9-6df1-5ac9-9223-b6ada3b5572b"
 version = "0.1.0+0"
 
 [[deps.CouplerWarmupCommon]]
-deps = ["ClimaComms", "ClimaCoupler", "ClimaParams", "Thermodynamics"]
+deps = ["CairoMakie", "ClimaComms", "ClimaCoupler", "ClimaParams", "GeoMakie", "Makie", "Poppler_jll", "Printf", "Thermodynamics"]
 path = "CouplerWarmupCommon"
 uuid = "b7e4c201-9a63-4d85-8f12-3c6a0b94e7d2"
 version = "0.1.0"

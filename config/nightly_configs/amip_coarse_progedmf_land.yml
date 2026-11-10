@@ -1,6 +1,7 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_progedmf.yml"
+binary_area_fraction: false
 checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_progedmf.toml"]
 dt: "120secs"

@@ -154,7 +154,7 @@ dispatch in coupling.
 - `simple_ocean`: Whether to use a simple ocean model setup (default: `false`)
 - `ocean_grid`: Horizontal grid for Oceananigans (`:one_deg_tripolar` or `:orca`, default: `:one_deg_tripolar`)
 - `depth`: Maximum ocean depth in metres (default: 5500 m for EN4 compatibility)
-- `Nz`: Number of vertical levels (default: 60)
+- `Nz`: Number of vertical levels (default: 60); 10 or fewer use `simplified_ocean_closure`
 - `dt`: Time step (default: `1800.0` seconds, or 30 minutes)
 - `comms_ctx`: Communication context (default: `ClimaComms.context()`)
 - `FT_ocean`: Float type for the ocean simulation (default: `Float64`)
@@ -197,12 +197,9 @@ function OceananigansSimulation(
     OC.Oceananigans.defaults.planet_radius = coupled_param_dict["planet_radius"]
 
     # Create ocean simulation
-    closure = if simple_ocean
-        @info "Using simpler ocean setup; to be used for software testing only."
-        simplified_ocean_closure()
-    else
-        default_one_degree_closure()
-    end
+    simple_ocean && @info "Using simpler ocean setup; to be used for software testing only."
+    closure =
+        simple_ocean || Nz <= 10 ? simplified_ocean_closure() : default_one_degree_closure()
 
     if tspan[1] isa ITime
         # create a model clock that uses DateTime, for compatibility with ITime.

@@ -4,6 +4,7 @@ import Dates
 import ClimaCoupler
 import ClimaCoupler: CalibrationTools
 import ClimaAnalysis
+import ClimaAnalysis: Template
 
 # TODO: Remove this once the name is added to ClimaAnalysis
 push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
@@ -12,16 +13,28 @@ push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
     config_file = joinpath(pkgdir(ClimaCoupler), "experiments", "test", "amip_test.jl")
     valid_config_args = (;
         config_file,
-        short_names = ["pr"],
-        minibatch_size = 2,
+        observables = [
+            CalibrationTools.Observable(
+                name = "pr",
+                reduce = identity,
+                model_error_fraction = 0.1,
+            ),
+            CalibrationTools.Observable(name = "rtmt", reduce = identity, noise_sd = 0.2),
+        ],
         n_iterations = 3,
         sample_date_ranges = [["2010-01", "2010-01"], ["2011-01", "2011-01"]],
         extend = Dates.Week(1),
         spinup = Dates.Week(1),
         output_dir = ".",
         rng_seed = 42,
+        # CalibrateConfig only checks that priors are given.
+        priors = :test_priors,
     )
     config = CalibrationTools.CalibrateConfig(; valid_config_args...)
+
+    # The targets are used in order, one per iteration plus one.
+    @test config.sample_date_ranges ==
+          [(Dates.DateTime(y, 1), Dates.DateTime(y, 1)) for y in (2010, 2011, 2010, 2011)]
 
     function make_calibrate_config(; kwargs...)
         CalibrationTools.CalibrateConfig(; valid_config_args..., kwargs...)
@@ -31,9 +44,9 @@ push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
         config_file = "this_does_not_exist.yml",
     )
 
-    @test_throws ErrorException make_calibrate_config(short_names = String[])
-
     @test_throws ErrorException make_calibrate_config(sample_date_ranges = [])
+    @test_throws ErrorException make_calibrate_config(observables = [])
+    @test_throws ErrorException make_calibrate_config(priors = nothing)
 
     @test_throws ErrorException make_calibrate_config(extend = -Dates.Week(1))
 
@@ -43,18 +56,26 @@ push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
         sample_date_ranges = [["2010-02", "2010-01"], ["2011-02", "2011-01"]],
     )
 
-    @test_throws ErrorException make_calibrate_config(minibatch_size = -1)
-
     @test_throws ErrorException make_calibrate_config(n_iterations = -1)
 
-    @test_throws ErrorException make_calibrate_config(
-        minibatch_size = 3,
-        sample_date_ranges = [["2010-01", "2010-01"] for _ in 1:2],
+    # Each observable needs a name, a reduce function and exactly one of
+    # model_error_fraction and noise_sd, and names may not repeat.
+    @test_throws UndefKeywordError CalibrationTools.Observable(
+        name = "pr",
+        model_error_fraction = 0.1,
     )
-
-    @test_logs (:warn, r"Number of samples is not divisible by the minibatch size") make_calibrate_config(
-        minibatch_size = 3,
-        sample_date_ranges = [["2010-01", "2010-01"] for _ in 1:7],
+    @test_throws ErrorException CalibrationTools.Observable(name = "pr", reduce = identity)
+    @test_throws ErrorException CalibrationTools.Observable(
+        name = "pr",
+        reduce = identity,
+        model_error_fraction = 0.1,
+        noise_sd = 0.2,
+    )
+    @test_throws ErrorException make_calibrate_config(
+        observables = [
+            CalibrationTools.Observable(name = "pr", reduce = identity, noise_sd = 0.2),
+            CalibrationTools.Observable(name = "pr", reduce = identity, noise_sd = 0.1),
+        ],
     )
 end
 
@@ -187,15 +208,18 @@ end
 @testset "regrid_to_model_levels" begin
 
     # Construct a simple synthetic OutputVar with an altitude dimension
-    # dims: (altitude=5, lon=2)
+    # dims: (lon=2, altitude=5)
     lons = [0.0, 1.0]
     z_i = [0.0, 1000.0, 2000.0, 3000.0, 4000.0]
     # data: cloud fraction = 0.5 everywhere
     data = fill(0.5f0, length(lons), length(z_i))
-    dims = Dict("z" => z_i, "longitude" => lons)
-    dim_attribs = Dict("z" => Dict{String, Any}(), "longitude" => Dict{String, Any}())
-    attribs = Dict{String, Any}("short_name" => "cl", "units" => "unitless")
-    obs_var = ClimaAnalysis.OutputVar(attribs, dims, dim_attribs, data)
+    obs_var =
+        Template.TemplateVar() |>
+        Template.add_attribs(short_name = "cl", units = "unitless") |>
+        Template.add_lon_dim(dim = lons) |>
+        Template.add_z_dim(dim = z_i) |>
+        Template.add_data(data = data) |>
+        Template.initialize
 
     # Regrid to 3 model levels
     model_alts = [500.0, 2000.0, 3500.0]

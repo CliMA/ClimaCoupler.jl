@@ -4,6 +4,18 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Move CI and the experiment environments to Julia 1.13 and CUDA 6
+Buildkite runs Julia 1.13.3, and the experiment environments ship `Manifest-v1.13.toml` instead of
+`Manifest-v1.11.toml`. The AMIP and CMIP environments require CUDA 6.
+
+#### Checkpoints do not save or restore ClimaCore spaces
+Cache checkpoints skip ClimaCore spaces and grids, which remain unchanged during
+simulations, so they no longer store the local geometry of every field's space.
+
+#### Split ocean and sea-ice output files by size
+The Oceananigans and ClimaSeaIce output writers start a new part file when a file reaches 2 GiB, instead of
+every 15 days, so output less frequent than every 15 days no longer stores a copy of the grid with every record.
+
 #### Set `dz_top` for the stretched atmosphere grids
 ClimaAtmos stretches vertical grids with ClimaCore's two-scale
 `BoundaryLayerHyperbolicTangentStretching` (CliMA/ClimaAtmos.jl#4949), which admits a range of

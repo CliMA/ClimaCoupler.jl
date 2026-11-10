@@ -93,6 +93,8 @@ nothing # hide
 ```@docs
 CalibrationTools.CalibrateConfig
 CalibrationTools.CalibrateConfig()
+CalibrationTools.Observable
+CalibrationTools.Observable()
 CalibrationTools.ERA5DataLoader
 CalibrationTools.ERA5DataLoader()
 CalibrationTools.CERESDataLoader

@@ -8,10 +8,6 @@ import ClimaCore as CC
 import ClimaCoupler: ConservationChecker, Interfacer
 import ClimaCoupler.Utilities: integral
 
-get_slab_energy(slab_sim, T_sfc) =
-    slab_sim.integrator.p.params.ρ .* slab_sim.integrator.p.params.c .* T_sfc .*
-    slab_sim.integrator.p.params.h
-
 struct TestAtmos{I} <: Interfacer.AbstractAtmosSimulation
     i::I
 end

@@ -22,6 +22,9 @@ the whole setup and step path on one core. Measured on a coupled CMIP configurat
 Startup is ~99 % single-core: Julia serializes codegen process-wide, so the only parallelism
 available is across *processes*, which is what `Pkg.precompile()` provides.
 
+These figures, and the image sizes below, were measured on Julia 1.11 / CUDA 5.11 /
+ClimaCore 0.16. They have not been re-measured since the move to Julia 1.13 and CUDA 6.
+
 ## Layout
 
 | package | caches | depends on |
@@ -95,21 +98,32 @@ and setting `t_end`.
 
 ## Building
 
-These packages are developed from this repository rather than registered, so the manifest
-is generated locally (and git-ignored, because it records absolute paths):
+The packages are developed from this repository rather than registered. Their paths live in
+`Project.toml`'s `[sources]` block and are relative, so the manifest is committed and the
+environment instantiates without a separate `Pkg.develop` step:
 
 ```bash
-julia --project=experiments/warmup -e '
-  using Pkg
-  Pkg.develop(path=".")
-  Pkg.develop([PackageSpec(path=joinpath("experiments","warmup",p)) for p in
-    ("CouplerWarmupCommon","AtmosWarmupSetup","AtmosWarmupExplicit","AtmosWarmupStep",
-     "OceanWarmup","LandWarmup","SeaIceWarmup","CMIPWarmup")])'
-
 CLIMACOMMS_DEVICE=CUDA JULIA_NUM_PRECOMPILE_TASKS=1 \
-  julia --project=experiments/warmup -e 'using Pkg; Pkg.precompile()'
+  julia --project=experiments/warmup -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
+```
 
+```bash
 julia --project=experiments/warmup experiments/warmup/check_warmup.jl
+```
+
+### Versions must match `experiments/CMIP`
+
+A cached specialization is keyed on the package versions it was built from, so the warmup
+environment has to resolve to exactly what the run environment resolves to. The manifest
+here is therefore seeded from `experiments/CMIP/Manifest-v1.13.toml` and only the
+warmup-only extras are resolved on top of it. Left to float, it picks up newer releases
+(observed: ClimaCore 1.0.8 against CMIP's 1.0.5) and the cache silently stops applying.
+
+Re-seed after any change to the CMIP manifest:
+
+```bash
+cp experiments/CMIP/Manifest-v1.13.toml experiments/warmup/Manifest-v1.13.toml
+julia --project=experiments/warmup -e 'using Pkg; Pkg.resolve()'
 ```
 
 **Always run `check_warmup.jl` afterwards.** Two failures are invisible otherwise:
@@ -156,7 +170,12 @@ packages without it. That is the per-launch cost, set against a setup and first 
 measured in tens of minutes. The number of images does not matter -- splitting is free at
 run time; total bytes is what costs.
 
-What precompilation cannot reach: **GPU kernel compilation**. CUDA.jl 5.11 cannot persist
-device code, so ~2390 kernels are compiled on every launch warm or cold -- 36 % of a cold
-first step. Only CUDA.jl 6 changes this, and it will add cubins to images already near the
-2 GiB limit, so that migration and this splitting work are coupled.
+**GPU kernel compilation** used to be out of reach: CUDA.jl 5.11 could not persist device
+code, so ~2390 kernels were compiled on every launch warm or cold -- 36 % of a cold first
+step. On the current stack (Julia 1.13, CUDA 6.4.1, GPUCompiler 2.10) it can be:
+`GPUCompiler.can_persist_results` is true for a CUDA job, because `supports_relocatable_ir()`
+holds from Julia 1.13 and `CUDACore` requests `relocation_lowering = :patch`.
+
+The consequence for this directory is that persisted device code *adds* cubins to images
+that already peaked at 1554 MiB against the ~2 GiB ceiling below. Image sizes need
+re-measuring, and the split may need to go further.

@@ -78,17 +78,31 @@ loudly on drift.
 
 ## The warmup must be the production configuration, briefly
 
-Resolution changes array sizes rather than types, so a cheap low-resolution warmup looks
-like it should work. Three constraints rule it out:
+A cheap low-resolution warmup looks like it should work. Three constraints rule it out:
 
+* **Vertical resolution is part of the type.** A field's data layout is
+  `ClimaCore.DataLayouts.VIJFH{FT, Nv, ...}`, where `Nv` is the number of levels, so an
+  image built at one `z_elem` is not usable by a run at another. Measured against an image
+  built at `z_elem = 79`, `ClimaAtmos.get_simulation` compiled 0.2 s at 79, 250.6 s at 78
+  and 243.8 s at 63 -- one level of difference costs essentially the whole cache.
+  Horizontal resolution is *not* affected: `h_elem` changes the number of elements, which
+  is a runtime dimension.
 * **Type fidelity** -- model selections must match production exactly (above).
-* **Physical validity** -- the warmup has to be a configuration that actually runs. Below
-  roughly production vertical resolution the coupled state degrades within a few steps until
+* **Physical validity** -- the warmup has to be a configuration that actually runs. Well
+  below production vertical resolution the coupled state degrades within a few steps until
   `@assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ 1`
-  (`FieldExchanger.jl`) fails. Horizontal resolution is not the constraint; `z_elem` is.
+  (`FieldExchanger.jl`) fails.
 * **Schedule coverage** -- code behind a schedule is only compiled if the schedule fires.
   `orchestrate_diagnostics` skips `compute_field!` entirely when inactive, and the same
   applies to radiation (`dt_rad`), cloud fraction, gravity-wave drag and checkpointing.
+
+### Building on a small GPU
+
+The coupled workloads hold the atmosphere, ocean and sea ice on the device at once, which
+at production `z_elem` exceeds a 15 GB card. `WARMUP_Z_ELEM` lowers it so such a machine
+can build the stack at all -- but by the first point above, the resulting images serve only
+runs at that same `z_elem`. It is for a self-consistent local measurement, never for
+building images a production run will use. The value is recorded in `workload_report.txt`.
 
 So the configuration here is production's, at production resolution, run briefly via `run!`
 with every cadence shortened enough to fire. Periods are safe to shorten: `time_to_period`

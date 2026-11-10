@@ -19,6 +19,17 @@ using TOML
 const REPO = normpath(joinpath(@__DIR__, "..", ".."))
 const MANIFEST = "Manifest-v$(VERSION.major).$(VERSION.minor).toml"
 
+# Packages allowed to differ, with the reason. Only build-time tooling belongs here: a
+# science package that differs invalidates the cache, which is the whole point of this
+# check. Anything listed is reported but does not fail the run.
+const ALLOWED = Dict(
+    "PrecompileTools" =>
+        "1.2 does not cache externally-owned code on Julia >= 1.12 (measured: 0.02 MiB " *
+        "vs 143.55 MiB for the same workload), so this environment needs >= 1.3 even " *
+        "though experiments/CMIP still pins 1.2.1. It is a build-time tool and does not " *
+        "appear in the cached code.",
+)
+
 "Map package name => version string for every versioned entry in a manifest."
 function versions(path)
     deps = get(TOML.parsefile(path), "deps", Dict{String, Any}())
@@ -39,9 +50,15 @@ end
 run_versions, warm_versions = versions(RUN_MANIFEST), versions(WARM_MANIFEST)
 shared = sort!(collect(intersect(keys(run_versions), keys(warm_versions))))
 
-mismatched = [(n, run_versions[n], warm_versions[n]) for n in shared if run_versions[n] != warm_versions[n]]
+differing = [(n, run_versions[n], warm_versions[n]) for n in shared if run_versions[n] != warm_versions[n]]
+mismatched = filter(t -> !haskey(ALLOWED, first(t)), differing)
 
 println("compared $(length(shared)) packages present in both environments")
+for (name, runv, warmv) in differing
+    haskey(ALLOWED, name) || continue
+    println("  allowed: ", name, " CMIP ", runv, ", warmup ", warmv)
+    println("    ", ALLOWED[name])
+end
 if isempty(mismatched)
     println("Warmup and experiments/CMIP agree on every shared package version.")
 else

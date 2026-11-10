@@ -36,29 +36,28 @@ const REPORT = joinpath(@__DIR__, "..", "workload_report.txt")
 """
     small_gpu_atmos_config(path, outdir)
 
-Path to the atmosphere config, with `z_elem` replaced when `WARMUP_Z_ELEM` is set.
+Path to the atmosphere config, with `h_elem` reduced when `WARMUP_H_ELEM` is set.
 
 The coupled workloads hold the atmosphere, ocean and sea ice on the device at once, which
-at production `z_elem` needs more memory than a 15 GB card has. Setting `WARMUP_Z_ELEM`
-lets such a machine build the stack, **for a self-consistent local measurement only**.
+at production resolution exceeds a 15 GB card. Lowering `h_elem` cuts that cost without
+costing cache validity, because horizontal resolution is *not* part of the type: a field's
+data layout is `ClimaCore.DataLayouts.VIJFH{S, Nv, Nij, Nij, ...}`, which carries the
+vertical level count and the quadrature size but not the number of elements. Measured
+against an image built at `h_elem = 16`, `ClimaAtmos.get_simulation` at `h_elem = 8`
+compiled 0.2 s -- the same as at 16.
 
-Vertical resolution is part of the type. A field's data layout is
-`ClimaCore.DataLayouts.VIJFH{FT, Nv, ...}`, where `Nv` is the number of levels, so images
-built at one `z_elem` are not usable by a run at another. Measured against an image built
-at `z_elem = 79`: `ClimaAtmos.get_simulation` compiled 0.2 s at 79, 250.6 s at 78 and
-243.8 s at 63.
+`z_elem` is the opposite and must never be lowered for this purpose: it is the `Nv` type
+parameter above, and against the same image `get_simulation` compiled 0.2 s at 79 but
+250.6 s at 78 and 243.8 s at 63. One level of difference costs the whole cache.
 
-A run must therefore use the same `WARMUP_Z_ELEM` the images were built with, and the
-override is recorded in `workload_report.txt` so a mismatch is visible. Never set it when
-building images for production. Horizontal resolution is unaffected: `h_elem` changes the
-number of elements, which is a runtime dimension.
+The value is recorded in `workload_report.txt`.
 """
 function small_gpu_atmos_config(path, outdir)
-    z_elem = get(ENV, "WARMUP_Z_ELEM", "")
-    isempty(z_elem) && return path
+    h_elem = get(ENV, "WARMUP_H_ELEM", "")
+    isempty(h_elem) && return path
     cfg = YAML.load_file(path)
-    cfg["z_elem"] = parse(Int, z_elem)
-    out = joinpath(outdir, "atmos_warmup_z$(z_elem).yml")
+    cfg["h_elem"] = parse(Int, h_elem)
+    out = joinpath(outdir, "atmos_warmup_h$(h_elem).yml")
     YAML.write_file(out, cfg)
     return out
 end
@@ -99,8 +98,8 @@ end
         try
             open(REPORT, "w") do io
                 println(io, "status = ", status)
-                zo = get(ENV, "WARMUP_Z_ELEM", "")
-                isempty(zo) || println(io, "z_elem override = ", zo, " (not the production grid)")
+                ho = get(ENV, "WARMUP_H_ELEM", "")
+                isempty(ho) || println(io, "h_elem override = ", ho, " (type-neutral; see README)")
                 println(io, "device = ", get(ENV, "CLIMACOMMS_DEVICE", "(unset)"))
             end
         catch

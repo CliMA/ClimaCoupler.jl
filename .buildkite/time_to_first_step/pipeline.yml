@@ -10,42 +10,44 @@ env:
 # Time to first step for the flagship AMIP simulation. See .buildkite/README.md.
 
 steps:
-  - label: "Time to first step: flagship AMIP"
-    key: "ttfs_amip"
-    command:
-      - "bash .buildkite/time_to_first_step/measure.sh ttfs_amip"
-      - "buildkite-agent annotate --style info --context ttfs_amip < output/ttfs_amip/artifacts/time_to_first_step.md"
+  - label: "Time to first step: flagship AMIP, stock Julia"
+    key: "ttfs_amip_stock"
+    command: "bash .buildkite/time_to_first_step/measure.sh ttfs_amip_stock"
     artifact_paths:
-      - "output/ttfs_amip/artifacts/*"
-      - "experiments/AMIP_ttfs_amip/Manifest*.toml"
+      - "output/ttfs_amip_stock/artifacts/*"
+      - "experiments/AMIP_ttfs_amip_stock/Manifest*.toml"
     env: &ttfs_env
       CLIMACOMMS_DEVICE: "CUDA"
       JULIA_NUM_PRECOMPILE_TASKS: 8
-    agents: &ttfs_agents
+    agents:
       slurm_gpus_per_task: 1
       slurm_cpus_per_task: 8
       slurm_ntasks: 1
       slurm_mem: 30GB
 
-  - label: "Time to first step: flagship AMIP, upstream main"
-    key: "ttfs_amip_baseline"
-    if: build.env("UPSTREAM_PACKAGES") != null
-    command: "bash .buildkite/time_to_first_step/measure.sh ttfs_amip_baseline --main"
+  - label: "Time to first step: flagship AMIP, optimized Julia"
+    key: "ttfs_amip_opt"
+    command: "bash .buildkite/time_to_first_step/measure.sh ttfs_amip_opt"
     artifact_paths:
-      - "output/ttfs_amip_baseline/artifacts/*"
-      - "experiments/AMIP_ttfs_amip_baseline/Manifest*.toml"
+      - "output/ttfs_amip_opt/artifacts/*"
+      - "experiments/AMIP_ttfs_amip_opt/Manifest*.toml"
     env: *ttfs_env
-    agents: *ttfs_agents
+    agents:
+      slurm_gpus_per_task: 1
+      slurm_cpus_per_task: 8
+      slurm_ntasks: 1
+      slurm_mem: 30GB
+      # Loaded after climacommon, so its julia comes first in PATH
+      modules: climacommon/2026_11_06-1.13.3 julia/1.13.3-opt
 
-  - label: "Compare time to first step with upstream main"
-    if: build.env("UPSTREAM_PACKAGES") != null
+  - label: "Compare optimized Julia with stock Julia"
     depends_on:
-      - "ttfs_amip"
-      - "ttfs_amip_baseline"
+      - "ttfs_amip_stock"
+      - "ttfs_amip_opt"
     command: |
-      buildkite-agent artifact download "output/ttfs_amip*/artifacts/time_to_first_step.csv" .
+      buildkite-agent artifact download "output/ttfs_amip_*/artifacts/time_to_first_step.csv" .
       status=0
-      julia --startup-file=no .buildkite/time_to_first_step/compare.jl output/ttfs_amip_baseline/artifacts/time_to_first_step.csv output/ttfs_amip/artifacts/time_to_first_step.csv comparison.md || status=$$?
+      julia --startup-file=no .buildkite/time_to_first_step/compare.jl output/ttfs_amip_stock/artifacts/time_to_first_step.csv output/ttfs_amip_opt/artifacts/time_to_first_step.csv comparison.md || status=$$?
       style=$$([ $$status -eq 0 ] && echo info || echo error)
       buildkite-agent annotate --style $$style --context ttfs_amip < comparison.md
       exit $$status

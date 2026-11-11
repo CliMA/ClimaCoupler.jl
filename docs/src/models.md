@@ -94,14 +94,33 @@ where:
 - ``T_{\text{base}}`` is the prescribed temperature at the ice base (sea water
   temperature) [K]
 - ``k_{\text{ice}}`` is the thermal conductivity of sea ice [W/(m·K)]
-- ``h`` is the ice thickness [m]
+- ``h`` is the prescribed ice thickness [m], set per hemisphere: ``h_{\text{nh}}``
+  (default 2 m) for latitudes ``\geq 0`` and ``h_{\text{sh}}`` (default 1 m) for
+  latitudes ``< 0``
+- ``\alpha`` is the surface albedo, which depends on ``T_{\text{sfc}}`` (see below)
 - Other variables are as defined for the slab ocean model
 
+The surface albedo ramps linearly from a cold, snow-covered value to a
+melt-pond value as the surface approaches its melting point:
+
+```math
+\alpha = \alpha_{\text{melt}} + (\alpha_{\text{cold}} - \alpha_{\text{melt}})
+\cdot \min\left(\max\left(\frac{T_{\text{freeze}} - T_{\text{sfc}}}{\Delta T_{\text{melt}}}, 0\right), 1\right)
+```
+
+with defaults ``\alpha_{\text{cold}} = 0.78``, ``\alpha_{\text{melt}} = 0.55``,
+and ``\Delta T_{\text{melt}} = 3`` K. The albedo is evaluated once per coupling
+step and held fixed while the ice model advances, so the atmosphere and sea ice
+see the same absorbed shortwave flux.
+
 The sea ice concentration is read from observational data (e.g., HadISST) and
-updated at each timestep. The ice temperature is constrained to remain at or
-below the freezing point of seawater. The model assumes a linear temperature
-profile through the ice layer, allowing the surface temperature to be computed
-from the bulk temperature and base temperature.
+updated at each timestep. The model assumes a linear temperature profile
+through the ice layer, so the surface temperature is extrapolated as
+``T_{\text{sfc}} = 2 T_{\text{bulk}} - T_{\text{base}}``. The surface
+temperature is constrained to remain at or below the surface melting point
+``T_{\text{freeze}}`` (default 273.15 K), which caps ``T_{\text{bulk}}`` at
+``(T_{\text{base}} + T_{\text{freeze}}) / 2``. Because thickness is prescribed,
+energy in excess of this cap (i.e., melt energy) is discarded.
 
 This formulation follows the approach of
 [Holloway and Manabe (1971)](https://journals.ametsoc.org/view/journals/mwre/99/5/1520-0493_1971_099_0335_socbag_2_3_co_2.xml),

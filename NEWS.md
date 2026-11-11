@@ -4,6 +4,23 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Prescribed sea ice: melt-dependent albedo, 0 °C surface melting point, and hemispheric thickness
+- [#2217](https://github.com/CliMA/ClimaCoupler.jl/pull/2217): `PrescribedIceSimulation`
+  changes its physics and its `IceSlabParameters` API.
+  - The surface albedo ramps linearly from `α_cold = 0.78` (cold, snow-covered ice) to
+    `α_melt = 0.55` (melt ponds) over the `ΔT_melt = 3` K below `T_freeze`, instead of
+    a constant `α = 0.65`. The albedo is evaluated once per coupling step and held fixed
+    while the ice steps, so the atmosphere and the ice absorb the same shortwave.
+  - `T_freeze` is now the melting point of the ice surface and defaults to 273.15 K
+    (was 271.2 K, the freezing point of seawater). The surface temperature is capped at
+    `T_freeze`, which caps the bulk temperature at `(T_base + T_freeze) / 2`.
+  - The thickness is prescribed by hemisphere: `h_nh = 2` m for latitudes ≥ 0 and
+    `h_sh = 1` m for latitudes < 0, instead of a single `h = 2` m.
+  - **Breaking:** the `IceSlabParameters` fields and keyword arguments `h` and `α` are
+    removed; use `h_nh`/`h_sh` and `α_cold`/`α_melt`/`ΔT_melt`.
+  - **Breaking:** the sea-ice cache gains `α_sfc` and `h_ice`, so cache checkpoints
+    written before this change cannot be restored with `restart_cache = true`.
+
 #### Move CI and the experiment environments to Julia 1.13 and CUDA 6
 Buildkite runs Julia 1.13.3, and the experiment environments ship `Manifest-v1.13.toml` instead of
 `Manifest-v1.11.toml`. The AMIP and CMIP environments require CUDA 6.
@@ -29,6 +46,23 @@ ClimaAtmos versions without the two-scale stretching ignore the key.
   weights each polygon by its area inside control volumes around the nodes, so masked flux
   transfers stay bounded without the flux clamp or `cov_cutoff`. The wet, sea-ice and
   open-ocean area fractions are the DSS'd coverages of these weights.
+
+#### Update to ClimaDiagnostics v0.4
+Time-reduced diagnostics no longer include the initial state, so the first window of the coupler and
+atmosphere diagnostics is no longer `NaN` for fields such as shortwave fluxes. NetCDF diagnostics no
+longer have `date` and `date_bnds`, and `time` is in seconds since `start_date`. `DictWriter` and
+`HDF5Writer` save time-reduced diagnostics at the start of their window.
+
+#### Fix land restarts
+Restarted runs with a ClimaLand model now start the land model at the restart time instead of
+`t = 0` when not using `ITime`.
+
+#### Fix restart time when restart options are set after loading the config
+`CoupledSimulation(config_dict)` now updates `t_start` from `restart_t` (or the latest checkpoint
+when `detect_restart_files` is set), so restart options set after `get_coupler_config_dict` no
+longer restart the checkpointed state at the original `t_start`. `Checkpointer.restart!` errors if
+the coupled simulation does not start at the checkpoint time. Non-`ITime` runs with a prescribed
+ocean no longer error with `UndefVarError: Dates`.
 
 #### Add ocean config options
 New `ocean_float_type` (`Float64` by default) and `ocean_vertical_levels` (60 by default) options set the

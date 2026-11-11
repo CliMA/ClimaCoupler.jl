@@ -283,6 +283,10 @@ end
 function _build_coupled_simulation(config_dict::AbstractDict)
     comms_ctx = Utilities.get_comms_context(config_dict)
 
+    # The restart options can be set after `get_coupler_config_dict`, so `t_start` must be
+    # updated here; otherwise the restarted simulation starts at the original `t_start`
+    Input.update_t_start_for_restarts!(config_dict)
+
     (;
         sim_mode,
         random_seed,

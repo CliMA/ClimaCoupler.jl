@@ -59,7 +59,7 @@ function horizontal_ocean_grid(
     ocean_grid::Symbol;
     z,
     Nz,
-    halo = (5, 5, 4),
+    halo = (5, 5, 5),
     active_cells_map = true,
     minimum_depth = 10,
     interpolation_passes = 10,

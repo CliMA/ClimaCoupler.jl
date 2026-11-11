@@ -80,6 +80,13 @@ import ClimaCoupler: FluxCalculator
     err_emissivity = @. ifelse(land_fraction ≈ 0, zero(err_emissivity), err_emissivity)
     @test maximum(abs.(err_emissivity)) < 1e-10
 
+    # The prescribed ice holds its albedo fixed over a coupling step and refreshes it
+    # at the end of `step!`, while the atmosphere's radiation during this step used the
+    # albedo exported before it. Save a copy (`get_field` returns the cache field,
+    # which is updated in place) so the ice flux below matches what the atmosphere saw.
+    ice_albedo_before_step =
+        copy(Interfacer.get_field(ice_sim, Val(:surface_direct_albedo)))
+
     step!(cs)
     boundary_space = Interfacer.boundary_space(cs)
 
@@ -111,7 +118,8 @@ import ClimaCoupler: FluxCalculator
     # Radiative flux toward surface (positive downward)
     # TODO: get sigma from parameters
     σ = FT(5.67e-8)
-    (; k_ice, h, T_base, ρ, c, α, ϵ) = p.params
+    α = ice_albedo_before_step
+    ϵ = Interfacer.get_field(ice_sim, Val(:emissivity))
     ice_rad_flux =
         (1 .- α) .* p.SW_d .+
         ϵ .* (p.LW_d .- σ .* Interfacer.get_field(ice_sim, Val(:surface_temperature)) .^ 4)

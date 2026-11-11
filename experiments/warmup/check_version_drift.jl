@@ -24,11 +24,14 @@ const MANIFEST = "Manifest-v$(VERSION.major).$(VERSION.minor).toml"
 # check. Anything listed is reported but does not fail the run.
 const ALLOWED = Dict(
     "PrecompileTools" =>
-        "1.2 does not cache externally-owned code on Julia >= 1.12 (measured: 0.02 MiB " *
-        "vs 143.55 MiB for the same workload), so this environment needs >= 1.3 even " *
-        "though experiments/CMIP still pins 1.2.1. It is a build-time tool and does not " *
-        "appear in the cached code.",
+        "a build-time tool that does not appear in the cached code, so the two " *
+        "environments may differ by patch or minor version. Both must be >= 1.3 on " *
+        "Julia >= 1.12: 1.2 caches no externally-owned code there (measured, same " *
+        "workload: 0.02 MiB against 143.55 MiB).",
 )
+
+"Versions below which a package is known not to work, regardless of what the manifests say."
+const FLOORS = Dict("PrecompileTools" => (VERSION >= v"1.12" ? v"1.3" : v"0"))
 
 "Map package name => version string for every versioned entry in a manifest."
 function versions(path)
@@ -59,6 +62,16 @@ for (name, runv, warmv) in differing
     println("  allowed: ", name, " CMIP ", runv, ", warmup ", warmv)
     println("    ", ALLOWED[name])
 end
+
+# An allowed *difference* is not a licence to be below a known-broken floor, in either
+# environment. This is what would have caught the PrecompileTools problem immediately.
+for (name, floor) in FLOORS, (env, vs) in (("experiments/CMIP", run_versions), ("warmup", warm_versions))
+    haskey(vs, name) || continue
+    if VersionNumber(vs[name]) < floor
+        push!(mismatched, (name, "$env has $(vs[name]), below the $floor floor", ""))
+    end
+end
+
 if isempty(mismatched)
     println("Warmup and experiments/CMIP agree on every shared package version.")
 else

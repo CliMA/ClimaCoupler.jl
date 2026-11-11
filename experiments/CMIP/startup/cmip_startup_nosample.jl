@@ -14,6 +14,14 @@ PhaseProbe.DUMPDIR[] = get(ENV, "COUPLER_PERF_OUT", "")
 # ----------------------------------------------------------------- load phases
 # `using` is only legal at top level, so each import goes through `@eval Main`.
 # These are not sampled: the profiler interacts badly with package loading.
+# The warm half of an A/B. `CMIPWarmup` sits at the top of the layered stack in
+# `experiments/warmup`, so loading it pulls in every warmup image; run with
+# `--project=experiments/warmup`. Loading them is itself a cost worth attributing, which is
+# why it is its own phase rather than folded into the imports below.
+if get(ENV, "WARMUP_LOAD", "") == "1"
+    @phase_nosample "load: warmup images" @eval Main using CMIPWarmup
+end
+
 @phase_nosample "load: ClimaCoupler" @eval Main using ClimaCoupler
 @phase_nosample "load: Makie stack" @eval Main using CairoMakie, GeoMakie, Makie, Poppler_jll, Printf
 @phase_nosample "load: Oceananigans+SeaIce" @eval Main import Oceananigans,

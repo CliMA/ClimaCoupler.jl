@@ -28,6 +28,19 @@ using PrecompileTools
 # These imports are load-bearing even though nothing here calls them.
 import CairoMakie, GeoMakie, Makie, Poppler_jll, Printf
 
+# The rest of what `experiments/CMIP/code_loading.jl` loads. Like the Makie stack above,
+# these are load-bearing even though nothing here calls them: a package loaded *after* this
+# workload's code is compiled invalidates it, and GPU kernels are attached to the
+# invalidated CodeInstances, so they are thrown away with it.
+#
+# Measured, the same atmosphere workload against this image: step 1 linked its 260 stepping
+# kernels in 0.9 s with only the atmosphere chain loaded, and recompiled all 260 at a cost
+# of 128.9 s once the coupled packages were loaded too. The cache has to be built in the
+# world a production run executes in.
+import ClimaCoupler
+import Oceananigans, ClimaSeaIce, KernelAbstractions, ConservativeRegridding, Adapt
+import ClimaLand
+
 
 # experiments/warmup/<pkg>/src -> experiments/warmup
 const WARMUP_DIR = normpath(joinpath(@__DIR__, "..", ".."))

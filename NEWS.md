@@ -4,6 +4,11 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Use `update_constrain_state_every: "step"` for 0M ProgEDMF
+`config/atmos_configs/climaatmos_progedmf.yml` sets `update_constrain_state_every: "step"` (the previous
+ClimaAtmos default). With `"stage"` (the default since CliMA/ClimaAtmos.jl#4968), coupled 1° 0M ProgEDMF
+weather forecasts crash within hours.
+
 #### Non-negative control-volume weights for exchange-grid fluxes (contd.)
 - [#2160](https://github.com/CliMA/ClimaCoupler.jl/pull/2160): Fluxes into ocean and sea-ice
   cells are divided by the ocean's cell area, so the step from the polygons to the cells

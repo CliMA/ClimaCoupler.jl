@@ -34,6 +34,7 @@ import ClimaCoupler:
     Models
 import ClimaUtilities.TimeManager: ITime, date
 import ClimaComms
+import Dates
 
 ###
 ### Functions required by ClimaCoupler.jl for an AbstractAtmosSimulation

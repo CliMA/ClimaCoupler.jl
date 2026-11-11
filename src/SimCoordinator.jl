@@ -220,6 +220,10 @@ end
 function _build_coupled_simulation(config_dict::AbstractDict)
     comms_ctx = Utilities.get_comms_context(config_dict)
 
+    # The restart options can be set after `get_coupler_config_dict`, so `t_start` must be
+    # updated here; otherwise the restarted simulation starts at the original `t_start`
+    Input.update_t_start_for_restarts!(config_dict)
+
     (;
         sim_mode,
         random_seed,
@@ -260,6 +264,8 @@ function _build_coupled_simulation(config_dict::AbstractDict)
         simple_ocean,
         ocean_grid,
         ocean_bathymetry_file,
+        ocean_float_type,
+        ocean_vertical_levels,
         use_intersection_grid,
         sst_adjustment,
         ocean_progress_interval,
@@ -387,6 +393,8 @@ function _build_coupled_simulation(config_dict::AbstractDict)
         simple_ocean,
         ocean_grid,
         ocean_bathymetry_file,
+        FT_ocean = ocean_float_type,
+        Nz = ocean_vertical_levels,
         use_intersection_grid,
         sst_path,
         sst_adjustment,

@@ -62,11 +62,22 @@ Mapped to the architectural layers in
 
 ## Running experiments
 
+Run from the repository root with Julia 1.10 or 1.13, the versions the experiment
+manifests are pinned to. See [docs/src/running.md](src/running.md) for the full guide.
+
 ### AMIP
 ```bash
 julia --project=experiments/AMIP -E "using Pkg; Pkg.instantiate()"
 julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl \
     --config_file config/ci_configs/amip_default.yml --job_id amip_default
+```
+
+### CMIP
+```bash
+julia --project=experiments/CMIP -e 'using Pkg; Pkg.instantiate()'
+julia --project=experiments/CMIP experiments/CMIP/run_simulation.jl \
+    --config_file config/ci_configs/cmip_oceananigans_climaseaice.yml
+```
 
 ### Slabplanet (conservation testing)
 ```bash
@@ -78,8 +89,10 @@ Set `energy_check: true` in the config to enable conservation tracking.
 ### Environment variables
 | Variable | Values | Effect |
 |:---|:---|:---|
-| `CLIMACOMMS_DEVICE` | `CPU` (default), `CUDA` | Switch between CPU and GPU |
-| `CLIMACOMMS_CONTEXT` | `SINGLETON` (default), `MPI` | Disable or enable MPI |
+| `CLIMACOMMS_DEVICE` | `CPU` (default), `CPUSingleThreaded`, `CPUMultiThreaded`, `CUDA` | Switch between CPU and GPU |
+| `CLIMACOMMS_CONTEXT` | `SINGLETON`, `MPI` | Disable or enable MPI; set `SINGLETON` if a single-process run in a SLURM session fails with an MPI error |
+
+Set these before including `code_loading.jl`: `ClimaComms.@import_required_backends` reads them to decide whether to load CUDA and MPI. Leave the `device` config option at `"auto"` so `CLIMACOMMS_DEVICE` takes effect.
 
 ### Caltech HPC (Central / clima)
 ```bash
@@ -94,17 +107,21 @@ See the [slurm-buildkite wiki](https://github.com/CliMA/slurm-buildkite/wiki) fo
 
 ## Test groups
 
-Run the full suite with:
+Run the full suite from the repository root with:
 ```bash
+julia --project=test -e 'using Pkg; Pkg.instantiate()'
 julia --project=test test/runtests.jl
 ```
 
 | Test file | What it covers |
 |:---|:---|
 | `aqua.jl` | Aqua.jl package-quality checks (ambiguities, unbound type params, stale deps) |
+| `defaults_from_ext.jl` | Default methods extended in `ClimaCouplerClimaAtmosExt` |
 | `interfacer_tests.jl` | Component interface contracts, `get_field`/`update_field!` dispatch |
 | `conservation_checker_tests.jl` | Energy and water conservation bookkeeping |
 | `utilities_tests.jl` | Regridding, masking, and shared utility functions |
+| `timemanager_tests.jl` | Simulation calendar and callback scheduling |
+| `checkpointer_tests.jl` | JLD2 checkpoint save/load |
 | `field_exchanger_tests.jl` | Field mapping between atmosphere and surface |
 | `flux_calculator_tests.jl` | Turbulent surface flux computations |
 | `input_tests.jl` | YAML config loading and parameter parsing |
@@ -113,11 +130,10 @@ julia --project=test test/runtests.jl
 | `models/prescr_ocean_tests.jl` | Prescribed ocean built-in model |
 | `models/prescr_seaice_tests.jl` | Prescribed sea-ice built-in model |
 | `calibration_tools_tests.jl` | EKI/calibration helpers |
-| `mpi_tests/` | MPI-parallel coupling tests (run separately via Buildkite) |
-| `checkpointer_tests.jl` | JLD2 checkpoint save/load (exists in `test/` but **not** in `runtests.jl`) |
+| `mpi_tests/` | Shell scripts for MPI-parallel coupling checks (not in `runtests.jl`) |
 | `cess_climate_sensitivity.jl` | Cess climate sensitivity analysis (exists in `test/` but **not** in `runtests.jl`) |
 
-CI is managed by Buildkite. The GitHub Actions matrix (`.github/workflows/ci.yml`) runs Julia 1.10 and 1.12 on Ubuntu, Windows, and macOS (macOS only on push to `main`).
+CI is managed by Buildkite. The GitHub Actions matrix (`.github/workflows/ci.yml`) runs Julia 1.10 and 1.13 on Ubuntu, Windows, and macOS (macOS only on push to `main`).
 
 ## Repo-specific conventions
 

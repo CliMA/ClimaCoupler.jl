@@ -7,6 +7,15 @@ KernelAbstractions, ConservativeRegridding). For CMIP, see `experiments/CMIP/`.
 
 ## Running
 
+Run these commands from the repository root with Julia 1.10 or 1.13, the versions
+this environment's manifests are pinned to. Install the environment once:
+
+```bash
+julia --project=experiments/AMIP -e 'using Pkg; Pkg.instantiate()'
+```
+
+Then run a simulation:
+
 ```bash
 julia --project=experiments/AMIP experiments/AMIP/run_simulation.jl
 ```

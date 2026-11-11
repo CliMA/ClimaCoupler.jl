@@ -27,41 +27,41 @@ For a more in-depth derivation of the regridding operations, see [the
 ConservativeRegridding.jl documentation](https://juliageo.org/ConservativeRegridding.jl/stable/extensions/climacore/).
 `build_exchange_grid` constructs the polygons once on the CPU (in `Float64`)
 via ConservativeRegridding.jl's intersection-operator API, with polygons over
-dry (immersed) cells dropped. Each polygon ``\\Omega_k`` in SE element ``e``
+dry (immersed) cells dropped. Each polygon ``\Omega_k`` in SE element ``e``
 carries two sets of weights.
 
 - **Gather** (SE nodes → FV polygons) uses the SEM basis integrals
-  ``B_{kn} = \\int_{\\Omega_k} \\phi_n \\, dA``:
-  ``\\bar f_k = \\sum_n (B_{kn}/\\sum_n B_{kn}) f_n``. Rows sum to 1, so
+  ``B_{kn} = \int_{\Omega_k} \phi_n \, dA``:
+  ``\bar f_k = \sum_n (B_{kn}/\sum_n B_{kn}) f_n``. Rows sum to 1, so
   constants are preserved exactly, and the atmospheric state is interpolated
   to high order.
 - **Scatter** (FV polygons → SE nodes) uses non-negative *control-volume*
-  weights ``\\tilde B_{kn}``: the area of ``\\Omega_k`` inside the control
+  weights ``\widetilde{B}_{kn}``: the area of ``\Omega_k`` inside the control
   volume of node ``n``. The control volumes are boxes in reference
   coordinates that tile the element, close to the GLL subcells (whose 1D
   widths are the GLL weights). Their edges are placed element by element so
   that each box's area under the interpolated Jacobian is exactly
-  ``(Jw)_n``. Then
-  ``F_n = \\sum_k (\\tilde B_{kn}/(Jw)_n) F_k``, and the weights at a node
+  ``(WJ)_n``. Then
+  ``F_n = \sum_k (\widetilde{B}_{kn}/(WJ)_n) F_k``, and the weights at a node
   sum to exactly 1 over the polygons tiling its control volume. The scatter
   is followed by `weighted_dss!`.
 - **Downward fluxes** (radiation and precipitation, SE nodes → FV polygons)
   use the transpose of the scatter:
-  ``\\bar g_k = \\sum_n (\\tilde B_{kn}/\\sum_n \\tilde B_{kn}) g_n``. Each
+  ``\bar g_k = \sum_n (\widetilde{B}_{kn}/\sum_n \widetilde{B}_{kn}) g_n``. Each
   polygon then receives a convex combination of the nodal values whose
   control volumes it overlaps, so these fluxes are resolved at the scale of
   the control volumes. The polygons together receive exactly the
-  atmosphere's share ``\\sum_n (Jw)_n \\alpha_n g_n`` for an area fraction
-  ``\\alpha_n`` built from the scatter weights and DSS'd, as the surface
+  atmosphere's share ``\sum_n (WJ)_n \alpha_n g_n`` for an area fraction
+  ``\alpha_n`` built from the scatter weights and DSS'd, as the surface
   fractions are. The atmosphere's radiation and precipitation can
   differ between the element copies of a shared node, so they are DSS'd
-  (weighted, which keeps ``\\sum_n (Jw)_n g_n``) before the gather.
+  (weighted, which keeps ``\sum_n (WJ)_n g_n``) before the gather.
 - **Nodal coverage**: `node_cov` (sum over wet polygons) is the fraction of
   each node's area over wet ocean, in ``[0, 1]`` by construction. The
   wet-ocean fraction is the DSS'd `node_cov`.
 
 The scatter cannot use ``B_{kn}``, because the GLL Lagrange basis is
-sign-indefinite for ``N_q \\ge 3``. Summed over all polygons, ``B_{kn}`` is
+sign-indefinite for ``N_q \ge 3``. Summed over all polygons, ``B_{kn}`` is
 close to the nodal weight. Summed over a subset (wet polygons, or
 polygons weighted by sea-ice concentration) it can cancel. Then a transfer
 normalized by that sum is unbounded, and the sum is not an area fraction. The
@@ -71,8 +71,8 @@ polygon values.
 
 On the FV side, each polygon belongs to exactly one cell, and gathers are
 direct reads. A flux is scattered as
-``F_c = \\sum_{k \\in c} (\\sum_n \\tilde B_{kn}) F_k / A_c``, with ``A_c`` the
-FV grid's own cell area, so the FV integral ``\\sum_c A_c F_c`` equals the
+``F_c = \sum_{k \in c} (\sum_n \widetilde{B}_{kn}) F_k / A_c``, with ``A_c`` the
+FV grid's own cell area, so the FV integral ``\sum_c A_c F_c`` equals the
 SE-side integral exactly even where the two grids disagree on a cell's area.
 A state, such as the diagnosed sea-ice surface temperature, is scattered as
 the mean weighted by the geometric polygon areas.
@@ -93,8 +93,8 @@ control-volume scatter of the per-polygon sea-ice concentration. That is exactly
 denominator of the ice flux scatter; `wet - ice` is the denominator of the
 open-ocean one. So the fractions and the fluxes share one set of
 weights, and `area_fraction × flux` integrates exactly to
-``\\sum_k b_k w_k F_k``, the polygon flux integral over the control-volume
-areas ``b_k = \\sum_n \\tilde B_{kn}``.
+``\sum_k b_k w_k F_k``, the polygon flux integral over the control-volume
+areas ``b_k = \sum_n \widetilde{B}_{kn}``.
 
 ## Per-polygon fluxes
 

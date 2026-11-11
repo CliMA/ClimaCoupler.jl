@@ -15,6 +15,7 @@ energy_check: false
 h_elem: 16
 z_max: 70000.0
 z_elem: 70
+dz_top: 3100.0
 land_fraction_source: "era5"
 binary_area_fraction: false
 

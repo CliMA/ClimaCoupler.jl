@@ -43,7 +43,7 @@ manually triggered to reset the depot.
 This pipeline runs nightly on Monday - Thursday (4x per week), and includes the
 following simulations, all with prognostic EDMF and integrated land:
 - coarse AMIP with 0-moment microphysics (366 days)
-- coarse AMIP with 1-moment microphysics (186 days)
+- coarse AMIP with 1-moment microphysics (279 days)
 - AMIP with 1-moment microphysics at 16 horizontal elements (20 minutes)
 - CMIP with 0-moment microphysics, an Oceananigans ocean, and ClimaSeaIce (186 days;
   uses `config/longrun_configs/cmip_progedmf_land.yml`)
@@ -54,6 +54,12 @@ This pipeline uses the main branches of many CliMA packages and its main goal is
 to monitor stability of coarse AMIP and CMIP simulations and to catch potential problems
 early. This pipeline is scheduled, but it can also be used to test out configuration changes
 in a smaller test case before running higher resolution global AMIP runs.
+
+Two build environment variables are used for downstream testing:
+- `DOWNSTREAM_CI`: run only the AMIP at 16 horizontal elements, e.g. to test
+  upstream changes. To use this, set this to an non-empty string.
+- `NEW_T_END`: set `t_end` of the coarse nightly AMIPs and CMIP, e.g. `96mins`.
+  To use this, set this to a valid `t_end`.
 
 > _Note:_  This configuration is under development and frequently changing.
 

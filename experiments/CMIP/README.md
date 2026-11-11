@@ -10,6 +10,15 @@ since it has fewer dependencies and faster precompilation.
 
 ## Running
 
+Run these commands from the repository root with Julia 1.10 or 1.13, the versions
+this environment's manifests are pinned to. Install the environment once:
+
+```bash
+julia --project=experiments/CMIP -e 'using Pkg; Pkg.instantiate()'
+```
+
+Then run a simulation:
+
 ```bash
 julia --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file config/ci_configs/cmip_oceananigans_climaseaice.yml
 ```

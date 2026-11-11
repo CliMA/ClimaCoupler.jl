@@ -32,13 +32,13 @@ SE-side weights come in three flavors over each polygon `Ω_k`:
     `gweight = B_{kn} / Σ_n B_{kn}` (rows sum to 1; constants preserved;
     high-order interpolation of the atmospheric state);
   - scatter (node-major): `F_n = Σ_k sweight[n,k] F_k` with
-    `sweight = B̃_{kn} / (Jw)_n`, where `B̃_{kn} ≥ 0` is the area of `Ω_k`
-    inside node `n`'s control volume, whose area is `(Jw)_n`; follow with
+    `sweight = B̃_{kn} / (WJ)_n`, where `B̃_{kn} ≥ 0` is the area of `Ω_k`
+    inside node `n`'s control volume, whose area is `(WJ)_n`; follow with
     `weighted_dss!`;
   - transpose of the scatter (polygon-major, on the gather's sparsity):
     `ḡ_k = Σ_n tweight[k,n] g_n` with `tweight = B̃_{kn} / b_area_k`, for the
     fluxes the atmosphere hands down (radiation, precipitation). For any
-    polygon weights `w`, `Σ_k b_area_k w_k ḡ_k = Σ_n (Jw)_n (Σ_k sweight[n,k] w_k) g_n`;
+    polygon weights `w`, `Σ_k b_area_k w_k ḡ_k = Σ_n (WJ)_n (Σ_k sweight[n,k] w_k) g_n`;
   - `node_cov[n] = Σ_{k wet} sweight[n,k]`: the fraction of node `n`'s area
     over wet ocean.
 
@@ -60,7 +60,7 @@ On one process the slots are the cells.
 - `elem_of_poly`, `oc_of_poly`: SE element / FV cell slot owning each polygon
 - `soc_ptr`, `soc_poly`: slot-major CSR of the polygon→cell scatter
 - `area`: geometric polygon areas [m²]
-- `b_area`: SE-side scatter areas `Σ_n B̃_{kn} = Σ_n sweight[n,k] (Jw)_n` [m²]; equals
+- `b_area`: SE-side scatter areas `Σ_n B̃_{kn} = Σ_n sweight[n,k] (WJ)_n` [m²]; equals
   `area` up to quadrature error and makes SE-side conservation statements
   exact
 - `oc_wet_area`: retained (wet) polygon area, of the polygons of every process, per
@@ -214,8 +214,8 @@ function build_exchange_grid(boundary_space, grid_oc)
     qs = CC.Spaces.quadrature_style(mesh_space_cpu)
     Nq = CC.Quadratures.degrees_of_freedom(qs)
     triangle_quad_degree = 2 * (Nq - 1)
-    Jw = Array(CRExt.se_node_weights(boundary_space)) # flat nodal, this process
-    n_nodes = length(Jw)
+    WJ = Array(CRExt.se_node_weights(boundary_space)) # flat nodal, this process
+    n_nodes = length(WJ)
     volumes = ControlVolumes(mesh_space_cpu)
 
     g_poly, g_node, g_b, g_t = Int[], Int[], Float64[], Float64[] # gather COO: B_kn, B̃_kn
@@ -235,7 +235,7 @@ function build_exchange_grid(boundary_space, grid_oc)
         node_offset = (elem - first(local_elems)) * Nq^2
         for j in 1:Nq, i in 1:Nq
             n = node_offset + (j - 1) * Nq + i
-            w = B̃[i, j] / Jw[n]
+            w = B̃[i, j] / WJ[n]
             if w != 0
                 push!(s_poly, k)
                 push!(s_node, n)

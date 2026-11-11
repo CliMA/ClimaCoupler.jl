@@ -1,7 +1,7 @@
 #=
 Control-volume weights for the exchange-grid scatter. Each SE node owns a box in
 reference coordinates; the boxes of an element tile it, and each box's area is the node's
-quadrature weight `(Jw)_n`. The weight of polygon `Ω_k` at node `n` is the area of `Ω_k`
+quadrature weight `(WJ)_n`. The weight of polygon `Ω_k` at node `n` is the area of `Ω_k`
 inside the box, `B̃_{kn} = ∫_{Ω_k ∩ box(n)} dA ≥ 0`.
 =#
 
@@ -11,7 +11,7 @@ inside the box, `B̃_{kn} = ∫_{Ω_k ∩ box(n)} dA ≥ 0`.
 Mass-matched control volumes of every element of the spectral-element `space`: node `(i, j)`
 of element `e` owns `[ξ[i, j, e], ξ[i + 1, j, e]] × [η[j, e], η[j + 1, e]]` in reference
 coordinates. The row edges `η` give each row of boxes its row's total weight, and the column
-edges `ξ` within each row give each box its weight `(Jw)_{ij}`; each edge is found by
+edges `ξ` within each row give each box its weight `(WJ)_{ij}`; each edge is found by
 bisection on the exact area under the interpolated Jacobian.
 """
 struct ControlVolumes
@@ -22,8 +22,8 @@ end
 function ControlVolumes(space)
     ξs, ws = CC.Quadratures.quadrature_points(Float64, CC.Spaces.quadrature_style(space))
     Nq = length(ξs)
-    Jw = get_ConservativeRegriddingCCExt().se_node_weights(space)
-    n_elem = length(Jw) ÷ Nq^2
+    WJ = get_ConservativeRegriddingCCExt().se_node_weights(space)
+    n_elem = length(WJ) ÷ Nq^2
     # Φ(x)[p] = ∫_{-1}^x ϕ_p, exact by GLL quadrature on [-1, x]
     Φ(x) =
         (x + 1) / 2 *
@@ -31,7 +31,7 @@ function ControlVolumes(space)
     η = zeros(Nq + 1, n_elem)
     ξ = zeros(Nq + 1, Nq, n_elem)
     for e in 1:n_elem
-        W = reshape(Jw[((e - 1) * Nq ^ 2 + 1):(e * Nq ^ 2)], Nq, Nq)
+        W = reshape(WJ[((e - 1) * Nq ^ 2 + 1):(e * Nq ^ 2)], Nq, Nq)
         J = W ./ (ws * ws') # nodal Jacobian
         row_weight = J' * ws
         η[1, e], η[Nq + 1, e] = -1, 1

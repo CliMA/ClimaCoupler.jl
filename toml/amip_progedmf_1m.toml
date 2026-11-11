@@ -31,9 +31,6 @@ value = 0.001
 [min_area_limiter_power]
 value = 1
 
-[turb_entr_param_vec]
-value = [0.001, 1e5]
-
 [entr_detr_limit_inv_tau]
 value = 0
 
@@ -67,14 +64,8 @@ value = 0.0
 [sgs_liquid_uniform_fraction]
 value = 0.0
 
-[sgs_variance_horizontal_scale_factor]
-value = 1.0
-
-[sgs_variance_vertical_scale_factor]
-value = 0.5
-
 [condensation_evaporation_timescale]
-value = 100
+value = 10
 
 [sublimation_deposition_timescale]
 value = 3600
@@ -106,8 +97,5 @@ value = 3000.0
 [cloud_fraction_steepness_scale]
 value = 1.2
 
-[cloud_fraction_eps_rel]
-value = 0.05
-
 [snow_apparent_density]
-value = 300.0
+value = 200.0

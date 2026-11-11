@@ -4,6 +4,13 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Ocean subsurface reflectance and zero-allocation albedo updates
+`PrescribedOceanSimulation` caches `insolation_params` from
+`coupled_param_dict` and a `ClimaAtmos.RegressionFunctionAlbedo{FT}(; R_sub)`
+instance (`ocean_subsurface_reflectance = 0.007` by default), and
+`Interfacer.set_albedos!(::PrescribedOceanSimulation, t)` updates `p.α_direct`
+and `p.α_diffuse` in-place with zero heap allocations.
+
 #### Average ClimaAtmos precipitation over the atmosphere steps of a coupling step
 The `liquid_precipitation` and `snow_precipitation` that `ClimaAtmosSimulation` passes to the surfaces
 are the mean over the atmosphere steps taken in one coupling step, not just the last value.

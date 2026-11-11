@@ -34,18 +34,25 @@ const PACKAGES = [
     "CMIPWarmup",
 ]
 
-# A floor, not an expectation: roughly a quarter of what each package measured on the
-# stack it was developed against. Sizes legitimately move with Julia and dependency
-# versions, so this is set loose enough not to need updating for ordinary drift, and tight
-# enough to catch an image that cached nothing.
+# A floor, not an expectation: enough to catch an image that cached nothing, loose enough
+# not to need updating for ordinary drift. Sizes move legitimately with Julia and
+# dependency versions -- the whole stack shrank about 2.7x between Julia 1.11/CUDA 5.11 and
+# Julia 1.13/CUDA 6.4, even though the latter also persists GPU kernels into the image
+# (measured at ~89 KiB each).
+#
+# A package that sits high in the DAG is *expected* to be small: it caches only its own
+# increment over everything beneath it. SeaIceWarmup is 80 MiB because OceanWarmup carries
+# the ocean, and CMIPWarmup is 219 MiB because the six packages below it carry the
+# components -- a run against that stack still reached its first step with 5.7 s of setup
+# compilation, so the small image reflects good layering, not a failed workload.
 const MIN_MIB = Dict(
     "AtmosWarmupSetup" => 300,
-    "AtmosWarmupExplicit" => 300,
-    "AtmosWarmupStep" => 200,
-    "OceanWarmup" => 300,
-    "LandWarmup" => 300,
+    "AtmosWarmupExplicit" => 150,
+    "AtmosWarmupStep" => 150,
+    "OceanWarmup" => 200,
+    "LandWarmup" => 200,
     "SeaIceWarmup" => 25,
-    "CMIPWarmup" => 400,
+    "CMIPWarmup" => 75,
 )
 
 "Newest package image for `pkg`, or `nothing`."

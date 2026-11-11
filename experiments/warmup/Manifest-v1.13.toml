@@ -193,7 +193,7 @@ uuid = "a1b2c3d4-0002-4000-8000-000000000002"
 version = "0.1.0"
 
 [[deps.AtmosWarmupSetup]]
-deps = ["CUDA", "CairoMakie", "ClimaAtmos", "ClimaComms", "ClimaTimeSteppers", "GeoMakie", "MPI", "Makie", "Poppler_jll", "PrecompileTools", "Printf", "YAML"]
+deps = ["Adapt", "CUDA", "CairoMakie", "ClimaAtmos", "ClimaComms", "ClimaCoupler", "ClimaLand", "ClimaSeaIce", "ClimaTimeSteppers", "ConservativeRegridding", "GeoMakie", "KernelAbstractions", "MPI", "Makie", "Oceananigans", "Poppler_jll", "PrecompileTools", "Printf", "YAML"]
 path = "AtmosWarmupSetup"
 uuid = "a1b2c3d4-0001-4000-8000-000000000001"
 version = "0.1.0"

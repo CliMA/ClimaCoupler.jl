@@ -9,6 +9,8 @@ ClimaCoupler.jl Release Notes
 ClimaAtmos default). With `"stage"` (the default since CliMA/ClimaAtmos.jl#4968), coupled 1° 0M ProgEDMF
 weather forecasts crash within hours.
 
+The nightly and weekly AMIP configs (0M and 1M ProgEDMF) use `dt: "180secs"` and `dt_cpl: "180secs"` (previously 120 s).
+
 #### Non-negative control-volume weights for exchange-grid fluxes (contd.)
 - [#2160](https://github.com/CliMA/ClimaCoupler.jl/pull/2160): Fluxes into ocean and sea-ice
   cells are divided by the ocean's cell area, so the step from the polygons to the cells

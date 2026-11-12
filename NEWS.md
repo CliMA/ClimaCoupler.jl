@@ -4,6 +4,11 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Restore component clocks when restarting
+Checkpoints now save the clocks of integrator-based components. A slow component
+restarted during flux accumulation resumes at its last completed step.
+Slab-ocean cache checkpoints also save the heat fluxes queued for its next step.
+
 #### Prescribed sea ice: melt-dependent albedo, 0 °C surface melting point, and hemispheric thickness
 - [#2217](https://github.com/CliMA/ClimaCoupler.jl/pull/2217): `PrescribedIceSimulation`
   changes its physics and its `IceSlabParameters` API.

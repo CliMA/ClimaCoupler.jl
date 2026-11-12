@@ -14,6 +14,9 @@ end
 @safetestset "surface radiative flux consistency tests" begin
     include("fluxes_test.jl")
 end
+@safetestset "slow slab-ocean restart" begin
+    include("restart_slow_slab.jl")
+end
 @safetestset "debug diagnostics: debug plots" begin
     include("debug_plots_tests.jl")
 end

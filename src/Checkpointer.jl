@@ -8,7 +8,7 @@ module Checkpointer
 import ClimaComms
 import ClimaCore as CC
 import ClimaUtilities.Utils: sort_by_creation_time
-import ClimaUtilities.TimeManager: ITime, seconds
+import ClimaUtilities.TimeManager: ITime, counter, epoch, period, seconds
 import ClimaUtilities.TimeVaryingInputs: AbstractTimeVaryingInput
 import ..Interfacer
 import Dates
@@ -33,6 +33,36 @@ Returns the model cache of a simulation.
 This is a template function that should be implemented for each component model.
 """
 get_model_cache(sim::Interfacer.AbstractComponentSimulation) = nothing
+
+"""
+    get_model_time(sim)
+
+Return the component's time for simulations using the default integrator interface.
+Components with their own checkpoint format can manage their clock there.
+"""
+function get_model_time(sim::Interfacer.AbstractComponentSimulation)
+    hasproperty(sim, :integrator) || return nothing
+    integrator = sim.integrator
+    return hasproperty(integrator, :t) ? integrator.t : nothing
+end
+
+function restore_model_time!(sim::Interfacer.AbstractComponentSimulation, saved_time)
+    current_time = get_model_time(sim)
+    isnothing(current_time) && return nothing
+    if current_time isa ITime
+        saved_time = if saved_time isa ITime
+            ITime(counter(saved_time), period(saved_time), epoch(current_time))
+        else
+            ITime(saved_time; epoch = epoch(current_time))
+        end
+    elseif saved_time isa ITime
+        saved_time = float(saved_time)
+    end
+    if current_time != saved_time
+        sim.integrator.t = saved_time
+    end
+    return nothing
+end
 
 """
     checkpoint_model_state(
@@ -257,12 +287,16 @@ function checkpoint_sims(cs::Interfacer.CoupledSimulation)
         end
     end
 
-    # Checkpoint the Coupler fields
+    # Checkpoint the coupler fields and the component clocks for multirate restarts.
     pid = ClimaComms.mypid(comms_ctx)
     @info "Saving coupler fields to JLD2 on day $day second $sec"
     output_file = joinpath(output_dir, "checkpoint_coupler_fields_$(pid)_$time.jld2")
     # Adapt to Array move fields to the CPU
-    JLD2.jldsave(output_file, coupler_fields = CC.Adapt.adapt(Array, cs.fields))
+    JLD2.jldsave(
+        output_file;
+        coupler_fields = CC.Adapt.adapt(Array, cs.fields),
+        component_times = map(get_model_time, cs.model_sims),
+    )
 
     # Remove previous Coupler fields checkpoint if it exists
     prev_checkpoint_file =
@@ -403,8 +437,7 @@ end
 """
     restart_coupler_fields!(cs, input_file)
 
-Overwrite the content of the coupled simulation `cs` with the coupler fields
-read from `input_file`.
+Restore the coupler fields and any saved component clocks from `input_file`.
 """
 function restart_coupler_fields!(cs, input_file)
     ispath(input_file) || error("File $(input_file) not found")
@@ -414,6 +447,13 @@ function restart_coupler_fields!(cs, input_file)
             ArrayType = ClimaComms.array_type(ClimaComms.device(cs))
             parent(getproperty(cs.fields, name)) .=
                 ArrayType(parent(getproperty(fields_read, name)))
+        end
+        if haskey(file, "component_times")
+            times = file["component_times"]
+            for (name, sim) in pairs(cs.model_sims)
+                saved_time = get(times, name, nothing)
+                isnothing(saved_time) || restore_model_time!(sim, saved_time)
+            end
         end
     end
 end

@@ -1,3 +1,4 @@
+import ClimaComms
 import ClimaCore as CC
 import ClimaTimeSteppers as CTS
 import ClimaUtilities
@@ -264,6 +265,28 @@ Extension of Checkpointer.get_model_prog_state to get the model state.
 """
 function Checkpointer.get_model_prog_state(sim::SlabOceanSimulation)
     return sim.integrator.u
+end
+
+function Checkpointer.get_model_cache(sim::SlabOceanSimulation)
+    # The next slab step can consume fluxes already transferred from the accumulator.
+    (; F_turb_energy, SW_d, LW_d) = sim.integrator.p
+    return (; F_turb_energy, SW_d, LW_d)
+end
+
+function Checkpointer.restore_cache!(sim::SlabOceanSimulation, saved_cache)
+    cache = Checkpointer.get_model_cache(sim)
+    comms_ctx = ClimaComms.context(cache.SW_d)
+    Checkpointer.restore!(cache, saved_cache, comms_ctx)
+    return nothing
+end
+
+function Checkpointer.restart_model_cache!(sim::SlabOceanSimulation, input_file)
+    # Accept slab checkpoints that contain only the prognostic state.
+    isfile(input_file) || return nothing
+    return @invoke Checkpointer.restart_model_cache!(
+        sim::Interfacer.AbstractComponentSimulation,
+        input_file,
+    )
 end
 
 ###

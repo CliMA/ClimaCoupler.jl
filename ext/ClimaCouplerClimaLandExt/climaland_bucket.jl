@@ -174,24 +174,25 @@ function BucketSimulation(
             reduction_period = land_diagnostics_period,
             reduction_type = land_diagnostics_reduction,
             dt = float(dt),
+            date_last = start_date + Dates.Second(float(tspan[1])),
         )
     else
         diagnostics = nothing
     end
 
-    stop_date = start_date + Dates.Second(float(tspan[2]))
-    # Convert start_date and stop_date to ITime if using ITime
+    # `tspan` can start at a non-zero time when restarting, so start the land model there
     if dt isa ITime
-        start_date = tspan[1]
-        stop_date = tspan[2]
+        t0, tf, Δt = tspan..., dt
+    else
+        t0, tf, Δt = promote(ITime.((tspan..., dt); epoch = start_date)...)
     end
 
     # Choose the timestepping algorithm
     timestepper = CTS.ExplicitAlgorithm(CTS.RK4())
     simulation = CL.Simulations.LandSimulation(
-        start_date,
-        stop_date,
-        dt,
+        t0,
+        tf,
+        Δt,
         model;
         outdir = output_dir,
         set_ic!,

@@ -118,7 +118,7 @@ function ocean_simulation(
     substeps = simple_ocean ? 70 : 150
 
     active_cells_map = !simple_ocean
-    zstar = !simple_ocean
+    zstar = true
 
     z = OC.ExponentialDiscretization(Nz, -depth, 0; mutable = zstar)
     grid = horizontal_ocean_grid(arch, ocean_grid; z, Nz, active_cells_map)

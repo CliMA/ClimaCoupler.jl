@@ -25,7 +25,7 @@ steps:
       slurm_ntasks: 1
       slurm_mem: 30GB
 
-  - label: "Time to first step: flagship AMIP, optimized Julia"
+  - label: "Time to first step: flagship AMIP, mimalloc"
     key: "ttfs_amip_opt"
     command: "bash .buildkite/time_to_first_step/measure.sh ttfs_amip_opt"
     artifact_paths:
@@ -37,10 +37,10 @@ steps:
       slurm_cpus_per_task: 8
       slurm_ntasks: 1
       slurm_mem: 30GB
-      # Loaded after climacommon, so its julia comes first in PATH
-      modules: climacommon/2026_11_06-1.13.3 julia/1.13.3-opt
+      # Use mimalloc for the allocator
+      modules: climacommon/2026_11_06-1.13.3 mimalloc/3.6.1
 
-  - label: "Compare optimized Julia with stock Julia"
+  - label: "Compare Julia with mimalloc with stock Julia"
     depends_on:
       - "ttfs_amip_stock"
       - "ttfs_amip_opt"

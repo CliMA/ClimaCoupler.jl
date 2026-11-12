@@ -62,7 +62,6 @@ four_steps_reading["detect_restart_files"] = true
 four_steps_reading["restart_dir"] = cs_four_steps.dir_paths.checkpoints_dir
 four_steps_reading["restart_t"] = 1440
 four_steps_reading["job_id"] = "four_steps_reading"
-Input.update_t_start_for_restarts!(four_steps_reading)
 
 cs_four_steps_reading = setup_and_run(four_steps_reading)
 @testset "CMIP restarts (state and cache)" begin
@@ -90,13 +89,12 @@ cs_two_steps1 = setup_and_run(two_steps)
 println("Restarting from checkpoint, initialization only")
 # Construct a restarted CoupledSimulation at t = 720s, but do not advance it.
 restart_init = deepcopy(two_steps)
-restart_init["t_end"] = "720secs" # equal to t_start after update_t_start_for_restarts!
+restart_init["t_end"] = "720secs" # equal to the restart t_start
 restart_init["detect_restart_files"] = true
 restart_init["restart_dir"] = cs_two_steps1.dir_paths.checkpoints_dir
 restart_init["restart_t"] = 720
 restart_init["restart_cache"] = true
 restart_init["job_id"] = "two_steps_restart_init_only"
-Input.update_t_start_for_restarts!(restart_init)
 cs_two_steps_restart_init = Interfacer.CoupledSimulation(restart_init)
 
 @testset "Restart initialization matches checkpointed state" begin

@@ -28,11 +28,11 @@ git clone https://github.com/CliMA/ClimaCoupler.jl.git
 cd ClimaCoupler.jl
 ```
 
-Use Julia 1.10 or 1.11. Each experiment environment ships manifests pinned to those versions
-(`Manifest.toml` for 1.10, `Manifest-v1.11.toml` for 1.11); other Julia versions fall back
+Use Julia 1.10 or 1.13. Each experiment environment ships manifests pinned to those versions
+(`Manifest.toml` for 1.10, `Manifest-v1.13.toml` for 1.13); other Julia versions fall back
 to the 1.10 manifest and may need to re-resolve it. With
-[juliaup](https://github.com/JuliaLang/juliaup), `juliaup add 1.11` installs a matching
-version and `julia +1.11` selects it.
+[juliaup](https://github.com/JuliaLang/juliaup), `juliaup add 1.13` installs a matching
+version and `julia +1.13` selects it.
 
 Install the packages of the environment you will use, once and again after pulling changes
 to its manifest:

@@ -29,6 +29,7 @@ t_end: "600secs"
 time_varying_trace_gases: ["CO2", "O3"]
 toml: ["toml/amip_progedmf.toml"]   # resolved against pkgdir(ClimaCoupler) at run time
 turbconv: "prognostic_edmfx"
+update_constrain_state_every: "step"
 viscous_sponge: true
 z_elem: 79
 z_max: 60000.0

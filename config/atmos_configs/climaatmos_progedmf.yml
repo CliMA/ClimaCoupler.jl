@@ -29,6 +29,8 @@ t_end: "120days"
 time_varying_trace_gases: ["CO2", "O3"]
 toml: [toml/longrun_aquaplanet_progedmf.toml]
 turbconv: "prognostic_edmfx"
+# "stage" (ClimaAtmos default since #4968) crashes coupled 1° 0M weather forecasts
+update_constrain_state_every: "step"
 viscous_sponge: true
 z_elem: 79
 z_max: 60000.0

@@ -610,6 +610,14 @@ Non-ClimaCore fields should provide a method to this function.
 """
 function remap end
 
+# A masked copy of a spectral-element space has the same nodes and data layout
+# as the unmasked space.
+same_nodes(space1, space2) =
+    space1 isa CC.Spaces.SpectralElementSpace2D &&
+    space2 isa CC.Spaces.SpectralElementSpace2D &&
+    CC.Spaces.topology(space1) === CC.Spaces.topology(space2) &&
+    CC.Spaces.quadrature_style(space1) == CC.Spaces.quadrature_style(space2)
+
 NVTX.@annotate function remap(
     target_space::CC.Spaces.AbstractSpace,
     source_field::CC.Fields.Field,
@@ -626,7 +634,8 @@ NVTX.@annotate function remap(
     spaces_are_compatible =
         source_space == target_space ||
         CC.Spaces.issubspace(source_space, target_space) ||
-        CC.Spaces.issubspace(target_space, source_space)
+        CC.Spaces.issubspace(target_space, source_space) ||
+        same_nodes(source_space, target_space)
 
     # If the spaces are the same or one is a subspace of the other, we can just copy the
     # source field to the target space. Note this is a dangerous operation because it accesses
@@ -654,10 +663,11 @@ end
 Remap the given `source_field` onto the `target_field`. This is the core non-allocating
 implementation.
 
-All ClimaCore components share the atmosphere's surface space, so this is a copy in
-every case except single-column mode, where the coupler boundary space is a
-`PointSpace` and the atmosphere surface space is a small `SpectralElementSpace2D`.
-A remap between two distinct spectral-element spaces is an error.
+All ClimaCore components share the atmosphere's surface space or a masked copy of
+it, so this is a copy in every case except single-column mode, where the coupler
+boundary space is a `PointSpace` and the atmosphere surface space is a small
+`SpectralElementSpace2D`. Copying onto a masked space writes only its active nodes.
+A remap between spectral-element spaces on different nodes is an error.
 
 Non-ClimaCore fields should provide a method to this function.
 """
@@ -671,7 +681,8 @@ NVTX.@annotate function remap!(target_field::CC.Fields.Field, source_field::CC.F
     spaces_are_compatible =
         source_space == target_space ||
         CC.Spaces.issubspace(source_space, target_space) ||
-        CC.Spaces.issubspace(target_space, source_space)
+        CC.Spaces.issubspace(target_space, source_space) ||
+        same_nodes(source_space, target_space)
 
     # TODO: Handle remapping of Vectors correctly
     if hasproperty(source_field, :components)

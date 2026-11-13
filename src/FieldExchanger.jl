@@ -19,7 +19,8 @@ export update_sim!,
     set_caches!,
     update_surface_fractions!,
     resolve_area_fractions!,
-    align_surface_fractions!
+    align_surface_fractions!,
+    land_mask
 
 """
     update_surface_fractions!(cs::Interfacer.CoupledSimulation)
@@ -63,6 +64,17 @@ fractions sum to 1 at every point of the boundary space.
 function align_surface_fractions!(ocean_sim, cs::Interfacer.CoupledSimulation)
     return false
 end
+
+"""
+    land_mask(ocean_sim)
+
+Return a field on the boundary space that is 1 wherever the ocean model's
+land/sea distribution has a nonzero land fraction and 0 elsewhere, or `nothing`
+if the ocean model does not provide one. The land model is evaluated only where
+the mask is 1, so implementations must keep it consistent with the land fraction
+set by [`align_surface_fractions!`](@ref).
+"""
+land_mask(ocean_sim) = nothing
 
 function _update_surface_fractions_from_land_fraction!(cs::Interfacer.CoupledSimulation)
     FT = CC.Spaces.undertype(Interfacer.boundary_space(cs))

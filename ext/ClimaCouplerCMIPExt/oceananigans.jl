@@ -562,6 +562,20 @@ function FieldExchanger.align_surface_fractions!(
     return true
 end
 
+"""
+    FieldExchanger.land_mask(ocean_sim::OceananigansSimulation)
+
+1 where the static wet-ocean fraction is below 1, matching the nonzero land
+fraction `1 - wet` set by `FieldExchanger.align_surface_fractions!`;
+`nothing` when the exchange grid is not active.
+"""
+function FieldExchanger.land_mask(ocean_sim::OceananigansSimulation)
+    ocean_sim.remapping.use_exchange_grid || return nothing
+    wet_fraction = ocean_sim.remapping.wet_ocean_fraction
+    FT = eltype(wet_fraction)
+    return ifelse.(wet_fraction .< 1, FT(1), FT(0))
+end
+
 ###############################################################################
 ### Functions required by ClimaCoupler.jl for a AbstractSurfaceSimulation
 ###############################################################################

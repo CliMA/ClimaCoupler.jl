@@ -346,30 +346,6 @@ function _build_coupled_simulation(config_dict::AbstractDict)
             )
     end
 
-    land_sim = @timed_log "Initialized land simulation" Interfacer.LandSimulation(
-        FT,
-        land_model;
-        dt = component_dt_dict["dt_land"],
-        tspan,
-        start_date,
-        output_dir = dir_paths.land_output_dir,
-        area_fraction = land_fraction,
-        surface_space = boundary_space,
-        atmos_h,
-        initial_T,
-        use_land_diagnostics,
-        land_diagnostics_period,
-        land_diagnostics_reduction,
-        coupled_param_dict,
-        albedo_type = bucket_albedo_type,
-        bucket_initial_condition,
-        era5_albedo_file_path = albedo_path,
-        land_spun_up_ic,
-        land_ic_path,
-        lai_source,
-        dt_drivers = ITime(Utilities.time_to_seconds(config_dict["dt_rad"])),
-    )
-
     ocean_sim = @timed_log "Initialized ocean simulation" Interfacer.OceanSimulation(
         FT,
         ocean_model;
@@ -393,6 +369,46 @@ function _build_coupled_simulation(config_dict::AbstractDict)
         ocean_diagnostic_interval,
         ocean_3d_diagnostic_interval,
         ocean_diagnostic_mode,
+    )
+
+    # The land model is evaluated only where the ocean model has any land
+    land_mask = FieldExchanger.land_mask(ocean_sim)
+    land_space = boundary_space
+    if !isnothing(land_mask)
+        grid = CC.Spaces.grid(boundary_space)
+        land_space = CC.Spaces.SpectralElementSpace2D(
+            grid.topology,
+            grid.quadrature_style;
+            grid.enable_bubble,
+            grid.autodiff_metric,
+            grid.discretization,
+            enable_mask = true,
+        )
+        CC.Spaces.set_mask!(land_space, land_mask)
+    end
+
+    land_sim = @timed_log "Initialized land simulation" Interfacer.LandSimulation(
+        FT,
+        land_model;
+        dt = component_dt_dict["dt_land"],
+        tspan,
+        start_date,
+        output_dir = dir_paths.land_output_dir,
+        area_fraction = land_fraction,
+        surface_space = land_space,
+        atmos_h,
+        initial_T,
+        use_land_diagnostics,
+        land_diagnostics_period,
+        land_diagnostics_reduction,
+        coupled_param_dict,
+        albedo_type = bucket_albedo_type,
+        bucket_initial_condition,
+        era5_albedo_file_path = albedo_path,
+        land_spun_up_ic,
+        land_ic_path,
+        lai_source,
+        dt_drivers = ITime(Utilities.time_to_seconds(config_dict["dt_rad"])),
     )
 
     ice_sim = @timed_log "Initialized sea ice simulation" Interfacer.SeaIceSimulation(

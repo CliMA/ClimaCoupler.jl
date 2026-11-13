@@ -461,8 +461,10 @@ Build the wet-ocean surface fraction as a `CC.Fields.Field` on
 `boundary_space` from a CPU-resident [`ExchangeGrid`](@ref): the nodal wet
 coverage `node_cov` (the wet fraction of each node's control volume), made
 continuous across shared element-boundary nodes with `weighted_dss!` and
-clamped to [0, 1]. The complement is the land fraction; sea ice and open ocean
-partition the wet fraction itself (see `FieldExchanger.align_surface_fractions!`).
+clamped to [0, 1]. Values within `sqrt(eps(FT))` of 1 are set to 1, so that
+fully wet nodes have exactly zero land fraction. The complement is the land
+fraction; sea ice and open ocean partition the wet fraction itself (see
+`FieldExchanger.align_surface_fractions!`).
 """
 function wet_ocean_fraction_field(
     boundary_space,
@@ -475,6 +477,7 @@ function wet_ocean_fraction_field(
 
     dss_buffer = Utilities.init_dss_buffer(field)
     Utilities.apply_dss!(field, dss_buffer)
-    @. field = clamp(field, FT(0), FT(1))
+    # Summing polygon weights leaves fully wet nodes O(1e-14) below 1 in Float64
+    @. field = ifelse(field > 1 - sqrt(eps(FT)), FT(1), clamp(field, FT(0), FT(1)))
     return field
 end

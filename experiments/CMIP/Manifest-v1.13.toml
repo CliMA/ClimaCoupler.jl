@@ -2,7 +2,7 @@
 
 julia_version = "1.13.3"
 manifest_format = "2.1"
-project_hash = "345a22c6204aa9a4e9f9bfc6616ec1dab19104a5"
+project_hash = "2a3ea622111b68503e2ef5dd3e0b4c4ba7a3ba94"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -794,9 +794,8 @@ uuid = "95dc2771-c249-4cd0-9c9f-1f3b4330693c"
 version = "0.1.9"
 
 [[deps.ConservativeRegridding]]
-deps = ["ChunkSplitters", "ConstructionBase", "DocStringExtensions", "Extents", "GeoInterface", "GeometryOps", "GeometryOpsCore", "LinearAlgebra", "ProgressMeter", "SciMLPublic", "SmallCollections", "SortTileRecursiveTree", "SparseArrays", "StableTasks", "StaticArrays"]
-git-tree-sha1 = "1d57e8093c5ef17adf8ca4b6058d1afe2afc63aa"
-registries = "General"
+deps = ["Adapt", "ChunkSplitters", "ConstructionBase", "DocStringExtensions", "Extents", "GeoInterface", "GeometryOps", "GeometryOpsCore", "LinearAlgebra", "ProgressMeter", "SciMLPublic", "SmallCollections", "SortTileRecursiveTree", "SparseArrays", "StableTasks", "StaticArrays"]
+path = "../../../ConservativeRegridding.jl"
 uuid = "8e50ac2c-eb48-49bc-a402-07c87b949343"
 version = "0.2.20"
 

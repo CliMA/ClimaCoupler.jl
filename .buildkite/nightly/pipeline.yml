@@ -123,7 +123,7 @@ steps:
         env:
           CLIMACOMMS_DEVICE: "CUDA"
           JULIA_NVTX_CALLBACKS: "gc,alloc,free,inference"
-          CLIMA_NAME_CUDA_KERNELS_FROM_STACK_TRACE: "true"
+          CLIMA_NAME_CUDA_KERNELS_FROM_STACK_TRACE: "false"
           PROFILE_STEPS: 20 # makes the profiler capture RRTMGP callback (runs every 20 steps)
         agents:
           slurm_gpus_per_task: 1

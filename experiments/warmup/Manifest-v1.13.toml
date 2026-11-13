@@ -2,7 +2,7 @@
 
 julia_version = "1.13.3"
 manifest_format = "2.1"
-project_hash = "52d6e190578b60bc4da40f59d31f37f7500e3db4"
+project_hash = "b5f5848ca9360d63274f089abc9734cec808960d"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -632,10 +632,10 @@ version = "1.3.6"
 
 [[deps.ClimaSeaIce]]
 deps = ["Adapt", "JLD2", "KernelAbstractions", "Oceananigans", "RootSolvers", "SeawaterPolynomials"]
-git-tree-sha1 = "91b3558db88f1f66c64023a6b05a58f6821dbde1"
+git-tree-sha1 = "7967b31c7abb93b6c2a483a96efc4bd45a1eb0e5"
 registries = "General"
 uuid = "6ba0ff68-24e6-4315-936c-2e99227c95a4"
-version = "0.5.12"
+version = "0.7.2"
 
 [[deps.ClimaTimeSteppers]]
 deps = ["ClimaComms", "Krylov", "LinearAlgebra", "LinearOperators", "NVTX", "NullBroadcasts", "StaticArrays"]
@@ -819,10 +819,10 @@ version = "0.1.9"
 
 [[deps.ConservativeRegridding]]
 deps = ["ChunkSplitters", "ConstructionBase", "DocStringExtensions", "Extents", "GeoInterface", "GeometryOps", "GeometryOpsCore", "LinearAlgebra", "ProgressMeter", "SciMLPublic", "SmallCollections", "SortTileRecursiveTree", "SparseArrays", "StableTasks", "StaticArrays"]
-git-tree-sha1 = "72f4e81c033e6dea2ae72962695b2375ea624928"
+git-tree-sha1 = "1d57e8093c5ef17adf8ca4b6058d1afe2afc63aa"
 registries = "General"
 uuid = "8e50ac2c-eb48-49bc-a402-07c87b949343"
-version = "0.2.18"
+version = "0.2.20"
 
     [deps.ConservativeRegridding.extensions]
     ConservativeRegriddingClimaCoreExt = "ClimaCore"
@@ -2574,14 +2574,14 @@ version = "0.1.0"
 
 [[deps.Oceananigans]]
 deps = ["Adapt", "BFloat16s", "Crayons", "CubedSphere", "Dates", "Distances", "DocStringExtensions", "FFTW", "GPUArraysCore", "Glob", "InteractiveUtils", "JLD2", "KernelAbstractions", "Krylov", "LinearAlgebra", "Logging", "MPI", "MuladdMacro", "OffsetArrays", "OrderedCollections", "Printf", "ReactantCore", "Rotations", "SeawaterPolynomials", "SparseArrays", "StaticArrays", "Statistics", "StructArrays"]
-git-tree-sha1 = "86558b9dd92469cc97a74a0b57912cb1b8b411c9"
+git-tree-sha1 = "10751f2a96272e0caa66b342c2990b9885f4a21b"
 registries = "General"
 uuid = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
-version = "0.113.6"
+version = "0.117.2"
 
     [deps.Oceananigans.extensions]
     OceananigansAMDGPUExt = ["AMDGPU", "AbstractFFTs"]
-    OceananigansCUDAExt = ["CUDA", "GPUArrays", "GPUArraysCore"]
+    OceananigansCUDAExt = ["CUDA", "GPUArraysCore"]
     OceananigansConservativeRegriddingExt = "ConservativeRegridding"
     OceananigansEnzymeExt = "Enzyme"
     OceananigansMakieExt = "Makie"
@@ -2599,7 +2599,6 @@ version = "0.113.6"
     ConservativeRegridding = "8e50ac2c-eb48-49bc-a402-07c87b949343"
     ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
     Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
-    GPUArrays = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
     Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
     Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
     NCCL = "3fe64909-d7a1-4096-9b7d-7a0f12cf0f6b"
@@ -2863,10 +2862,10 @@ version = "0.2.4"
 
 [[deps.PrecompileTools]]
 deps = ["Preferences"]
-git-tree-sha1 = "edbeefc7a4889f528644251bdb5fc9ab5348bc2c"
+git-tree-sha1 = "1e697ad6f68af89cd3651bbe9b4a7b5d800adf5a"
 registries = "General"
 uuid = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
-version = "1.3.4"
+version = "1.4.0"
 
 [[deps.Preferences]]
 deps = ["TOML"]

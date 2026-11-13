@@ -719,18 +719,20 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:area_fraction}) = sim.a
 
 # TODO: Better values for these, read from ClimaParams
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_model}) = :coare3
+# The ocean's float type, also on the ranks without the ocean
+ocean_float_type(sim::OceananigansSimulation) = typeof(sim.ocean_properties.σ)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:coare3_roughness_params}) =
     sim.ocean_properties.coare3_roughness_params
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_buoyancy}) =
-    eltype(sim.area_fraction)(5.8e-5)
+    ocean_float_type(sim)(5.8e-5)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) =
-    eltype(sim.area_fraction)(5.8e-5)
+    ocean_float_type(sim)(5.8e-5)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:emissivity}) =
-    eltype(sim.area_fraction)(0.97)
+    ocean_float_type(sim)(0.97)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) =
-    eltype(sim.area_fraction)(0.06)
+    ocean_float_type(sim)(0.06)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) =
-    eltype(sim.area_fraction)(0.06)
+    ocean_float_type(sim)(0.06)
 
 """
     FieldExchanger.import_atmos_fields!(csf, sim::OceananigansSimulation, atmos_sim)

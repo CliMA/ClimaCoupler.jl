@@ -289,6 +289,10 @@ function argparse_settings()
         help = "Boolean flag indicating whether to use the atmosphere-ocean intersection (exchange) grid for surface fractions and ocean/sea-ice fluxes with Oceananigans. Automatically disabled in column mode; required for distributed runs. [`true` (default), `false`]"
         arg_type = Bool
         default = true
+        "--exchange_on_root"
+        help = "Boolean flag indicating whether, with several MPI processes, the ocean, the sea ice and the intersection grid live on the root process only, with the coupler fields gathered to it each coupling step. Requires use_intersection_grid. [`false` (default), `true`]"
+        arg_type = Bool
+        default = false
         "--sst_adjustment"
         help = "Adjustment to add to prescribed SST after conversion to Kelvin (default: 0.0)"
         arg_type = Float64
@@ -613,6 +617,7 @@ function get_coupler_args(config_dict::Dict)
     ocean_float_type = config_dict["ocean_float_type"] == "Float64" ? Float64 : Float32
     ocean_vertical_levels = config_dict["ocean_vertical_levels"]
     use_intersection_grid = config_dict["use_intersection_grid"]
+    exchange_on_root = config_dict["exchange_on_root"]
     sst_adjustment = FT(config_dict["sst_adjustment"])
     ocean_progress_interval = config_dict["ocean_progress_interval"]
     ocean_diagnostic_interval = config_dict["ocean_diagnostic_interval"]
@@ -708,6 +713,7 @@ function get_coupler_args(config_dict::Dict)
         ocean_float_type,
         ocean_vertical_levels,
         use_intersection_grid,
+        exchange_on_root,
         sst_adjustment,
         ocean_progress_interval,
         ocean_diagnostic_interval,

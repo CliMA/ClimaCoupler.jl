@@ -124,18 +124,18 @@ function _build_csr(rows::Vector{Int}, n_rows::Int)
 end
 
 """
-    single_process_space(boundary_space)
+    single_process_space(boundary_space, device = ClimaComms.CPUSingleThreaded())
 
-A space on the CPU of one process with the whole mesh, element order and
+A space on `device` of one process with the whole mesh, element order and
 quadrature of `boundary_space`, whose element `e` is global element `e` of
 `boundary_space`. Built rather than adapted: adapting a ClimaCore space to
 `Array` gives it the default comms context, which is MPI in an MPI job.
 """
-function single_process_space(boundary_space)
+function single_process_space(boundary_space, device = ClimaComms.CPUSingleThreaded())
     grid = CC.Spaces.grid(boundary_space)
     topology = grid.topology
     cpu_topology = CC.Topologies.Topology2D(
-        ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded()),
+        ClimaComms.SingletonCommsContext(device),
         topology.mesh,
         topology.elemorder,
         nothing,
@@ -534,6 +534,7 @@ function _scatter_polys_to_cells!(
         poly_values,
         cx.n_local,
     )
+    KernelAbstractions.synchronize(backend)
     returned = push_partials!(cx)
     launch_kernel!(
         _scatter_cells_kernel!,

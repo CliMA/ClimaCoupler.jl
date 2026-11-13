@@ -14,7 +14,8 @@ This type is used by the coupler to indicate that this simulation
 is a surface/ocean simulation for dispatch.
 
 It contains the following objects:
-- `ocean::SIM`: The Oceananigans simulation object; under MPI, the latitude slab of this process.
+- `ocean::SIM`: The Oceananigans simulation object; under MPI, the latitude slab of this process,
+    or `nothing` on the ranks without the ocean when the exchange is on the root rank.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
 - `ocean_properties::OPROP`: A NamedTuple of ocean properties and parameters (including COARE3 roughness params).
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
@@ -178,6 +179,7 @@ dispatch in coupling.
 - `Nz`: Number of vertical levels (default: 60); 10 or fewer use `simplified_ocean_closure`
 - `dt`: Time step (default: `1800.0` seconds, or 30 minutes)
 - `comms_ctx`: Communication context; with several processes the ocean is split into one latitude slab per process (default: `ClimaComms.context()`)
+- `exchange_on_root`: Whether, with several processes, the ocean and the exchange grid live on the root rank only (default: `false`)
 - `FT_ocean`: Float type for the ocean simulation (default: `Float64`)
 - `coupled_param_dict`: Coupled parameter dictionary (default: created from `ClimaParams.create_toml_dict(FT)`)
 - `ocean_diagnostic_interval`: Interval for ocean surface diagnostics (default: `"1days"`)
@@ -197,6 +199,7 @@ function OceananigansSimulation(
     ocean_grid = :one_deg_tripolar,
     ocean_bathymetry_file = nothing,
     use_intersection_grid = true,
+    exchange_on_root = false,
     depth = 5500,
     Nz = 60,
     dt = 1800.0, # 30 minutes
@@ -210,8 +213,13 @@ function OceananigansSimulation(
 ) where {FT}
     device_arch = comms_ctx.device isa ClimaComms.CUDADevice ? OC.GPU() : OC.CPU()
     nprocs = ClimaComms.nprocs(comms_ctx)
+    # On one process the exchange is on the root already
+    exchange_on_root = exchange_on_root && nprocs > 1
+    exchange_on_root &&
+        !use_intersection_grid &&
+        error("exchange_on_root needs use_intersection_grid: true")
     arch =
-        nprocs == 1 ? device_arch :
+        nprocs == 1 || exchange_on_root ? device_arch :
         OC.Distributed(
             device_arch;
             partition = OC.Partition(1, nprocs),
@@ -257,31 +265,37 @@ function OceananigansSimulation(
         coare3_roughness_params,
     )
 
-    ocean = ocean_simulation(
-        arch,
-        ocean_grid;
-        bathymetry_file = ocean_bathymetry_file,
-        clock,
-        stop_time,
-        simple_ocean,
-        closure,
-        depth,
-        Nz,
-        # need to pass ρ₀ explicitly because it isn't in `Oceananigans.defaults`:
-        reference_density = ocean_properties.reference_density,
-    )
-    ocean.Δt = float(dt)
+    if exchange_on_root && !ClimaComms.iamroot(comms_ctx)
+        ocean = grid = ice_concentration = nothing
+    else
+        ocean = ocean_simulation(
+            arch,
+            ocean_grid;
+            bathymetry_file = ocean_bathymetry_file,
+            clock,
+            stop_time,
+            simple_ocean,
+            closure,
+            depth,
+            Nz,
+            # need to pass ρ₀ explicitly because it isn't in `Oceananigans.defaults`:
+            reference_density = ocean_properties.reference_density,
+        )
+        ocean.Δt = float(dt)
 
-    # Set initial condition to the EN4 state estimate at start_date (monthly)
-    set_ocean_initial_conditions!(ocean.model, start_date)
-    grid = ocean.model.grid
+        # Set initial condition to the EN4 state estimate at start_date (monthly)
+        set_ocean_initial_conditions!(ocean.model, start_date)
+        grid = ocean.model.grid
 
-    # Initialize with 0 ice concentration; this will be updated in `resolve_area_fractions!`
-    # if the ocean is coupled to a non-prescribed sea ice model.
-    ice_concentration = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+        # Initialize with 0 ice concentration; this will be updated in `resolve_area_fractions!`
+        # if the ocean is coupled to a non-prescribed sea ice model.
+        ice_concentration = OC.Field{OC.Center, OC.Center, Nothing}(grid)
+    end
 
     # Construct the remapper object and allocate scratch space
-    remapping = construct_remapper(grid, boundary_space; use_intersection_grid)
+    remapping =
+        exchange_on_root ? construct_root_remapper(grid, boundary_space) :
+        construct_remapper(grid, boundary_space; use_intersection_grid)
 
     # Create a dummy area fraction that will get overwritten in `update_surface_fractions!`
     area_fraction = ones(boundary_space)
@@ -296,7 +310,7 @@ function OceananigansSimulation(
         clock,
     )
 
-    add_ocean_diagnostics!(
+    isnothing(ocean) || add_ocean_diagnostics!(
         sim;
         output_dir,
         interval = TimeManager.time_to_period(ocean_diagnostic_interval),
@@ -316,6 +330,7 @@ Print some statistics with a frequency determined by the `ocean_progress_interva
 """
 function Interfacer.progress(ocean_sim::OceananigansSimulation, cs)
     ocean = ocean_sim.ocean
+    isnothing(ocean) && return nothing
     model = ocean.model
 
     (Tmin, Tmax) = extrema(model.tracers.T)
@@ -513,7 +528,66 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
         flux_dss_buffer,
         uv_basis,
         use_exchange_grid,
+        exchange_on_root = false,
     )
+end
+
+"""
+    construct_root_remapper(grid_oc, boundary_space)
+
+The remapping of [`construct_remapper`](@ref) with the exchange on the root rank:
+`grid_oc` is the whole ocean grid there and `nothing` on the other ranks. The root
+builds the exchange on a single-process replica of `boundary_space`, which also
+carries the coupler fields the exchange reads, gathered from the boundary space,
+and the fluxes it writes (`exchange_fields`). Every rank holds the boundary-space
+`wet_ocean_fraction` and `flux_fields` scattered from the root, the staging field
+of the gathers and scatters (`local_scratch`) and the element count of each rank
+(`rank_counts`).
+"""
+function construct_root_remapper(grid_oc, boundary_space)
+    context = ClimaComms.context(boundary_space)
+    local_scratch = CC.Fields.zeros(boundary_space)
+    rank_counts = MPI.Allgather(length(parent(local_scratch)), context.mpicomm)
+    wet_ocean_fraction = CC.Fields.zeros(boundary_space)
+    flux_fields = (;
+        F_turb_ρτxz = CC.Fields.zeros(boundary_space),
+        F_turb_ρτyz = CC.Fields.zeros(boundary_space),
+        F_sh = CC.Fields.zeros(boundary_space),
+        F_lh = CC.Fields.zeros(boundary_space),
+        F_turb_moisture = CC.Fields.zeros(boundary_space),
+    )
+    remapping = if ClimaComms.iamroot(context)
+        space = single_process_space(boundary_space, ClimaComms.device(context))
+        root = construct_remapper(grid_oc, space)
+        names = exchange_field_names()
+        exchange_fields = (;
+            NamedTuple{names}(map(_ -> CC.Fields.zeros(space), names))...,
+            root.flux_scratch...,
+        )
+        exchange_fields.scalar_temp .= root.wet_ocean_fraction
+        # `wet_ocean_fraction` replaces the root's, which is on the replica
+        (;
+            root...,
+            exchange_fields,
+            wet_ocean_fraction,
+            flux_fields,
+            local_scratch,
+            rank_counts,
+            exchange_on_root = true,
+        )
+    else
+        (;
+            exchange_fields = nothing,
+            wet_ocean_fraction,
+            flux_fields,
+            local_scratch,
+            rank_counts,
+            use_exchange_grid = true,
+            exchange_on_root = true,
+        )
+    end
+    scatter_from_root!(wet_ocean_fraction, remapping, :scalar_temp)
+    return remapping
 end
 
 """
@@ -532,6 +606,7 @@ function FieldExchanger.resolve_area_fractions!(
     ice_sim,
     land_fraction,
 )
+    isnothing(ocean_sim.ocean) && return nothing
     ice_sim isa ClimaSeaIceSimulation && (
         ocean_sim.ice_concentration .=
             Interfacer.get_field(ice_sim, Val(:ice_concentration))
@@ -647,25 +722,42 @@ Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_model}) = :co
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:coare3_roughness_params}) =
     sim.ocean_properties.coare3_roughness_params
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_buoyancy}) =
-    eltype(sim.ocean.model)(5.8e-5)
+    eltype(sim.area_fraction)(5.8e-5)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:roughness_momentum}) =
-    eltype(sim.ocean.model)(5.8e-5)
+    eltype(sim.area_fraction)(5.8e-5)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:emissivity}) =
-    eltype(sim.ocean.model)(0.97)
+    eltype(sim.area_fraction)(0.97)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_direct_albedo}) =
-    eltype(sim.ocean.model)(0.06)
+    eltype(sim.area_fraction)(0.06)
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_diffuse_albedo}) =
-    eltype(sim.ocean.model)(0.06)
+    eltype(sim.area_fraction)(0.06)
 
 """
     FieldExchanger.import_atmos_fields!(csf, sim::OceananigansSimulation, atmos_sim)
 
 Import `csf.SW_d_diffuse` [W m⁻²], the diffuse part of the downwelling shortwave
-`csf.SW_d`, which open water reflects with its diffuse albedo.
+`csf.SW_d`, which open water reflects with its diffuse albedo. With the exchange on
+the root rank, also gather the near-surface atmospheric state the ocean and sea-ice
+turbulent fluxes read onto it.
 """
-function FieldExchanger.import_atmos_fields!(csf, ::OceananigansSimulation, atmos_sim)
+function FieldExchanger.import_atmos_fields!(csf, sim::OceananigansSimulation, atmos_sim)
     Interfacer.get_field!(csf.SW_d_diffuse, atmos_sim, Val(:diffuse_fraction))
     csf.SW_d_diffuse .*= csf.SW_d
+    sim.remapping.exchange_on_root && gather_to_root!(
+        sim.remapping,
+        csf,
+        (
+            :T_atmos,
+            :q_tot_atmos,
+            :q_liq_atmos,
+            :q_ice_atmos,
+            :ρ_atmos,
+            :u_int,
+            :v_int,
+            :height_int,
+            :height_sfc,
+        ),
+    )
     return nothing
 end
 
@@ -698,6 +790,19 @@ function Interfacer.get_field!(
         Interfacer.remap!(target_field, surface_temperature, remapping)
         return nothing
     end
+    if remapping.exchange_on_root
+        isnothing(sim.ocean) ||
+            ocean_emission_temperature!(remapping.exchange_fields.scalar_temp, sim)
+        scatter_from_root!(target_field, remapping, :scalar_temp)
+    else
+        ocean_emission_temperature!(target_field, sim)
+    end
+    return nothing
+end
+
+# The `(1 - SIC)`-weighted control-volume transfer of the SST's `T⁴` onto `field`
+function ocean_emission_temperature!(field, sim::OceananigansSimulation)
+    remapping = sim.remapping
     eg = remapping.exchange_grid
     fs = remapping.ocean_flux_state
     C_to_K = eltype(fs.scratch1)(sim.ocean_properties.C_to_K)
@@ -714,8 +819,8 @@ function Interfacer.get_field!(
         vec(OC.interior(sim.ice_concentration, :, :, 1)),
     )
     @. fs.scratch2 = 1 - fs.scratch2
-    emission_temperature!(target_field, remapping, fs.scratch1, fs.scratch2)
-    return nothing
+    emission_temperature!(field, remapping, fs.scratch1, fs.scratch2)
+    return field
 end
 
 """
@@ -742,7 +847,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fi
         # The exchange-grid path pushes the per-polygon fluxes currently held
         # in `sim.remapping.ocean_flux_state` (`fields` is ignored: the
         # boundary-space fields are a coarser view of the same fluxes).
-        push_exchange_fluxes_to_ocean!(sim)
+        isnothing(sim.ocean) || push_exchange_fluxes_to_ocean!(sim)
     else
         _update_turbulent_fluxes_boundary!(sim, fields)
     end
@@ -828,7 +933,9 @@ Compute atmosphere-ocean turbulent fluxes on the exchange (intersection)
 grid with [`compute_ocean_exchange_fluxes!`](@ref) and hand them to
 `FluxCalculator.update_flux_fields!`, which applies the (exchange-grid
 derived) area-fraction weighting for the coupler sums and triggers the
-ocean-side push or the accumulator.
+ocean-side push or the accumulator. With the exchange on the root rank, the
+fluxes are computed there from the gathered coupler fields and scattered to
+the boundary space first.
 
 Falls back to the generic boundary-space computation when the exchange grid
 is not active.
@@ -858,8 +965,22 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
             accumulator,
         )
     end
-    compute_ocean_exchange_fluxes!(sim, csf, atmos_sim, thermo_params)
-    FluxCalculator.update_flux_fields!(csf, sim, remapping.flux_scratch, accumulator)
+    if remapping.exchange_on_root
+        isnothing(sim.ocean) || compute_ocean_exchange_fluxes!(
+            sim,
+            remapping.exchange_fields,
+            atmos_sim,
+            thermo_params,
+        )
+        for name in keys(remapping.flux_fields)
+            scatter_from_root!(remapping.flux_fields[name], remapping, name)
+        end
+        fluxes = remapping.flux_fields
+    else
+        compute_ocean_exchange_fluxes!(sim, csf, atmos_sim, thermo_params)
+        fluxes = remapping.flux_scratch
+    end
+    FluxCalculator.update_flux_fields!(csf, sim, fluxes, accumulator)
     return nothing
 end
 
@@ -988,8 +1109,10 @@ function FluxCalculator.push_and_reset!(
         )
     end
     iszero(acc.n_steps[]) && return nothing
-    average_and_reset_exchange_accumulators!(sim.remapping.ocean_flux_state)
-    push_exchange_fluxes_to_ocean!(sim)
+    if !isnothing(sim.ocean)
+        average_and_reset_exchange_accumulators!(sim.remapping.ocean_flux_state)
+        push_exchange_fluxes_to_ocean!(sim)
+    end
     # Keep the (unused but still accumulated) boundary-space accumulator in
     # sync so its averages stay well-defined.
     FluxCalculator.reset!(acc)
@@ -1026,7 +1149,17 @@ so a sign change is needed when we convert from precipitation to salinity flux.
 """
 function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     if sim.remapping.use_exchange_grid
-        push_exchange_radiation_to_ocean!(sim, csf)
+        if sim.remapping.exchange_on_root
+            gather_to_root!(
+                sim.remapping,
+                csf,
+                (:SW_d, :SW_d_diffuse, :LW_d, :P_liq, :P_snow),
+            )
+            isnothing(sim.ocean) ||
+                push_exchange_radiation_to_ocean!(sim, sim.remapping.exchange_fields)
+        else
+            push_exchange_radiation_to_ocean!(sim, csf)
+        end
         return nothing
     end
 

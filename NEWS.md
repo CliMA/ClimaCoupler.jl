@@ -58,16 +58,19 @@ ClimaAtmos versions without the two-scale stretching ignore the key.
   also conserves.
 
 #### Multi-GPU CMIP runs
-The coupled CMIP configuration runs on several MPI ranks with one GPU each. The
-atmosphere and land are distributed; the ocean, the sea ice and the exchange grid live
-on the root rank, on a single-process replica of the boundary space. The coupler fields
+The coupled CMIP configuration runs on several MPI ranks with one GPU each. Every
+component is distributed: the atmosphere and the land over the elements of the boundary
+space, the ocean and the sea ice over latitude slabs, and the exchange grid over the
+elements, with the ocean cells a rank's polygons use fetched from the ranks storing them.
+With `exchange_on_root: true` the ocean, the sea ice and the exchange grid live on the
+root rank instead, on a single-process replica of the boundary space: the coupler fields
 the exchange reads are gathered into the replica each coupling step and the surface
 temperatures, area fractions and turbulent fluxes it produces are scattered back, so the
 exchange is the same as on one GPU. See `docs/src/multi_gpu.md`. The "GPU MPI CMIP
 (2 GPUs)" Buildkite job runs the one-degree `cmip_oceananigans_climaseaice_bucket`
 configuration on two ranks, "MPI exchange (intersection) grid unit tests" checks the
-gathers and scatters bitwise against the single-process exchange, and "GPU MPI AMIP
-(2 GPUs)" runs `amip_coarse_mpi` on two ranks.
+distributed exchange and the root-rank gathers and scatters against the single-process
+exchange, and "GPU MPI AMIP (2 GPUs)" runs `amip_coarse_mpi` on two ranks.
 
 The longrun pipeline gains a "CMIP multi-GPU scaling" group: `cmip_edonly_land_he16` on 1, 2
 and 4 GPUs, `cmip_edonly_land_he30` on 4 and 8, and `cmip_edonly_land_he30_half_deg` on 4 and 8,

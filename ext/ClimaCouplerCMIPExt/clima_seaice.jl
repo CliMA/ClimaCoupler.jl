@@ -18,7 +18,8 @@ This type is used by the coupler to indicate that this simulation
 is a surface/sea ice simulation for dispatch.
 
 It contains the following objects:
-- `ice::SIM`: The ClimaSeaIce simulation object; under MPI, the latitude slab of this process.
+- `ice::SIM`: The ClimaSeaIce simulation object; under MPI, the latitude slab of this process,
+    or `nothing` on the ranks without the sea ice when the exchange is on the root rank.
 - `area_fraction::A`: A ClimaCore Field representing the surface area fraction of this component model on the exchange grid.
 - `remapping::REMAP`: Objects needed to remap from the exchange (spectral) grid to Oceananigans spaces.
 - `ocean_ice_interface::NT`: A NamedTuple containing fluxes between the ocean and sea ice, computed at each coupling step,
@@ -107,6 +108,16 @@ function ClimaSeaIceSimulation(
     area_fraction = CC.Fields.zeros(axes(ocean.area_fraction))
 
     clock = deepcopy(ocean.clock)
+    isnothing(ocean.ocean) && return ClimaSeaIceSimulation(
+        nothing,
+        area_fraction,
+        remapping,
+        nothing,
+        ice_properties,
+        dt,
+        nothing,
+        clock,
+    )
 
     # Initialize the sea ice with the same grid as the ocean
     grid = ocean.ocean.model.grid
@@ -202,6 +213,7 @@ Output some sea-ice stats at a frequency determined by the `seaice_progress_inte
 """
 function Interfacer.progress(ice_sim::ClimaSeaIceSimulation, cs)
     ice = ice_sim.ice
+    isnothing(ice) && return nothing
     model = ice.model
 
     h_max = maximum(model.ice_thickness)
@@ -289,6 +301,19 @@ function Interfacer.get_field!(
         Interfacer.remap!(target_field, surface_temperature, remapping)
         return nothing
     end
+    if remapping.exchange_on_root
+        isnothing(sim.ice) ||
+            ice_emission_temperature!(remapping.exchange_fields.scalar_temp, sim)
+        scatter_from_root!(target_field, remapping, :scalar_temp)
+    else
+        ice_emission_temperature!(target_field, sim)
+    end
+    return nothing
+end
+
+# The SIC-weighted control-volume transfer of the skin temperature's `T⁴` onto `field`
+function ice_emission_temperature!(field, sim::ClimaSeaIceSimulation)
+    remapping = sim.remapping
     is = remapping.ice_flux_state
     fs = is.fluxes
     @. fs.scratch2 = is.T_sfc_new^4
@@ -297,8 +322,8 @@ function Interfacer.get_field!(
         remapping.exchange_grid,
         vec(OC.interior(sim.ice.model.ice_concentration, :, :, 1)),
     )
-    emission_temperature!(target_field, remapping, fs.scratch2, fs.scratch1)
-    return nothing
+    emission_temperature!(field, remapping, fs.scratch2, fs.scratch1)
+    return field
 end
 
 """
@@ -323,8 +348,23 @@ NVTX.@annotate function FluxCalculator.compute_surface_fluxes!(
         _compute_ice_boundary_fluxes!(csf, sim, atmos_sim, thermo_params, accumulator)
         return nothing
     end
-    compute_ice_exchange_fluxes!(sim, csf, atmos_sim, thermo_params)
-    FluxCalculator.update_flux_fields!(csf, sim, remapping.flux_scratch, accumulator)
+    if remapping.exchange_on_root
+        gather_to_root!(remapping, csf, (:SW_d, :LW_d))
+        isnothing(sim.ice) || compute_ice_exchange_fluxes!(
+            sim,
+            remapping.exchange_fields,
+            atmos_sim,
+            thermo_params,
+        )
+        for name in keys(remapping.flux_fields)
+            scatter_from_root!(remapping.flux_fields[name], remapping, name)
+        end
+        fluxes = remapping.flux_fields
+    else
+        compute_ice_exchange_fluxes!(sim, csf, atmos_sim, thermo_params)
+        fluxes = remapping.flux_scratch
+    end
+    FluxCalculator.update_flux_fields!(csf, sim, fluxes, accumulator)
     return nothing
 end
 
@@ -467,7 +507,7 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaSeaIceSimulation, fie
         # The exchange-grid path pushes the per-polygon fluxes currently held
         # in `sim.remapping.ice_flux_state` (`fields` is ignored: the
         # boundary-space fields are a coarser view of the same fluxes).
-        push_exchange_fluxes_to_ice!(sim)
+        isnothing(sim.ice) || push_exchange_fluxes_to_ice!(sim)
     else
         _update_ice_turbulent_fluxes_boundary!(sim, fields)
     end
@@ -629,6 +669,18 @@ the per-polygon ice concentration. Uses the ocean flux state's `scratch1` as
 per-polygon scratch.
 """
 function exchange_ice_fraction!(ice_fraction, remapping, sim::ClimaSeaIceSimulation)
+    if remapping.exchange_on_root
+        isnothing(sim.ice) ||
+            ice_fraction_coverage!(remapping.exchange_fields.scalar_temp, remapping, sim)
+        scatter_from_root!(ice_fraction, remapping, :scalar_temp)
+    else
+        ice_fraction_coverage!(ice_fraction, remapping, sim)
+    end
+    return ice_fraction
+end
+
+# The exchange-grid coverage of the per-polygon ice concentration on `field`
+function ice_fraction_coverage!(field, remapping, sim::ClimaSeaIceSimulation)
     eg = remapping.exchange_grid
     sic = remapping.ocean_flux_state.scratch1
     gather_cells_to_polys!(
@@ -636,8 +688,8 @@ function exchange_ice_fraction!(ice_fraction, remapping, sim::ClimaSeaIceSimulat
         eg,
         vec(OC.interior(sim.ice.model.ice_concentration, :, :, 1)),
     )
-    flux_weight_coverage!(ice_fraction, eg, sic, remapping.flux_dss_buffer)
-    return ice_fraction
+    flux_weight_coverage!(field, eg, sic, remapping.flux_dss_buffer)
+    return field
 end
 
 """
@@ -832,8 +884,10 @@ function FluxCalculator.push_and_reset!(
         )
     end
     iszero(acc.n_steps[]) && return nothing
-    average_and_reset_exchange_accumulators!(sim.remapping.ice_flux_state.fluxes)
-    push_exchange_fluxes_to_ice!(sim)
+    if !isnothing(sim.ice)
+        average_and_reset_exchange_accumulators!(sim.remapping.ice_flux_state.fluxes)
+        push_exchange_fluxes_to_ice!(sim)
+    end
     # Keep the (unused but still accumulated) boundary-space accumulator in
     # sync so its averages stay well-defined.
     FluxCalculator.reset!(acc)
@@ -866,7 +920,13 @@ ClimaSeaIce expects `snowfall` as a positive accumulation rate, so the sign is f
 """
 function FieldExchanger.update_sim!(sim::ClimaSeaIceSimulation, csf)
     if sim.remapping.use_exchange_grid
-        push_exchange_radiation_to_ice!(sim, csf)
+        if sim.remapping.exchange_on_root
+            gather_to_root!(sim.remapping, csf, (:SW_d, :LW_d, :P_snow))
+            isnothing(sim.ice) ||
+                push_exchange_radiation_to_ice!(sim, sim.remapping.exchange_fields)
+        else
+            push_exchange_radiation_to_ice!(sim, csf)
+        end
         return nothing
     end
     ice_concentration = sim.ice.model.ice_concentration

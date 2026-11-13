@@ -170,6 +170,7 @@ function pull_cells!(cx::CellExchange, cell_values)
         cell_values,
         cx.send_slots,
     )
+    KernelAbstractions.synchronize(backend)
     ClimaComms.start(cx.pull)
     ClimaComms.finish(cx.pull)
     return cx.remote

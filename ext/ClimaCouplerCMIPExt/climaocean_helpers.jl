@@ -300,9 +300,11 @@ end
 """
     step_model!(oc_sim, clock, Δt)
 
-Advance the Oceananigans-backed simulation by `Δt`, which advances `clock`.
+Advance the Oceananigans-backed simulation by `Δt`, which advances `clock`, or
+only `clock` on a rank without the simulation.
 """
 step_model!(oc_sim::OC.Simulation, clock, Δt) = OC.time_step!(oc_sim, Δt)
+step_model!(::Nothing, clock, Δt) = OC.TimeSteppers.tick!(clock, Δt)
 
 # Under MPI each process checkpoints its own slab, in a file named with its rank.
 rank_suffix(comms_ctx) =
@@ -325,6 +327,7 @@ function Checkpointer.checkpoint_model_state(
     prev_checkpoint_t::Int;
     output_dir = "output",
 )
+    isnothing(get_oc_sim(sim)) && return nothing
     day = floor(Int, t / (60 * 60 * 24))
     sec = floor(Int, t % (60 * 60 * 24))
     @info "Saving checkpoint $(nameof(sim)) model state to JLD2 on day $day second $sec"
@@ -352,6 +355,7 @@ function Checkpointer.restart_model_state!(
     input_file,
     comms_ctx,
 )
+    isnothing(get_oc_sim(sim)) && return nothing
     jld2_file = replace(input_file, ".hdf5" => "$(rank_suffix(comms_ctx)).jld2")
     ispath(jld2_file) || error("Oceananigans checkpoint file not found: $jld2_file")
     OC.set!(get_oc_sim(sim); checkpoint = jld2_file)

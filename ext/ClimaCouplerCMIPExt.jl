@@ -48,6 +48,7 @@ include("ClimaCouplerCMIPExt/control_volumes.jl")
 include("ClimaCouplerCMIPExt/cell_exchange.jl")
 include("ClimaCouplerCMIPExt/exchange_grid.jl")
 include("ClimaCouplerCMIPExt/exchange_fluxes.jl")
+include("ClimaCouplerCMIPExt/root_exchange.jl")
 
 # Data readers first: the model files call into them during construction
 include("ClimaCouplerCMIPExt/ocean_data_artifacts.jl")

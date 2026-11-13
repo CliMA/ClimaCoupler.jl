@@ -980,6 +980,7 @@ end
     )
     remapping = (;
         use_exchange_grid = true,
+        exchange_on_root = false,
         exchange_grid = eg,
         ocean_flux_state = CMIPExt.ExchangeFluxState{FT}(ocean_arch, eg_cpu.n_poly),
         scratch_field_oc3 = surface_field(),
@@ -1076,6 +1077,7 @@ Base.eltype(::FakeIceModel) = FT
     model = FakeIceModel(grid, ice_concentration, (; top), snowfall)
     remapping = (;
         use_exchange_grid = true,
+        exchange_on_root = false,
         exchange_grid = eg,
         ice_flux_state = CMIPExt.IceExchangeState{FT}(ice_arch, eg_cpu.n_poly),
         scratch_field_oc1 = surface_field(),

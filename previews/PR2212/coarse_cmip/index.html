@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="referrer" content="no-referrer"/><title>Coarse CMIP · ClimaCoupler.jl</title><meta name="title" content="Coarse CMIP · ClimaCoupler.jl"/><meta property="og:title" content="Coarse CMIP · ClimaCoupler.jl"/><meta property="twitter:title" content="Coarse CMIP · ClimaCoupler.jl"/><meta name="description" content="Documentation for ClimaCoupler.jl."/><meta property="og:description" content="Documentation for ClimaCoupler.jl."/><meta property="twitter:description" content="Documentation for ClimaCoupler.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../"><img src="../assets/logo.svg" alt="ClimaCoupler.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../">ClimaCoupler.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../running/">Running a simulation</a></li><li><a class="tocitem" href="../coupledsimulation/">The CoupledSimulation object</a></li><li><a class="tocitem" href="../models/">Available component models</a></li><li><a class="tocitem" href="../simtypes/">Available simulation types</a></li><li><span class="tocitem">Coupler interface</span><ul><li><a class="tocitem" href="../interfacer/">Interfacer</a></li><li><a class="tocitem" href="../input/">Input</a></li><li><a class="tocitem" href="../simcoordinator/">SimCoordinator</a></li><li><a class="tocitem" href="../timemanager/">TimeManager</a></li><li><a class="tocitem" href="../fieldexchanger/">FieldExchanger</a></li><li><a class="tocitem" href="../fluxcalculator/">FluxCalculator</a></li><li><a class="tocitem" href="../exchange_grid/">Exchange (intersection) grid</a></li><li><a class="tocitem" href="../checkpointer/">Checkpointer</a></li><li><a class="tocitem" href="../conservation/">ConservationChecker</a></li><li><a class="tocitem" href="../utilities/">Utilities</a></li></ul></li><li><span class="tocitem">Simulation output</span><ul><li><a class="tocitem" href="../simoutput/">SimOutput</a></li><li><a class="tocitem" href="../plotting/">Plotting</a></li><li><a class="tocitem" href="../leaderboard/">Leaderboard</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><input class="collapse-toggle" id="menuitem-8-1" type="checkbox"/><label class="tocitem" for="menuitem-8-1"><span class="docs-label">AMIP</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../generated/amip/run_simulation/">AMIP Driver</a></li></ul></li><li class="is-active"><a class="tocitem" href>Coarse CMIP</a><ul class="internal"><li><a class="tocitem" href="#Setup"><span>Setup</span></a></li><li><a class="tocitem" href="#Running"><span>Running</span></a></li><li><a class="tocitem" href="#Plotting"><span>Plotting</span></a></li></ul></li></ul></li><li><a class="tocitem" href="../performance/">Performance tips</a></li><li><a class="tocitem" href="../debugging/">Debugging tips</a></li><li><a class="tocitem" href="../calibrationtools/">Parameter calibration</a></li><li><a class="tocitem" href="../contributing/">Contributing to ClimaCoupler</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Coarse CMIP</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Coarse CMIP</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/CliMA/ClimaCoupler.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/CliMA/ClimaCoupler.jl/blob/main/docs/src/coarse_cmip.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Coarse-CMIP"><a class="docs-heading-anchor" href="#Coarse-CMIP">Coarse CMIP</a><a id="Coarse-CMIP-1"></a><a class="docs-heading-anchor-permalink" href="#Coarse-CMIP" title="Permalink"></a></h1><p>This example runs one year of the coarse fully coupled configuration, <code>config/longrun_configs/cmip_coarse.yml</code>, on one GPU, and plots the monthly-mean wind over the polar oceans, their sea ice, and the surrounding land.</p><h2 id="Setup"><a class="docs-heading-anchor" href="#Setup">Setup</a><a id="Setup-1"></a><a class="docs-heading-anchor-permalink" href="#Setup" title="Permalink"></a></h2><table><tr><th style="text-align: left">Component</th><th style="text-align: left">Model</th><th style="text-align: left">Grid</th><th style="text-align: left">Time step</th></tr><tr><td style="text-align: left">Atmosphere</td><td style="text-align: left">ClimaAtmos</td><td style="text-align: left">cubed sphere, 6 × 6 elements per panel (about 5°), 10 levels to 30 km</td><td style="text-align: left">600 s</td></tr><tr><td style="text-align: left">Land</td><td style="text-align: left">ClimaLand (soil, canopy, snow)</td><td style="text-align: left">the atmosphere&#39;s surface</td><td style="text-align: left">600 s</td></tr><tr><td style="text-align: left">Ocean</td><td style="text-align: left">Oceananigans</td><td style="text-align: left">eORCA1 tripolar grid (1°), 10 levels to 5500 m</td><td style="text-align: left">3600 s</td></tr><tr><td style="text-align: left">Sea ice</td><td style="text-align: left">ClimaSeaIce</td><td style="text-align: left">the ocean grid</td><td style="text-align: left">3600 s</td></tr></table><p>The atmosphere has the eddy-diffusivity turbulence and 0-moment microphysics of <code>config/atmos_configs/climaatmos_edonly.yml</code>, all-sky radiation every hour, fixed trace gases, and no aerosols or gravity-wave drag. <code>toml/cmip_coarse.toml</code> weakens the subgrid variance of its cloud scheme for the coarse grid and sets 150 cloud droplets per cm³, and the shortwave sees the clouds without the scaling for unresolved inhomogeneity. The land reads the MODIS monthly leaf-area-index climatology. With 10 levels, the ocean uses <code>simplified_ocean_closure</code>: convective adjustment, a background vertical diffusivity, and biharmonic horizontal viscosity. Fluxes are exchanged every 600 s, those between the atmosphere and the ocean or sea ice on the exchange grid (see <a href="../exchange_grid/#Exchange-(intersection)-grid">Exchange (intersection) grid</a>). The run starts on 1 January 2010 from a dry atmosphere at rest whose temperature decays from 290 K at the surface to 220 K aloft (<code>DecayingProfile</code>), and from EN4 (ocean) and ECCO4 (sea ice), in <code>Float32</code>.</p><h2 id="Running"><a class="docs-heading-anchor" href="#Running">Running</a><a id="Running-1"></a><a class="docs-heading-anchor-permalink" href="#Running" title="Permalink"></a></h2><p>Start Julia in a new environment, on a machine with an NVIDIA GPU:</p><pre><code class="language-bash hljs">CLIMACOMMS_DEVICE=CUDA julia --project=coarse_cmip</code></pre><p>Install the packages once:</p><pre><code class="language-julia hljs">using Pkg
+Pkg.add(name = &quot;ClimaCore&quot;, version = &quot;1.0.5&quot;)
+Pkg.add([&quot;ClimaCoupler&quot;, &quot;ClimaAtmos&quot;, &quot;ClimaLand&quot;, &quot;Oceananigans&quot;, &quot;ClimaSeaIce&quot;, &quot;ConservativeRegridding&quot;])
+Pkg.add([&quot;ClimaComms&quot;, &quot;CUDA&quot;]) # For using an NVIDIA GPU
+Pkg.add([&quot;ClimaAnalysis&quot;, &quot;CairoMakie&quot;]) # For plotting</code></pre><p>Then load them, shorten the run from 30 years to one, and run it:</p><pre><code class="language-julia hljs">using ClimaCoupler
+# The component models and the packages that load ClimaCoupler&#39;s extensions for them
+import ClimaAtmos, ClimaLand, Oceananigans, ClimaSeaIce, ConservativeRegridding
+import ClimaComms
+ClimaComms.@import_required_backends
+
+config_file = joinpath(pkgdir(ClimaCoupler), &quot;config&quot;, &quot;longrun_configs&quot;, &quot;cmip_coarse.yml&quot;)
+config_dict = Input.get_coupler_config_dict(config_file)
+config_dict[&quot;t_end&quot;] = &quot;365days&quot;
+cs = CoupledSimulation(config_dict)
+run!(cs)</code></pre><p>The first run will take some time to setup and compile, but once it is running it should finish in ~1 hour depending on your card. Every component writes monthly means to <code>output/cmip_coarse</code>, about 1 GB in all.</p><h2 id="Plotting"><a class="docs-heading-anchor" href="#Plotting">Plotting</a><a id="Plotting-1"></a><a class="docs-heading-anchor-permalink" href="#Plotting" title="Permalink"></a></h2><p>The figure shows September, near the smallest extent of Arctic sea ice and the largest of Antarctic sea ice: monthly means of the wind at the lowest model level (about 250 m) as white arrows, over the sea-ice concentration, the ocean surface speed and the soil temperature of the top 5 cm, poleward of 45°N (left) and 45°S (right). Each map is the orthographic projection onto the plane tangent at its pole.</p><pre><code class="language-julia hljs">using CairoMakie, Dates, Oceananigans
+import ClimaAnalysis
+using LinearAlgebra: normalize
+
+month = 9
+month_start = DateTime(2010, month)
+
+# Atmosphere and land monthly means are stamped at the start of their month, ocean and sea-ice ones at the end
+atmos = ClimaAnalysis.SimDir(cs.dir_paths.atmos_output_dir)
+uas, vas = map((&quot;uas&quot;, &quot;vas&quot;)) do short_name
+    var = get(atmos; short_name, reduction = &quot;average&quot;, period = &quot;1M&quot;)
+    return ClimaAnalysis.slice(var; time = month_start)
+end
+land = ClimaAnalysis.SimDir(cs.dir_paths.land_output_dir)
+tsoil = get(land; short_name = &quot;tsoil&quot;, reduction = &quot;average&quot;, period = &quot;1M&quot;)
+tsoil = ClimaAnalysis.slice(tsoil; time = month_start, z = 0)  # the top layer
+
+ocean_file = joinpath(cs.dir_paths.ocean_output_dir, &quot;ocean_surface.jld2&quot;)
+ice_file = joinpath(cs.dir_paths.ice_output_dir, &quot;seaice_surface.jld2&quot;)
+U, V = (FieldTimeSeries(ocean_file, name; backend = OnDisk())
+        for name in (&quot;sea_surface_zonal_velocity&quot;, &quot;sea_surface_meridional_velocity&quot;))
+ℵ = FieldTimeSeries(ice_file, &quot;ice_concentration&quot;; backend = OnDisk())
+n = findfirst(==(month_start + Month(1)), U.times)
+grid = U.grid
+Nx, Ny = grid.Nx, grid.Ny
+speed = hypot.(interior(U[n], :, :, 1), interior(V[n], :, 1:Ny, 1))
+concentration = interior(ℵ[n], :, :, 1)
+
+# Position on the map [Earth radii] of longitude λ and latitude φ around the pole of hemisphere h (1 north,
+# -1 south), and the directions of east and north there. The maps reach 45° latitude.
+project(λ, φ, h) = Point2f(cosd(φ) * sind(λ), -h * cosd(φ) * cosd(λ))
+east(λ, h) = Vec2f(cosd(λ), h * sind(λ))
+north(λ, φ, h) = sind(φ) * Vec2f(-sind(λ), h * cosd(λ))
+radius = cosd(45)
+
+# Ocean cells colored by sea-ice concentration over surface speed, drawn as quadrilaterals between their
+# corners over the soil temperature
+speed_colors, ice_colors, speed_range = cgrad(:magma), cgrad(:ice), (0, 0.5)
+soil_colors, soil_range = cgrad(:balance), (-30, 30)
+colors = map(speed, concentration) do s, c
+    ocean = speed_colors[min(s / speed_range[2], 1)]
+    return RGBAf(Makie.weighted_color_mean(c, ice_colors[c], ocean))
+end
+wet = grid.immersed_boundary.bottom_height[1:Nx, 1:Ny, 1] .&lt; 0
+latitudes = φnodes(grid, Center(), Center(), Center())
+corner_longitudes = λnodes(grid, Face(), Face(), Center())
+corner_latitudes = φnodes(grid, Face(), Face(), Center())
+corners(i, j) = ((i, j), (i % Nx + 1, j), (i % Nx + 1, j + 1), (i, j + 1))
+
+# Arrows on a square grid of each map, outside the latitude rows at the poles, where the wind has no
+# direction. An arrow is `scale` Earth radii long per m s⁻¹.
+spacing, scale = 0.062, 4.5e-3
+inner_radius = cosd(ClimaAnalysis.latitudes(uas)[2])
+offsets = -radius:spacing:radius
+tails = [Point2f(x, y) for x in offsets, y in offsets if inner_radius &lt; hypot(x, y) &lt; radius]
+style = (shaftwidth = 1.5, tipwidth = 7, tiplength = 8)
+
+fig = Figure(size = (2800, 1200), fontsize = 38)
+Label(fig[0, 1:2], monthname(month); font = :bold)
+maps = map(((1, 1), (2, -1))) do (column, h)
+    ax = Axis(fig[1, column]; aspect = DataAspect(), limits = (-radius, radius, -radius, radius))
+    hidedecorations!(ax)
+    hidespines!(ax)
+    soil = ClimaAnalysis.resampled_as(tsoil; lon = collect(-180.0:180), lat = sort(h .* collect(45.0:90)))
+    soil_points = project.(ClimaAnalysis.longitudes(soil), ClimaAnalysis.latitudes(soil)&#39;, h)
+    surface!(ax, first.(soil_points), last.(soil_points), zeros(size(soil_points));
+             color = soil.data .- 273.15, colormap = soil_colors, colorrange = soil_range, shading = NoShading)
+    cells = filter(I -&gt; wet[I] &amp;&amp; h * latitudes[I] &gt;= 45, CartesianIndices(wet))
+    vertices = [project(corner_longitudes[c...], corner_latitudes[c...], h)
+                for I in cells for c in corners(Tuple(I)...)]
+    quads = permutedims(reshape(1:length(vertices), 4, :))
+    mesh!(ax, vertices, [quads[:, [1, 2, 3]]; quads[:, [1, 3, 4]]];
+          color = repeat(colors[cells]; inner = 4), shading = NoShading)
+    directions = map(tails) do p
+        λ, φ = atand(p[1], -h * p[2]), h * acosd(hypot(p...))
+        eastward, northward = uas([λ, φ]), vas([λ, φ])
+        wind = eastward * east(λ, h) + northward * north(λ, φ, h)
+        return scale * hypot(eastward, northward) * normalize(wind)
+    end
+    arrows2d!(ax, tails, directions; color = :white, style...)
+    return ax
+end
+reference = radius * Point2f(0.75, -0.93)
+arrows2d!(maps[2], [reference], [Vec2f(10scale, 0)]; color = :black, style...)
+text!(maps[2], reference - Vec2f(0.012, 0); text = &quot;10 m/s&quot;, align = (:right, :center))
+colorbars = GridLayout(fig[1, 3]; default_colgap = 60)
+Colorbar(colorbars[1, 1]; colormap = speed_colors, limits = speed_range,
+         label = &quot;Sea-surface speed (m/s)&quot;, height = Relative(0.8))
+Colorbar(colorbars[1, 2]; colormap = ice_colors, limits = (0, 100),
+         label = &quot;Sea-ice concentration (%)&quot;, height = Relative(0.8))
+Colorbar(colorbars[1, 3]; colormap = soil_colors, limits = soil_range,
+         label = &quot;Soil temperature, top 5 cm (°C)&quot;, height = Relative(0.8))
+save(&quot;polar_winds.png&quot;, fig; px_per_unit = 1)</code></pre><p><img src="../assets/coarse_cmip_polar_winds.png" alt="Monthly-mean wind over the Arctic and Southern Oceans in September 2010"/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../generated/amip/run_simulation/">« AMIP Driver</a><a class="docs-footer-nextpage" href="../performance/">Performance tips »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.20.0 on <span class="colophon-date" title="Saturday 7 November 2026 00:13">Saturday 7 November 2026</span>. Using Julia version 1.13.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

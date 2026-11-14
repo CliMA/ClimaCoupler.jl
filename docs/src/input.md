@@ -98,6 +98,8 @@ Note: the `mode_name` determines which Julia environment to use. Use `experiment
 | `--unique_seed` | Bool | `false` | `true`, `false` | Whether to set the random number seed to a unique value |
 | `--FLOAT_TYPE` | String | `"Float64"` | `Float64`, `Float32` | Floating point precision |
 | `--device` | String | `"auto"` | `auto`, `CPUSingleThreaded`, `CPUMultiThreaded`, `CUDADevice` | Device type to control running on CPU or GPU |
+| `--step_concurrently` | Bool | `false` | `true`, `false` | Step the component models concurrently, as two groups: land then atmosphere in one task, sea ice then ocean in another. Only worthwhile on a GPU; see [SimCoordinator](@ref) |
+| `--overlap_slow_surfaces` | Bool | `false` | `true`, `false` | With `step_concurrently`, span one ocean/sea ice step across several coupling steps instead of blocking on it within one. The atmosphere then sees an ocean one slow step older. Pays best when `dt_ocean`/`dt_seaice` are a few multiples of `dt_cpl`; if they equal `dt_cpl` it overlaps the coupler's exchange and communication but saves no more computation than `step_concurrently` alone. See [SimCoordinator](@ref) |
 
 #### Time information
 

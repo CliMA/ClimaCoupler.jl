@@ -2,7 +2,6 @@ aerosol_radiation: true
 approximate_linear_solve_iters: 2
 cloud_model: "quadrature"
 dt: "120secs"
-dt_cloud_fraction: "1hours"
 dt_rad: "1hours"
 dt_save_state_to_disk: "30days"
 dz_bottom: 28.0
@@ -12,7 +11,6 @@ edmfx_filter: true
 edmfx_nh_pressure: true
 edmfx_sgs_diffusive_flux: true
 edmfx_sgs_mass_flux: true
-edmfx_upwinding: "first_order"
 edmfx_vertical_diffusion: true
 h_elem: 16
 implicit_diffusion: true

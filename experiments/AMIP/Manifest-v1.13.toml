@@ -2,7 +2,7 @@
 
 julia_version = "1.13.3"
 manifest_format = "2.1"
-project_hash = "981b6332242c064ba46f37d02ba77fa3abfb0494"
+project_hash = "1eaea07ec7482bad1745d859599817c02e99e290"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -465,8 +465,7 @@ weakdeps = ["GeoMakie", "Makie"]
 
 [[deps.ClimaAtmos]]
 deps = ["Adapt", "ArgParse", "Artifacts", "ClimaComms", "ClimaCore", "ClimaDiagnostics", "ClimaInitialConditions", "ClimaInterpolations", "ClimaParams", "ClimaTimeSteppers", "ClimaUtilities", "CloudMicrophysics", "Dates", "Flux", "ForwardDiff", "Insolation", "Interpolations", "JLD2", "LazyArtifacts", "LazyBroadcast", "LinearAlgebra", "Logging", "NCDatasets", "NVTX", "NullBroadcasts", "RRTMGP", "Random", "SparseMatrixColorings", "StaticArrays", "Statistics", "SurfaceFluxes", "Thermodynamics", "UnrolledUtilities", "YAML"]
-git-tree-sha1 = "b1ba10ca40ce5257ae61160b12283d10549b98a8"
-registries = "General"
+path = "../../../ClimaAtmos.jl"
 uuid = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 version = "0.42.19"
 
@@ -507,8 +506,7 @@ version = "0.6.13"
 
 [[deps.ClimaCore]]
 deps = ["Adapt", "BandedMatrices", "BlockArrays", "ClimaComms", "ClimaInterpolations", "CubedSphere", "DataStructures", "ForwardDiff", "GaussQuadrature", "GilbertCurves", "HDF5", "InteractiveUtils", "IntervalSets", "KrylovKit", "LLVM", "LazyBroadcast", "LinearAlgebra", "MultiBroadcastFusion", "NVTX", "PkgVersion", "Random", "RootSolvers", "SparseArrays", "StaticArrays", "Statistics", "UnrolledUtilities"]
-git-tree-sha1 = "1befc274efc078d6a056b003e1d1472a0a9cbd58"
-registries = "General"
+path = "../../../ClimaCore.jl"
 uuid = "d414da3d-4745-48bb-8d80-42e94e092884"
 version = "1.0.8"
 weakdeps = ["CUDA", "Krylov", "Makie", "RecipesBase"]
@@ -2841,8 +2839,7 @@ version = "1.11.0"
 
 [[deps.RRTMGP]]
 deps = ["Adapt", "Artifacts", "ClimaComms", "PrecompileTools", "Serialization"]
-git-tree-sha1 = "b5a80f449e86516720c13c49299b04451cba657b"
-registries = "General"
+path = "../../../RRTMGP.jl"
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
 version = "1.1.1"
 weakdeps = ["CUDA", "ClimaParams", "NCDatasets"]

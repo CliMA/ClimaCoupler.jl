@@ -394,13 +394,14 @@ steps:
 
       - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce (concurrent stepping)"
         key: "gpu_cmip_oceananigans_climaseaice"
-        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice.yml --job_id gpu_cmip_oceananigans_climaseaice"
+        command: "julia -O0 --threads=3 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice.yml --job_id gpu_cmip_oceananigans_climaseaice"
         artifact_paths: "output/gpu_cmip_oceananigans_climaseaice/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         retry: *retry_policy
         agents:
           slurm_mem: 20GB
+          slurm_cpus_per_task: 4
           slurm_gpus: 1
 
   - group: "Calibration"

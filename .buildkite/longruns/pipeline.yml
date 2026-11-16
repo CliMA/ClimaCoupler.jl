@@ -109,7 +109,7 @@ steps:
       - label: "GPU CMIP: ED only + bucket (concurrent stepping)"
         key: "cmip_edonly_bucket"
         command:
-            - "julia --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_edonly_bucket.yml --job_id cmip_edonly_bucket"
+            - "julia --threads=3 --color=yes --project=experiments/CMIP experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_edonly_bucket.yml --job_id cmip_edonly_bucket"
         artifact_paths: "output/cmip_edonly_bucket/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -117,6 +117,7 @@ steps:
           queue: clima
           modules: climacommon/2026_11_06-1.13.3
           slurm_mem: 32GB
+          slurm_cpus_per_task: 4
           slurm_gpus: 1
 
       - label: "GPU CMIP: ED only + integrated land"

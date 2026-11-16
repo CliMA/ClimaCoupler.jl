@@ -429,7 +429,7 @@ function step_model_sims!(cs::Interfacer.CoupledSimulation; skip_slow::Bool = fa
         cs.t[],
         cs.fields,
         cs.thermo_params,
-        cs.step_concurrently;
+        cs.schedule.concurrent;
         skip_slow,
     )
 end
@@ -479,9 +479,9 @@ function launch_slow_sims!(cs::Interfacer.CoupledSimulation)
     # A step past the end of the run would never be joined.
     Float64(float(target)) > Float64(float(cs.tspan[end])) && return nothing
     # The task writes the ocean clock, so scheduling reads this copy instead.
-    cs.slow_task[] = (;
-        task = Threads.@spawn(step_slow_sims!(model_sims, target)),
-        target = Float64(float(target)),
+    cs.schedule.in_flight = Interfacer.SlowStep(
+        Threads.@spawn(step_slow_sims!(model_sims, target)),
+        Float64(float(target)),
     )
     return nothing
 end
@@ -493,10 +493,10 @@ Join an in-flight ice/ocean step, if any, and keep the progress snapshot it
 gathered. A no-op when no step is in flight.
 """
 function wait_slow_sims!(cs::Interfacer.CoupledSimulation)
-    inflight = cs.slow_task[]
+    inflight = cs.schedule.in_flight
     isnothing(inflight) && return nothing
     wait(inflight.task)
-    cs.slow_task[] = nothing
+    cs.schedule.in_flight = nothing
     return nothing
 end
 
@@ -507,7 +507,7 @@ The time an in-flight ice/ocean step is advancing to, or `nothing` if none is in
 flight.
 """
 slow_step_target(cs::Interfacer.CoupledSimulation) =
-    isnothing(cs.slow_task[]) ? nothing : cs.slow_task[].target
+    isnothing(cs.schedule.in_flight) ? nothing : cs.schedule.in_flight.target
 
 
 """
@@ -531,7 +531,7 @@ end
 
 Whether an ice/ocean step is currently running as a task.
 """
-slow_step_in_flight(cs::Interfacer.CoupledSimulation) = !isnothing(cs.slow_task[])
+slow_step_in_flight(cs::Interfacer.CoupledSimulation) = !isnothing(cs.schedule.in_flight)
 
 """
     combine_surfaces!(csf, sims, field_name_val::Val{field_name}) where {field_name}

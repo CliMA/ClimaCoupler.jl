@@ -34,6 +34,7 @@ export CoupledSimulation,
     sim_dt,
     will_step,
     is_overlapped,
+    SteppingSchedule,
     set_cache!,
     remap,
     remap!,
@@ -51,6 +52,37 @@ export CoupledSimulation,
 An abstract super-type representing a simulation.
 """
 abstract type AbstractSimulation{FT} end
+
+"""
+    SlowStep
+
+An ice/ocean step running asynchronously: the task, and the model time it is
+advancing to. The target is held here because the models' own clocks are being
+written by that task.
+"""
+struct SlowStep
+    task::Task
+    target::Float64
+end
+
+"""
+    SteppingSchedule(concurrent, overlap_slow)
+
+How the component models are stepped relative to one another, and the in-flight
+ice/ocean step if there is one.
+
+- `concurrent`: step the overlapped group in its own task.
+- `overlap_slow`: let one ice/ocean step span several coupling steps.
+- `in_flight`: the running [`SlowStep`](@ref), or `nothing`.
+"""
+mutable struct SteppingSchedule
+    const concurrent::Bool
+    const overlap_slow::Bool
+    in_flight::Union{Nothing, SlowStep}
+end
+
+SteppingSchedule(concurrent::Bool, overlap_slow::Bool) =
+    SteppingSchedule(concurrent, overlap_slow, nothing)
 
 """
     CoupledSimulation
@@ -73,9 +105,7 @@ struct CoupledSimulation{
     TP,
     DH,
     SC <: Bool,
-    SCC <: Bool,
-    OSS <: Bool,
-    STK,
+    SS <: SteppingSchedule,
     NTFA <: NamedTuple,
 }
     start_date::D
@@ -92,10 +122,7 @@ struct CoupledSimulation{
     thermo_params::TP
     diags_handler::DH
     save_cache::SC
-    step_concurrently::SCC
-    overlap_slow_surfaces::OSS
-    "`(; task, target)` for an in-flight asynchronous ice/ocean step, or `nothing`. See `FieldExchanger.launch_slow_sims!`."
-    slow_task::STK
+    schedule::SS
     flux_accumulators::NTFA
 end
 
@@ -104,9 +131,9 @@ CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args).
 """
     CoupledSimulation{FT}(start_date, ..., flux_accumulators; step_concurrently, ...)
 
-Construct a `CoupledSimulation`. The concurrent-stepping fields
-`step_concurrently`, `overlap_slow_surfaces` and `slow_task` are keyword
-arguments that are off by default.
+Construct a `CoupledSimulation`. `step_concurrently` and
+`overlap_slow_surfaces` are keyword arguments, off by default; they are held
+in a [`SteppingSchedule`](@ref) alongside any in-flight ice/ocean step.
 """
 function CoupledSimulation{FT}(
     start_date,
@@ -126,7 +153,6 @@ function CoupledSimulation{FT}(
     flux_accumulators;
     step_concurrently = false,
     overlap_slow_surfaces = false,
-    slow_task = Ref{Any}(nothing),
 ) where {FT}
     return CoupledSimulation{FT}(
         start_date,
@@ -143,9 +169,7 @@ function CoupledSimulation{FT}(
         thermo_params,
         diags_handler,
         save_cache,
-        step_concurrently,
-        overlap_slow_surfaces,
-        slow_task,
+        SteppingSchedule(step_concurrently, overlap_slow_surfaces),
         flux_accumulators,
     )
 end

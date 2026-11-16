@@ -161,7 +161,7 @@ Join an overlapped ice/ocean step if this coupling step needs its result, and
 report whether one is still in flight afterwards.
 """
 function join_slow_if_due!(cs::Interfacer.CoupledSimulation)
-    cs.overlap_slow_surfaces && slow_surfaces_due(cs) && FieldExchanger.wait_slow_sims!(cs)
+    cs.schedule.overlap_slow && slow_surfaces_due(cs) && FieldExchanger.wait_slow_sims!(cs)
     return FieldExchanger.slow_step_in_flight(cs)
 end
 
@@ -172,7 +172,7 @@ Whether `step_model_sims!` should leave the slow group alone. Under overlap the
 task advances them, never the loop.
 """
 skip_slow_stepping(cs::Interfacer.CoupledSimulation, frozen::Bool) =
-    frozen || cs.overlap_slow_surfaces
+    frozen || cs.schedule.overlap_slow
 
 """
     launch_slow_if_due!(cs, frozen) -> launched
@@ -181,7 +181,7 @@ Launch the next overlapped ice/ocean step if this coupling step is a boundary.
 Called once the slow group's forcing is fully assembled.
 """
 function launch_slow_if_due!(cs::Interfacer.CoupledSimulation, frozen::Bool)
-    (cs.overlap_slow_surfaces && !frozen && slow_surfaces_due(cs)) || return false
+    (cs.schedule.overlap_slow && !frozen && slow_surfaces_due(cs)) || return false
     FieldExchanger.launch_slow_sims!(cs)
     return true
 end

@@ -32,7 +32,6 @@ export update_sim!,
     step_slow_sims!,
     slow_step_target,
     slow_launch_target,
-    slow_progress_snapshot,
     slow_sim_dt,
     launch_slow_sims!,
     wait_slow_sims!,
@@ -440,23 +439,14 @@ end
 
 Advance the overlapped group (sea ice, then ocean) to time `t`.
 """
-function step_slow_sims!(model_sims, t; gather_progress::Bool = false)
+function step_slow_sims!(model_sims, t)
     for sim in model_sims
         sim isa Interfacer.AbstractSeaIceSimulation && Interfacer.step!(sim, t)
     end
     for sim in model_sims
         sim isa Interfacer.AbstractOceanSimulation && Interfacer.step!(sim, t)
     end
-    # Reduce over the slow sims here, where this task still owns their state.
-    gather_progress || return nothing
-    names = Symbol[]
-    snapshots = Any[]
-    for (name, sim) in pairs(model_sims)
-        Interfacer.is_overlapped(sim) || continue
-        push!(names, name)
-        push!(snapshots, Interfacer.progress_snapshot(sim))
-    end
-    return NamedTuple{Tuple(names)}(Tuple(snapshots))
+    return nothing
 end
 
 """
@@ -490,7 +480,7 @@ function launch_slow_sims!(cs::Interfacer.CoupledSimulation)
     Float64(float(target)) > Float64(float(cs.tspan[end])) && return nothing
     # The task writes the ocean clock, so scheduling reads this copy instead.
     cs.slow_task[] = (;
-        task = Threads.@spawn(step_slow_sims!(model_sims, target; gather_progress = true)),
+        task = Threads.@spawn(step_slow_sims!(model_sims, target)),
         target = Float64(float(target)),
     )
     return nothing
@@ -505,21 +495,9 @@ gathered. A no-op when no step is in flight.
 function wait_slow_sims!(cs::Interfacer.CoupledSimulation)
     inflight = cs.slow_task[]
     isnothing(inflight) && return nothing
-    cs.slow_progress[] = fetch(inflight.task)
+    wait(inflight.task)
     cs.slow_task[] = nothing
     return nothing
-end
-
-"""
-    slow_progress_snapshot(cs, sim_name)
-
-Progress scalars gathered at the end of the most recent completed slow step, or
-`nothing` if none has completed yet.
-"""
-function slow_progress_snapshot(cs::Interfacer.CoupledSimulation, sim_name::Symbol)
-    snapshots = cs.slow_progress[]
-    (isnothing(snapshots) || !haskey(snapshots, sim_name)) && return nothing
-    return snapshots[sim_name]
 end
 
 """

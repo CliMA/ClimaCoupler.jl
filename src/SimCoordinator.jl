@@ -142,14 +142,15 @@ function step!(cs::Interfacer.CoupledSimulation)
     # Compute any ocean-sea ice fluxes
     frozen || FluxCalculator.ocean_seaice_fluxes!(cs)
 
-    # The slow surfaces' forcing is now fully assembled.
-    launch_slow_if_due!(cs, frozen)
-
     # Maybe call the callbacks
     TimeManager.callbacks!(cs)
 
     # Compute and save coupler diagnostics
     CD.orchestrate_diagnostics(cs)
+
+    # Launched last, so nothing in this step reads ice or ocean state after it.
+    # The slow surfaces' forcing is fully assembled by here.
+    launch_slow_if_due!(cs, frozen)
     return nothing
 end
 
@@ -614,18 +615,7 @@ function _build_coupled_simulation(config_dict::AbstractDict)
         progress_cb = TimeManager.Callback(
             schedule_progress,
             let sim_name = sim_name
-                cs -> begin
-                    sim = cs.model_sims[sim_name]
-                    # Report from the task's last snapshot: the in-flight
-                    # step is writing this sim's fields.
-                    if Interfacer.is_overlapped(sim) &&
-                       FieldExchanger.slow_step_in_flight(cs)
-                        snapshot = FieldExchanger.slow_progress_snapshot(cs, sim_name)
-                        isnothing(snapshot) && return nothing
-                        return Interfacer.progress(sim, cs, snapshot)
-                    end
-                    Interfacer.progress(sim, cs)
-                end
+                cs -> Interfacer.progress(cs.model_sims[sim_name], cs)
             end,
         )
         callbacks = (callbacks..., progress_cb)

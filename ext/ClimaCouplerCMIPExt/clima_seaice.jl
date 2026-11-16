@@ -186,10 +186,10 @@ Extension of `Interfacer.progress` for ClimaSeaIce.
 
 Output some sea-ice stats at a frequency determined by the `seaice_progress_interval` config option.
 """
-function Interfacer.progress_snapshot(ice_sim::ClimaSeaIceSimulation)
+function Interfacer.progress(ice_sim::ClimaSeaIceSimulation, cs)
     model = ice_sim.ice.model
     (T_sfc_min, T_sfc_max) = extrema(model.ice_thermodynamics.top_surface_temperature)
-    return (;
+    s = (;
         clock_time = model.clock.time,
         iteration = OC.iteration(ice_sim.ice),
         h_max = maximum(model.ice_thickness),
@@ -199,12 +199,6 @@ function Interfacer.progress_snapshot(ice_sim::ClimaSeaIceSimulation)
         u_max = maximum(abs, model.velocities.u),
         v_max = maximum(abs, model.velocities.v),
     )
-end
-
-Interfacer.progress(ice_sim::ClimaSeaIceSimulation, cs) =
-    Interfacer.progress(ice_sim, cs, Interfacer.progress_snapshot(ice_sim))
-
-function Interfacer.progress(::ClimaSeaIceSimulation, cs, s::NamedTuple)
     if ClimaComms.iamroot(ClimaComms.context(cs))
         @info "Sea-ice | time: $(Interfacer.current_date(cs, s.clock_time)), iteration: $(s.iteration), " *
               "maximum(h): $(round(s.h_max, digits = 2)) m, maximum(a): $(round(s.a_max, digits = 2)), " *

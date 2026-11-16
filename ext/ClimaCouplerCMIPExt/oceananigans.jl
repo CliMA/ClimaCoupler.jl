@@ -282,12 +282,12 @@ Extension of `Interfacer.progress` for Oceananigans.
 
 Print some statistics with a frequency determined by the `ocean_progress_interval` config option.
 """
-function Interfacer.progress_snapshot(ocean_sim::OceananigansSimulation)
+function Interfacer.progress(ocean_sim::OceananigansSimulation, cs)
     model = ocean_sim.ocean.model
     (Tmin, Tmax) = extrema(model.tracers.T)
     (Smin, Smax) = extrema(model.tracers.S)
     (ηmin, ηmax) = extrema(model.free_surface.displacement)
-    return (;
+    s = (;
         clock_time = model.clock.time,
         iteration = OC.iteration(ocean_sim.ocean),
         Tmin,
@@ -300,12 +300,6 @@ function Interfacer.progress_snapshot(ocean_sim::OceananigansSimulation)
         vmax = maximum(abs, model.velocities.v),
         wmax = maximum(abs, model.velocities.w),
     )
-end
-
-Interfacer.progress(ocean_sim::OceananigansSimulation, cs) =
-    Interfacer.progress(ocean_sim, cs, Interfacer.progress_snapshot(ocean_sim))
-
-function Interfacer.progress(::OceananigansSimulation, cs, s::NamedTuple)
     if ClimaComms.iamroot(ClimaComms.context(cs))
         @info "Ocean | time: $(Interfacer.current_date(cs, s.clock_time)), iteration: $(s.iteration), " *
               "extrema(η): ($(round(s.ηmin, sigdigits=2)), $(round(s.ηmax, sigdigits=2))) " *

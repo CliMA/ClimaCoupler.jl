@@ -34,7 +34,6 @@ export CoupledSimulation,
     sim_dt,
     will_step,
     is_overlapped,
-    progress_snapshot,
     set_cache!,
     remap,
     remap!,
@@ -77,7 +76,6 @@ struct CoupledSimulation{
     SCC <: Bool,
     OSS <: Bool,
     STK,
-    SPG,
     NTFA <: NamedTuple,
 }
     start_date::D
@@ -98,8 +96,6 @@ struct CoupledSimulation{
     overlap_slow_surfaces::OSS
     "`(; task, target)` for an in-flight asynchronous ice/ocean step, or `nothing`. See `FieldExchanger.launch_slow_sims!`."
     slow_task::STK
-    "Progress scalars gathered at the end of the last completed slow step. See `Interfacer.progress_snapshot`."
-    slow_progress::SPG
     flux_accumulators::NTFA
 end
 
@@ -109,8 +105,8 @@ CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args).
     CoupledSimulation{FT}(start_date, ..., flux_accumulators; step_concurrently, ...)
 
 Construct a `CoupledSimulation`. The concurrent-stepping fields
-`step_concurrently`, `overlap_slow_surfaces`, `slow_task` and `slow_progress`
-are keyword arguments that are off by default.
+`step_concurrently`, `overlap_slow_surfaces` and `slow_task` are keyword
+arguments that are off by default.
 """
 function CoupledSimulation{FT}(
     start_date,
@@ -131,7 +127,6 @@ function CoupledSimulation{FT}(
     step_concurrently = false,
     overlap_slow_surfaces = false,
     slow_task = Ref{Any}(nothing),
-    slow_progress = Ref{Any}(nothing),
 ) where {FT}
     return CoupledSimulation{FT}(
         start_date,
@@ -151,7 +146,6 @@ function CoupledSimulation{FT}(
         step_concurrently,
         overlap_slow_surfaces,
         slow_task,
-        slow_progress,
         flux_accumulators,
     )
 end
@@ -607,24 +601,6 @@ function progress(sim::AbstractComponentSimulation, _cs)
         1
     return nothing
 end
-
-"""
-    progress_snapshot(sim)
-
-Gather the scalars `progress` reports into a `NamedTuple`, without printing, so
-the reduction can run inside the task that owns the model's state.
-
-Returns `nothing` for models that have not extended it.
-"""
-progress_snapshot(::AbstractComponentSimulation) = nothing
-
-"""
-    progress(sim, cs, snapshot)
-
-Print a progress report from a previously gathered [`progress_snapshot`](@ref).
-Falls back to the live report when a model has no snapshot method.
-"""
-progress(sim::AbstractComponentSimulation, cs, ::Nothing) = progress(sim, cs)
 
 """
     close_output_writers(sim::AbstractComponentSimulation)

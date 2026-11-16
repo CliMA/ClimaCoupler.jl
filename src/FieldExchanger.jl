@@ -12,21 +12,16 @@ import .Threads
 import ..Interfacer, ..FluxCalculator, ..Utilities
 import ..Interfacer: update_sim!
 
-"True when this quantity has an overlap cache and the coupler fields carry it."
-function has_slow_cache(csf, val)
-    name = slow_cache_name(val)
-    return !isnothing(name) && name in propertynames(csf)
+"""
+Coupler field parking the slow surfaces' share of `name`, or `nothing` when
+that quantity has no cache or the coupler fields do not carry it.
+"""
+function slow_cache_field(csf, name::Symbol)
+    pairs = Interfacer.blended_cache_pairs()
+    haskey(pairs, name) || return nothing
+    cache = pairs[name]
+    return cache in propertynames(csf) ? getproperty(csf, cache) : nothing
 end
-
-"""
-Coupler field parking the slow surfaces' contribution to each blended quantity,
-or `nothing` for quantities that have no such cache.
-"""
-slow_cache_name(::Val) = nothing
-slow_cache_name(::Val{:emissivity}) = :slow_emissivity
-slow_cache_name(::Val{:surface_temperature}) = :slow_LW_up
-slow_cache_name(::Val{:surface_direct_albedo}) = :slow_direct_albedo
-slow_cache_name(::Val{:surface_diffuse_albedo}) = :slow_diffuse_albedo
 
 export update_sim!,
     accumulated_coupler_fields,
@@ -591,11 +586,8 @@ function combine_surfaces!(
     combined_field .= zero(FT)
 
     # Summed separately so it can be carried across an overlapped step.
-    slow_sum = nothing
-    if has_slow_cache(csf, field_name_val)
-        slow_sum = getproperty(csf, slow_cache_name(field_name_val))
-        slow_frozen || (slow_sum .= zero(FT))
-    end
+    slow_sum = slow_cache_field(csf, field_name)
+    isnothing(slow_sum) || slow_frozen || (slow_sum .= zero(FT))
 
     for sim in sims
         if sim isa Interfacer.AbstractSurfaceSimulation
@@ -634,11 +626,8 @@ function combine_surfaces!(
     T_sfc .= zero(FT)
 
     # Summed separately so it can be carried across an overlapped step.
-    slow_sum = nothing
-    if has_slow_cache(csf, val)
-        slow_sum = getproperty(csf, slow_cache_name(val))
-        slow_frozen || (slow_sum .= zero(FT))
-    end
+    slow_sum = slow_cache_field(csf, :surface_temperature)
+    isnothing(slow_sum) || slow_frozen || (slow_sum .= zero(FT))
 
     for sim in sims
         if sim isa Interfacer.AbstractSurfaceSimulation

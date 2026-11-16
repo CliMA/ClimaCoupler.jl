@@ -42,9 +42,8 @@ function turbulent_fluxes!(cs::Interfacer.CoupledSimulation; slow_frozen::Bool =
     return nothing
 end
 
-turb_flux_names() = (:F_turb_ρτxz, :F_turb_ρτyz, :F_lh, :F_sh, :F_turb_moisture)
-slow_turb_flux_names() =
-    (:slow_F_turb_ρτxz, :slow_F_turb_ρτyz, :slow_F_lh, :slow_F_sh, :slow_F_turb_moisture)
+turb_flux_names() = keys(Interfacer.turb_flux_cache_pairs())
+slow_turb_flux_names() = values(Interfacer.turb_flux_cache_pairs())
 
 """
     turbulent_fluxes!(cs::CoupledSimulation; slow_frozen = false)

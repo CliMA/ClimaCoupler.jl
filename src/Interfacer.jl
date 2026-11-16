@@ -245,17 +245,33 @@ quantity, carried across an overlapped slow-surface step.
 `:slow_LW_up` holds the area- and emissivity-weighted sum of `T^4`, which is
 what is accumulated before converting back to a temperature.
 """
-overlap_cache_fields() = [
-    :slow_emissivity,
-    :slow_LW_up,
-    :slow_direct_albedo,
-    :slow_diffuse_albedo,
-    :slow_F_turb_ρτxz,
-    :slow_F_turb_ρτyz,
-    :slow_F_lh,
-    :slow_F_sh,
-    :slow_F_turb_moisture,
-]
+overlap_cache_fields() =
+    [values(blended_cache_pairs())..., values(turb_flux_cache_pairs())...]
+
+"""
+    blended_cache_pairs()
+    turb_flux_cache_pairs()
+
+Each quantity summed across surfaces, paired with the coupler field parking the
+ocean/sea ice share of it. These are the only definitions of those names.
+
+`:surface_temperature` pairs with `:slow_LW_up` because what is summed is the
+area- and emissivity-weighted `T^4`, not the temperature.
+"""
+blended_cache_pairs() = (;
+    emissivity = :slow_emissivity,
+    surface_temperature = :slow_LW_up,
+    surface_direct_albedo = :slow_direct_albedo,
+    surface_diffuse_albedo = :slow_diffuse_albedo,
+)
+
+@doc (@doc blended_cache_pairs) turb_flux_cache_pairs() = (;
+    F_turb_ρτxz = :slow_F_turb_ρτxz,
+    F_turb_ρτyz = :slow_F_turb_ρτyz,
+    F_lh = :slow_F_lh,
+    F_sh = :slow_F_sh,
+    F_turb_moisture = :slow_F_turb_moisture,
+)
 
 """
     init_coupler_fields(FT, coupler_field_names, boundary_space)

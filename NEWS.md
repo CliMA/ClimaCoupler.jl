@@ -4,6 +4,10 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Average ClimaAtmos precipitation over the atmosphere steps of a coupling step
+The `liquid_precipitation` and `snow_precipitation` that `ClimaAtmosSimulation` passes to the surfaces
+are the mean over the atmosphere steps taken in one coupling step, not just the last value.
+
 #### Use `update_constrain_state_every: "step"` for 0M ProgEDMF
 `config/atmos_configs/climaatmos_progedmf.yml` sets `update_constrain_state_every: "step"` (the previous
 ClimaAtmos default). With `"stage"` (the default since CliMA/ClimaAtmos.jl#4968), coupled 1° 0M ProgEDMF

@@ -36,10 +36,7 @@ Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [sources]
-ClimaAtmos = {path = "../../../ClimaAtmos.jl"}
-ClimaCore = {path = "../../../ClimaCore.jl"}
 ClimaCoupler = {path = "../.."}
-RRTMGP = {path = "../../../RRTMGP.jl"}
 
 [compat]
 CUDA = "6"
@@ -53,7 +50,7 @@ Interpolations = "0.14, 0.15"
 MPI = "0.20"
 Makie = "=0.24.15"
 NVTX = "1"
-NaNStatistics = "< 0.6.57"
+NaNStatistics = "0.6.58, 1"
 Poppler_jll = "24"
 StaticArrays = "1"
 SurfaceFluxes = "1.2"

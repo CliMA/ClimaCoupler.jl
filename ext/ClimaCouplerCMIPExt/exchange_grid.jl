@@ -54,6 +54,8 @@ column index).
   exact
 - `oc_wet_area`: retained (wet) polygon area per FV cell [m²]; zero for dry
   (immersed) cells and tripolar fold shadow cells
+- `oc_area`: the FV grid's own cell area `Az` [m²] where `oc_wet_area > 0`;
+  zero elsewhere
 """
 struct ExchangeGrid{FT, VI <: AbstractVector{Int32}, VF <: AbstractVector{FT}}
     n_poly::Int
@@ -74,6 +76,7 @@ struct ExchangeGrid{FT, VI <: AbstractVector{Int32}, VF <: AbstractVector{FT}}
     area::VF
     b_area::VF
     oc_wet_area::VF
+    oc_area::VF
 end
 
 Adapt.@adapt_structure ExchangeGrid
@@ -240,6 +243,12 @@ function build_exchange_grid(boundary_space, grid_oc)
     for k in eachindex(area)
         oc_wet_area[oc_of_poly[k]] += area[k]
     end
+    Nx_oc, _, Nz_oc = size(grid_oc_underlying_cpu)
+    oc_area = zeros(Float64, n_oc)
+    for c in findall(>(0), oc_wet_area)
+        i, j = mod1(c, Nx_oc), (c - 1) ÷ Nx_oc + 1
+        oc_area[c] = OC.Operators.Azᶜᶜᶜ(i, j, Nz_oc, grid_oc_underlying_cpu)
+    end
 
     return ExchangeGrid{FT, Vector{Int32}, Vector{FT}}(
         n_poly,
@@ -260,6 +269,7 @@ function build_exchange_grid(boundary_space, grid_oc)
         FT.(area),
         FT.(b_area),
         FT.(oc_wet_area),
+        FT.(oc_area),
     )
 end
 
@@ -383,17 +393,17 @@ function scatter_polys_to_nodes_normalized!(nodal_values, eg::ExchangeGrid, poly
     return nodal_values
 end
 
-@kernel function _scatter_cells_kernel!(dst, ptr, polys, area, wet_area, src)
+@kernel function _scatter_cells_kernel!(dst, ptr, polys, area, cell_area, src)
     c = @index(Global)
     @inbounds begin
-        aw = wet_area[c]
-        if aw > 0
+        A = cell_area[c]
+        if A > 0
             acc = zero(eltype(dst))
             for p in ptr[c]:(ptr[c + 1] - 1)
                 k = polys[p]
                 acc += area[k] * src[k]
             end
-            dst[c] = acc / aw
+            dst[c] = acc / A
         else
             dst[c] = 0
         end
@@ -403,12 +413,37 @@ end
 """
     scatter_polys_to_cells!(cell_values, eg::ExchangeGrid, poly_values)
 
-Area-weighted average of per-polygon values onto each FV cell:
-`F_c = Σ_{k ∈ c} area_k F_k / oc_wet_area_c`, conserving the area integral
-exactly. Cells with zero wet area (dry, fold shadows) are set to 0; run
-[`mirror_fold_partners!`](@ref) afterwards to fill the shadow copies.
+Per-polygon fluxes onto each FV cell: `F_c = Σ_{k ∈ c} b_area_k F_k / oc_area_c`, a flux
+per unit FV cell area whose integral `Σ_c Az_c F_c` equals the SE-side integral
+`Σ_k b_area_k F_k`. Cells with zero `oc_area` (dry, fold shadows) are set to 0; run
+[`mirror_fold_partners!`](@ref) afterwards to fill the shadow copies. For the mean of a
+state use [`scatter_polys_to_cells_normalized!`](@ref).
 """
 function scatter_polys_to_cells!(cell_values, eg::ExchangeGrid, poly_values)
+    backend = KernelAbstractions.get_backend(cell_values)
+    launch_kernel!(
+        _scatter_cells_kernel!,
+        backend,
+        eg.n_oc,
+        cell_values,
+        eg.soc_ptr,
+        eg.soc_poly,
+        eg.b_area,
+        eg.oc_area,
+        poly_values,
+    )
+    return cell_values
+end
+
+"""
+    scatter_polys_to_cells_normalized!(cell_values, eg::ExchangeGrid, poly_values)
+
+Area-weighted mean of per-polygon values on each FV cell:
+`T_c = Σ_{k ∈ c} area_k T_k / oc_wet_area_c`, a convex combination of the polygon values.
+Cells with zero `oc_wet_area` (dry, fold shadows) are set to 0; run
+[`mirror_fold_partners!`](@ref) afterwards to fill the shadow copies.
+"""
+function scatter_polys_to_cells_normalized!(cell_values, eg::ExchangeGrid, poly_values)
     backend = KernelAbstractions.get_backend(cell_values)
     launch_kernel!(
         _scatter_cells_kernel!,

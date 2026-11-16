@@ -356,58 +356,19 @@ function update_model_sims!(
     slow_frozen::Bool = false,
 )
     for (name, sim) in pairs(model_sims)
-        slow_frozen && Interfacer.is_overlapped(sim) && continue
-        update_sim!(sim, csf)
+        # Accumulating is coupler-side, so it continues while the step is in
+        # flight; only `update_sim!`, which writes the model, stands down.
+        frozen = slow_frozen && Interfacer.is_overlapped(sim)
+        frozen || update_sim!(sim, csf)
         accumulator = get(flux_accumulators, name, nothing)
         isnothing(accumulator) ||
             FluxCalculator.accumulate_coupler_fields!(accumulator, csf)
     end
 end
 
-function Interfacer.step!(
-    land_sim::Interfacer.AbstractLandSimulation,
-    atmos_sim::Interfacer.AbstractAtmosSimulation,
-    t,
-    coupler_fields,
-    thermo_params,
-)
-    Interfacer.step!(land_sim, t)
-
-    # The atmosphere needs its turbulent fluxes before it steps.
-    FluxCalculator.update_turbulent_fluxes!(atmos_sim, coupler_fields)
-    Interfacer.step!(atmos_sim, t)
-end
-
-function Interfacer.step!(
-    implicit_flux_sim::Interfacer.AbstractImplicitFluxSimulation,
-    atmos_sim::Interfacer.AbstractAtmosSimulation,
-    t,
-    coupler_fields,
-    thermo_params,
-)
-    Interfacer.step!(implicit_flux_sim, t)
-
-    # For an implicit flux simulation, `compute_surface_fluxes!` reads in the precomputed
-    # fluxes, and puts them into the coupler fields.
-    FluxCalculator.compute_surface_fluxes!(
-        coupler_fields,
-        implicit_flux_sim,
-        atmos_sim,
-        thermo_params,
-    )
-
-    # Update the atmosphere with the fluxes across all surface models
-    # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`,
-    # or internally within the step in the case of the integrated land model.
-    FluxCalculator.update_turbulent_fluxes!(atmos_sim, coupler_fields)
-
-    # Step the atmosphere model
-    Interfacer.step!(atmos_sim, t)
-end
-
 """
-    step_model_sims!(model_sims, t, coupler_fields, thermo_params)
-    step_model_sims!(cs::CoupledSimulation)
+    step_model_sims!(model_sims, t, coupler_fields, thermo_params, step_concurrently; skip_slow = false)
+    step_model_sims!(cs::CoupledSimulation; skip_slow = false)
 
 Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 
@@ -416,6 +377,9 @@ Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 - `t`: [AbstractFloat or ITime] denoting the simulation time.
 - `coupler_fields`: [Field of NamedTuple] containing the coupler exchange fields.
 - `thermo_params`: thermodynamic parameters.
+- `step_concurrently`: [Bool] step the overlapped group in its own task.
+- `skip_slow`: [Bool] a step launched earlier is still in flight, so the
+    overlapped group is neither stepped nor launched here.
 """
 function step_model_sims!(
     model_sims,
@@ -425,62 +389,43 @@ function step_model_sims!(
     step_concurrently;
     skip_slow::Bool = false,
 )
-    if step_concurrently && (haskey(model_sims, :ocean_sim) || haskey(model_sims, :ice_sim))
-        # Group 1: land and atmosphere. These are implicitly coupled, so they
-        # step sequentially inside a single task.
-        land_atmos_group = function ()
-            if haskey(model_sims, :land_sim)
-                Interfacer.step!(
-                    model_sims.land_sim,
-                    model_sims.atmos_sim,
-                    t,
-                    coupler_fields,
-                    thermo_params,
-                )
-            else
-                # The atmosphere needs its turbulent fluxes before it steps.
-                FluxCalculator.update_turbulent_fluxes!(model_sims.atmos_sim, coupler_fields)
-                Interfacer.step!(model_sims.atmos_sim, t)
-            end
-        end
+    # One overlap test for the whole function: `Interfacer.is_overlapped`.
+    concurrent = step_concurrently && any(Interfacer.is_overlapped, model_sims)
 
-        # Group 2: sea ice and ocean.
-        ice_ocean_group = () -> step_slow_sims!(model_sims, t)
+    # Only the overlapped group is spawned; everything else runs on the calling
+    # task, which costs no second task or CUDA stream. `skip_slow` means a step
+    # launched earlier is still in flight, so none is started here.
+    slow_task =
+        (concurrent && !skip_slow) ? Threads.@spawn(step_slow_sims!(model_sims, t)) :
+        nothing
 
-        # A slow step already in flight: advance only the fast group.
-        if skip_slow
-            land_atmos_group()
-            return nothing
-        end
+    for sim in model_sims
+        sim isa Interfacer.AbstractSurfaceSimulation || continue
+        # Stepped by the task, or by the one already in flight.
+        concurrent && Interfacer.is_overlapped(sim) && continue
 
-        @sync begin
-            Threads.@spawn land_atmos_group()
-            Threads.@spawn ice_ocean_group()
-        end
-    else
-        # Step all surface models (the ordering doesn't matter here)
-        for sim in model_sims
-            sim isa Interfacer.AbstractSurfaceSimulation && Interfacer.step!(sim, t)
+        Interfacer.step!(sim, t)
 
-            # For an implicit flux simulation, `compute_surface_fluxes!` reads in the precomputed
-            # fluxes, and puts them into the coupler fields.
-            sim isa Interfacer.AbstractImplicitFluxSimulation &&
-                FluxCalculator.compute_surface_fluxes!(
-                    coupler_fields,
-                    sim,
-                    model_sims.atmos_sim,
-                    thermo_params,
-                )
-        end
-
-        # Update the atmosphere with the fluxes across all surface models
-        # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`,
-        # or internally within the step in the case of the integrated land model.
-        FluxCalculator.update_turbulent_fluxes!(model_sims.atmos_sim, coupler_fields)
-
-        # Step the atmosphere model
-        Interfacer.step!(model_sims.atmos_sim, t)
+        # For an implicit flux simulation, `compute_surface_fluxes!` reads in the precomputed
+        # fluxes, and puts them into the coupler fields.
+        sim isa Interfacer.AbstractImplicitFluxSimulation &&
+            FluxCalculator.compute_surface_fluxes!(
+                coupler_fields,
+                sim,
+                model_sims.atmos_sim,
+                thermo_params,
+            )
     end
+
+    # Update the atmosphere with the fluxes across all surface models
+    # The surface models have already been updated with the fluxes in `compute_surface_fluxes!`,
+    # or internally within the step in the case of the integrated land model.
+    FluxCalculator.update_turbulent_fluxes!(model_sims.atmos_sim, coupler_fields)
+
+    # Step the atmosphere model
+    Interfacer.step!(model_sims.atmos_sim, t)
+
+    isnothing(slow_task) || wait(slow_task)
     return nothing
 end
 
@@ -544,9 +489,10 @@ is joined by [`wait_slow_sims!`](@ref), the coupler must not read or write ice
 or ocean state.
 """
 function launch_slow_sims!(cs::Interfacer.CoupledSimulation)
-    @assert isnothing(cs.slow_task[]) "a slow-surface step is already in flight"
     model_sims = cs.model_sims
     target = slow_launch_target(cs)
+    # A step past the end of the run would never be joined.
+    Float64(float(target)) > Float64(float(cs.tspan[end])) && return nothing
     # The task writes the ocean clock, so scheduling reads this copy instead.
     cs.slow_task[] = (;
         task = Threads.@spawn(step_slow_sims!(model_sims, target; gather_progress = true)),
@@ -710,14 +656,11 @@ function combine_surfaces!(
             # Zero out the contribution from this surface if the area fraction is zero.
             # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs
             # Compute upward longwave radiation from surface temperature for this simulation
-            contribution =
+            target =
+                (!isnothing(slow_sum) && Interfacer.is_overlapped(sim)) ? slow_sum : T_sfc
+            target .+=
                 area_fraction .*
                 ifelse.(area_fraction .≈ 0, zero(FT), emissivity_sim .* T_sfc_sim .^ FT(4))
-            if !isnothing(slow_sum) && Interfacer.is_overlapped(sim)
-                slow_sum .+= contribution
-            else
-                T_sfc .+= contribution
-            end
         end
     end
     isnothing(slow_sum) || (T_sfc .+= slow_sum)

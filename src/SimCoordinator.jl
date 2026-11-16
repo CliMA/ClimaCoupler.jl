@@ -77,6 +77,8 @@ function run!(
             while cs.t[] < cs.tspan[end]
                 step!(cs)
             end
+            # The last launched step is still running; its cost is part of the run.
+            FieldExchanger.wait_slow_sims!(cs)
         end
     finally
         # Join here too on a loop that threw, reporting rather than raising so
@@ -115,14 +117,18 @@ function step!(cs::Interfacer.CoupledSimulation)
     cs.t[] += cs.Δt_cpl
     cs.step[] += 1
 
-    frozen = join_slow_if_due!(cs)
+    in_flight = FieldExchanger.slow_step_in_flight(cs)
 
     # Compute global energy and water conservation checks
     # (only for slabplanet if tracking conservation is enabled)
-    frozen || ConservationChecker.check_conservation!(cs)
+    in_flight || ConservationChecker.check_conservation!(cs)
 
     # Step component model simulations sequentially for one coupling timestep (Δt_cpl)
-    FieldExchanger.step_model_sims!(cs; skip_slow = skip_slow_stepping(cs, frozen))
+    FieldExchanger.step_model_sims!(cs; skip_slow = skip_slow_stepping(cs, in_flight))
+
+    # Joining here rather than before `step_model_sims!` lets an in-flight step
+    # overlap this coupling step's component work as well as the ones before it.
+    frozen = join_slow_if_due!(cs)
 
     # Update the surface fractions for surface models
     FieldExchanger.update_surface_fractions!(cs; slow_frozen = frozen)
@@ -364,13 +370,9 @@ function _build_coupled_simulation(config_dict::AbstractDict)
     if step_concurrently
         if !(comms_ctx.device isa ClimaComms.CUDADevice)
             @warn "`step_concurrently` is set, but the device is \
-                   $(nameof(typeof(comms_ctx.device))), not CUDADevice. Component models \
-                   will be stepped in separate tasks that contend for the same threads, \
-                   which adds overhead without speeding anything up."
+                   $(nameof(typeof(comms_ctx.device))), not CUDADevice."
         elseif Threads.nthreads() == 1
-            @warn "`step_concurrently` is set, but Julia is running with a single thread, \
-                   so the component tasks will time-share it and run effectively \
-                   sequentially. Start Julia with `--threads=N` (N ≥ 2) to get concurrency."
+            @warn "`step_concurrently` is set, but Julia is running with a single thread."
         end
     end
 

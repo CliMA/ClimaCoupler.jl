@@ -112,7 +112,7 @@ function argparse_settings()
         arg_type = Bool
         default = false
         "--overlap_slow_surfaces"
-        help = "With `step_concurrently`, overlap one ocean/sea ice step with several coupling steps of atmos/land, instead of blocking on it within a single coupling step. Increases the lag of the ocean state seen by the atmosphere."
+        help = "Requires `step_concurrently`. Overlap one ocean/sea ice step with several coupling steps of atmos/land, instead of blocking on it within a single coupling step. Increases the lag of the ocean state seen by the atmosphere."
         arg_type = Bool
         default = false
         "--dt_atmos"
@@ -549,6 +549,9 @@ function get_coupler_args(config_dict::Dict)
 
     step_concurrently = config_dict["step_concurrently"]
     overlap_slow_surfaces = config_dict["overlap_slow_surfaces"]
+    overlap_slow_surfaces &&
+        !step_concurrently &&
+        error("overlap_slow_surfaces requires step_concurrently")
 
     # Save solution to integrator.sol at the beginning and end
     saveat = [t_start, t_end]

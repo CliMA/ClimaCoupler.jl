@@ -87,11 +87,14 @@ function build_cs_itime(; dt_cpl, dt_slow, overlap)
     ice = StubIceIT(epoch, Dates.Second(Int(dt_slow)), epoch, 0)
     Δt = ITime(Int64(dt_cpl), period = Dates.Second(1), epoch = epoch)
     t0 = ITime(Int64(0), period = Dates.Second(1), epoch = epoch)
+    # Long enough that the end of the run never gates a launch, matching the
+    # `Inf` the Float64 builder uses.
+    t_end = ITime(Int64(10)^9, period = Dates.Second(1), epoch = epoch)
     cs = Interfacer.CoupledSimulation{Float64}(
         epoch,
         nothing,
         nothing,
-        (t0, t0),
+        (t0, t_end),
         Δt,
         Ref(t0),
         Ref(0),

@@ -86,18 +86,47 @@ end
             config_dict = warmup_config(outdir)
             P = prologue(config_dict)
             a = P.args
-            ocean_sim = Interfacer.OceanSimulation(a.FT, a.ocean_model;
-                dt = a.component_dt_dict["dt_ocean"], a.start_date, tspan = (a.t_start, a.t_end),
-                P.coupled_param_dict, P.thermo_params, P.comms_ctx, P.boundary_space,
-                output_dir = P.dir_paths.ocean_output_dir, a.simple_ocean, a.ocean_grid,
-                a.use_intersection_grid, P.sst_path, a.sst_adjustment, a.saveat,
-                evolving = a.evolving_ocean, a.ocean_diagnostic_interval, a.ocean_diagnostic_mode)
-            ice_sim = Interfacer.SeaIceSimulation(a.FT, a.ice_model;
-                dt = a.component_dt_dict["dt_seaice"], a.start_date, P.coupled_param_dict,
-                output_dir = P.dir_paths.ice_output_dir, ocean = ocean_sim,
-                tspan = (a.t_start, a.t_end), a.saveat, P.boundary_space, P.thermo_params,
-                P.comms_ctx, P.land_fraction, P.sic_path, a.binary_area_fraction,
-                a.domain_type, a.seaice_diagnostic_interval, a.seaice_diagnostic_mode)
+            ocean_sim = Interfacer.OceanSimulation(
+                a.FT,
+                a.ocean_model;
+                dt = a.component_dt_dict["dt_ocean"],
+                a.start_date,
+                tspan = (a.t_start, a.t_end),
+                P.coupled_param_dict,
+                P.thermo_params,
+                P.comms_ctx,
+                P.boundary_space,
+                output_dir = P.dir_paths.ocean_output_dir,
+                a.simple_ocean,
+                a.ocean_grid,
+                a.use_intersection_grid,
+                P.sst_path,
+                a.sst_adjustment,
+                a.saveat,
+                evolving = a.evolving_ocean,
+                a.ocean_diagnostic_interval,
+                a.ocean_diagnostic_mode,
+            )
+            ice_sim = Interfacer.SeaIceSimulation(
+                a.FT,
+                a.ice_model;
+                dt = a.component_dt_dict["dt_seaice"],
+                a.start_date,
+                P.coupled_param_dict,
+                output_dir = P.dir_paths.ice_output_dir,
+                ocean = ocean_sim,
+                tspan = (a.t_start, a.t_end),
+                a.saveat,
+                P.boundary_space,
+                P.thermo_params,
+                P.comms_ctx,
+                P.land_fraction,
+                P.sic_path,
+                a.binary_area_fraction,
+                a.domain_type,
+                a.seaice_diagnostic_interval,
+                a.seaice_diagnostic_mode,
+            )
             Interfacer.step!(ice_sim, a.component_dt_dict["dt_seaice"])
             status = "ok"
         catch err
@@ -107,7 +136,8 @@ end
             open(REPORT, "w") do io
                 println(io, "status = ", status)
                 ho = get(ENV, "WARMUP_H_ELEM", "")
-                isempty(ho) || println(io, "h_elem override = ", ho, " (type-neutral; see README)")
+                isempty(ho) ||
+                    println(io, "h_elem override = ", ho, " (type-neutral; see README)")
                 println(io, "device = ", get(ENV, "CLIMACOMMS_DEVICE", "(unset)"))
             end
         catch

@@ -93,8 +93,14 @@ for pkg in PACKAGES
     fresh = mtime(so) >= source_mtime(pkg)
     floor_mib = get(MIN_MIB, pkg, 0)
     big_enough = mib >= floor_mib
-    println(rpad(pkg, 24), rpad("$(Int(mib)) MiB", 12), rpad(fresh ? "yes" : "STALE", 8), status)
-    fresh || push!(failures, "$pkg: image older than its sources/configs -- link likely failed")
+    println(
+        rpad(pkg, 24),
+        rpad("$(Int(mib)) MiB", 12),
+        rpad(fresh ? "yes" : "STALE", 8),
+        status,
+    )
+    fresh ||
+        push!(failures, "$pkg: image older than its sources/configs -- link likely failed")
     big_enough || push!(
         failures,
         "$pkg: image is $(Int(mib)) MiB, under the $(floor_mib) MiB floor -- the workload " *
@@ -110,7 +116,9 @@ if isempty(failures)
 else
     println("UNUSABLE ($(length(failures))):")
     foreach(f -> println("  - ", f), failures)
-    println("\nA failure low in the DAG makes the packages above it re-cache its content, which")
+    println(
+        "\nA failure low in the DAG makes the packages above it re-cache its content, which",
+    )
     println("can push them over the 2 GiB limit. Fix the lowest failure first and rebuild.")
     exit(1)
 end

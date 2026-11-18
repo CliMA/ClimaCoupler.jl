@@ -36,6 +36,7 @@ import Adapt # for ConservativeRegridding
 import ClimaCore as CC # for ConservativeRegriddingClimaCoreExt
 import ConservativeRegridding as CR
 import SparseArrays # for converting Regridder element types
+import LazyArtifacts # lets @clima_artifact download the lazy high-resolution ocean artifacts
 
 get_ConservativeRegriddingCCExt() =
     Base.get_extension(CR, :ConservativeRegriddingClimaCoreExt)

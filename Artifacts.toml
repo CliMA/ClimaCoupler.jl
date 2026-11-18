@@ -103,9 +103,41 @@ git-tree-sha1 = "c6489a5249e1457493590f1735e83a5a4454becd"
     sha256 = "9041850fb9cbd04fa44e68f36f3fbb5e08f721670de8cbcba5b2ac0b3ec66c17"
     url = "https://caltech.box.com/shared/static/rq8iq35nf80xc9rrumdnxvzsm0zr7rff.gz"
 
+[orca_half_grid]
+lazy = true
+git-tree-sha1 = "039cac97a664c1062b7ce73dcd5fc344043c1cc3"
+
+    [[orca_half_grid.download]]
+    sha256 = "ec7d856533e1d06b0cd9d952b001c091e025176f7bccf6a181cfdc4340957128"
+    url = "https://caltech.box.com/shared/static/q8yvt1765s7p7bp2t177pyt5az4fdoqb.gz"
+
+[orca_quarter_grid]
+lazy = true
+git-tree-sha1 = "0afc0d5aabc29c39f6cd3818952d14721e7bbb34"
+
+    [[orca_quarter_grid.download]]
+    sha256 = "29d442fefdf908b8022f117022eb4a9abb52688449dc78ec27227c3c54bb586f"
+    url = "https://caltech.box.com/shared/static/7f6rfk9ml5fj9knbyy996vc9q4mlamw3.gz"
+
 [tripolar_one_degree_bathymetry]
 git-tree-sha1 = "bc3ca2024cc0f2f918fd2685615a9382908fbbe4"
 
     [[tripolar_one_degree_bathymetry.download]]
     sha256 = "4ead74da0626f260ded7e2b9797af810d11e6cd774ca4bd25668f6a1f2059c89"
     url = "https://caltech.box.com/shared/static/1e4cvzlyqglursxsh8ca2km1v04eolvg.gz"
+
+[tripolar_half_degree_bathymetry]
+lazy = true
+git-tree-sha1 = "7be987b22fe0fcc391a07694ee4e6778809743b5"
+
+    [[tripolar_half_degree_bathymetry.download]]
+    sha256 = "ccd36c0d9d1d5711bbc155c2ed3bd544ca4ddee75e65670972bdba998e3de55c"
+    url = "https://caltech.box.com/shared/static/yot024b9soyoarbjooe3fes0q4ap8djk.gz"
+
+[tripolar_quarter_degree_bathymetry]
+lazy = true
+git-tree-sha1 = "3c0c4a1e02c3074779828d41e10cbc26666d194e"
+
+    [[tripolar_quarter_degree_bathymetry.download]]
+    sha256 = "0f94dbf3c55402c469968ea0c994aab1d8406086d487bb57949f5d2b24fefe62"
+    url = "https://caltech.box.com/shared/static/3hru66bfdt5zmgvdyx2drp3a5ob16tkt.gz"

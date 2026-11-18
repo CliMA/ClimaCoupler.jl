@@ -158,11 +158,12 @@ function set_sea_ice_initial_conditions!(sea_ice_model, start_date)
 end
 
 """
-    tripolar_bottom_height(grid, bathymetry; minimum_depth, major_basins, interpolation_passes)
+    tripolar_bottom_height(grid, bathymetry; context, minimum_depth, major_basins, interpolation_passes)
 
-The ETOPO-derived bottom height for a tripolar `grid`, read from `bathymetry`: the name of a
-ClimaArtifact (`tripolar_one_degree_bathymetry` or `tripolar_half_degree_bathymetry`) or the path of a
-NetCDF file written by the artifact's `create_artifact.jl`.
+The ETOPO-derived bottom height for a tripolar `grid`, read from the ClimaArtifact named
+`bathymetry` (`tripolar_one_degree_bathymetry`, `tripolar_half_degree_bathymetry` or
+`tripolar_quarter_degree_bathymetry`). The latter two are lazy: the root of `context` downloads them
+while the other processes wait, so every process of `context` must call this.
 
 The regridding parameters are baked into the file, so they are validated rather than applied: a
 mismatch means the caller is asking for bathymetry this file does not describe.
@@ -170,15 +171,12 @@ mismatch means the caller is asking for bathymetry this file does not describe.
 function tripolar_bottom_height(
     grid,
     bathymetry;
+    context,
     minimum_depth,
     major_basins,
     interpolation_passes,
 )
-    path = if endswith(bathymetry, ".nc")
-        bathymetry
-    else
-        joinpath(@clima_artifact(bathymetry), bathymetry * ".nc")
-    end
+    path = joinpath(@clima_artifact(bathymetry, context), bathymetry * ".nc")
 
     bottom_height, attributes = NCDatasets.NCDataset(path) do ds
         Array(ds["bottom_height"][:, :]), Dict(ds.attrib)

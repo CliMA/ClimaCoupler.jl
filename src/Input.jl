@@ -270,13 +270,9 @@ function argparse_settings()
         arg_type = Bool
         default = false
         "--ocean_grid"
-        help = "Horizontal grid for Oceananigans ocean model. [`one_deg_tripolar` (default), `half_deg_tripolar`, `orca`]"
+        help = "Horizontal grid for Oceananigans ocean model. [`one_deg_tripolar` (default), `half_deg_tripolar`, `quarter_deg_tripolar`, `orca`, `half_deg_orca`, `quarter_deg_orca`]"
         arg_type = String
         default = "one_deg_tripolar"
-        "--ocean_bathymetry_file"
-        help = "NetCDF file with the `bottom_height` of a tripolar ocean grid, in place of the bathymetry artifact [none (default)]"
-        arg_type = String
-        default = nothing
         "--ocean_float_type"
         help = "Float type of the Oceananigans ocean model. [`Float64` (default), `Float32`]"
         arg_type = String
@@ -613,7 +609,6 @@ function get_coupler_args(config_dict::Dict)
     ocean_model = Val(Symbol(config_dict["ocean_model"]))
     simple_ocean = config_dict["simple_ocean"]
     ocean_grid = Symbol(lowercase(config_dict["ocean_grid"]))
-    ocean_bathymetry_file = config_dict["ocean_bathymetry_file"]
     ocean_float_type = config_dict["ocean_float_type"] == "Float64" ? Float64 : Float32
     ocean_vertical_levels = config_dict["ocean_vertical_levels"]
     use_intersection_grid = config_dict["use_intersection_grid"]
@@ -709,7 +704,6 @@ function get_coupler_args(config_dict::Dict)
         ocean_model,
         simple_ocean,
         ocean_grid,
-        ocean_bathymetry_file,
         ocean_float_type,
         ocean_vertical_levels,
         use_intersection_grid,

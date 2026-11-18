@@ -46,16 +46,20 @@ end
 
 """
     horizontal_ocean_grid(arch, ocean_grid; z, halo, active_cells_map, minimum_depth,
-                          interpolation_passes, bathymetry_file)
+                          interpolation_passes, context)
 
 Build the immersed ocean grid named by `ocean_grid`: `:one_deg_tripolar` (360 × 180),
-`:half_deg_tripolar` (720 × 360) or `:orca`.
+`:half_deg_tripolar` (720 × 360), `:quarter_deg_tripolar` (1440 × 720), `:orca` (eORCA1),
+`:half_deg_orca` (eORCA05) or `:quarter_deg_orca` (eORCA025).
 
 All grids come with pre-generated bathymetry: the tripolar grids from the
-`tripolar_one_degree_bathymetry` and `tripolar_half_degree_bathymetry` artifacts, or from
-`bathymetry_file` when given, generated with the `minimum_depth`, `major_basins` and
-`interpolation_passes` given here (validated against the file rather than applied), and the eORCA1
-mesh from the `orca_one_grid` artifact.
+`tripolar_one_degree_bathymetry`, `tripolar_half_degree_bathymetry` and
+`tripolar_quarter_degree_bathymetry` artifacts, generated with the `minimum_depth`, `major_basins`
+and `interpolation_passes` given here (validated against the file rather than applied), and the eORCA
+meshes from the `orca_one_grid`, `orca_half_grid` and `orca_quarter_grid` artifacts.
+
+The half- and quarter-degree artifacts are lazy, downloaded on first use by the root of `context`, which
+must be the processes that build this grid.
 
 `active_cells_map` is exposed because tripolar immersed grids with `active_cells_map = true` exceed the
 4 KiB CUDA kernel parameter limit on sm_60 (P100) even with a minimal closure; disabling the map keeps
@@ -70,17 +74,29 @@ function horizontal_ocean_grid(
     active_cells_map = true,
     minimum_depth = 10,
     interpolation_passes = 10,
-    bathymetry_file = nothing,
+    context = ClimaComms.SingletonCommsContext(),
 )
     if ocean_grid == :orca
         @info "Using ORCA1 ocean grid"
-        return ORCAOneGrid(arch; Nz, z, halo, active_cells_map)
+        return ORCAGrid(arch; Nz, z, halo, active_cells_map)
+    elseif ocean_grid == :half_deg_orca
+        @info "Using ORCA05 ocean grid"
+        mesh_path = orca_grid_path("orca_half_grid", context)
+        return ORCAGrid(arch; Nz, z, halo, active_cells_map, mesh_path)
+    elseif ocean_grid == :quarter_deg_orca
+        @info "Using ORCA025 ocean grid"
+        mesh_path = orca_grid_path("orca_quarter_grid", context)
+        return ORCAGrid(arch; Nz, z, halo, active_cells_map, mesh_path)
     end
 
     if ocean_grid == :half_deg_tripolar
         @info "Using half-degree tripolar ocean grid"
         size = (720, 360, Nz)
         bathymetry = "tripolar_half_degree_bathymetry"
+    elseif ocean_grid == :quarter_deg_tripolar
+        @info "Using quarter-degree tripolar ocean grid"
+        size = (1440, 720, Nz)
+        bathymetry = "tripolar_quarter_degree_bathymetry"
     else
         @info "Using one-degree tripolar ocean grid"
         size = (360, 180, Nz)
@@ -90,7 +106,8 @@ function horizontal_ocean_grid(
 
     bottom_height = tripolar_bottom_height(
         grid,
-        something(bathymetry_file, bathymetry);
+        bathymetry;
+        context,
         minimum_depth,
         major_basins = 2,
         interpolation_passes,
@@ -120,7 +137,7 @@ function ocean_simulation(
     closure,
     clock,
     stop_time,
-    bathymetry_file = nothing,
+    context = ClimaComms.SingletonCommsContext(),
     depth = 5500,
     Nz = 60,
     momentum_advection = OC.WENOVectorInvariant(
@@ -139,7 +156,7 @@ function ocean_simulation(
     zstar = !simple_ocean
 
     z = OC.ExponentialDiscretization(Nz, -depth, 0; mutable = zstar)
-    grid = horizontal_ocean_grid(arch, ocean_grid; z, Nz, active_cells_map, bathymetry_file)
+    grid = horizontal_ocean_grid(arch, ocean_grid; z, Nz, active_cells_map, context)
 
     # Extended halos would be deeper than a latitude slab, so a distributed
     # grid fills its halos every substep instead.
@@ -173,8 +190,7 @@ dispatch in coupling.
 
 # Optional keyword arguments
 - `simple_ocean`: Whether to use a simple ocean model setup (default: `false`)
-- `ocean_grid`: Horizontal grid for Oceananigans (`:one_deg_tripolar`, `:half_deg_tripolar` or `:orca`, default: `:one_deg_tripolar`)
-- `ocean_bathymetry_file`: NetCDF file with the tripolar grid's `bottom_height`, in place of the bathymetry artifact (default: `nothing`)
+- `ocean_grid`: Horizontal grid for Oceananigans (`:one_deg_tripolar`, `:half_deg_tripolar`, `:quarter_deg_tripolar`, `:orca`, `:half_deg_orca` or `:quarter_deg_orca`, default: `:one_deg_tripolar`)
 - `depth`: Maximum ocean depth in metres (default: 5500 m for EN4 compatibility)
 - `Nz`: Number of vertical levels (default: 60); 10 or fewer use `simplified_ocean_closure`
 - `dt`: Time step (default: `1800.0` seconds, or 30 minutes)
@@ -197,7 +213,6 @@ function OceananigansSimulation(
     output_dir,
     simple_ocean = false,
     ocean_grid = :one_deg_tripolar,
-    ocean_bathymetry_file = nothing,
     use_intersection_grid = true,
     exchange_on_root = false,
     depth = 5500,
@@ -268,10 +283,12 @@ function OceananigansSimulation(
     if exchange_on_root && !ClimaComms.iamroot(comms_ctx)
         ocean = grid = ice_concentration = nothing
     else
+        # Only the root builds the ocean under exchange_on_root, so it fetches artifacts alone
+        context = exchange_on_root ? ClimaComms.SingletonCommsContext() : comms_ctx
         ocean = ocean_simulation(
             arch,
             ocean_grid;
-            bathymetry_file = ocean_bathymetry_file,
+            context,
             clock,
             stop_time,
             simple_ocean,

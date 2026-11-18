@@ -1,12 +1,13 @@
 FLOAT_TYPE: "Float32"
 albedo_model: "CouplerAlbedo"
 atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
+binary_area_fraction: false
 bucket_albedo_type: "map_temporal"
 checkpoint_dt: "1months"
 coupler_toml: ["toml/amip_edonly.toml"]
-dt: "120secs"
+dt: "180secs"
 dt_cloud_fraction: "1hours"
-dt_cpl: "120secs"
+dt_cpl: "180secs"
 dt_rad: "1hours"
 energy_check: false
 extra_atmos_diagnostics:

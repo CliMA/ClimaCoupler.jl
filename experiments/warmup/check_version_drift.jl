@@ -53,7 +53,10 @@ end
 run_versions, warm_versions = versions(RUN_MANIFEST), versions(WARM_MANIFEST)
 shared = sort!(collect(intersect(keys(run_versions), keys(warm_versions))))
 
-differing = [(n, run_versions[n], warm_versions[n]) for n in shared if run_versions[n] != warm_versions[n]]
+differing = [
+    (n, run_versions[n], warm_versions[n]) for
+    n in shared if run_versions[n] != warm_versions[n]
+]
 mismatched = filter(t -> !haskey(ALLOWED, first(t)), differing)
 
 println("compared $(length(shared)) packages present in both environments")
@@ -65,7 +68,9 @@ end
 
 # An allowed *difference* is not a licence to be below a known-broken floor, in either
 # environment. This is what would have caught the PrecompileTools problem immediately.
-for (name, floor) in FLOORS, (env, vs) in (("experiments/CMIP", run_versions), ("warmup", warm_versions))
+for (name, floor) in FLOORS,
+    (env, vs) in (("experiments/CMIP", run_versions), ("warmup", warm_versions))
+
     haskey(vs, name) || continue
     if VersionNumber(vs[name]) < floor
         push!(mismatched, (name, "$env has $(vs[name]), below the $floor floor", ""))

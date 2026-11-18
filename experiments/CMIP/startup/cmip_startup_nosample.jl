@@ -23,9 +23,10 @@ if get(ENV, "WARMUP_LOAD", "") == "1"
 end
 
 @phase_nosample "load: ClimaCoupler" @eval Main using ClimaCoupler
-@phase_nosample "load: Makie stack" @eval Main using CairoMakie, GeoMakie, Makie, Poppler_jll, Printf
+@phase_nosample "load: Makie stack" @eval Main using CairoMakie,
+    GeoMakie, Makie, Poppler_jll, Printf
 @phase_nosample "load: Oceananigans+SeaIce" @eval Main import Oceananigans,
-ClimaSeaIce, KernelAbstractions, ConservativeRegridding, Adapt
+    ClimaSeaIce, KernelAbstractions, ConservativeRegridding, Adapt
 @phase_nosample "load: ClimaLand" @eval Main import ClimaLand
 @phase_nosample "load: ClimaAtmos" @eval Main import ClimaAtmos
 @phase_nosample "load: ClimaComms backends" begin

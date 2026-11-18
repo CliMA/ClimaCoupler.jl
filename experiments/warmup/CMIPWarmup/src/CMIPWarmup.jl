@@ -108,7 +108,8 @@ end
             open(REPORT, "w") do io
                 println(io, "status = ", status)
                 ho = get(ENV, "WARMUP_H_ELEM", "")
-                isempty(ho) || println(io, "h_elem override = ", ho, " (type-neutral; see README)")
+                isempty(ho) ||
+                    println(io, "h_elem override = ", ho, " (type-neutral; see README)")
                 println(io, "device = ", get(ENV, "CLIMACOMMS_DEVICE", "(unset)"))
             end
         catch

@@ -48,18 +48,46 @@ end
 "Frame-name / file-path patterns, in precedence order. First match wins."
 const RULES = [
     :gpu_compile => (
-        paths = ["/GPUCompiler/", "/CUDA/src/compiler/", "/LLVM/src/", "/KernelAbstractions/src/compiler"],
-        funcs = ["cufunction", "ptxas", "nvlink", "compile_method_instance", "emit_llvm", "emit_asm"],
+        paths = [
+            "/GPUCompiler/",
+            "/CUDA/src/compiler/",
+            "/LLVM/src/",
+            "/KernelAbstractions/src/compiler",
+        ],
+        funcs = [
+            "cufunction",
+            "ptxas",
+            "nvlink",
+            "compile_method_instance",
+            "emit_llvm",
+            "emit_asm",
+        ],
     ),
     :inference => (
-        paths = ["compiler/typeinfer.jl", "compiler/abstractinterpretation.jl", "compiler/inferencestate.jl", "compiler/ssair/"],
+        paths = [
+            "compiler/typeinfer.jl",
+            "compiler/abstractinterpretation.jl",
+            "compiler/inferencestate.jl",
+            "compiler/ssair/",
+        ],
         funcs = ["jl_type_infer", "typeinf", "abstract_call", "abstract_eval"],
     ),
     :codegen => (
         paths = String[],
-        funcs = ["jl_create_native", "jl_emit_code", "jl_emit_codeinst", "_jl_compile_codeinst",
-                 "jl_compile_method_internal", "jl_generate_fptr", "emit_function", "jl_compile_codeinst",
-                 "llvm::", "ir_to_codeinf", "jl_compile_extern_c", "jl_jit_"],
+        funcs = [
+            "jl_create_native",
+            "jl_emit_code",
+            "jl_emit_codeinst",
+            "_jl_compile_codeinst",
+            "jl_compile_method_internal",
+            "jl_generate_fptr",
+            "emit_function",
+            "jl_compile_codeinst",
+            "llvm::",
+            "ir_to_codeinf",
+            "jl_compile_extern_c",
+            "jl_jit_",
+        ],
     ),
     :gc => (paths = String[], funcs = ["jl_gc_", "gc_mark", "jl_gc_collect", "sweep_"]),
     :io => (
@@ -156,8 +184,16 @@ macro phase_impl(name, sample, expr)
             dump_phase(nm)
             Profile.clear()
         end
-        println(stdout, "    ", nm, ": ", round((t1 - t0) / 1e9, digits = 1), " s wall, ",
-                round((c1 - c0) / 1e9, digits = 1), " s julia-compile")
+        println(
+            stdout,
+            "    ",
+            nm,
+            ": ",
+            round((t1 - t0) / 1e9, digits = 1),
+            " s wall, ",
+            round((c1 - c0) / 1e9, digits = 1),
+            " s julia-compile",
+        )
         flush(stdout)
         val
     end
@@ -165,8 +201,14 @@ end
 
 _s(ns) = round(ns / 1e9, digits = 1)
 
-_row(io, a, b, c, d, e) = println(io, rpad(string(a), 30), lpad(string(b), 11),
-                                  lpad(string(c), 7), lpad(string(d), 14), lpad(string(e), 13))
+_row(io, a, b, c, d, e) = println(
+    io,
+    rpad(string(a), 30),
+    lpad(string(b), 11),
+    lpad(string(c), 7),
+    lpad(string(d), 14),
+    lpad(string(e), 13),
+)
 
 function report(io::IO = stdout)
     total = sum(p -> p.wall_ns, PHASES; init = UInt64(0))
@@ -177,8 +219,14 @@ function report(io::IO = stdout)
     _row(io, "phase", "wall(s)", "%", "jlcompile(s)", "recomp(s)")
     println(io, "-"^76)
     for p in PHASES
-        _row(io, p.name, _s(p.wall_ns), round(100 * p.wall_ns / total, digits = 1),
-             _s(p.compile_ns), _s(p.recompile_ns))
+        _row(
+            io,
+            p.name,
+            _s(p.wall_ns),
+            round(100 * p.wall_ns / total, digits = 1),
+            _s(p.compile_ns),
+            _s(p.recompile_ns),
+        )
     end
 
     println(io, "\n", "="^92)

@@ -24,8 +24,7 @@ const REPO = normpath(joinpath(@__DIR__, "..", ".."))
 
 # Deviations we intend. Each key maps to the reason it differs; anything else is drift.
 const ATMOS_EXPECTED = Dict(
-    "initial_condition" =>
-        "WeatherModel needs an ERA5 artifact that is cluster-only; see README",
+    "initial_condition" => "WeatherModel needs an ERA5 artifact that is cluster-only; see README",
     "t_end" => "the workload runs briefly",
     # The coupler applies these itself in `get_atmos_config_dict`, so a standalone
     # atmosphere workload has to replicate them or it caches the wrong types.
@@ -62,30 +61,47 @@ function drift(production, warmup, expected)
         haskey(expected, key) && continue
         inprod, inwarm = haskey(production, key), haskey(warmup, key)
         if inprod && !inwarm
-            push!(issues, (key, "missing from the warmup config (production has $(repr(production[key])))"))
+            push!(
+                issues,
+                (
+                    key,
+                    "missing from the warmup config (production has $(repr(production[key])))",
+                ),
+            )
         elseif inwarm && !inprod
             push!(issues, (key, "only in the warmup config ($(repr(warmup[key])))"))
         elseif production[key] != warmup[key]
-            push!(issues, (key, "production $(repr(production[key])), warmup $(repr(warmup[key]))"))
+            push!(
+                issues,
+                (key, "production $(repr(production[key])), warmup $(repr(warmup[key]))"),
+            )
         end
     end
     sort!(issues, by = first)
 end
 
 const PAIRS = [
-    ("atmosphere",
-     joinpath(REPO, "config", "atmos_configs", "climaatmos_progedmf.yml"),
-     joinpath(REPO, "experiments", "warmup", "configs", "atmos_warmup.yml"),
-     ATMOS_EXPECTED),
-    ("coupled",
-     joinpath(REPO, "config", "longrun_configs", "cmip_progedmf_land.yml"),
-     joinpath(REPO, "experiments", "warmup", "configs", "cmip_warmup.yml"),
-     CMIP_EXPECTED),
+    (
+        "atmosphere",
+        joinpath(REPO, "config", "atmos_configs", "climaatmos_progedmf.yml"),
+        joinpath(REPO, "experiments", "warmup", "configs", "atmos_warmup.yml"),
+        ATMOS_EXPECTED,
+    ),
+    (
+        "coupled",
+        joinpath(REPO, "config", "longrun_configs", "cmip_progedmf_land.yml"),
+        joinpath(REPO, "experiments", "warmup", "configs", "cmip_warmup.yml"),
+        CMIP_EXPECTED,
+    ),
 ]
 
 total = sum(PAIRS) do (label, prodpath, warmpath, expected)
     issues = drift(YAML.load_file(prodpath), YAML.load_file(warmpath), expected)
-    println(label, ": ", isempty(issues) ? "matches production" : "$(length(issues)) drifted")
+    println(
+        label,
+        ": ",
+        isempty(issues) ? "matches production" : "$(length(issues)) drifted",
+    )
     for (key, why) in issues
         println("  ", rpad(key, 32), why)
     end
@@ -96,9 +112,15 @@ println()
 if total == 0
     println("Warmup configs match production apart from the recorded deviations.")
 else
-    println("$total drifted setting(s). Either update the warmup config to match production,")
-    println("or, if the difference is intentional, record it in this script with its reason.")
-    println("Settings that are type parameters (gravity-wave model, microphysics, turbconv,")
+    println(
+        "$total drifted setting(s). Either update the warmup config to match production,",
+    )
+    println(
+        "or, if the difference is intentional, record it in this script with its reason.",
+    )
+    println(
+        "Settings that are type parameters (gravity-wave model, microphysics, turbconv,",
+    )
     println("radiation mode) silently invalidate the whole cache when they drift.")
     exit(1)
 end

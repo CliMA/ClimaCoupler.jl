@@ -40,17 +40,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
     observation_vector = JLD2.load_object(observation_vector_filepath)
 
     (; sample_date_ranges) = CALIBRATE_CONFIG
-    obs_series = EKP.ObservationSeries(
-        Dict(
-            "observations" => observation_vector,
-            "names" => [
-                string(Dates.year(start_date)) for
-                (start_date, stop_date) in sample_date_ranges
-            ],
-            # One target per iteration, in order.
-            "minibatcher" =>
-                ClimaCalibrate.minibatcher_over_samples(length(observation_vector), 1),
-        ),
+    # One target per iteration, in order.
+    obs_series = ClimaCalibrate.observation_series_from_samples(
+        observation_vector,
+        1,
+        [string(Dates.year(start_date)) for (start_date, stop_date) in sample_date_ranges],
     )
 
     (; rng_seed, priors) = CALIBRATE_CONFIG

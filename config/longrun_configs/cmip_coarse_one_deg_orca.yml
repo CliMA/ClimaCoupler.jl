@@ -42,6 +42,7 @@ dt_rad: "1hours"
 #land_progress_interval: "7days"
 #ocean_progress_interval: "7days"
 #seaice_progress_interval: "7days"
+coupler_output_dir: "/resnick/scratch/scaling"
 output_default_diagnostics: false
 energy_check: false
 insolation: "timevarying"

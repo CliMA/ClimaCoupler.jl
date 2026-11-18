@@ -24,18 +24,15 @@ include(
         "preprocessing.jl",
     ),
 )
-include(
-    joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "amip", "noise_model.jl"),
-)
 
 """
     make_observation_vector(
         vars,
         sample_date_ranges;
         covariance_date_ranges = sample_date_ranges,
-        beta = 0.05^2,
+        beta = 0.05,
         rank = 2,
-        sigma2 = 1e-6,
+        sigma = 1e-3,
         use_latitude_weights = true,
         min_cosd_lat = 0.1,
         independent_noise_sd = Dict{String, Float64}(),
@@ -46,18 +43,24 @@ Make a vector of `EKP.Observation`s, one for each sample corresponding to the da
 `sample_date_ranges`. The fields in `independent_noise_sd` get independent noise of the
 given standard deviation, and the other fields share an `SVDplusD` covariance matrix.
 
-The covariance is the `Gamma` of `noise_model.jl`, estimated from one sample per date
-range in `covariance_date_ranges`, so it is the interannual spread of the observation
-across those dates. Give it enough date ranges to estimate that spread: `rank` modes need
-appreciably more than `rank` samples, and identical date ranges produce a singular
-covariance. Each target in `sample_date_ranges` must be one of the covariance date ranges,
-and targets may repeat.
+The covariance is `ObservationRecipe.SVDplusModelErrorCovariance`: a truncated SVD of the
+sample covariance with `rank` modes, plus the sample variance those modes leave out,
+plus a model error term. It is estimated from one sample per date range in
+`covariance_date_ranges`, so it is the interannual spread of the observation across those
+dates. Give it enough date ranges to estimate that spread: `rank` modes need appreciably
+more than `rank` samples, and identical date ranges produce a singular covariance. Each
+target in `sample_date_ranges` must be one of the covariance date ranges, and targets may
+repeat.
 
-`beta` is the model-error part of `Gamma`, `beta * mean^2` at each point, with `mean` the
-observed mean over the covariance dates: it is a variance scale, the square of the model
-error as a fraction of the observed mean, so `beta = 0.05^2` is a 5% model error. Give one
-value for all variables, or a `Dict` from short name to value with an entry for every
-variable not in `independent_noise_sd`.
+`beta` is the model error as a fraction of the observed mean over the covariance dates, so
+`beta = 0.05` is a 5% model error. Give one value for all variables, or a `Dict` from short
+name to value with an entry for every variable not in `independent_noise_sd`. `sigma`
+floors the squared mean at `sigma^2` times the variable's median sample variance, so the
+model error does not vanish where the mean does.
+
+With `use_latitude_weights`, the covariance is estimated from samples weighted by
+`SampleBuilder.LatitudeWeighting`, which scales the variance at each point by
+`1 / max(cosd(lat), min_cosd_lat)`. The observation itself is unweighted.
 
 Variables named in `independent_noise_sd`, one value per target date such as global means,
 are left out of the `SVDplusD` covariance and form a second block of the observation, with
@@ -68,9 +71,9 @@ function make_observation_vector(
     vars,
     sample_date_ranges;
     covariance_date_ranges = sample_date_ranges,
-    beta = 0.05^2,
+    beta = 0.05,
     rank = 2,
-    sigma2 = 1e-6,
+    sigma = 1e-3,
     use_latitude_weights = true,
     min_cosd_lat = 0.1,
     independent_noise_sd = Dict{String, Float64}(),
@@ -85,21 +88,23 @@ function make_observation_vector(
             error("No beta for $missing_beta, and they are not in independent_noise_sd")
         beta = [beta[ClimaAnalysis.short_name(v)] for v in vars]
     end
-    @info "Using SVDplusD covariance matrix with" beta rank sigma2 use_latitude_weights min_cosd_lat
-    covar_estimator =
-        noise_covariance_estimator(; beta, rank, sigma2, use_latitude_weights, min_cosd_lat)
+    @info "Using SVDplusD covariance matrix with" beta rank sigma use_latitude_weights min_cosd_lat
+    covar_estimator = ObservationRecipe.SVDplusModelErrorCovariance(; rank, beta, sigma)
 
     # The targets are samples of this collection, so every observation's covariance is
     # estimated from all of its samples.
     samples = SampleBuilder.build_samples_by_times(vars, covariance_date_ranges; FT)
     @info "Built covariance samples" samples
+    weighted_samples =
+        use_latitude_weights ? samples |> SampleBuilder.LatitudeWeighting(; min_cosd_lat) :
+        samples
     return map(sample_date_ranges) do date_range
         i = findfirst(==(date_range), covariance_date_ranges)
         isnothing(i) && error(
             "The target $date_range is not one of the covariance_date_ranges, which the \
             observation is taken from",
         )
-        obs = ObservationRecipe.observation(covar_estimator, samples, i)
+        obs = ObservationRecipe.observation(covar_estimator, weighted_samples, i)
         isempty(independent_vars) && return obs
 
         # A second block per global mean, with independent noise.
@@ -110,7 +115,9 @@ function make_observation_vector(
             length(SampleBuilder.get_samples(block_samples)) == 1 ||
                 error("A global mean must be one value per target date")
             ObservationRecipe.observation(
-                ObservationRecipe.ScalarCovariance(scalar = sd^2),
+                ObservationRecipe.DiagonalCovariance(
+                    ObservationRecipe.ScalarDiagonal(sd^2),
+                ),
                 block_samples,
                 1,
             )
@@ -177,20 +184,19 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # the observation.
     JLD2.save_object(coverage_mask_path(output_dir), coverage_masks)
 
-    # Create the observation vector, in physical units: the noise model's model-error term
-    # is a fraction of the observed mean. Each field's `beta`, the model-error variance, is
-    # the square of its model_error_fraction. Fields with noise_sd instead get independent
-    # noise.
+    # Create the observation vector, in physical units. Each field's `beta` is its
+    # model_error_fraction, the model error as a fraction of the observed mean. Fields with
+    # noise_sd instead get independent noise.
     observation_vec = make_observation_vector(
         vars,
         sample_date_ranges;
         covariance_date_ranges,
         beta = Dict(
-            o.name => o.model_error_fraction^2 for
+            o.name => o.model_error_fraction for
             o in observables if !isnothing(o.model_error_fraction)
         ),
         rank = 2,
-        sigma2 = 1e-6,
+        sigma = 1e-3,
         use_latitude_weights = true,
         min_cosd_lat = 0.1,
         independent_noise_sd = Dict{String, Float64}(

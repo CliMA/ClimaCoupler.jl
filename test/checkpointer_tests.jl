@@ -249,6 +249,7 @@ ClimaComms.device(s::StubCSForFluxAcc) = s.device
     acc_a.F_turb_ρτxz .= FT(4)
     acc_a.F_turb_ρτyz .= FT(5)
     acc_a.n_steps[] = 7
+    acc_a.n_coupler_steps[] = 9
 
     acc_b = FluxCalculator.FluxAccumulator(boundary_space)
     acc_b.F_lh .= FT(10)
@@ -257,6 +258,7 @@ ClimaComms.device(s::StubCSForFluxAcc) = s.device
     acc_b.F_turb_ρτxz .= FT(40)
     acc_b.F_turb_ρτyz .= FT(50)
     acc_b.n_steps[] = 3
+    acc_b.n_coupler_steps[] = 4
 
     original = (; ocean_sim = acc_a, ice_sim = acc_b)
 
@@ -278,7 +280,7 @@ ClimaComms.device(s::StubCSForFluxAcc) = s.device
     Checkpointer.restart_flux_accumulators!(cs, output_file)
 
     # Each restored accumulator must match the original field-by-field and
-    # carry the same `n_steps` count.
+    # carry the same step counts.
     for name in keys(original)
         orig = original[name]
         restored = cs.flux_accumulators[name]
@@ -288,6 +290,7 @@ ClimaComms.device(s::StubCSForFluxAcc) = s.device
         @test parent(restored.F_turb_ρτxz) == parent(orig.F_turb_ρτxz)
         @test parent(restored.F_turb_ρτyz) == parent(orig.F_turb_ρτyz)
         @test restored.n_steps[] == orig.n_steps[]
+        @test restored.n_coupler_steps[] == orig.n_coupler_steps[]
     end
 
     # Missing accumulators in the file should raise an error.

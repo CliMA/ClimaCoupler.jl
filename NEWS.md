@@ -4,6 +4,25 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Concurrent and overlapped component stepping
+`step_concurrently` steps sea ice then ocean in a task of their own while the
+calling task steps land then atmosphere. Component models opt in to this with
+`Interfacer.is_overlapped`. This feature is meant to be used with multiple threads
+and on a GPU, though the savings are minimal on a single GPU due to shared compute.
+
+`overlap_slow_surfaces`, which requires `step_concurrently`, runs each ocean/sea
+ice step across the `k = dt_ocean / dt_cpl` coupling steps it spans rather than
+blocking on it within one. While that step is in flight the coupler holds the
+ocean and sea ice state it last read, so the atmosphere sees each ocean step
+`k − 1` coupling steps later (one step when `k = 1`).
+
+Both default to `false`. `CoupledSimulation` has a new `schedule` field, an
+`Interfacer.SteppingSchedule`, passed before `flux_accumulators`.
+
+`FluxAccumulator` divides its coupler-field sums by their own count,
+`n_coupler_steps`, so the push at initialization averages the two exchanges it
+follows rather than summing them.
+
 #### Average ClimaAtmos precipitation over the atmosphere steps of a coupling step
 The `liquid_precipitation` and `snow_precipitation` that `ClimaAtmosSimulation` passes to the surfaces
 are the mean over the atmosphere steps taken in one coupling step, not just the last value.

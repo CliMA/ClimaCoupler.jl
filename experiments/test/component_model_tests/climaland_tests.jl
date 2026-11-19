@@ -143,6 +143,7 @@ end
         thermo_params, # thermo_params
         nothing, # diags_handler
         true, # save_cache
+        Interfacer.SteppingSchedule(false, false), # schedule
         (;), # flux_accumulators
     )
 

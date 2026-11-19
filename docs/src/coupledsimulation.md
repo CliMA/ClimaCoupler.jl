@@ -25,6 +25,18 @@ Here we will describe the structure and internals of `CoupledSimulation`.
 | `thermo_params`       | `Thermodynamics.Parameters.ThermodynamicsParameters` or `nothing` | Thermodynamic parameters shared across component models |
 | `flux_accumulators`   | `NamedTuple` of `FluxCalculator.FluxAccumulator` | Per-surface turbulent and coupler flux accumulators for slow explicit surfaces (`sim_dt > Δt_cpl`); empty otherwise |
 | `save_cache`          | `Bool` | Whether model caches are included when writing checkpoint files |
+| `schedule`            | `Interfacer.SteppingSchedule` | How the components are stepped relative to one another, and any in-flight ice/ocean step (see below) |
+
+### Stepping schedule (`cs.schedule`)
+
+| Field | Type | Description |
+|---|---|---|
+| `concurrent`   | `Bool` | Whether to step the overlapped group in its own task |
+| `overlap_slow` | `Bool` | Whether one ocean/sea ice step spans several coupling steps |
+| `in_flight`    | `Interfacer.SlowStep` or `nothing` | The running ice/ocean step: its task, and the model time it is advancing to |
+
+`concurrent` and `overlap_slow` are set from the `step_concurrently` and
+`overlap_slow_surfaces` configuration options and do not change during a run.
 
 ## Component model simulations (`cs.model_sims`)
 

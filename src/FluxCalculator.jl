@@ -28,15 +28,26 @@ export turbulent_fluxes!,
     push_ready_accumulators!,
     reset!
 
-function turbulent_fluxes!(cs::Interfacer.CoupledSimulation)
-    turbulent_fluxes!(cs.fields, cs.model_sims, cs.thermo_params, cs.flux_accumulators)
-    push_ready_accumulators!(cs.model_sims, cs.flux_accumulators, cs.t[] + cs.Δt_cpl)
+function turbulent_fluxes!(cs::Interfacer.CoupledSimulation; slow_frozen::Bool = false)
+    turbulent_fluxes!(
+        cs.fields,
+        cs.model_sims,
+        cs.thermo_params,
+        cs.flux_accumulators;
+        slow_frozen,
+    )
+    push_ready_accumulators!(
+        cs.model_sims,
+        cs.flux_accumulators,
+        cs.t[] + cs.Δt_cpl;
+        slow_frozen,
+    )
     return nothing
 end
 
 """
-    turbulent_fluxes!(cs::CoupledSimulation)
-    turbulent_fluxes!(fields, model_sims, thermo_params, flux_accumulators = (;))
+    turbulent_fluxes!(cs::CoupledSimulation; slow_frozen = false)
+    turbulent_fluxes!(fields, model_sims, thermo_params, flux_accumulators = (;); slow_frozen = false)
 
 Compute turbulent fluxes and associated quantities. Store the results in `fields` as
 area-weighted sums.
@@ -59,13 +70,40 @@ Args:
 
 (NB: Radiation surface fluxes are calculated by the atmosphere.)
 """
-function turbulent_fluxes!(csf, model_sims, thermo_params, flux_accumulators = (;))
+function turbulent_fluxes!(
+    csf,
+    model_sims,
+    thermo_params,
+    flux_accumulators = (;);
+    slow_frozen::Bool = false,
+)
     atmos_sim = model_sims.atmos_sim
+    flux_names = (:F_turb_ρτxz, :F_turb_ρτyz, :F_lh, :F_sh, :F_turb_moisture)
+    cache_names = map(Interfacer.slow_cache_name, flux_names)
 
     # Reset the coupler fields will compute. We need to do this because we will compute
     # area-weighted averages
-    for p in (:F_turb_ρτxz, :F_turb_ρτyz, :F_lh, :F_sh, :F_turb_moisture)
+    for p in flux_names
         fill!(getproperty(csf, p), 0)
+    end
+
+    # Under `overlap_slow_surfaces`, the overlapped surfaces go first, into the zeroed
+    # fields, so that their share can be cached, and restored while their step is in flight.
+    have_cache = all(q -> hasproperty(csf, q), cache_names)
+    if slow_frozen
+        for (p, q) in zip(flux_names, cache_names)
+            getproperty(csf, p) .= getproperty(csf, q)
+        end
+    elseif have_cache
+        for (name, sim) in pairs(model_sims)
+            sim isa Interfacer.AbstractImplicitFluxSimulation && continue
+            Interfacer.is_overlapped(sim) || continue
+            accumulator = get(flux_accumulators, name, nothing)
+            compute_surface_fluxes!(csf, sim, atmos_sim, thermo_params, accumulator)
+        end
+        for (p, q) in zip(flux_names, cache_names)
+            getproperty(csf, q) .= getproperty(csf, p)
+        end
     end
 
     # Compute the surface fluxes for each surface model and add them to `csf`.
@@ -73,6 +111,7 @@ function turbulent_fluxes!(csf, model_sims, thermo_params, flux_accumulators = (
         # If the simulation is an implicit flux simulation, the fluxes are computed in the
         # component model's `step!` function, so we don't need to compute them here.
         sim isa Interfacer.AbstractImplicitFluxSimulation && continue
+        have_cache && Interfacer.is_overlapped(sim) && continue
         # `accumulator` is `nothing` for fast surfaces (and for atmos, which is
         # also iterated but whose `compute_surface_fluxes!` is a no-op).
         accumulator = get(flux_accumulators, name, nothing)
@@ -91,8 +130,8 @@ computed at each coupling step, and `coupler_fields` holds the running sum of th
 fields the surface declares in `FieldExchanger.accumulated_coupler_fields` (radiative and
 precipitation fluxes, and for some surfaces the near-surface atmospheric state).
 
-`n_steps` counts the coupling steps accumulated since the last reset. It is incremented by
-`accumulate!` only, not by `accumulate_coupler_fields!`, and is the divisor for both sums.
+`n_steps` counts the coupling steps in the turbulent-flux sum and `n_coupler_steps` those
+in the coupler-field sum; they differ while an overlapped surface's step is in flight.
 
 Used by `turbulent_fluxes!` to push the time-averaged flux to a
 slow surface just before it steps. Allocated only for slow explicit
@@ -106,6 +145,7 @@ struct FluxAccumulator{F <: CC.Fields.Field, D <: NamedTuple}
     F_turb_ρτyz::F
     coupler_fields::D
     n_steps::Base.RefValue{Int}
+    n_coupler_steps::Base.RefValue{Int}
 end
 
 """
@@ -129,6 +169,7 @@ function FluxAccumulator(boundary_space, field_names = ())
         CC.Fields.zeros(boundary_space),
         coupler_fields,
         Ref(0),
+        Ref(0),
     )
 end
 
@@ -137,12 +178,13 @@ end
 
 Add each declared coupler field in `csf` into the accumulator. Called from
 `FieldExchanger.update_model_sims!`, once per coupling step alongside `accumulate!`.
-`n_steps` is not incremented here: `accumulate!` counts the coupling step for both sums.
+Increments `n_coupler_steps`, which is this sum's own divisor.
 """
 function accumulate_coupler_fields!(acc::FluxAccumulator, csf)
     for name in keys(acc.coupler_fields)
         acc.coupler_fields[name] .+= getproperty(csf, name)
     end
+    acc.n_coupler_steps[] += 1
     return nothing
 end
 
@@ -209,11 +251,12 @@ function reset!(acc::FluxAccumulator)
     fill!(acc.F_turb_ρτxz, 0)
     fill!(acc.F_turb_ρτyz, 0)
     acc.n_steps[] = 0
+    acc.n_coupler_steps[] = 0
     return nothing
 end
 
 """
-    push_ready_accumulators!(model_sims, flux_accumulators, t_next; force = false)
+    push_ready_accumulators!(model_sims, flux_accumulators, t_next; force = false, slow_frozen = false)
 
 For each surface model present in `flux_accumulators`, check whether the surface will
 step at time `t_next`. If so, push the time-averaged coupler fluxes via `update_sim!`
@@ -221,6 +264,8 @@ and the time-averaged turbulent fluxes via `push_and_reset!`.
 
 Called by `turbulent_fluxes!(cs)` with `t_next = cs.t[] + cs.Δt_cpl`
 immediately after accumulation.
+
+Pass `slow_frozen = true` to skip the overlapped surfaces, whose step is in flight.
 
 Pass `force = true` to skip the `will_step` check and unconditionally push
 every non-empty accumulator to its surface. This is used during initialization
@@ -231,17 +276,19 @@ function push_ready_accumulators!(
     flux_accumulators,
     t_next;
     force::Bool = false,
+    slow_frozen::Bool = false,
 )
     for name in keys(flux_accumulators)
         sim, acc = model_sims[name], flux_accumulators[name]
+        slow_frozen && Interfacer.is_overlapped(sim) && continue
         (force || Interfacer.will_step(sim, t_next)) || continue
-        n = acc.n_steps[]
+        n_coupler = acc.n_coupler_steps[]
         # Pushed here rather than from `push_and_reset!`, which a surface may specialize,
         # and before it so a surface that resets its flux boundary conditions in
         # `update_sim!` does not discard the turbulent push.
-        if !iszero(n) && !isempty(acc.coupler_fields)
+        if !iszero(n_coupler) && !isempty(acc.coupler_fields)
             for field_name in keys(acc.coupler_fields)
-                acc.coupler_fields[field_name] ./= n
+                acc.coupler_fields[field_name] ./= n_coupler
             end
             Interfacer.update_sim!(sim, acc.coupler_fields)
         end

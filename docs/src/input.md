@@ -98,6 +98,8 @@ Note: the `mode_name` determines which Julia environment to use. Use `experiment
 | `--unique_seed` | Bool | `false` | `true`, `false` | Whether to set the random number seed to a unique value |
 | `--FLOAT_TYPE` | String | `"Float64"` | `Float64`, `Float32` | Floating point precision |
 | `--device` | String | `"auto"` | `auto`, `CPUSingleThreaded`, `CPUMultiThreaded`, `CUDADevice` | Device type to control running on CPU or GPU |
+| `--step_concurrently` | Bool | `false` | `true`, `false` | Step sea ice and ocean in their own task while land and atmosphere step; only worthwhile on a GPU. See [SimCoordinator](@ref) |
+| `--overlap_slow_surfaces` | Bool | `false` | `true`, `false` | Run each ocean/sea ice step across the coupling steps it spans, so the atmosphere sees a lagged ocean; requires `step_concurrently`. See [SimCoordinator](@ref) |
 
 #### Time information
 

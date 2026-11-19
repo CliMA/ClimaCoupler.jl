@@ -119,10 +119,10 @@ steps:
           slurm_mem: 32GB
           slurm_gpus: 1
 
-      - label: "GPU CMIP: ED only + integrated land"
+      - label: "GPU CMIP: ED only + integrated land (concurrent stepping)"
         key: "cmip_edonly_land"
         command:
-            - "julia --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_edonly_land.yml --job_id cmip_edonly_land"
+            - "julia --threads=3 --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_edonly_land.yml --job_id cmip_edonly_land"
         artifact_paths: "output/cmip_edonly_land/artifacts/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -130,6 +130,7 @@ steps:
           queue: clima
           modules: climacommon/2026_11_06-1.13.3
           slurm_mem: 32GB
+          slurm_cpus_per_task: 4
           slurm_gpus: 1
 
       - label: "GPU CMIP: prog. EDMF + integrated land"

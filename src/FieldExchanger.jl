@@ -34,7 +34,12 @@ If a surface model is not present, the area fraction is set to 0.
 # Arguments
 - `cs`: [Interfacer.CoupledSimulation] containing area fraction information.
 """
-function update_surface_fractions!(cs::Interfacer.CoupledSimulation)
+function update_surface_fractions!(
+    cs::Interfacer.CoupledSimulation;
+    slow_frozen::Bool = false,
+)
+    slow_frozen && return nothing
+
     # An ocean model may provide its own authoritative surface fractions
     # (e.g. derived from its bathymetric wet mask); if it does, skip the
     # land-fraction-based derivation below.
@@ -206,11 +211,11 @@ from each surface model when surface fluxes are computed, in `compute_surface_fl
 - `csf`: [NamedTuple] containing coupler fields.
 - `model_sims`: [NamedTuple] containing `AbstractComponentSimulation`s.
 """
-function import_combined_surface_fields!(csf, model_sims)
-    combine_surfaces!(csf, model_sims, Val(:emissivity))
-    combine_surfaces!(csf, model_sims, Val(:surface_temperature))
-    combine_surfaces!(csf, model_sims, Val(:surface_direct_albedo))
-    combine_surfaces!(csf, model_sims, Val(:surface_diffuse_albedo))
+function import_combined_surface_fields!(csf, model_sims; slow_frozen::Bool = false)
+    combine_surfaces!(csf, model_sims, Val(:emissivity); slow_frozen)
+    combine_surfaces!(csf, model_sims, Val(:surface_temperature); slow_frozen)
+    combine_surfaces!(csf, model_sims, Val(:surface_direct_albedo); slow_frozen)
+    combine_surfaces!(csf, model_sims, Val(:surface_diffuse_albedo); slow_frozen)
     return nothing
 end
 
@@ -302,7 +307,7 @@ accumulated_coupler_fields(::Interfacer.AbstractSurfaceSimulation) =
     (:SW_d, :LW_d, :P_liq, :P_snow)
 
 """
-    update_model_sims!(model_sims, csf, flux_accumulators = (;))
+    update_model_sims!(model_sims, csf, flux_accumulators = (;); slow_frozen = false)
 
 Iterates `update_sim!` over all component model simulations saved in `cs.model_sims`.
 
@@ -316,10 +321,20 @@ before the surface steps.
 - `csf`: [NamedTuple] containing coupler fields.
 - `flux_accumulators`: [NamedTuple] of `FluxCalculator.FluxAccumulator`s keyed by
     surface simulation name.
+- `slow_frozen`: [Bool] if `true`, skip `update_sim!` for overlapped sims, whose step is in
+    flight.
 """
-function update_model_sims!(model_sims, csf, flux_accumulators = (;))
+function update_model_sims!(
+    model_sims,
+    csf,
+    flux_accumulators = (;);
+    slow_frozen::Bool = false,
+)
     for (name, sim) in pairs(model_sims)
-        update_sim!(sim, csf)
+        # Accumulating is coupler-side, so it continues while the step is in
+        # flight; only `update_sim!`, which writes the model, stands down.
+        frozen = slow_frozen && Interfacer.is_overlapped(sim)
+        frozen || update_sim!(sim, csf)
         accumulator = get(flux_accumulators, name, nothing)
         isnothing(accumulator) ||
             FluxCalculator.accumulate_coupler_fields!(accumulator, csf)
@@ -327,7 +342,7 @@ function update_model_sims!(model_sims, csf, flux_accumulators = (;))
 end
 
 """
-    step_model_sims!(model_sims, t, coupler_fields, thermo_params)
+    step_model_sims!(model_sims, t, coupler_fields, thermo_params; step_concurrently = false, skip_slow = false)
     step_model_sims!(cs::CoupledSimulation)
 
 Iterates `step!` over all component model simulations saved in `cs.model_sims`.
@@ -337,10 +352,28 @@ Iterates `step!` over all component model simulations saved in `cs.model_sims`.
 - `t`: [AbstractFloat or ITime] denoting the simulation time.
 - `coupler_fields`: [Field of NamedTuple] containing the coupler exchange fields.
 - `thermo_params`: thermodynamic parameters.
+- `step_concurrently`: [Bool] step the overlapped group in its own task.
+- `skip_slow`: [Bool] leave the overlapped group to the task launched under
+    `overlap_slow_surfaces`.
 """
-function step_model_sims!(model_sims, t, coupler_fields, thermo_params)
+function step_model_sims!(
+    model_sims,
+    t,
+    coupler_fields,
+    thermo_params;
+    step_concurrently::Bool = false,
+    skip_slow::Bool = false,
+)
+    concurrent = step_concurrently && any(Interfacer.is_overlapped, model_sims)
+
+    # The overlapped group steps in its own task while this one steps the rest.
+    slow_task =
+        (concurrent && !skip_slow) ? Threads.@spawn(step_slow_sims!(model_sims, t)) :
+        nothing
+
     # Step all surface models (the ordering doesn't matter here)
     for sim in model_sims
+        concurrent && Interfacer.is_overlapped(sim) && continue
         sim isa Interfacer.AbstractSurfaceSimulation && Interfacer.step!(sim, t)
 
         # For an implicit flux simulation, `compute_surface_fluxes!` reads in the precomputed
@@ -361,11 +394,52 @@ function step_model_sims!(model_sims, t, coupler_fields, thermo_params)
 
     # Step the atmosphere model
     Interfacer.step!(model_sims.atmos_sim, t)
+
+    isnothing(slow_task) || wait(slow_task)
     return nothing
 end
 
 function step_model_sims!(cs::Interfacer.CoupledSimulation)
-    step_model_sims!(cs.model_sims, cs.t[], cs.fields, cs.thermo_params)
+    step_model_sims!(
+        cs.model_sims,
+        cs.t[],
+        cs.fields,
+        cs.thermo_params;
+        step_concurrently = cs.schedule.concurrent,
+        skip_slow = cs.schedule.overlap_slow,
+    )
+end
+
+"""
+    step_slow_sims!(model_sims, t)
+
+Advance the overlapped group (sea ice, then ocean) to time `t`.
+"""
+function step_slow_sims!(model_sims, t)
+    for sim in model_sims
+        sim isa Interfacer.AbstractSeaIceSimulation &&
+            Interfacer.is_overlapped(sim) &&
+            Interfacer.step!(sim, t)
+    end
+    for sim in model_sims
+        sim isa Interfacer.AbstractOceanSimulation &&
+            Interfacer.is_overlapped(sim) &&
+            Interfacer.step!(sim, t)
+    end
+    return nothing
+end
+
+"""
+    wait_slow_sims!(cs)
+
+Join an in-flight ice/ocean step, if any. A no-op when no step is in flight.
+"""
+function wait_slow_sims!(cs::Interfacer.CoupledSimulation)
+    inflight = cs.schedule.in_flight
+    isnothing(inflight) && return nothing
+    cs.schedule.in_flight = nothing
+    wait(inflight.task)
+    return nothing
 end
 
 """
@@ -387,14 +461,26 @@ is computed from the combined upward longwave radiation.
 # Example
 - `combine_surfaces!(temp_field, cs.model_sims, Val(:emissivity))`
 """
-function combine_surfaces!(csf, sims, field_name_val::Val{field_name}) where {field_name}
+function combine_surfaces!(
+    csf,
+    sims,
+    field_name_val::Val{field_name};
+    slow_frozen::Bool = false,
+) where {field_name}
     # Extract the coupler field we are updating
     combined_field = getproperty(csf, field_name)
     FT = eltype(combined_field)
     combined_field .= zero(FT)
 
+    # Summed separately so it can be carried across an overlapped step.
+    cache = Interfacer.slow_cache_name(field_name)
+    slow_sum = (slow_frozen || hasproperty(csf, cache)) ? getproperty(csf, cache) : nothing
+    isnothing(slow_sum) || slow_frozen || (slow_sum .= zero(FT))
+
     for sim in sims
         if sim isa Interfacer.AbstractSurfaceSimulation
+            slow_frozen && Interfacer.is_overlapped(sim) && continue
+
             # Store the area fraction of this simulation in `scalar_temp` and rename for clarity
             Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
             area_fraction = csf.scalar_temp1
@@ -405,21 +491,37 @@ function combine_surfaces!(csf, sims, field_name_val::Val{field_name}) where {fi
 
             # Zero out the contribution from this surface if the area fraction is zero.
             # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs
-            combined_field .+=
-                area_fraction .* ifelse.(area_fraction .≈ 0, zero(FT), surface_field)
+            target =
+                (!isnothing(slow_sum) && Interfacer.is_overlapped(sim)) ? slow_sum :
+                combined_field
+            target .+= area_fraction .* ifelse.(area_fraction .≈ 0, zero(FT), surface_field)
         end
     end
+    isnothing(slow_sum) || (combined_field .+= slow_sum)
     return nothing
 end
-function combine_surfaces!(csf, sims, ::Val{:surface_temperature})
+function combine_surfaces!(
+    csf,
+    sims,
+    ::Val{:surface_temperature};
+    slow_frozen::Bool = false,
+)
     # extract the coupler fields we need to get the surface temperature
     T_sfc = csf.T_sfc
     emissivity_sfc = csf.emissivity
 
     FT = eltype(T_sfc)
     T_sfc .= zero(FT)
+
+    # Summed separately so it can be carried across an overlapped step. Like `T_sfc`, it
+    # holds the area- and emissivity-weighted T⁴ until the conversion below.
+    cache = Interfacer.slow_cache_name(:T_sfc)
+    slow_sum = (slow_frozen || hasproperty(csf, cache)) ? getproperty(csf, cache) : nothing
+    isnothing(slow_sum) || slow_frozen || (slow_sum .= zero(FT))
+
     for sim in sims
         if sim isa Interfacer.AbstractSurfaceSimulation
+            slow_frozen && Interfacer.is_overlapped(sim) && continue
             # Store the area fraction and emissivity of this simulation in temp fields
             Interfacer.get_field!(csf.scalar_temp1, sim, Val(:area_fraction))
             area_fraction = csf.scalar_temp1
@@ -433,11 +535,14 @@ function combine_surfaces!(csf, sims, ::Val{:surface_temperature})
             # Zero out the contribution from this surface if the area fraction is zero.
             # Note that multiplying by `area_fraction` is not sufficient in the case of NaNs
             # Compute upward longwave radiation from surface temperature for this simulation
-            T_sfc .+=
+            target =
+                (!isnothing(slow_sum) && Interfacer.is_overlapped(sim)) ? slow_sum : T_sfc
+            target .+=
                 area_fraction .*
                 ifelse.(area_fraction .≈ 0, zero(FT), emissivity_sim .* T_sfc_sim .^ FT(4))
         end
     end
+    isnothing(slow_sum) || (T_sfc .+= slow_sum)
     # Convert the combined upward longwave radiation into a surface temperature
     @. T_sfc = (T_sfc / emissivity_sfc)^FT(1 / 4)
     return nothing
@@ -454,13 +559,13 @@ This is done in 2 steps:
 The order of these steps is important, as importing the surface fields requires
 the atmosphere fields to be updated so that surface humidity can be computed.
 """
-function exchange!(cs::Interfacer.CoupledSimulation)
+function exchange!(cs::Interfacer.CoupledSimulation; slow_frozen::Bool = false)
     # Import the atmosphere fields and surface fields into the coupler
     import_atmos_fields!(cs.fields, cs.model_sims)
-    import_combined_surface_fields!(cs.fields, cs.model_sims)
+    import_combined_surface_fields!(cs.fields, cs.model_sims; slow_frozen)
 
     # Update the component model simulations with the coupler fields
-    update_model_sims!(cs.model_sims, cs.fields, cs.flux_accumulators)
+    update_model_sims!(cs.model_sims, cs.fields, cs.flux_accumulators; slow_frozen)
     return nothing
 end
 

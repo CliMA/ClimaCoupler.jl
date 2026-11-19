@@ -1,0 +1,2 @@
+# Written by each workload to record whether it succeeded; a build artifact.
+workload_report.txt

@@ -1,0 +1,36 @@
+name = "AtmosWarmupSetup"
+uuid = "a1b2c3d4-0001-4000-8000-000000000001"
+version = "0.1.0"
+
+[deps]
+ClimaLand = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+ConservativeRegridding = "8e50ac2c-eb48-49bc-a402-07c87b949343"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+ClimaSeaIce = "6ba0ff68-24e6-4315-936c-2e99227c95a4"
+Oceananigans = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
+ClimaCoupler = "4ade58fe-a8da-486c-bd89-46df092ec0c7"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Poppler_jll = "9c32591e-4766-534b-9725-b71a8799265b"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+ClimaAtmos = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
+ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
+ClimaTimeSteppers = "595c0a79-7f3d-439a-bc5a-b232dc3bde79"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
+YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
+
+[compat]
+Poppler_jll = "24"
+Makie = "0.24 - 0.24.15"
+GeoMakie = "0.7"
+CairoMakie = "0.15"
+# PrecompileTools 1.2 does not cache externally-owned code on Julia >= 1.12: it collects
+# inference roots and calls `precompile`, while 1.3 uses `jl_tag_newly_inferred_*`, which
+# is what marks another package's CodeInstances for serialization. Measured on Julia
+# 1.13.3: 1500 externally-owned specializations gave a 0.02 MiB image under 1.2.1 and
+# 143.55 MiB under 1.3.4. Everything this directory caches is externally owned.
+PrecompileTools = "1.3"

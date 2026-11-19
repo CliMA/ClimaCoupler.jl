@@ -27,7 +27,6 @@ rayleigh_sponge: true
 surface_setup: "DefaultMoninObukhov"
 t_end: "120days"
 time_varying_trace_gases: ["CO2", "O3"]
-toml: [toml/prognostic_edmfx_1M.toml]
 turbconv: "prognostic_edmfx"
 update_cache_every: stage
 viscous_sponge: true

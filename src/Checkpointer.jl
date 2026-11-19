@@ -300,8 +300,9 @@ end
     _accumulator_to_cpu_nt(acc)
 
 Move a `FluxCalculator.FluxAccumulator` to CPU for JLD2 serialization.
-Fields are moved to host arrays via `CC.Adapt.adapt`; `n_steps` is unwrapped
-from the `Base.RefValue` so the value, not the reference, is written.
+Fields are moved to host arrays via `CC.Adapt.adapt`; `n_steps` and
+`n_coupler_steps` are unwrapped from their `Base.RefValue`s so the values, not
+the references, are written.
 """
 function _accumulator_to_cpu_nt(acc)
     return (;
@@ -312,6 +313,7 @@ function _accumulator_to_cpu_nt(acc)
         F_turb_ρτyz = CC.Adapt.adapt(Array, acc.F_turb_ρτyz),
         coupler_fields = map(field -> CC.Adapt.adapt(Array, field), acc.coupler_fields),
         n_steps = acc.n_steps[],
+        n_coupler_steps = acc.n_coupler_steps[],
     )
 end
 
@@ -427,7 +429,7 @@ end
 Overwrite the flux accumulator state in `cs` with values read from
 `input_file`. The file is the JLD2 written by `checkpoint_sims` and contains a
 NamedTuple keyed by surface simulation name; each value is a NamedTuple of
-host-arrayed fields plus the integer `n_steps`.
+host-arrayed fields plus the integers `n_steps` and `n_coupler_steps`.
 """
 function restart_flux_accumulators!(cs, input_file)
     ispath(input_file) || error("File $(input_file) not found")
@@ -450,6 +452,8 @@ function restart_flux_accumulators!(cs, input_file)
                     ArrayType(parent(saved.coupler_fields[field_name]))
             end
             live.n_steps[] = saved.n_steps
+            # A checkpoint without `n_coupler_steps` counts both sums in `n_steps`.
+            live.n_coupler_steps[] = get(saved, :n_coupler_steps, saved.n_steps)
         end
     end
     return nothing

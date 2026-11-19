@@ -52,45 +52,35 @@ function run!(
     cs::Interfacer.CoupledSimulation;
     precompile::Bool = cs.tspan[end] > 2 * cs.Δt_cpl + cs.tspan[begin],
 )
-    local walltime, t_timed_start
-    try
-        ## Precompilation of Coupling Loop
-        # Here we run the entire coupled simulation for two timesteps to precompile several
-        # functions for more accurate timing of the overall simulation. Each step is logged
-        # with its wall and compile time.
-        if precompile
-            @timed_log "First coupling step (includes compilation)" step!(cs)
-            @timed_log "Second coupling step" step!(cs)
-        end
+    ## Precompilation of Coupling Loop
+    # Here we run the entire coupled simulation for two timesteps to precompile several
+    # functions for more accurate timing of the overall simulation. Each step is logged
+    # with its wall and compile time.
+    if precompile
+        @timed_log "First coupling step (includes compilation)" step!(cs)
+        @timed_log "Second coupling step" step!(cs)
+    end
 
-        ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
-        GC.gc()
+    ## Run garbage collection before solving for more accurate memory comparison to ClimaAtmos
+    GC.gc()
 
-        ## Solving and Timing the Full Simulation
+    ## Solving and Timing the Full Simulation
 
-        # This is where the full coupling loop is called for the full timespan of the simulation.
-        # We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU and use this
-        # value to calculate the simulated years per day (SYPD) of the simulation.
-        @info "Starting coupling loop"
-        t_timed_start = cs.t[] # get t just before timing (equal to cs.tspan[begin] if `precompile` is false)
-        walltime = ClimaComms.@elapsed ClimaComms.device(cs) begin
+    # This is where the full coupling loop is called for the full timespan of the simulation.
+    # We use the `ClimaComms.@elapsed` macro to time the simulation on both CPU and GPU and use this
+    # value to calculate the simulated years per day (SYPD) of the simulation.
+    @info "Starting coupling loop"
+    t_timed_start = cs.t[] # get t just before timing (equal to cs.tspan[begin] if `precompile` is false)
+    walltime = ClimaComms.@elapsed ClimaComms.device(cs) begin
+        try
             while cs.t[] < cs.tspan[end]
                 step!(cs)
             end
-            # The last launched step is still running; its cost is part of the run.
+        finally
+            # Join the last ocean/sea ice step, also when the loop throws.
             FieldExchanger.wait_slow_sims!(cs)
-        end
-    finally
-        # Join here too on a loop that threw, reporting rather than raising so
-        # the failure cannot mask whatever ended the run.
-        try
-            FieldExchanger.wait_slow_sims!(cs)
-        catch e
-            @error "slow-surface step failed during teardown" exception =
-                (e, catch_backtrace())
         end
     end
-
     @info "Simulation took $(walltime) seconds"
 
     save_sypd_walltime_to_disk(cs, walltime, t_timed_start)
@@ -117,17 +107,14 @@ function step!(cs::Interfacer.CoupledSimulation)
     cs.t[] += cs.Δt_cpl
     cs.step[] += 1
 
-    in_flight = FieldExchanger.slow_step_in_flight(cs)
-
     # Compute global energy and water conservation checks
     # (only for slabplanet if tracking conservation is enabled)
-    in_flight || ConservationChecker.check_conservation!(cs)
+    ConservationChecker.check_conservation!(cs)
 
     # Step component model simulations sequentially for one coupling timestep (Δt_cpl)
-    FieldExchanger.step_model_sims!(cs; skip_slow = skip_slow_stepping(cs, in_flight))
+    FieldExchanger.step_model_sims!(cs)
 
-    # Joining here rather than before `step_model_sims!` lets an in-flight step
-    # overlap this coupling step's component work as well as the ones before it.
+    # While an ocean/sea ice step is in flight, the coupler holds their last state.
     frozen = join_slow_if_due!(cs)
 
     # Update the surface fractions for surface models
@@ -149,7 +136,6 @@ function step!(cs::Interfacer.CoupledSimulation)
     CD.orchestrate_diagnostics(cs)
 
     # Launched last, so nothing in this step reads ice or ocean state after it.
-    # The slow surfaces' forcing is fully assembled by here.
     launch_slow_if_due!(cs, frozen)
     return nothing
 end
@@ -158,32 +144,33 @@ end
     join_slow_if_due!(cs) -> frozen
 
 Join an overlapped ice/ocean step if this coupling step needs its result, and
-report whether one is still in flight afterwards.
+return whether one is still in flight.
 """
 function join_slow_if_due!(cs::Interfacer.CoupledSimulation)
     cs.schedule.overlap_slow && slow_surfaces_due(cs) && FieldExchanger.wait_slow_sims!(cs)
-    return FieldExchanger.slow_step_in_flight(cs)
+    return !isnothing(cs.schedule.in_flight)
 end
 
 """
-    skip_slow_stepping(cs, frozen)
+    launch_slow_if_due!(cs, frozen)
 
-Whether `step_model_sims!` should leave the slow group alone. Under overlap the
-task advances them, never the loop.
-"""
-skip_slow_stepping(cs::Interfacer.CoupledSimulation, frozen::Bool) =
-    frozen || cs.schedule.overlap_slow
-
-"""
-    launch_slow_if_due!(cs, frozen) -> launched
-
-Launch the next overlapped ice/ocean step if this coupling step is a boundary.
-Called once the slow group's forcing is fully assembled.
+Launch the next overlapped ice/ocean step as a task if it falls due at the next
+coupling time. The step advances one slow timestep, and none is launched past the
+end of the run.
 """
 function launch_slow_if_due!(cs::Interfacer.CoupledSimulation, frozen::Bool)
-    (cs.schedule.overlap_slow && !frozen && slow_surfaces_due(cs)) || return false
-    FieldExchanger.launch_slow_sims!(cs)
-    return true
+    (cs.schedule.overlap_slow && !frozen && slow_surfaces_due(cs)) || return nothing
+    t = cs.t[]
+    overlapped = filter(Interfacer.is_overlapped, values(cs.model_sims))
+    # Native time, an `ITime` under `use_itime`, not Float64.
+    target = any(sim -> Interfacer.will_step(sim, t), overlapped) ? t : t + cs.Δt_cpl
+    Float64(float(target)) > Float64(float(cs.tspan[end])) && return nothing
+    model_sims = cs.model_sims
+    cs.schedule.in_flight = Interfacer.SlowStep(
+        Threads.@spawn(FieldExchanger.step_slow_sims!(model_sims, target)),
+        Float64(float(target)),
+    )
+    return nothing
 end
 
 """
@@ -194,17 +181,15 @@ time.
 """
 function slow_surfaces_due(cs::Interfacer.CoupledSimulation)
     t_next = cs.t[] + cs.Δt_cpl
-    target = FieldExchanger.slow_step_target(cs)
-    if !isnothing(target)
-        # The in-flight step is writing the ocean clock; `target` is where it
-        # will land, so the next step falls due one slow timestep after that.
-        return Float64(float(t_next)) >= target + FieldExchanger.slow_sim_dt(cs)
+    overlapped = filter(Interfacer.is_overlapped, values(cs.model_sims))
+    in_flight = cs.schedule.in_flight
+    if !isnothing(in_flight)
+        # The ocean clock is not read while a step is in flight; that step lands on
+        # `target`, and the next falls due one slow timestep later.
+        dt = minimum(Interfacer.sim_dt, overlapped)
+        return Float64(float(t_next)) >= in_flight.target + dt
     end
-    for sim in cs.model_sims
-        Interfacer.is_overlapped(sim) || continue
-        Interfacer.will_step(sim, t_next) && return true
-    end
-    return false
+    return any(sim -> Interfacer.will_step(sim, t_next), overlapped)
 end
 
 """
@@ -366,8 +351,6 @@ function _build_coupled_simulation(config_dict::AbstractDict)
     Random.seed!(random_seed)
     @info "Random seed set to $(random_seed)"
 
-    # Only worth doing on a GPU; on CPU the groups oversubscribe each other
-    # through KernelAbstractions. Not incorrect, so warn rather than error.
     if step_concurrently
         if !(comms_ctx.device isa ClimaComms.CUDADevice)
             @warn "`step_concurrently` is set, but the device is \
@@ -520,7 +503,21 @@ function _build_coupled_simulation(config_dict::AbstractDict)
     foreach(sim -> Interfacer.add_coupler_fields!(coupler_field_names, sim), model_sims)
 
     energy_check && push!(coupler_field_names, :P_net)
-    overlap_slow_surfaces && append!(coupler_field_names, Interfacer.overlap_cache_fields())
+    # The overlapped surfaces' share of each blended quantity and turbulent flux.
+    overlap_slow_surfaces && append!(
+        coupler_field_names,
+        Interfacer.slow_cache_name.([
+            :emissivity,
+            :T_sfc,
+            :surface_direct_albedo,
+            :surface_diffuse_albedo,
+            :F_turb_ρτxz,
+            :F_turb_ρτyz,
+            :F_lh,
+            :F_sh,
+            :F_turb_moisture,
+        ]),
+    )
 
     coupler_fields = @timed_log "Initialized coupler fields" Interfacer.init_coupler_fields(
         FT,
@@ -612,10 +609,15 @@ function _build_coupled_simulation(config_dict::AbstractDict)
     for (sim_name, interval) in pairs(progress_intervals)
         (haskey(model_sims, sim_name) && interval != "never") || continue
         schedule_progress = TimeManager.calendar_dt_schedule(interval, start_date, t_start)
+        # A report that falls due while this sim's step is in flight is made at the join.
+        deferred = Ref(false)
         progress_cb = TimeManager.Callback(
-            schedule_progress,
-            let sim_name = sim_name
-                cs -> Interfacer.progress(cs.model_sims[sim_name], cs)
+            s -> schedule_progress(s) || deferred[],
+            cs -> begin
+                sim = cs.model_sims[sim_name]
+                deferred[] =
+                    Interfacer.is_overlapped(sim) && !isnothing(cs.schedule.in_flight)
+                deferred[] || Interfacer.progress(sim, cs)
             end,
         )
         callbacks = (callbacks..., progress_cb)
@@ -654,9 +656,8 @@ function _build_coupled_simulation(config_dict::AbstractDict)
         thermo_params,
         diags_handler,
         save_cache,
-        flux_accumulators;
-        step_concurrently = step_concurrently,
-        overlap_slow_surfaces = overlap_slow_surfaces,
+        Interfacer.SteppingSchedule(step_concurrently, overlap_slow_surfaces),
+        flux_accumulators,
     )
 
     ## Restart component model states if specified

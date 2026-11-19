@@ -112,7 +112,7 @@ function argparse_settings()
         arg_type = Bool
         default = false
         "--overlap_slow_surfaces"
-        help = "Requires `step_concurrently`. Overlap one ocean/sea ice step with several coupling steps of atmos/land, instead of blocking on it within a single coupling step. Increases the lag of the ocean state seen by the atmosphere."
+        help = "Run each ocean/sea ice step across the coupling steps it spans, so the atmosphere sees a lagged ocean (requires `step_concurrently`)"
         arg_type = Bool
         default = false
         "--dt_atmos"

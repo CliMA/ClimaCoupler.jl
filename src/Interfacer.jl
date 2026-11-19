@@ -34,7 +34,6 @@ export CoupledSimulation,
     sim_dt,
     will_step,
     is_overlapped,
-    SteppingSchedule,
     set_cache!,
     remap,
     remap!,
@@ -56,9 +55,7 @@ abstract type AbstractSimulation{FT} end
 """
     SlowStep
 
-An ice/ocean step running asynchronously: the task, and the model time it is
-advancing to. The target is held here because the models' own clocks are being
-written by that task.
+An ice/ocean step running as a task, and the model time it is advancing to.
 """
 struct SlowStep
     task::Task
@@ -68,21 +65,19 @@ end
 """
     SteppingSchedule(concurrent, overlap_slow)
 
-How the component models are stepped relative to one another, and the in-flight
-ice/ocean step if there is one.
+How the component models are stepped relative to one another.
 
 - `concurrent`: step the overlapped group in its own task.
 - `overlap_slow`: let one ice/ocean step span several coupling steps.
-- `in_flight`: the running [`SlowStep`](@ref), or `nothing`.
+- `in_flight`: the running `SlowStep`, or `nothing`.
 """
 mutable struct SteppingSchedule
     const concurrent::Bool
     const overlap_slow::Bool
     in_flight::Union{Nothing, SlowStep}
+    SteppingSchedule(concurrent::Bool, overlap_slow::Bool) =
+        new(concurrent, overlap_slow, nothing)
 end
-
-SteppingSchedule(concurrent::Bool, overlap_slow::Bool) =
-    SteppingSchedule(concurrent, overlap_slow, nothing)
 
 """
     CoupledSimulation
@@ -127,52 +122,6 @@ struct CoupledSimulation{
 end
 
 CoupledSimulation{FT}(args...) where {FT} = CoupledSimulation{FT, typeof.(args)...}(args...)
-
-"""
-    CoupledSimulation{FT}(start_date, ..., flux_accumulators; step_concurrently, ...)
-
-Construct a `CoupledSimulation`. `step_concurrently` and
-`overlap_slow_surfaces` are keyword arguments, off by default; they are held
-in a [`SteppingSchedule`](@ref) alongside any in-flight ice/ocean step.
-"""
-function CoupledSimulation{FT}(
-    start_date,
-    fields,
-    conservation_checks,
-    tspan,
-    Δt_cpl,
-    t,
-    step,
-    prev_checkpoint_t,
-    model_sims,
-    callbacks,
-    dir_paths,
-    thermo_params,
-    diags_handler,
-    save_cache,
-    flux_accumulators;
-    step_concurrently = false,
-    overlap_slow_surfaces = false,
-) where {FT}
-    return CoupledSimulation{FT}(
-        start_date,
-        fields,
-        conservation_checks,
-        tspan,
-        Δt_cpl,
-        t,
-        step,
-        prev_checkpoint_t,
-        model_sims,
-        callbacks,
-        dir_paths,
-        thermo_params,
-        diags_handler,
-        save_cache,
-        SteppingSchedule(step_concurrently, overlap_slow_surfaces),
-        flux_accumulators,
-    )
-end
 
 function Base.show(io::IO, sim::CoupledSimulation)
     device_type = nameof(typeof(ClimaComms.device(sim)))
@@ -255,41 +204,12 @@ default_coupler_fields() = [
 ]
 
 """
-    overlap_cache_fields()
+    slow_cache_name(name)
 
-Coupler fields that hold the ocean/sea ice contribution to each blended surface
-quantity, carried across an overlapped slow-surface step.
-
-`:slow_LW_up` holds the area- and emissivity-weighted sum of `T^4`, which is
-what is accumulated before converting back to a temperature.
+Coupler field holding the overlapped surfaces' share of the summed coupler field
+`name`, carried across an in-flight ice/ocean step.
 """
-overlap_cache_fields() =
-    [values(blended_cache_pairs())..., values(turb_flux_cache_pairs())...]
-
-"""
-    blended_cache_pairs()
-    turb_flux_cache_pairs()
-
-Each quantity summed across surfaces, paired with the coupler field parking the
-ocean/sea ice share of it. These are the only definitions of those names.
-
-`:surface_temperature` pairs with `:slow_LW_up` because what is summed is the
-area- and emissivity-weighted `T^4`, not the temperature.
-"""
-blended_cache_pairs() = (;
-    emissivity = :slow_emissivity,
-    surface_temperature = :slow_LW_up,
-    surface_direct_albedo = :slow_direct_albedo,
-    surface_diffuse_albedo = :slow_diffuse_albedo,
-)
-
-@doc (@doc blended_cache_pairs) turb_flux_cache_pairs() = (;
-    F_turb_ρτxz = :slow_F_turb_ρτxz,
-    F_turb_ρτyz = :slow_F_turb_ρτyz,
-    F_lh = :slow_F_lh,
-    F_sh = :slow_F_sh,
-    F_turb_moisture = :slow_F_turb_moisture,
-)
+slow_cache_name(name::Symbol) = Symbol(:slow_, name)
 
 """
     init_coupler_fields(FT, coupler_field_names, boundary_space)
@@ -337,11 +257,9 @@ abstract type AbstractOceanSimulation <: AbstractSurfaceSimulation end
 """
     is_overlapped(sim)
 
-Whether `sim` belongs to the group that is stepped asynchronously across several
-coupling steps when `overlap_slow_surfaces` is set. Ocean and sea ice step
-together in that group, to properly pass the frazil heat flux.
-
-Defaults to `false`; concrete surface types opt in.
+Whether `sim` is in the ocean/sea ice group, which steps in its own task under
+`step_concurrently` and across several coupling steps under
+`overlap_slow_surfaces`. Defaults to `false`.
 """
 is_overlapped(::AbstractComponentSimulation) = false
 

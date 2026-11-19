@@ -283,29 +283,21 @@ Extension of `Interfacer.progress` for Oceananigans.
 Print some statistics with a frequency determined by the `ocean_progress_interval` config option.
 """
 function Interfacer.progress(ocean_sim::OceananigansSimulation, cs)
-    model = ocean_sim.ocean.model
+    ocean = ocean_sim.ocean
+    model = ocean.model
+
     (Tmin, Tmax) = extrema(model.tracers.T)
     (Smin, Smax) = extrema(model.tracers.S)
     (ηmin, ηmax) = extrema(model.free_surface.displacement)
-    s = (;
-        clock_time = model.clock.time,
-        iteration = OC.iteration(ocean_sim.ocean),
-        Tmin,
-        Tmax,
-        Smin,
-        Smax,
-        ηmin,
-        ηmax,
-        umax = maximum(abs, model.velocities.u),
-        vmax = maximum(abs, model.velocities.v),
-        wmax = maximum(abs, model.velocities.w),
-    )
+    umax = maximum(abs, model.velocities.u)
+    vmax = maximum(abs, model.velocities.v)
+    wmax = maximum(abs, model.velocities.w)
     if ClimaComms.iamroot(ClimaComms.context(cs))
-        @info "Ocean | time: $(Interfacer.current_date(cs, s.clock_time)), iteration: $(s.iteration), " *
-              "extrema(η): ($(round(s.ηmin, sigdigits=2)), $(round(s.ηmax, sigdigits=2))) " *
-              "extrema(T, S): ($(round(s.Tmin, digits=2)), $(round(s.Tmax, digits=2))) ᵒC, " *
-              "($(round(s.Smin, digits=2)), $(round(s.Smax, digits=2))) psu " *
-              "maximum(u): ($(round(s.umax, sigdigits=2)), $(round(s.vmax, sigdigits=2)), $(round(s.wmax, sigdigits=2))) m/s"
+        @info "Ocean | time: $(Interfacer.current_date(cs, model.clock.time)), iteration: $(OC.iteration(ocean)), " *
+              "extrema(η): ($(round(ηmin, sigdigits=2)), $(round(ηmax, sigdigits=2))) " *
+              "extrema(T, S): ($(round(Tmin, digits=2)), $(round(Tmax, digits=2))) ᵒC, " *
+              "($(round(Smin, digits=2)), $(round(Smax, digits=2))) psu " *
+              "maximum(u): ($(round(umax, sigdigits=2)), $(round(vmax, sigdigits=2)), $(round(wmax, sigdigits=2))) m/s"
     end
     return nothing
 end

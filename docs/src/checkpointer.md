@@ -133,17 +133,15 @@ a checkpoint falls due. [`Checkpointer.checkpoint_sims`](@ref) joins it before
 reading any component state, so a checkpoint never captures a half-stepped
 ocean.
 
-The join completes whatever step was running, so a checkpoint taken part-way
-through a slow-surface window saves the slow group already advanced to the end
-of that window. The ocean and sea ice in a checkpoint are therefore generally at
-a *later* model time than the coupler and the other components. On restart the
-schedule follows from the component clocks themselves, which the checkpoint
-restores, rather than from a count of coupling steps -- `cs.step[]` starts again
-at zero while those clocks do not.
-
-Their diagnostics carry their own clocks for the same reason, so those files lead
-coupler time. See [Concurrent component stepping](@ref) for the stepping scheme
-these follow from.
+The joined ocean and sea ice are at or behind the coupler time, as on the
+sequential path. For the rest of that window the coupler reads them instead of
+holding their previous step, just as a restart from the checkpoint does, so a
+run's answer depends on `checkpoint_dt`. On restart the schedule follows from the
+component clocks, which the checkpoint restores, rather than from `cs.step[]`,
+which starts again at zero. A run with `overlap_slow_surfaces` restarts only from
+a checkpoint written with it, because the restart reads every coupler field,
+including the `slow_*` caches. See [Concurrent component stepping](@ref) for the
+stepping scheme.
 
 ### Adding checkpointing to a new component model
 

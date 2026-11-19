@@ -404,6 +404,18 @@ steps:
           slurm_cpus_per_task: 4
           slurm_gpus: 1
 
+      - label: "GPU CMIP: ClimaAtmos + integrated land + Oceananigans + ClimaSeaIce (overlapped stepping)"
+        key: "gpu_cmip_oceananigans_climaseaice_overlap"
+        command: "julia -O0 --threads=3 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/CMIP/run_simulation.jl --config_file $CONFIG_PATH/cmip_oceananigans_climaseaice_overlap.yml --job_id gpu_cmip_oceananigans_climaseaice_overlap"
+        artifact_paths: "output/gpu_cmip_oceananigans_climaseaice_overlap/artifacts/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        retry: *retry_policy
+        agents:
+          slurm_mem: 20GB
+          slurm_cpus_per_task: 4
+          slurm_gpus: 1
+
   - group: "Calibration"
     skip: "${DOWNSTREAM_CI:-}"
     steps:

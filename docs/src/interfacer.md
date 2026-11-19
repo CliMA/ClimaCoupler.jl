@@ -155,6 +155,10 @@ own steps. The default implementation compares `t` against
 flux to a slow surface before it steps. Component models that need different
 step-boundary detection logic can override this method.
 
+- `is_overlapped(sim::AbstractComponentSimulation)`: Returns `true` for a model in
+the ocean/sea ice group stepped in its own task under `step_concurrently` and
+`overlap_slow_surfaces`. Defaults to `false`; Oceananigans and ClimaSeaIce opt in.
+
 - `progress(sim::AbstractComponentSimulation, cs)`: Print progress statistics
 from the component model simulation. This is called by a coupler callback with
 a frequency controlled by the `<component>_progress_interval` config options.

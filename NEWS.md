@@ -175,23 +175,25 @@ instead of ponding on it (and being lost) while snow can still accumulate on
 the ice.
 
 #### Concurrent and overlapped component stepping. PR [#1723](https://github.com/CliMA/ClimaCoupler.jl/pull/1723)
-`step_concurrently` advances the component models as two concurrent groups —
-land then atmosphere in one task, sea ice then ocean in another. The ice and
-ocean must share a task: the sea ice model holds views into the ocean's surface
-velocity and salinity, so stepping them in parallel races on ocean state. Group
-membership is decided by type, via `Interfacer.is_overlapped`. Only worthwhile on
-a GPU; on a CPU device the components fan out over all threads through
-KernelAbstractions and oversubscribe each other, and the coupler now warns when
-asked to do this, or when only one Julia thread is available.
+`step_concurrently` steps sea ice then ocean in a task of their own while the
+calling task steps land then atmosphere. The ice and ocean share a task because
+the sea ice model holds views into the ocean's surface velocity and salinity.
+Concrete models join that group through `Interfacer.is_overlapped`. Only
+worthwhile on a GPU; the coupler warns on a CPU device or with a single Julia
+thread.
 
-`overlap_slow_surfaces` spans one ocean/sea ice step across several coupling
-steps rather than blocking on it within one, so a whole window of atmosphere and
-land work is hidden rather than a single step. While that step is in flight the
-coupler leaves ice and ocean state alone; the atmosphere still gets a live
-blended surface state because `combine_surfaces!` sums the fast and slow
-surfaces separately and reuses the slow sum for the window.
+`overlap_slow_surfaces`, which requires `step_concurrently`, runs each ocean/sea
+ice step across the `k = dt_ocean / dt_cpl` coupling steps it spans rather than
+blocking on it within one. While that step is in flight the coupler holds the
+ocean and sea ice state it last read, so the atmosphere sees each ocean step
+`k − 1` coupling steps later (one step when `k = 1`).
 
-Both default to `false`.
+`FluxAccumulator` divides its coupler-field sums by their own count,
+`n_coupler_steps`, so the push at initialization averages the two exchanges it
+follows rather than summing them.
+
+Both default to `false`. `CoupledSimulation` has a new `schedule` field, an
+`Interfacer.SteppingSchedule`, passed before `flux_accumulators`.
 
 #### Exchange (intersection) grid for CMIP surface fractions and fluxes. PR [#2051](https://github.com/CliMA/ClimaCoupler.jl/pull/2051)
 When coupling to an Oceananigans ocean, ClimaCoupler now builds the exchange

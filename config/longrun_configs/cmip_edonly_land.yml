@@ -33,6 +33,7 @@ rmse_check: true
 seaice_diagnostic_interval: "30days"
 seaice_diagnostic_mode: "average"
 start_date: "20100101"
+step_concurrently: true
 surface_setup: "PrescribedSurface"
 t_end: "366days"
 topo_smoothing: true

@@ -181,11 +181,11 @@ for the following properties:
 | `air_temperature`           | air temperature at the bottom cell centers of the atmosphere              | K          |
 | `height_int`                | height at the bottom cell center of the atmosphere space                  | m          |
 | `height_sfc`                | height at the bottom face of the atmosphere space                         | m          |
-| `liquid_precipitation`      | liquid precipitation at the surface                                       | kg m⁻² s⁻¹ |
+| `liquid_precipitation`      | liquid precipitation at the surface, mean over the last coupling step     | kg m⁻² s⁻¹ |
 | `SW_d`                      | downwelling shortwave radiation at the surface                            | W m⁻²      |
 | `LW_d`                      | downwelling longwave radiation at the surface                             | W m⁻²      |
 | `radiative_energy_flux_toa` | net radiative flux at the top of the atmosphere                           | W m⁻²      |
-| `snow_precipitation`        | snow precipitation at the surface                                         | kg m⁻² s⁻¹ |
+| `snow_precipitation`        | snow precipitation at the surface, mean over the last coupling step       | kg m⁻² s⁻¹ |
 | `specific_humidity`         | specific humidity at the bottom cell centers of the atmosphere            | kg kg⁻¹    |
 | `turbulent_energy_flux`     | aerodynamic turbulent surface fluxes of energy (sensible and latent heat) | W m⁻²      |
 | `turbulent_moisture_flux`   | aerodynamic turbulent surface fluxes of energy (evaporation)              | kg m⁻² s⁻¹ |

@@ -23,6 +23,10 @@ Both default to `false`. `CoupledSimulation` has a new `schedule` field, an
 `n_coupler_steps`, so the push at initialization averages the two exchanges it
 follows rather than summing them.
 
+#### Average ClimaAtmos precipitation over the atmosphere steps of a coupling step
+The `liquid_precipitation` and `snow_precipitation` that `ClimaAtmosSimulation` passes to the surfaces
+are the mean over the atmosphere steps taken in one coupling step, not just the last value.
+
 #### Use `update_constrain_state_every: "step"` for 0M ProgEDMF
 `config/atmos_configs/climaatmos_progedmf.yml` sets `update_constrain_state_every: "step"` (the previous
 ClimaAtmos default). With `"stage"` (the default since CliMA/ClimaAtmos.jl#4968), coupled 1° 0M ProgEDMF
@@ -56,6 +60,26 @@ The nightly and weekly AMIP configs (0M and 1M ProgEDMF) use `dt: "180secs"` and
 Buildkite runs Julia 1.13.3, and the experiment environments ship `Manifest-v1.13.toml` instead of
 `Manifest-v1.11.toml`. The AMIP and CMIP environments require CUDA 6.
 
+#### Update to ClimaDiagnostics v0.4
+Time-reduced diagnostics no longer include the initial state, so the first window of the coupler and
+atmosphere diagnostics is no longer `NaN` for fields such as shortwave fluxes. NetCDF diagnostics no
+longer have `date` and `date_bnds`, and `time` is in seconds since `start_date`. `DictWriter` and
+`HDF5Writer` save time-reduced diagnostics at the start of their window.
+
+#### Fix land restarts
+Restarted runs with a ClimaLand model now start the land model at the restart time instead of
+`t = 0` when not using `ITime`.
+
+#### Fix restart time when restart options are set after loading the config
+`CoupledSimulation(config_dict)` now updates `t_start` from `restart_t` (or the latest checkpoint
+when `detect_restart_files` is set), so restart options set after `get_coupler_config_dict` no
+longer restart the checkpointed state at the original `t_start`. `Checkpointer.restart!` errors if
+the coupled simulation does not start at the checkpoint time. Non-`ITime` runs with a prescribed
+ocean no longer error with `UndefVarError: Dates`.
+
+v0.3.0
+-------
+
 #### Checkpoints do not save or restore ClimaCore spaces
 Cache checkpoints skip ClimaCore spaces and grids, which remain unchanged during
 simulations, so they no longer store the local geometry of every field's space.
@@ -77,23 +101,6 @@ ClimaAtmos versions without the two-scale stretching ignore the key.
   weights each polygon by its area inside control volumes around the nodes, so masked flux
   transfers stay bounded without the flux clamp or `cov_cutoff`. The wet, sea-ice and
   open-ocean area fractions are the DSS'd coverages of these weights.
-
-#### Update to ClimaDiagnostics v0.4
-Time-reduced diagnostics no longer include the initial state, so the first window of the coupler and
-atmosphere diagnostics is no longer `NaN` for fields such as shortwave fluxes. NetCDF diagnostics no
-longer have `date` and `date_bnds`, and `time` is in seconds since `start_date`. `DictWriter` and
-`HDF5Writer` save time-reduced diagnostics at the start of their window.
-
-#### Fix land restarts
-Restarted runs with a ClimaLand model now start the land model at the restart time instead of
-`t = 0` when not using `ITime`.
-
-#### Fix restart time when restart options are set after loading the config
-`CoupledSimulation(config_dict)` now updates `t_start` from `restart_t` (or the latest checkpoint
-when `detect_restart_files` is set), so restart options set after `get_coupler_config_dict` no
-longer restart the checkpointed state at the original `t_start`. `Checkpointer.restart!` errors if
-the coupled simulation does not start at the checkpoint time. Non-`ITime` runs with a prescribed
-ocean no longer error with `UndefVarError: Dates`.
 
 #### Add ocean config options
 New `ocean_float_type` (`Float64` by default) and `ocean_vertical_levels` (60 by default) options set the

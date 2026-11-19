@@ -42,7 +42,9 @@ units, a `model_var` method, both in `src/CalibrationTools.jl`.
 - `pipeline_test.jl`: an end-to-end test that runs a single iteration using `ta`
   and `hur` observations of October 2010. To use this config, you
   should set the environment variable `TEST_CALIBRATION` to anything before
-  generating the observations and starting the calibration.
+  generating the observations and starting the calibration. It runs the
+  ensemble members one after another on the CPU in the current process, so it
+  needs no workers or job submissions.
 
 ## Running a calibration
 

@@ -76,6 +76,9 @@ improves on `step_concurrently` when `O > A`, and its saving peaks when
 `O ≈ k·A`. For `k = 1` it saves no more than `step_concurrently` and adds a
 coupling step of lag.
 
+These savings assume the two groups run in parallel, which needs them on separate
+devices. On one GPU, either option saves only a fraction of the figures above.
+
 ## SimCoordinator API
 
 ```@docs

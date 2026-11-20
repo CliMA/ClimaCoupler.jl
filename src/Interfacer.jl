@@ -158,6 +158,8 @@ default_coupler_fields() = [
     :F_turb_moisture,
     :F_turb_ρτxz,
     :F_turb_ρτyz,
+    # screen-level (2 m) air temperature, computed with the turbulent fluxes
+    :T_2m,
     :SW_d,
     :LW_d,
     # fields used to compute radiation in the atmosphere

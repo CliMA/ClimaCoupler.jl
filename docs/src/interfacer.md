@@ -99,6 +99,7 @@ The default coupler exchange fields are the following, defined in
 | `F_turb_moisture`     | turbulent moisture flux                                     | kg m⁻² s⁻¹ |
 | `F_turb_ρτxz`         | turbulent momentum flux in the zonal direction              | kg m⁻¹ s⁻² |
 | `F_turb_ρτyz`         | turbulent momentum flux in the meridional direction         | kg m⁻¹ s⁻² |
+| `T_2m`                | screen-level (2 m) air temperature, averaged across components | K       |
 | `SW_d`                | downward SW flux at the surface                             | W m⁻²      |
 | `LW_d`                | downward LW flux at the surface                             | W m⁻²      |
 | `emissivity`          | surface emissivity                                          | -          |

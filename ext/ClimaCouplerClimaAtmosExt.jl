@@ -595,6 +595,10 @@ function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fiel
     L_MO = scalar_temp1 # rename for clarity
     Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.obukhov_length, L_MO)
 
+    # Area-weighted screen-level air temperature of the surfaces, which the
+    # atmosphere outputs as its 2 m temperature diagnostic (`tas`)
+    Interfacer.remap!(sim.integrator.p.precomputed.sfc_conditions.T_2m, fields.T_2m)
+
     return nothing
 end
 

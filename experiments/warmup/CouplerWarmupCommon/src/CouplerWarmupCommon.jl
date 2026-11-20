@@ -1,12 +1,7 @@
 """
     CouplerWarmupCommon
 
-Shared setup for the component precompilation workloads (`OceanWarmup`, `LandWarmup`,
-`SeaIceWarmup`).
-
-`prologue` builds what a coupled run builds before its component models, mirroring the
-start of `ClimaCoupler.SimCoordinator._build_coupled_simulation`. `check_matches_coupled`
-checks that a workload built the same type as a coupled run.
+Shared setup for the component workloads (`OceanWarmup`, `LandWarmup`, `SeaIceWarmup`).
 """
 module CouplerWarmupCommon
 
@@ -16,9 +11,7 @@ import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
 import ClimaComms
 
-# Loaded, although nothing here calls it, because `experiments/CMIP/code_loading.jl` loads
-# it: a package loaded after this workload is compiled invalidates the cached code. See
-# `experiments/warmup/precompile_info.md`.
+# Loaded because `experiments/CMIP/code_loading.jl` loads it; see `AtmosWarmupSetup`.
 import CairoMakie, GeoMakie, Makie, Poppler_jll, Printf
 
 export prologue, check_matches_coupled
@@ -26,20 +19,9 @@ export prologue, check_matches_coupled
 """
     prologue(config_dict; with_atmos = true)
 
-Build the inputs shared by every component model, as a coupled run builds them.
-
-# Arguments
-- `config_dict`: coupler config, as returned by `Input.get_coupler_config_dict`.
-
-# Keyword Arguments
-- `with_atmos = true`: build the atmosphere simulation and everything derived from its
-  boundary space. With `false`, `atmos_sim` and `boundary_space` are `nothing`.
-
-# Returns
-A `NamedTuple` with `comms_ctx`, `args` (from `Input.get_coupler_args`),
-`coupled_param_dict`, `thermo_params`, `dir_paths`, `atmos_sim` and `boundary_space`. With
-`with_atmos = true` it also holds `atmos_h`, `initial_T`, `land_fraction`, `sst_path`,
-`sic_path`, `land_ic_path`, `albedo_path` and `bucket_initial_condition`.
+Return, as a `NamedTuple`, the inputs a coupled run builds before its component models,
+mirroring the start of `SimCoordinator._build_coupled_simulation`. With `with_atmos = false`
+the atmosphere and everything derived from its boundary space are skipped.
 """
 function prologue(config_dict::AbstractDict; with_atmos::Bool = true)
     comms_ctx = Utilities.get_comms_context(config_dict)
@@ -120,11 +102,8 @@ end
 """
     check_matches_coupled(label, built, expected_type)
 
-Return `true` if `typeof(built) === expected_type`, and throw an error naming `label`
-otherwise.
-
-Cached specializations are keyed on concrete types, so a workload that builds a different
-type than a coupled run produces an image the run cannot use.
+Throw unless `typeof(built) === expected_type`: a workload building a different type than
+a coupled run caches code the run cannot use.
 """
 function check_matches_coupled(label, built, expected_type)
     actual = typeof(built)

@@ -2,10 +2,8 @@
 #
 #     julia --project=experiments/warmup experiments/warmup/check_config_drift.jl
 #
-# Several model selections are type parameters (the gravity-wave model of `AtmosModel`, for
-# instance), so a drifted config yields an image a production run cannot use, and the run
-# silently recompiles. Exits non-zero on any difference not recorded in `ATMOS_EXPECTED` or
-# `CMIP_EXPECTED`, including keys added upstream.
+# Model selections are type parameters, so a drifted config yields images production
+# cannot use. Exits non-zero on any difference not in `ATMOS_EXPECTED` or `CMIP_EXPECTED`.
 
 using YAML
 
@@ -46,8 +44,7 @@ const CMIP_EXPECTED = Dict(
 """
     drift(production, warmup, expected)
 
-Return the sorted `(key, reason)` pairs where the `production` and `warmup` config dicts
-differ, skipping keys in `expected`.
+Return sorted `(key, reason)` pairs where the config dicts differ, skipping `expected` keys.
 """
 function drift(production, warmup, expected)
     issues = Tuple{String, String}[]

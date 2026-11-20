@@ -1,11 +1,7 @@
 """
     OceanWarmup
 
-Precompilation workload that caches the Oceananigans ocean component as a coupled run builds
-and steps it.
-
-Precompile with `CLIMACOMMS_DEVICE=CUDA`, or the image holds CPU code. See
-`experiments/warmup/README.md`.
+Precompilation workload caching the Oceananigans ocean as a coupled run builds and steps it.
 """
 module OceanWarmup
 
@@ -18,13 +14,13 @@ import ClimaComms
 ClimaComms.@import_required_backends
 import YAML
 using CouplerWarmupCommon
-import AtmosWarmupSetup  # layered: its cached code is reused, not re-serialised
+# Layered: reuse the code cached by the warmup packages beneath this one.
+import AtmosWarmupSetup
 using PrecompileTools
 
 include(joinpath(@__DIR__, "..", "..", "warmup_utils.jl"))
 
-# Julia invalidates a package image when its *source* changes, not when data it read during
-# precompilation changes. Register the config so editing it forces a rebuild.
+# Rebuild the image when a config it reads changes, not only when the source does.
 include_dependency(config_path("cmip_warmup.yml"))
 include_dependency(config_path("atmos_warmup.yml"))
 

@@ -15,6 +15,7 @@ import ClimaAtmos.Parameters as CAP
 import ClimaParams as CP
 import ClimaCore as CC
 import ClimaCore.Geometry: ⊗
+import LazyBroadcast: @lazy
 import SurfaceFluxes as SF
 import SurfaceFluxes.Parameters as SFP
 import Thermodynamics as TD
@@ -344,30 +345,32 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:diffuse_fraction
     FT = eltype(sim.integrator.u)
     hasradiation(sim.integrator) || return zero(FT)
 
-    # only take the first level
+    # Gray radiation has no direct beam
     radiation_model = sim.integrator.p.radiation.rrtmgp_solver
-    total_flux_dn = CA.RRTMGP.sw_flux_dn(radiation_model)[1, :]
+    CA.RRTMGP.radiation_method(radiation_model) isa CA.RRTMGP.GrayRadiation &&
+        return zero(FT)
 
     # only take the first level
-    lowest_face_space = CC.Spaces.level(axes(sim.integrator.u.f), CC.Utilities.half)
-
-    is_gray = CA.RRTMGP.radiation_method(radiation_model) isa CA.RRTMGP.GrayRadiation
-
-    if is_gray
-        diffuse_fraction = zero(total_flux_dn)
-    else
-        direct_flux_dn = CA.RRTMGP.sw_direct_flux_dn(radiation_model)[1, :]
-        FT = eltype(total_flux_dn)
-        diffuse_fraction = clamp.(
-            ((x, y) -> y > zero(y) ? x / y : zero(y)).(
-                total_flux_dn .- direct_flux_dn,
-                total_flux_dn,
-            ),
+    face_space = axes(sim.integrator.u.f)
+    total_flux_dn = CC.Fields.level(
+        CC.Fields.array2field(CA.RRTMGP.sw_flux_dn(radiation_model), face_space),
+        CC.Utilities.half,
+    )
+    direct_flux_dn = CC.Fields.level(
+        CC.Fields.array2field(CA.RRTMGP.sw_direct_flux_dn(radiation_model), face_space),
+        CC.Utilities.half,
+    )
+    diffuse_fraction = sim.integrator.p.scratch.ᶠtemp_field_level
+    @. diffuse_fraction = clamp(
+        ifelse(
+            total_flux_dn > zero(FT),
+            (total_flux_dn - direct_flux_dn) / total_flux_dn,
             zero(FT),
-            one(FT),
-        )
-    end
-    return CC.Fields.array2field(diffuse_fraction, lowest_face_space)
+        ),
+        zero(FT),
+        one(FT),
+    )
+    return diffuse_fraction
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =
     sim.precipitation.rain
@@ -452,26 +455,33 @@ function Interfacer.update_field!(sim::ClimaAtmosSimulation, ::Val{:surface_humi
     csf.scalar_temp1 .= TD.q_vap_saturation.(thermo_params, csf.T_sfc, ρ_sfc, 0, 0)
 
     # Remap surface temperature and humidity to atmosphere surface space
-    q_sfc_atmos = Interfacer.remap(atmos_surface_space, csf.scalar_temp1)
-    sim.integrator.p.precomputed.sfc_conditions.q_vap_sfc .= q_sfc_atmos
+    Interfacer.remap!(
+        sim.integrator.p.precomputed.sfc_conditions.q_vap_sfc,
+        csf.scalar_temp1,
+    )
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_int}) =
     CC.Spaces.level(CC.Fields.coordinate_field(sim.integrator.u.c).z, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:height_sfc}) =
     CC.Spaces.level(CC.Fields.coordinate_field(sim.integrator.u.f).z, CC.Utilities.half)
+# These return ClimaAtmos scratch fields, valid until the scratch is next written
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:u_int})
-    # NOTE: This calculation is copied from ClimaAtmos (and is allocating! Fix me if you can!)
+    # NOTE: This calculation is copied from ClimaAtmos
     int_local_geometry_values =
         CC.Fields.level(CC.Fields.local_geometry_field(sim.integrator.u.c), 1)
     int_u_values = CC.Spaces.level(sim.integrator.p.precomputed.ᶜu, 1)
-    return CA.projected_vector_data.(CA.CT1, int_u_values, int_local_geometry_values)
+    u_int = sim.integrator.p.scratch.temp_field_level
+    @. u_int = CA.projected_vector_data(CA.CT1, int_u_values, int_local_geometry_values)
+    return u_int
 end
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:v_int})
-    # NOTE: This calculation is copied from ClimaAtmos (and is allocating! Fix me if you can!)
+    # NOTE: This calculation is copied from ClimaAtmos
     int_local_geometry_values =
         CC.Fields.level(CC.Fields.local_geometry_field(sim.integrator.u.c), 1)
     int_u_values = CC.Spaces.level(sim.integrator.p.precomputed.ᶜu, 1)
-    return CA.projected_vector_data.(CA.CT2, int_u_values, int_local_geometry_values)
+    v_int = sim.integrator.p.scratch.temp_field_level_2
+    @. v_int = CA.projected_vector_data(CA.CT2, int_u_values, int_local_geometry_values)
+    return v_int
 end
 
 # extensions required by the Interfacer
@@ -520,38 +530,38 @@ end
 
 function FluxCalculator.update_turbulent_fluxes!(sim::ClimaAtmosSimulation, fields)
     (; F_lh, F_sh, F_turb_moisture, F_turb_ρτxz, F_turb_ρτyz) = fields
-    atmos_surface_space = get_surface_space(sim)
     temp_field_surface = sim.integrator.p.scratch.ᶠtemp_field_level
 
     Y = sim.integrator.u
     FT = eltype(sim.integrator.p.params)
     surface_local_geometry =
         CC.Fields.level(CC.Fields.local_geometry_field(Y.f), CC.Utilities.half)
-    surface_normal = @. CA.C3(CA.unit_basis_vector_data(CA.C3, surface_local_geometry))
+    surface_normal =
+        @lazy @. CA.C3(CA.unit_basis_vector_data(CA.C3, surface_local_geometry))
 
     # get template objects for the contravariant components of the momentum fluxes (required by Atmos boundary conditions)
-    # NOTE: This is allocating! Fix me if you can!
-    vec_ct12_ct1 = @. CA.CT12(
+    vec_ct12_ct1 = @lazy @. CA.CT12(
         CA.CT1(CA.unit_basis_vector_data(CA.CT1, surface_local_geometry)),
         surface_local_geometry,
     )
-    vec_ct12_ct2 = @. CA.CT12(
+    vec_ct12_ct2 = @lazy @. CA.CT12(
         CA.CT2(CA.unit_basis_vector_data(CA.CT2, surface_local_geometry)),
         surface_local_geometry,
     )
 
-    # NOTE: This is allocating (F_turb_ρτyz_atmos)! If we had 1 more scratch field, we could avoid this
+    # The projection is linear, so the two components are remapped through the
+    # single scratch field one at a time
+    ρ_flux_uₕ = sim.integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ
     Interfacer.remap!(temp_field_surface, F_turb_ρτxz) # F_turb_ρτxz_atmos
-    F_turb_ρτyz_atmos = Interfacer.remap(atmos_surface_space, F_turb_ρτyz) # F_turb_ρτyz_atmos
-    sim.integrator.p.precomputed.sfc_conditions.ρ_flux_uₕ .= (
-        surface_normal .⊗ CA.C12.(
-            temp_field_surface .* vec_ct12_ct1 .+ F_turb_ρτyz_atmos .* vec_ct12_ct2,
-            surface_local_geometry,
-        )
-    )
+    @. ρ_flux_uₕ =
+        surface_normal ⊗ CA.C12(temp_field_surface * vec_ct12_ct1, surface_local_geometry)
+    Interfacer.remap!(temp_field_surface, F_turb_ρτyz) # F_turb_ρτyz_atmos
+    @. ρ_flux_uₕ +=
+        surface_normal ⊗ CA.C12(temp_field_surface * vec_ct12_ct2, surface_local_geometry)
 
     # Remap summed turbulent energy fluxes into the scratch field
-    Interfacer.remap!(temp_field_surface, F_lh .+ F_sh)
+    @. fields.scalar_temp1 = F_lh + F_sh
+    Interfacer.remap!(temp_field_surface, fields.scalar_temp1)
     sim.integrator.p.precomputed.sfc_conditions.ρ_flux_h_tot .=
         temp_field_surface .* surface_normal # (shf + lhf)
 

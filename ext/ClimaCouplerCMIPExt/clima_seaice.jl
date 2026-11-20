@@ -261,6 +261,32 @@ top_thermodynamics(sim::ClimaSeaIceSimulation) =
 Interfacer.get_field(sim::ClimaSeaIceSimulation, ::Val{:surface_temperature}) =
     sim.ice_properties.C_to_K + top_thermodynamics(sim).top_surface_temperature
 
+# Remap through a 2D scratch field instead of materializing the operations
+function Interfacer.get_field!(
+    target_field,
+    sim::ClimaSeaIceSimulation,
+    ::Val{:surface_temperature},
+)
+    T_sfc = sim.remapping.scratch_field_oc1
+    OC.interior(T_sfc, :, :, 1) .=
+        OC.interior(top_thermodynamics(sim).top_surface_temperature, :, :, 1) .+
+        sim.ice_properties.C_to_K
+    Interfacer.remap!(target_field, T_sfc, sim.remapping)
+    return nothing
+end
+function Interfacer.get_field!(
+    target_field,
+    sim::ClimaSeaIceSimulation,
+    ::Val{:internal_temperature},
+)
+    T_i = sim.remapping.scratch_field_oc1
+    OC.interior(T_i, :, :, 1) .=
+        OC.interior(sim.ocean_ice_interface.temperature, :, :, 1) .+
+        sim.ice_properties.C_to_K
+    Interfacer.remap!(target_field, T_i, sim.remapping)
+    return nothing
+end
+
 """
     FluxCalculator.compute_surface_fluxes!(csf, sim::ClimaSeaIceSimulation, atmos_sim, thermo_params)
 
@@ -297,7 +323,7 @@ function _compute_ice_boundary_fluxes!(
     FT = CC.Spaces.undertype(boundary_space)
     surface_fluxes_params = FluxCalculator.get_surface_params(atmos_sim)
 
-    uv_int = StaticArrays.SVector.(csf.u_int, csf.v_int)
+    uv_int = @lazy StaticArrays.SVector.(csf.u_int, csf.v_int)
 
     # Sea ice parameters for `update_T_sfc_cb` (load into boundary-space scratch Fields first
     # to avoid GPU scalar indexing when building the closure)
@@ -339,7 +365,7 @@ function _compute_ice_boundary_fluxes!(
     T_sfc = csf.scalar_temp1
 
     # Surface humidity
-    ρ_sfc = SF.surface_density.(
+    ρ_sfc = @lazy SF.surface_density.(
         surface_fluxes_params,
         csf.T_atmos,
         csf.ρ_atmos,
@@ -353,9 +379,10 @@ function _compute_ice_boundary_fluxes!(
     q_sfc = csf.scalar_temp2
 
     # Roughness and gustiness configuration
-    gustiness = ones(boundary_space)
     roughness_params = FluxCalculator.get_roughness_params(csf, sim)
-    config = SF.SurfaceFluxConfig.(roughness_params, SF.ConstantGustinessSpec.(gustiness))
+    gustiness_spec = SF.ConstantGustinessSpec(FT(1))
+    config = @lazy SF.SurfaceFluxConfig.(roughness_params, gustiness_spec)
+    uv_sfc = @lazy @. (uv_int * FT(0))
 
     fluxes = FluxCalculator.get_surface_fluxes.(
         surface_fluxes_params,
@@ -366,7 +393,7 @@ function _compute_ice_boundary_fluxes!(
         csf.q_ice_atmos,
         csf.ρ_atmos,
         csf.height_int,
-        uv_int .* FT(0),
+        uv_sfc,
         T_sfc,
         q_sfc,
         csf.height_sfc,

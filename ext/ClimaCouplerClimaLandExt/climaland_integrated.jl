@@ -301,7 +301,8 @@ function Interfacer.update_field!(
 )
     # Arbitrarily take parameters from the soil (they are the same for all land sub-components)
     ρ_liq = (LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set))
-    Interfacer.remap!(sim.integrator.p.drivers.P_liq, field ./ ρ_liq)
+    Interfacer.remap!(sim.integrator.p.drivers.P_liq, field)
+    sim.integrator.p.drivers.P_liq ./= ρ_liq
 end
 function Interfacer.update_field!(
     sim::ClimaLandSimulation,
@@ -310,7 +311,8 @@ function Interfacer.update_field!(
 )
     # Arbitrarily take parameters from the soil (they are the same for all land sub-components)
     ρ_liq = (LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set))
-    Interfacer.remap!(sim.integrator.p.drivers.P_snow, field ./ ρ_liq)
+    Interfacer.remap!(sim.integrator.p.drivers.P_snow, field)
+    sim.integrator.p.drivers.P_snow ./= ρ_liq
 end
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:LW_d}, field)
     Interfacer.remap!(sim.integrator.p.drivers.LW_d, field)
@@ -468,17 +470,15 @@ function FluxCalculator.compute_surface_fluxes!(
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     # Combine turbulent energy fluxes from each component of the land model
-    # Use temporary variables to avoid allocating
-    Interfacer.remap!(
-        csf.scalar_temp1,
+    # Combine in the land surface scratch field, then remap, to avoid allocating
+    p.scratch1 .=
         canopy_dest.lhf .+ soil_dest.lhf .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.lhf,
-    )
-    Interfacer.remap!(
-        csf.scalar_temp2,
+        p.snow.snow_cover_fraction .* snow_dest.lhf
+    Interfacer.remap!(csf.scalar_temp1, p.scratch1)
+    p.scratch1 .=
         canopy_dest.shf .+ soil_dest.shf .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.shf,
-    )
+        p.snow.snow_cover_fraction .* snow_dest.shf
+    Interfacer.remap!(csf.scalar_temp2, p.scratch1)
 
     # Zero out the fluxes where the area fraction is zero
     @. csf.scalar_temp1 =
@@ -493,15 +493,14 @@ function FluxCalculator.compute_surface_fluxes!(
     # Combine turbulent moisture fluxes from each component of the land model
     # Note that we multiply by ρ_liq to convert from m s-1 to kg m-2 s-1
     ρ_liq = (LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set))
-    Interfacer.remap!(
-        csf.scalar_temp1,
+    p.scratch1 .=
         (
             canopy_dest.vapor_flux .+
             (soil_dest.vapor_flux_liq .+ soil_dest.vapor_flux_ice) .*
             (1 .- p.snow.snow_cover_fraction) .+
             p.snow.snow_cover_fraction .* snow_dest.vapor_flux
-        ) .* ρ_liq,
-    )
+        ) .* ρ_liq
+    Interfacer.remap!(csf.scalar_temp1, p.scratch1)
     @. csf.scalar_temp1 =
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
     @. csf.F_turb_moisture += csf.scalar_temp1 * area_fraction
@@ -509,20 +508,18 @@ function FluxCalculator.compute_surface_fluxes!(
     # Combine turbulent momentum fluxes from each component of the land model
     # Note that we exclude the canopy component here for now, since we can have nonzero momentum fluxes
     #  where there is zero LAI. This should be fixed in ClimaLand.
-    Interfacer.remap!(
-        csf.scalar_temp1,
+    p.scratch1 .=
         soil_dest.ρτxz .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.ρτxz,
-    )
+        p.snow.snow_cover_fraction .* snow_dest.ρτxz
+    Interfacer.remap!(csf.scalar_temp1, p.scratch1)
     @. csf.scalar_temp1 =
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
     @. csf.F_turb_ρτxz += csf.scalar_temp1 * area_fraction
 
-    Interfacer.remap!(
-        csf.scalar_temp1,
+    p.scratch1 .=
         soil_dest.ρτyz .* (1 .- p.snow.snow_cover_fraction) .+
-        p.snow.snow_cover_fraction .* snow_dest.ρτyz,
-    )
+        p.snow.snow_cover_fraction .* snow_dest.ρτyz
+    Interfacer.remap!(csf.scalar_temp1, p.scratch1)
     @. csf.scalar_temp1 =
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
     @. csf.F_turb_ρτyz += csf.scalar_temp1 * area_fraction

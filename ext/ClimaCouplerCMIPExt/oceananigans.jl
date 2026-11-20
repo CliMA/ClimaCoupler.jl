@@ -557,8 +557,10 @@ function FieldExchanger.align_surface_fractions!(
     cs.fields.ice_area_fraction .= ice_fraction
     cs.fields.ocean_area_fraction .= ocean_fraction
 
-    @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
-    @assert maximum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
+    fraction_sum = cs.fields.scalar_temp4
+    @. fraction_sum = ice_fraction + land_fraction + ocean_fraction
+    @assert minimum(fraction_sum) ≈ FT(1)
+    @assert maximum(fraction_sum) ≈ FT(1)
     return true
 end
 
@@ -624,6 +626,20 @@ FieldExchanger.accumulated_coupler_fields(::OceananigansSimulation) =
 # NOTE: This is 3D, but it will be remapped to 2D
 Interfacer.get_field(sim::OceananigansSimulation, ::Val{:surface_temperature}) =
     sim.ocean.model.tracers.T + sim.ocean_properties.C_to_K # convert from Celsius to Kelvin
+
+# Remap the top level through a 2D scratch field instead of materializing the 3D operation
+function Interfacer.get_field!(
+    target_field,
+    sim::OceananigansSimulation,
+    ::Val{:surface_temperature},
+)
+    Nz = size(sim.ocean.model.grid, 3)
+    T_sfc = sim.remapping.scratch_field_oc1
+    OC.interior(T_sfc, :, :, 1) .=
+        OC.interior(sim.ocean.model.tracers.T, :, :, Nz) .+ sim.ocean_properties.C_to_K
+    Interfacer.remap!(target_field, T_sfc, sim.remapping)
+    return nothing
+end
 
 """
     FluxCalculator.update_turbulent_fluxes!(sim::OceananigansSimulation, fields)
@@ -716,13 +732,13 @@ function _update_turbulent_fluxes_boundary!(sim::OceananigansSimulation, fields)
     # Add the part of the salinity flux that comes from the moisture flux, we also need to
     # add the component due to precipitation (that was done with the radiative fluxes)
     Interfacer.remap!(sim.remapping.scratch_field_oc1, F_turb_moisture, sim.remapping) # moisture flux
-    moisture_fresh_water_flux =
-        OC.interior(sim.remapping.scratch_field_oc1, :, :, 1) ./ reference_density
+    remapped_F_moisture = OC.interior(sim.remapping.scratch_field_oc1, :, :, 1)
 
     oc_flux_S = surface_flux(sim.ocean.model.tracers.S)
     surface_salinity = OC.interior(sim.ocean.model.tracers.S, :, :, grid.Nz)
     OC.interior(oc_flux_S, :, :, 1) .-=
-        (1.0 .- ice_concentration) .* surface_salinity .* moisture_fresh_water_flux
+        (1.0 .- ice_concentration) .* surface_salinity .* remapped_F_moisture ./
+        reference_density
     return nothing
 end
 
@@ -974,11 +990,10 @@ function FieldExchanger.update_sim!(sim::OceananigansSimulation, csf)
     remapped_P_snow = OC.interior(sim.remapping.scratch_field_oc2, :, :, 1)
 
     # Rain drains through ice while snow can accumulate there (see the sea-ice `update_sim!`)
-    ocean_precipitation = remapped_P_liq .+ (1.0 .- ice_concentration) .* remapped_P_snow
-
     # Note the negative sign here to account for the sign change from precipitation to salinity flux
     OC.interior(oc_flux_S, :, :, 1) .-=
-        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .* ocean_precipitation ./
+        OC.interior(sim.ocean.model.tracers.S, :, :, Nz) .*
+        (remapped_P_liq .+ (1.0 .- ice_concentration) .* remapped_P_snow) ./
         reference_density
     return nothing
 end

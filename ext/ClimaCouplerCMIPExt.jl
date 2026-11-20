@@ -31,6 +31,7 @@ import ClimaAtmos as CA # for basis conversions (projected_vector_data)
 import ClimaCore as CC
 import ClimaParams as CP
 using KernelAbstractions: @kernel, @index, @inbounds
+import LazyBroadcast: @lazy
 
 import Adapt # for ConservativeRegridding
 import ClimaCore as CC # for ConservativeRegriddingClimaCoreExt

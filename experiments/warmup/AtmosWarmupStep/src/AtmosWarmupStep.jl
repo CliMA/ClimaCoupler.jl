@@ -1,15 +1,14 @@
 """
     AtmosWarmupStep
 
-Caches the remaining first-step path: the implicit solve, Jacobian, and timestepper.
+Precompilation workload that caches the rest of the first atmosphere step: the implicit
+solve, Jacobian and timestepper.
 
-Part of the layered atmosphere precompilation workloads in `experiments/warmup`. The
-dependency edges between these packages mirror ClimaAtmos's call graph and are *required*:
-without them each package re-caches the code it calls, and the resulting package image
-exceeds the ~2 GiB limit imposed by 32-bit ELF relocations (see `experiments/warmup/README.md`).
+Depends on `AtmosWarmupSetup` and `AtmosWarmupExplicit`, so it reuses their images rather
+than caching that code again.
 
-`CLIMACOMMS_DEVICE=CUDA` must be set when precompiling, or the cached specializations are
-for CPU-backed fields and a GPU run gains nothing.
+Precompile with `CLIMACOMMS_DEVICE=CUDA`, or the image holds CPU code. See
+`experiments/warmup/README.md`.
 """
 module AtmosWarmupStep
 

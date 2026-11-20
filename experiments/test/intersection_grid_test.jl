@@ -539,6 +539,9 @@ import ClimaCoupler: FieldExchanger, FluxCalculator, Utilities
         @test all(fs.F_moisture .== reference.F_turb_moisture)
         @test all(fs.F_τu .== reference.F_turb_ρτxz)
         @test all(fs.F_τv .== reference.F_turb_ρτyz)
+        @test all(fs.T_2m .== reference.T_2m)
+        # The screen-level temperature lies between the ocean surface and the air
+        @test state.T_atmos < reference.T_2m < state.T_sfc
 
         # Physical sanity: warm ocean under cool air gives upward heat and
         # moisture fluxes; westerly wind gives negative (downward eastward
@@ -565,6 +568,7 @@ import ClimaCoupler: FieldExchanger, FluxCalculator, Utilities
                 F_sh = CC.Fields.zeros(boundary_space),
                 F_lh = CC.Fields.zeros(boundary_space),
                 F_turb_moisture = CC.Fields.zeros(boundary_space),
+                T_2m = CC.Fields.zeros(boundary_space),
             )
             flux_dss_buffer = Utilities.init_dss_buffer(flux_scratch.F_sh)
             node_cov_dss = CC.Fields.zeros(boundary_space)
@@ -626,10 +630,13 @@ end
     thermo_params = TDP.ThermodynamicsParameters(FT)
     surface_fluxes_params =
         SF.Parameters.SurfaceFluxesParameters(FT, SF.UniversalFunctions.BusingerParams)
+    z0 = FT(5.8e-5)
     config = SF.SurfaceFluxConfig(
-        SF.ConstantRoughnessParams(FT(5.8e-5), FT(5.8e-5)),
+        SF.ConstantRoughnessParams(z0, z0),
         SF.ConstantGustinessSpec(FT(1)),
     )
+    grav = SF.Parameters.grav(surface_fluxes_params)
+    cp_d = TDP.cp_d(thermo_params)
     σ = FT(5.67e-8)
     ϵ = FT(1)
     α_albedo = FT(0.7)
@@ -682,6 +689,12 @@ end
             @test is.T_sfc_new[k] <= T_melt + sqrt(eps(FT))
             @test FT(200) < is.T_sfc_new[k] < FT(280)
             @test isfinite(fs.F_sh[k]) && isfinite(fs.F_lh[k])
+            # The dry static energy at the screen level, 2 m above the roughness
+            # length, lies between the surface and air values
+            s_sfc = cp_d * is.T_sfc_new[k]
+            s_air = cp_d * fs.T_atmos[k] + grav * fs.height_int[k]
+            s_2m = cp_d * fs.T_2m[k] + grav * (z0 + FluxCalculator.SCREEN_HEIGHT)
+            @test min(s_sfc, s_air) < s_2m < max(s_sfc, s_air)
             @test fs.F_τu[k] < 0 # westerly wind drag
         end
     end
@@ -700,6 +713,7 @@ end
             F_sh = CC.Fields.zeros(boundary_space),
             F_lh = CC.Fields.zeros(boundary_space),
             F_turb_moisture = CC.Fields.zeros(boundary_space),
+            T_2m = CC.Fields.zeros(boundary_space),
         )
         flux_dss_buffer = Utilities.init_dss_buffer(flux_scratch.F_sh)
         weight_cov_scratch = CC.Fields.zeros(boundary_space)
@@ -742,7 +756,7 @@ end
     rng = Random.Xoshiro(11)
 
     fs = CMIPExt.ExchangeFluxState{FT}(OC.CPU(), eg.n_poly)
-    for f in (fs.F_sh, fs.F_lh, fs.F_moisture, fs.F_τu, fs.F_τv)
+    for f in (fs.F_sh, fs.F_lh, fs.F_moisture, fs.F_τu, fs.F_τv, fs.T_2m)
         f .= 100 .+ 50 .* (2 .* rand(rng, FT, eg.n_poly) .- 1)
     end
     # Ice-free, partly and fully ice-covered polygons.
@@ -755,6 +769,7 @@ end
         F_sh = CC.Fields.zeros(boundary_space),
         F_lh = CC.Fields.zeros(boundary_space),
         F_turb_moisture = CC.Fields.zeros(boundary_space),
+        T_2m = CC.Fields.zeros(boundary_space),
     )
     remapping = (;
         flux_scratch,
@@ -772,8 +787,12 @@ end
         α = to_cpu(CRExt.se_field_to_vec(remapping.weight_cov_scratch))
         @test all(a -> 0 <= a <= 1 + 1e-8, α)
 
-        for (name, F_poly) in
-            ((:F_sh, fs.F_sh), (:F_lh, fs.F_lh), (:F_turb_moisture, fs.F_moisture))
+        for (name, F_poly) in (
+            (:F_sh, fs.F_sh),
+            (:F_lh, fs.F_lh),
+            (:F_turb_moisture, fs.F_moisture),
+            (:T_2m, fs.T_2m),
+        )
             F = to_cpu(CRExt.se_field_to_vec(getproperty(flux_scratch, name)))
             @test sum(WJ .* α .* F) ≈ sum(eg.b_area .* weight .* F_poly) rtol = 1e-10
             @test sum(WJ .* α .* F) ≈ sum(eg.area .* weight .* F_poly) rtol = 1e-3
@@ -827,6 +846,7 @@ end
         F_sh = CC.Fields.zeros(boundary_space),
         F_lh = CC.Fields.zeros(boundary_space),
         F_turb_moisture = CC.Fields.zeros(boundary_space),
+        T_2m = CC.Fields.zeros(boundary_space),
     )
     remapping = (;
         flux_scratch,

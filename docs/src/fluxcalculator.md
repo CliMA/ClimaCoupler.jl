@@ -34,6 +34,8 @@ fluxes and the CoupledSimulation object's fluxes fields.
 - the flux of energy due to latent heat, `F_lh`;
 - the flux of energy due to sensible heat, `F_sh`;
 - the flux of moisture, `F_turb_moisture`;
+- the screen-level (2 m) air temperature, `T_2m`, reconstructed from the
+  Monin-Obukhov profiles of the flux solve, which the atmosphere outputs as `tas`;
 
 !!! note
 

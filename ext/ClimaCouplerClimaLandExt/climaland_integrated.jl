@@ -437,13 +437,15 @@ computed in the land model's internal `step!` function, where they can be solved
 at the same time as canopy temperature. As a result, this function does not actually compute
 the fluxes, and some inputs are unused. However, it does access them from the land cache, combine
 them to get the total fluxes for the integrated land model, and update the coupler fields in-place.
+It also adds the land's screen-level (2 m) air temperature, which ClimaLand reconstructs from the
+flux solves of its components, to the area-weighted `T_2m`.
 
 Because the integrated land model is composed of multiple sub-components, the
 fluxes are computed for each sub-component and then combined here to get the total for this model.
 The land model cache contains the computed fluxes for each sub-component.
 
 # Arguments
-- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
+- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`, and the screen-level air temperature `T_2m`.
 - `sim`: [ClimaLandSimulation] the integrated land simulation to compute fluxes for.
 - `atmos_sim`: [Interfacer.AbstractAtmosSimulation] the atmosphere simulation to compute fluxes with.
 - `thermo_params`: [ClimaParams.ThermodynamicParameters] the thermodynamic parameters for the simulation.
@@ -526,6 +528,23 @@ function FluxCalculator.compute_surface_fluxes!(
     @. csf.scalar_temp1 =
         ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1)
     @. csf.F_turb_ρτyz += csf.scalar_temp1 * area_fraction
+
+    # Screen-level (2 m) air temperature of the land, the `t2m` diagnostic of
+    # ClimaLand: the mean over soil, snow, and canopy of the temperatures
+    # reconstructed from their flux solves. Allocates the land-space result.
+    Interfacer.remap!(
+        csf.scalar_temp1,
+        CL.Diagnostics.compute_t2m!(
+            nothing,
+            sim.integrator.u,
+            p,
+            sim.integrator.t,
+            sim.model,
+        ),
+    )
+    # The temperature may be NaN where there is no land
+    @. csf.T_2m +=
+        ifelse(area_fraction == 0, zero(csf.scalar_temp1), csf.scalar_temp1 * area_fraction)
 
     return nothing
 end

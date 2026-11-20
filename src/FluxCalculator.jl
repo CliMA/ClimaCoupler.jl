@@ -39,7 +39,8 @@ end
     turbulent_fluxes!(fields, model_sims, thermo_params, flux_accumulators = (;))
 
 Compute turbulent fluxes and associated quantities. Store the results in `fields` as
-area-weighted sums.
+area-weighted sums. The screen-level (2 m) air temperature `T_2m` of each surface,
+reconstructed from its flux solve, is combined the same way.
 
 This function uses `SurfaceFluxes.jl` under the hood.
 
@@ -64,7 +65,7 @@ function turbulent_fluxes!(csf, model_sims, thermo_params, flux_accumulators = (
 
     # Reset the coupler fields will compute. We need to do this because we will compute
     # area-weighted averages
-    for p in (:F_turb_ρτxz, :F_turb_ρτyz, :F_lh, :F_sh, :F_turb_moisture)
+    for p in (:F_turb_ρτxz, :F_turb_ρτyz, :F_lh, :F_sh, :F_turb_moisture, :T_2m)
         fill!(getproperty(csf, p), 0)
     end
 
@@ -255,7 +256,10 @@ end
                        update_T_sfc_cb, update_q_vap_sfc;
                        roughness_inputs, scheme, solver_opts, flux_specs)
 
-Uses SurfaceFluxes.jl to calculate turbulent surface fluxes.
+Uses SurfaceFluxes.jl to calculate turbulent surface fluxes, and the screen-level air
+temperature `T_2m` [K], `SCREEN_HEIGHT` (2 m) above the apparent sink for heat,
+reconstructed from the Monin-Obukhov profiles of the same solve with
+`SurfaceFluxes.screen_level_values`.
 Fluxes are computed over the entire surface, even where the relevant surface model is not present.
 
 `update_T_sfc_cb` and `update_q_vap_sfc` are positional so they participate in
@@ -284,11 +288,11 @@ function get_surface_fluxes(
     solver_opts = nothing,
     flux_specs = nothing,
 )
+    FT = eltype(surface_fluxes_params)
     Φ_sfc = SFP.grav(surface_fluxes_params) * h_sfc
     Δz = h_int - h_sfc
 
-    outputs = SF.surface_fluxes(
-        surface_fluxes_params,
+    inputs = SF.build_surface_flux_inputs(
         T_int,
         q_tot_int,
         q_liq_int,
@@ -301,13 +305,20 @@ function get_surface_fluxes(
         d,
         u_int,
         u_sfc,
-        roughness_inputs,
         config,
-        scheme,
-        solver_opts,
-        flux_specs,
+        roughness_inputs,
+        isnothing(flux_specs) ? SF.FluxSpecs{FT}() : flux_specs,
         update_T_sfc_cb,
         update_q_vap_sfc,
+    )
+    outputs = SF.surface_fluxes(surface_fluxes_params, inputs, scheme, solver_opts)
+    screen_level = SF.screen_level_values(
+        surface_fluxes_params,
+        outputs,
+        inputs,
+        SCREEN_HEIGHT,
+        ANEMOMETER_HEIGHT,
+        scheme,
     )
 
     (; shf, lhf, evaporation, ρτxz, ρτyz, T_sfc, q_vap_sfc) = outputs
@@ -319,8 +330,26 @@ function get_surface_fluxes(
         F_lh = lhf,
         F_turb_moisture = evaporation,
         T_sfc_new = T_sfc,
+        T_2m = screen_level.T,
     )
 end
+
+"""
+    SCREEN_HEIGHT
+
+Height [m] of the screen level, the WMO standard height of near-surface air
+temperature measurements, above the apparent sink for heat.
+"""
+const SCREEN_HEIGHT = 2
+
+"""
+    ANEMOMETER_HEIGHT
+
+Height [m] of the WMO standard anemometer above the apparent sink for momentum.
+Only passed through to `SurfaceFluxes.screen_level_values`, which also
+reconstructs the wind speed.
+"""
+const ANEMOMETER_HEIGHT = 10
 
 """
     get_surface_params(atmos_sim::Interfacer.AbstractAtmosSimulation)
@@ -470,7 +499,8 @@ end
 
 Update the surface simulation `sim` with the values stored in `fluxes`,
 without any area-weighting. Then, update the coupler fields `csf` with
-the area-weighted fluxes.
+the area-weighted fluxes and screen-level air temperature `T_2m`. The surface
+does not receive `T_2m`, a diagnostic of the atmosphere.
 
 If `accumulator` is a `FluxAccumulator` (i.e. `sim` is a slow surface), the
 per-surface fluxes are added to the accumulator instead of being pushed
@@ -480,9 +510,10 @@ coupling step) is updated unconditionally.
 
 # Arguments
 - `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields:
-    `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
+    `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`, and `T_2m`.
 - `sim`: [Interfacer.AbstractComponentSimulation] the surface simulation to update.
-- `fluxes`: [NamedTuple] containing the fluxes to update the surface simulation with.
+- `fluxes`: [NamedTuple] containing the fluxes to update the surface simulation with,
+    and the screen-level air temperature `T_2m`.
 - `accumulator`: optional `FluxAccumulator` for slow surfaces; `nothing` (default)
     updates the surface immediately.
 """
@@ -492,7 +523,7 @@ function update_flux_fields!(
     fluxes,
     accumulator = nothing,
 )
-    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture) = fluxes
+    (; F_turb_ρτxz, F_turb_ρτyz, F_sh, F_lh, F_turb_moisture, T_2m) = fluxes
     area_fraction = Interfacer.get_field(sim, Val(:area_fraction))
 
     # Zero out fluxes where the area fraction is zero
@@ -521,6 +552,8 @@ function update_flux_fields!(
     @. csf.F_lh += F_lh * area_fraction
     @. csf.F_sh += F_sh * area_fraction
     @. csf.F_turb_moisture += F_turb_moisture * area_fraction
+    # The screen-level temperature may be NaN where the area fraction is zero
+    @. csf.T_2m += ifelse(area_fraction ≈ 0, zero(T_2m), T_2m * area_fraction)
 
     return nothing
 end

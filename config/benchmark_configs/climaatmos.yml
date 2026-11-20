@@ -10,7 +10,7 @@ h_elem: 30
 implicit_diffusion: true
 insolation: "timevarying"
 output_default_diagnostics: false
-prescribed_aerosols: ["CB1", "CB2", "DST01", "DST02", "DST03", "DST04", "DST05", "OC1", "OC2", "SO4", "SSLT01", "SSLT02", "SSLT03", "SSLT04", "SSLT05"]
+prescribed_aerosols: ["CB", "DST", "OC", "SO4", "SSLT"]
 rad: allskywithclear
 surface_setup: DefaultMoninObukhov
 t_end: 12hours

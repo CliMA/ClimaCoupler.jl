@@ -42,6 +42,10 @@ Image sizes at production resolution: 1260 / 1205 / 925 / 1240 / 1332 / 108 / 15
 `SeaIceWarmup` is small because `OceanWarmup` is beneath it and it caches only the
 incremental sea-ice code.
 
+The config loading, `WARMUP_H_ELEM` override and `workload_report.txt` writer every package
+uses live in `warmup_utils.jl`, which each package `include`s. It is a file, not a package,
+so sharing it adds no edge to the graph above.
+
 ## The dependency edges are required, not an optimisation
 
 A package image cannot exceed ~2 GiB. Above that, code in the image references the

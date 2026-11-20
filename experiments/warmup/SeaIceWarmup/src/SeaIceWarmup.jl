@@ -26,57 +26,12 @@ import AtmosWarmupSetup  # layered: its cached code is reused, not re-serialised
 import OceanWarmup  # layered: its cached code is reused, not re-serialised
 using PrecompileTools
 
-const WARMUP_DIR = normpath(joinpath(@__DIR__, "..", ".."))
-const REPO_DIR = normpath(joinpath(WARMUP_DIR, "..", ".."))
-const CONFIG = joinpath(WARMUP_DIR, "configs", "cmip_warmup.yml")
-include_dependency(CONFIG)
-include_dependency(joinpath(WARMUP_DIR, "configs", "atmos_warmup.yml"))
+include(joinpath(@__DIR__, "..", "..", "warmup_utils.jl"))
 
-const REPORT = joinpath(@__DIR__, "..", "workload_report.txt")
-
-"""
-    small_gpu_atmos_config(path, outdir)
-
-Path to the atmosphere config, with `h_elem` reduced when `WARMUP_H_ELEM` is set.
-
-The coupled workloads hold the atmosphere, ocean and sea ice on the device at once, which
-at production resolution exceeds a 15 GB card. Lowering `h_elem` cuts that cost without
-costing cache validity, because horizontal resolution is *not* part of the type: a field's
-data layout is `ClimaCore.DataLayouts.VIJFH{S, Nv, Nij, Nij, ...}`, which carries the
-vertical level count and the quadrature size but not the number of elements. Measured
-against an image built at `h_elem = 16`, `ClimaAtmos.get_simulation` at `h_elem = 8`
-compiled 0.2 s -- the same as at 16.
-
-`z_elem` is the opposite and must never be lowered for this purpose: it is the `Nv` type
-parameter above, and against the same image `get_simulation` compiled 0.2 s at 79 but
-250.6 s at 78 and 243.8 s at 63. One level of difference costs the whole cache.
-
-The value is recorded in `workload_report.txt`.
-"""
-function small_gpu_atmos_config(path, outdir)
-    h_elem = get(ENV, "WARMUP_H_ELEM", "")
-    isempty(h_elem) && return path
-    cfg = YAML.load_file(path)
-    cfg["h_elem"] = parse(Int, h_elem)
-    out = joinpath(outdir, "atmos_warmup_h$(h_elem).yml")
-    YAML.write_file(out, cfg)
-    return out
-end
-
-"Load the warmup config with repository-relative paths resolved and output redirected."
-function warmup_config(outdir)
-    cfg = YAML.load_file(CONFIG)
-    cfg["coupler_output_dir"] = outdir
-    cfg["job_id"] = "warmup"
-    for key in ("atmos_config_file",)
-        v = get(cfg, key, nothing)
-        v isa AbstractString && !isabspath(v) && (cfg[key] = joinpath(REPO_DIR, v))
-    end
-    cfg["atmos_config_file"] = small_gpu_atmos_config(cfg["atmos_config_file"], outdir)
-    tmp = joinpath(outdir, "cmip_warmup_resolved.yml")
-    YAML.write_file(tmp, cfg)
-    return Input.get_coupler_config_dict(tmp)
-end
+# Julia invalidates a package image when its *source* changes, not when data it read during
+# precompilation changes. Register the config so editing it forces a rebuild.
+include_dependency(config_path("cmip_warmup.yml"))
+include_dependency(config_path("atmos_warmup.yml"))
 
 @setup_workload begin
     @compile_workload begin
@@ -132,16 +87,11 @@ end
         catch err
             status = "FAILED: " * first(sprint(showerror, err), 300)
         end
-        try
-            open(REPORT, "w") do io
-                println(io, "status = ", status)
-                ho = get(ENV, "WARMUP_H_ELEM", "")
-                isempty(ho) ||
-                    println(io, "h_elem override = ", ho, " (type-neutral; see README)")
-                println(io, "device = ", get(ENV, "CLIMACOMMS_DEVICE", "(unset)"))
-            end
-        catch
-        end
+        write_report(
+            joinpath(@__DIR__, "..", "workload_report.txt"),
+            status;
+            h_elem_override = get(ENV, "WARMUP_H_ELEM", ""),
+        )
     end
 end
 

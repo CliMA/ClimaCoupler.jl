@@ -1,22 +1,11 @@
-# Verify the warmup configs still describe the production configuration.
+# Check that the warmup configs still match the production configs.
 #
 #     julia --project=experiments/warmup experiments/warmup/check_config_drift.jl
 #
-# A warmup image is only useful if the workload builds the same types a production run
-# builds. Several model selections are type parameters -- the gravity-wave model is a type
-# parameter of `AtmosModel`, for instance -- so a config that drifts from production yields
-# an image the run cannot use. That failure is silent: the run simply recompiles, which
-# looks exactly like "precompilation didn't help".
-#
-# This happened. Production switched `orographic_gravity_wave` from `raw_topo` to
-# `raw_topo_online` on 2026-10-02 and the warmup config kept the old value for a month.
-#
-# `CouplerWarmupCommon.check_matches_coupled` guards the other half of the problem -- that
-# the component workloads build what the *coupler* builds. Nothing guarded drift against
-# the production config itself, which is what this script does.
-#
-# Exits non-zero on any difference that is not an explicitly recorded deviation, including
-# keys added upstream that the warmup config has not picked up.
+# Several model selections are type parameters (the gravity-wave model of `AtmosModel`, for
+# instance), so a drifted config yields an image a production run cannot use, and the run
+# silently recompiles. Exits non-zero on any difference not recorded in `ATMOS_EXPECTED` or
+# `CMIP_EXPECTED`, including keys added upstream.
 
 using YAML
 
@@ -54,7 +43,12 @@ const CMIP_EXPECTED = Dict(
     "extra_atmos_diagnostics" => "periods shortened so the schedule fires",
 )
 
-"Differences between a production config and its warmup counterpart, excluding `expected`."
+"""
+    drift(production, warmup, expected)
+
+Return the sorted `(key, reason)` pairs where the `production` and `warmup` config dicts
+differ, skipping keys in `expected`.
+"""
 function drift(production, warmup, expected)
     issues = Tuple{String, String}[]
     for key in union(keys(production), keys(warmup))

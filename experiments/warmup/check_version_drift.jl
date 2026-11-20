@@ -1,18 +1,11 @@
-# Verify the warmup environment resolves to the same package versions as experiments/CMIP.
+# Check that the warmup environment resolves to the same package versions as
+# experiments/CMIP.
 #
 #     julia --project=experiments/warmup experiments/warmup/check_version_drift.jl
 #
-# A cached specialization is keyed on the package versions it was built from. If this
-# environment resolves ClimaCore 1.0.8 while a run resolves 1.0.5, the images are simply
-# not applicable and the run recompiles -- the same silent failure that
-# `check_config_drift.jl` guards for model selections.
-#
-# This is not hypothetical: a fresh resolve under Julia 1.13 floated to ClimaCore 1.0.8,
-# ClimaAtmos 0.42.18 and ClimaLand 1.15.0 against CMIP's 1.0.5 / 0.42.17 / 1.14.1. The
-# manifest here is therefore seeded from CMIP's and only the warmup-only extras are
-# resolved on top; this script checks that the seeding has not since come apart.
-#
-# Exits non-zero if any package present in both manifests resolves to a different version.
+# Images are tied to the package versions they were built with, so a run against different
+# versions silently recompiles. Exits non-zero if any package in both manifests differs and
+# is not in `ALLOWED`, or if either environment is below a version in `FLOORS`.
 
 using TOML
 
@@ -25,15 +18,19 @@ const MANIFEST = "Manifest-v$(VERSION.major).$(VERSION.minor).toml"
 const ALLOWED = Dict(
     "PrecompileTools" =>
         "a build-time tool that does not appear in the cached code, so the two " *
-        "environments may differ by patch or minor version. Both must be >= 1.3 on " *
-        "Julia >= 1.12: 1.2 caches no externally-owned code there (measured, same " *
-        "workload: 0.02 MiB against 143.55 MiB).",
+        "environments may differ. Both must be >= 1.3 on Julia >= 1.12, where 1.2 " *
+        "caches no externally-owned code.",
 )
 
-"Versions below which a package is known not to work, regardless of what the manifests say."
+"Minimum version of each listed package, checked in both environments."
 const FLOORS = Dict("PrecompileTools" => (VERSION >= v"1.12" ? v"1.3" : v"0"))
 
-"Map package name => version string for every versioned entry in a manifest."
+"""
+    versions(path)
+
+Return a `Dict` mapping package name to version string for every versioned entry in the
+manifest at `path`.
+"""
 function versions(path)
     deps = get(TOML.parsefile(path), "deps", Dict{String, Any}())
     out = Dict{String, String}()
@@ -66,8 +63,7 @@ for (name, runv, warmv) in differing
     println("    ", ALLOWED[name])
 end
 
-# An allowed *difference* is not a licence to be below a known-broken floor, in either
-# environment. This is what would have caught the PrecompileTools problem immediately.
+# An allowed difference does not exempt either environment from the floor.
 for (name, floor) in FLOORS,
     (env, vs) in (("experiments/CMIP", run_versions), ("warmup", warm_versions))
 

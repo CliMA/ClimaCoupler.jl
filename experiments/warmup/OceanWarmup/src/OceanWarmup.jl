@@ -1,14 +1,11 @@
 """
     OceanWarmup
 
-Caches the Oceananigans ocean component as a coupled run constructs it.
+Precompilation workload that caches the Oceananigans ocean component as a coupled run builds
+and steps it.
 
-Part of the layered precompilation workloads in `experiments/warmup`. The dependency edges
-mirror the call graph and are required, not an optimisation: without them a package
-re-caches the code it calls and its image exceeds the ~2 GiB limit imposed by 32-bit ELF
-relocations. See `experiments/warmup/README.md`.
-
-`CLIMACOMMS_DEVICE=CUDA` must be set when precompiling.
+Precompile with `CLIMACOMMS_DEVICE=CUDA`, or the image holds CPU code. See
+`experiments/warmup/README.md`.
 """
 module OceanWarmup
 

@@ -155,3 +155,8 @@ A failure low in the table makes every package above it cache that code itself, 
 push them over the size limit too. Fix the lowest failing package first. Then delete the
 affected images, because Pkg considers an image from a failed workload up to date and will
 not rebuild it on its own, and build again.
+
+## Measurements
+
+The timings, image sizes and limits behind these rules are collected in
+[`precompile_info.md`](precompile_info.md).

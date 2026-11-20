@@ -1,19 +1,12 @@
 """
     PhaseProbe
 
-Phase-resolved accounting of a Julia program's startup, splitting wall time into
+Phase-resolved timing of a Julia program's startup. Each phase records wall time, exact
+Julia compile time (`Base.cumulative_compile_time_ns`) and, when sampled, a split of wall
+time into GPU compile, inference, host codegen, GC, I/O and execution.
 
-  * Julia inference         (type inference, `Core.Compiler`)
-  * Julia codegen           (LLVM lowering/optimisation of host code)
-  * GPU compile             (GPUCompiler + ptxas/nvlink, incl. the inference it drives)
-  * GC
-  * I/O                     (NetCDF/HDF5/Downloads/filesystem)
-  * execute                 (everything else: real work)
-
-Julia-side compile time is measured exactly with `Base.cumulative_compile_time_ns`.
-The breakdown within a phase comes from the sampling profiler with C frames
-enabled, which is the only mechanism that sees *both* Julia codegen and GPU
-kernel compilation (SnoopCompile sees inference only).
+The split uses the sampling profiler with C frames, which sees both host codegen and GPU
+kernel compilation; SnoopCompile sees inference only.
 """
 module PhaseProbe
 
@@ -45,7 +38,7 @@ function dump_phase(name)
     end
 end
 
-"Frame-name / file-path patterns, in precedence order. First match wins."
+"Category => frame-name and file-path patterns, in precedence order; the first match wins."
 const RULES = [
     :gpu_compile => (
         paths = [
@@ -98,7 +91,12 @@ const RULES = [
 
 _matches(s, pats) = any(p -> occursin(p, s), pats)
 
-"Classify one stack (vector of instruction pointers) into a category."
+"""
+    classify(ips, cache)
+
+Return the highest-precedence category in `RULES` matched by any frame of the stack `ips`,
+or `:execute`. `cache` memoizes the category of each instruction pointer.
+"""
 function classify(ips::Vector{UInt64}, cache::Dict{UInt64, Symbol})
     best = length(RULES) + 1          # index into RULES; larger == lower precedence
     for ip in ips
@@ -127,7 +125,12 @@ function classify(ips::Vector{UInt64}, cache::Dict{UInt64, Symbol})
     best > length(RULES) ? :execute : RULES[best].first
 end
 
-"Split a flat profile buffer (no metadata) into per-sample ip vectors."
+"""
+    samples(data)
+
+Split a profile buffer fetched with `include_meta = false` into one instruction-pointer
+vector per sample.
+"""
 function samples(data::Vector{UInt})
     out = Vector{UInt64}[]
     cur = UInt64[]
@@ -145,14 +148,18 @@ end
 """
     @phase name expr
 
-Run `expr`, recording wall time, Julia compile time and a sampled category
-breakdown under `name`.
+Run `expr` and record its wall time, Julia compile time and sampled category breakdown
+under `name`. Return the value of `expr`.
 """
 macro phase(name, expr)
     :(@phase_impl($(esc(name)), true, $(esc(expr))))
 end
 
-"Like `@phase`, but without the sampling profiler (use for package loading)."
+"""
+    @phase_nosample name expr
+
+Like `@phase`, without the sampling profiler. Use it for package loading.
+"""
 macro phase_nosample(name, expr)
     :(@phase_impl($(esc(name)), false, $(esc(expr))))
 end

@@ -1,28 +1,17 @@
-# Verify that a warmup build actually produced usable images.
+# Check that a warmup build produced usable images.
 #
 #     julia --project=experiments/warmup experiments/warmup/check_warmup.jl
 #
-# Two failure modes are invisible to the workloads themselves and need checking here:
+# Catches three failures that `Pkg.precompile()` does not report:
 #
-#   * A workload that threw. Each package catches its own exception so that one broken
-#     workload cannot break precompilation of the whole environment, and records the result
-#     in `workload_report.txt`. Pkg therefore sees a successful precompile and happily
-#     builds everything above it -- so a failure low in the DAG silently degrades the
-#     packages that depend on it. (Set `WARMUP_STRICT=1` to rethrow instead, which makes Pkg
-#     skip dependents.)
+#   * A workload that threw. Each workload catches its own error and records it in
+#     `workload_report.txt`, so Pkg sees a successful build.
+#   * A link that failed. An image over ~2 GiB fails to link after the workload returns,
+#     leaving a stale image alongside `status = ok`.
+#   * An image that cached almost nothing, detected by the size floors in `MIN_MIB`.
 #
-#   * A link that failed. Package images cannot exceed ~2 GiB: beyond that, 32-bit ELF
-#     relocations cannot encode the distance into the serialized blob and `lld` refuses.
-#     This happens *after* the workload returns, so no workload-level error handling sees
-#     it. The symptom is a stale image alongside `status = ok`.
-#
-# Exits non-zero if any package is unusable, so it can gate a CI step.
-
-#   * An image that built cleanly and cached almost nothing. A workload can run, report
-#     success and still produce a near-empty image if the mechanism that serializes
-#     *externally-owned* code is not active -- which is what PrecompileTools 1.2 does on
-#     Julia >= 1.12. Observed: AtmosWarmupExplicit at 2 MiB where it should be ~1200 MiB,
-#     with `status = ok`. Hence the minimum sizes below.
+# Exits non-zero if any package is unusable, so it can gate a CI step. Measurements behind
+# these checks are in `precompile_info.md`.
 
 const PACKAGES = [
     "AtmosWarmupSetup",
@@ -34,17 +23,9 @@ const PACKAGES = [
     "CMIPWarmup",
 ]
 
-# A floor, not an expectation: enough to catch an image that cached nothing, loose enough
-# not to need updating for ordinary drift. Sizes move legitimately with Julia and
-# dependency versions -- the whole stack shrank about 2.7x between Julia 1.11/CUDA 5.11 and
-# Julia 1.13/CUDA 6.4, even though the latter also persists GPU kernels into the image
-# (measured at ~89 KiB each).
-#
-# A package that sits high in the DAG is *expected* to be small: it caches only its own
-# increment over everything beneath it. SeaIceWarmup is 80 MiB because OceanWarmup carries
-# the ocean, and CMIPWarmup is 219 MiB because the six packages below it carry the
-# components -- a run against that stack still reached its first step with 5.7 s of setup
-# compilation, so the small image reflects good layering, not a failed workload.
+# Minimum image size per package: low enough to survive ordinary version drift, high enough
+# to catch an image that cached nothing. Packages high in the DAG cache only their increment
+# over the packages beneath them, so their floors are small.
 const MIN_MIB = Dict(
     "AtmosWarmupSetup" => 300,
     "AtmosWarmupExplicit" => 150,
@@ -55,7 +36,11 @@ const MIN_MIB = Dict(
     "CMIPWarmup" => 75,
 )
 
-"Newest package image for `pkg`, or `nothing`."
+"""
+    image_path(pkg)
+
+Return the newest package image for `pkg` in the first depot, or `nothing`.
+"""
 function image_path(pkg)
     dir = joinpath(DEPOT_PATH[1], "compiled", "v$(VERSION.major).$(VERSION.minor)", pkg)
     isdir(dir) || return nothing
@@ -63,7 +48,11 @@ function image_path(pkg)
     isempty(sos) ? nothing : argmax(mtime, sos)
 end
 
-"Most recent modification time across a package's sources and the configs it reads."
+"""
+    source_mtime(pkg)
+
+Return the latest modification time across the sources of `pkg` and the warmup configs.
+"""
 function source_mtime(pkg)
     here = @__DIR__
     srcs = String[]

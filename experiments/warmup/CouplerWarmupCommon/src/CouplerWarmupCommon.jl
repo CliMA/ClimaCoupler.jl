@@ -1,17 +1,12 @@
 """
     CouplerWarmupCommon
 
-Shared setup for the per-component precompilation workloads.
+Shared setup for the component precompilation workloads (`OceanWarmup`, `LandWarmup`,
+`SeaIceWarmup`).
 
-Each component's warmup package needs the same prerequisites a coupled run builds before it
-can construct its model: a comms context, the coupled parameter dictionaries, an atmosphere
-simulation (for the boundary space), and the land fraction. `prologue` assembles exactly
-those, mirroring the opening of `ClimaCoupler.SimCoordinator._build_coupled_simulation`.
-
-This duplicates a small amount of that constructor. The duplication is deliberate and
-temporary: factoring the component construction out of `CoupledSimulation` into reusable
-functions belongs in its own change. Until then, `check_matches_coupled` guards against
-drift by failing loudly if what we build stops matching what a coupled run builds.
+`prologue` builds what a coupled run builds before its component models, mirroring the
+start of `ClimaCoupler.SimCoordinator._build_coupled_simulation`. `check_matches_coupled`
+checks that a workload built the same type as a coupled run.
 """
 module CouplerWarmupCommon
 
@@ -21,25 +16,30 @@ import ClimaParams as CP
 import Thermodynamics.Parameters as TDP
 import ClimaComms
 
-# Production loads the Makie stack before it builds anything -- `experiments/CMIP/code_loading.jl`
-# does so to trigger `ClimaCouplerMakieExt`. Loading it *after* this workload's code has been
-# compiled invalidates that code, so the cache has to be built in the same world the run uses.
-# Measured: with the stack absent from the workload, `ClimaAtmos.get_simulation` compiled 0.2 s
-# in a session without Makie and 227.1 s in one with it, and coupled setup went 4.4 s -> 1153.1 s.
-# These imports are load-bearing even though nothing here calls them.
+# Loaded, although nothing here calls it, because `experiments/CMIP/code_loading.jl` loads
+# it: a package loaded after this workload is compiled invalidates the cached code. See
+# `experiments/warmup/precompile_info.md`.
 import CairoMakie, GeoMakie, Makie, Poppler_jll, Printf
-
 
 export prologue, check_matches_coupled
 
 """
     prologue(config_dict; with_atmos = true)
 
-Build the prerequisites shared by every component model and return them as a NamedTuple,
-together with the parsed coupler arguments in `args`.
+Build the inputs shared by every component model, as a coupled run builds them.
 
-`with_atmos = false` skips the atmosphere simulation (and therefore the boundary space);
-only useful for components that need neither.
+# Arguments
+- `config_dict`: coupler config, as returned by `Input.get_coupler_config_dict`.
+
+# Keyword Arguments
+- `with_atmos = true`: build the atmosphere simulation and everything derived from its
+  boundary space. With `false`, `atmos_sim` and `boundary_space` are `nothing`.
+
+# Returns
+A `NamedTuple` with `comms_ctx`, `args` (from `Input.get_coupler_args`),
+`coupled_param_dict`, `thermo_params`, `dir_paths`, `atmos_sim` and `boundary_space`. With
+`with_atmos = true` it also holds `atmos_h`, `initial_T`, `land_fraction`, `sst_path`,
+`sic_path`, `land_ic_path`, `albedo_path` and `bucket_initial_condition`.
 """
 function prologue(config_dict::AbstractDict; with_atmos::Bool = true)
     comms_ctx = Utilities.get_comms_context(config_dict)
@@ -120,12 +120,11 @@ end
 """
     check_matches_coupled(label, built, expected_type)
 
-Fail loudly when a warmup builds a different type than a coupled run would.
+Return `true` if `typeof(built) === expected_type`, and throw an error naming `label`
+otherwise.
 
-Cached specializations are keyed on concrete types, so a mismatch silently yields an image
-the production run cannot use — which looks exactly like "precompilation didn't help".
-This is the check that caught the atmosphere workload defaulting to `Float32` and
-`Val{:NoWarp}` because `FLOAT_TYPE` and `topography` are set in the *coupler* config.
+Cached specializations are keyed on concrete types, so a workload that builds a different
+type than a coupled run produces an image the run cannot use.
 """
 function check_matches_coupled(label, built, expected_type)
     actual = typeof(built)

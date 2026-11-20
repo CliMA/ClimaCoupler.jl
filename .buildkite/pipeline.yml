@@ -418,9 +418,7 @@ steps:
           CLIMACOMMS_CONTEXT: "SINGLETON"
           TEST_CALIBRATION: ""
         agents:
-          slurm_mem: 64GB
-          slurm_ntasks: 3
-          slurm_cpus_per_task: 4
+          slurm_mem: 32GB
 
   - wait
 

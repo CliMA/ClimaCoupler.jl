@@ -55,8 +55,9 @@ compare seasonal means, e.g. `seasonal_average ∘ zonal_average`, and set `exte
 
 Give exactly one of `model_error_fraction` and `noise_sd`. A field that keeps latitude
 takes `model_error_fraction`, the model error as a fraction of the observed mean
-(`noise_model.jl`). A field reduced to one value per date takes `noise_sd`, independent
-noise in its own units, whose value sets its weight against the other fields.
+(`make_observation_vector` in `experiments/calibration/amip/generate_observations.jl`). A
+field reduced to one value per date takes `noise_sd`, independent noise in its own units,
+whose value sets its weight against the other fields.
 """
 function Observable(; name, reduce, model_error_fraction = nothing, noise_sd = nothing)
     isnothing(model_error_fraction) == isnothing(noise_sd) &&

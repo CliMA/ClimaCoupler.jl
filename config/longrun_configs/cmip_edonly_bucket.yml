@@ -4,6 +4,7 @@ bucket_albedo_type: "map_temporal"
 checkpoint_dt: "30days"
 coupler_diagnostics_period: "30days"
 coupler_diagnostics_reduction: "average"
+coupler_toml: ["toml/amip_edonly.toml"]
 dt_atmos: "120secs" # 2 minutes
 dt_cloud_fraction: "1hours"
 dt_cpl: "360secs" # 6 minutes

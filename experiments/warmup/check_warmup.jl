@@ -2,16 +2,8 @@
 #
 #     julia --project=experiments/warmup experiments/warmup/check_warmup.jl
 #
-# Catches three failures that `Pkg.precompile()` does not report:
-#
-#   * A workload that threw. Each workload catches its own error and records it in
-#     `workload_report.txt`, so Pkg sees a successful build.
-#   * A link that failed. An image over ~2 GiB fails to link after the workload returns,
-#     leaving a stale image alongside `status = ok`.
-#   * An image that cached almost nothing, detected by the size floors in `MIN_MIB`.
-#
-# Exits non-zero if any package is unusable, so it can gate a CI step. Measurements behind
-# these checks are in `precompile_info.md`.
+# Exits non-zero on failures `Pkg.precompile()` does not report: a workload that threw, a
+# failed link (an image over ~2 GiB leaves a stale one behind) or an image below `MIN_MIB`.
 
 const PACKAGES = [
     "AtmosWarmupSetup",
@@ -23,9 +15,8 @@ const PACKAGES = [
     "CMIPWarmup",
 ]
 
-# Minimum image size per package: low enough to survive ordinary version drift, high enough
-# to catch an image that cached nothing. Packages high in the DAG cache only their increment
-# over the packages beneath them, so their floors are small.
+# Minimum image size per package, loose enough to survive version drift. Packages high in
+# the DAG cache only their increment, so their floors are small.
 const MIN_MIB = Dict(
     "AtmosWarmupSetup" => 300,
     "AtmosWarmupExplicit" => 150,

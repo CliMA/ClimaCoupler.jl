@@ -1,7 +1,5 @@
-# Helpers shared by the warmup packages. Each package `include`s this file rather than
-# depending on a shared package, so the package graph, and with it the load order, stays as
-# described in README.md. The atmosphere packages use `build_sim`; the coupled packages use
-# `warmup_config`.
+# Helpers `include`d by each warmup package (rather than a shared dependency, which would
+# change the package graph described in README.md).
 
 """
     warmup_dir()
@@ -13,7 +11,7 @@ warmup_dir() = @__DIR__
 """
     repo_dir()
 
-Return the repository root, against which the configs give relative paths.
+Return the repository root.
 """
 repo_dir() = normpath(joinpath(@__DIR__, "..", ".."))
 
@@ -27,11 +25,7 @@ config_path(name) = joinpath(warmup_dir(), "configs", name)
 """
     build_sim(outdir)
 
-Build the atmosphere simulation described by `configs/atmos_warmup.yml`, writing output to
-`outdir`.
-
-The config must match production in its model selections and `z_elem`, which are part of
-the cached types.
+Build the atmosphere simulation from `configs/atmos_warmup.yml`, writing output to `outdir`.
 """
 function build_sim(outdir)
     cfg = YAML.load_file(config_path("atmos_warmup.yml"))
@@ -45,12 +39,8 @@ end
 """
     small_gpu_atmos_config(path, outdir)
 
-Return `path`, or, when `WARMUP_H_ELEM` is set, the path to a copy in `outdir` with
-`h_elem` overridden.
-
-This lets the coupled workloads fit on a small GPU. `h_elem` is not part of any field's
-type, so the image still serves production runs; `z_elem` is, so it has no override. See
-`experiments/warmup/precompile_info.md`.
+Return `path`, or, when `WARMUP_H_ELEM` is set, a copy in `outdir` with `h_elem`
+overridden, so the coupled workloads fit on a small GPU.
 """
 function small_gpu_atmos_config(path, outdir)
     h_elem = get(ENV, "WARMUP_H_ELEM", "")
@@ -85,8 +75,7 @@ end
 """
     write_report(path, status; h_elem_override = "")
 
-Write the workload `status`, any `h_elem_override` and the device to `path`, so a caught
-workload failure is visible. Never throws.
+Write the workload `status`, any `h_elem_override` and the device to `path`. Never throws.
 """
 function write_report(path, status; h_elem_override = "")
     try

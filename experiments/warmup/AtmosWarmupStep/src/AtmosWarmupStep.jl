@@ -1,14 +1,8 @@
 """
     AtmosWarmupStep
 
-Precompilation workload that caches the rest of the first atmosphere step: the implicit
-solve, Jacobian and timestepper.
-
-Depends on `AtmosWarmupSetup` and `AtmosWarmupExplicit`, so it reuses their images rather
-than caching that code again.
-
-Precompile with `CLIMACOMMS_DEVICE=CUDA`, or the image holds CPU code. See
-`experiments/warmup/README.md`.
+Precompilation workload caching the rest of the first atmosphere step: implicit solve,
+Jacobian and timestepper.
 """
 module AtmosWarmupStep
 
@@ -17,14 +11,14 @@ import ClimaComms
 ClimaComms.@import_required_backends
 import ClimaTimeSteppers
 import YAML
-import AtmosWarmupSetup  # layered: its cached code is reused, not re-serialised
-import AtmosWarmupExplicit  # layered: its cached code is reused, not re-serialised
+# Layered: reuse the code cached by the warmup packages beneath this one.
+import AtmosWarmupSetup
+import AtmosWarmupExplicit
 using PrecompileTools
 
 include(joinpath(@__DIR__, "..", "..", "warmup_utils.jl"))
 
-# Julia invalidates a package image when its *source* changes, not when data it read during
-# precompilation changes. Register the config so editing it forces a rebuild.
+# Rebuild the image when a config it reads changes, not only when the source does.
 include_dependency(config_path("atmos_warmup.yml"))
 
 @setup_workload begin
@@ -36,8 +30,6 @@ include_dependency(config_path("atmos_warmup.yml"))
             ClimaTimeSteppers.step!(sim.integrator)
             status = "ok"
         catch err
-            # A broken workload must not break precompilation; it only means startup
-            # stays slow.
             status = "FAILED: " * first(sprint(showerror, err), 300)
         end
         write_report(joinpath(@__DIR__, "..", "workload_report.txt"), status)

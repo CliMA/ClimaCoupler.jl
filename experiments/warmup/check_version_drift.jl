@@ -3,18 +3,15 @@
 #
 #     julia --project=experiments/warmup experiments/warmup/check_version_drift.jl
 #
-# Images are tied to the package versions they were built with, so a run against different
-# versions silently recompiles. Exits non-zero if any package in both manifests differs and
-# is not in `ALLOWED`, or if either environment is below a version in `FLOORS`.
+# Exits non-zero if a package in both manifests differs and is not in `ALLOWED`, or if
+# either environment is below a version in `FLOORS`.
 
 using TOML
 
 const REPO = normpath(joinpath(@__DIR__, "..", ".."))
 const MANIFEST = "Manifest-v$(VERSION.major).$(VERSION.minor).toml"
 
-# Packages allowed to differ, with the reason. Only build-time tooling belongs here: a
-# science package that differs invalidates the cache, which is the whole point of this
-# check. Anything listed is reported but does not fail the run.
+# Packages allowed to differ, with the reason. Only build-time tooling belongs here.
 const ALLOWED = Dict(
     "PrecompileTools" =>
         "a build-time tool that does not appear in the cached code, so the two " *
@@ -28,8 +25,7 @@ const FLOORS = Dict("PrecompileTools" => (VERSION >= v"1.12" ? v"1.3" : v"0"))
 """
     versions(path)
 
-Return a `Dict` mapping package name to version string for every versioned entry in the
-manifest at `path`.
+Return a `Dict` of package name => version string for the manifest at `path`.
 """
 function versions(path)
     deps = get(TOML.parsefile(path), "deps", Dict{String, Any}())

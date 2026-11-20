@@ -1,13 +1,7 @@
 """
     AtmosWarmupExplicit
 
-Precompilation workload that caches the explicit tendency path,
-`ClimaAtmos.remaining_tendency!`.
-
-Depends on `AtmosWarmupSetup`, so it reuses that image rather than caching setup again.
-
-Precompile with `CLIMACOMMS_DEVICE=CUDA`, or the image holds CPU code. See
-`experiments/warmup/README.md`.
+Precompilation workload caching the explicit tendencies, `ClimaAtmos.remaining_tendency!`.
 """
 module AtmosWarmupExplicit
 
@@ -16,13 +10,13 @@ import ClimaComms
 ClimaComms.@import_required_backends
 import ClimaTimeSteppers
 import YAML
-import AtmosWarmupSetup  # layered: its cached code is reused, not re-serialised
+# Layered: reuse the code cached by the warmup packages beneath this one.
+import AtmosWarmupSetup
 using PrecompileTools
 
 include(joinpath(@__DIR__, "..", "..", "warmup_utils.jl"))
 
-# Julia invalidates a package image when its *source* changes, not when data it read during
-# precompilation changes. Register the config so editing it forces a rebuild.
+# Rebuild the image when a config it reads changes, not only when the source does.
 include_dependency(config_path("atmos_warmup.yml"))
 
 @setup_workload begin
@@ -36,8 +30,6 @@ include_dependency(config_path("atmos_warmup.yml"))
             CA.remaining_tendency!(Yₜ, Yₜ, integ.u, integ.p, integ.t)
             status = "ok"
         catch err
-            # A broken workload must not break precompilation; it only means startup
-            # stays slow.
             status = "FAILED: " * first(sprint(showerror, err), 300)
         end
         write_report(joinpath(@__DIR__, "..", "workload_report.txt"), status)

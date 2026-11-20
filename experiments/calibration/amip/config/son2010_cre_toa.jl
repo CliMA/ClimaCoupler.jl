@@ -15,7 +15,7 @@ const CALIBRATE_CONFIG = CalibrationTools.CalibrateConfig(;
         "amip_configs",
         "amip_calibration.yml",
     ),
-    # beta = model_error_fraction^2 is estimated from previous runs: it is chosen so that a
+    # model_error_fraction is estimated from previous runs: it is chosen so that a
     # reference run's misfit is about one per entry, which makes the model-error noise about
     # the size of the model's current bias. It depends on the resolution and reduction.
     # noise_sd for rtmt is about the run-to-run spread of the global-mean net flux.

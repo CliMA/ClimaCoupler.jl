@@ -2,7 +2,7 @@
 
 julia_version = "1.13.3"
 manifest_format = "2.1"
-project_hash = "345a22c6204aa9a4e9f9bfc6616ec1dab19104a5"
+project_hash = "f3b475a28adc8f80d741fa03ebd95dbf649bf500"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -497,10 +497,10 @@ version = "0.42.17"
 
 [[deps.ClimaCalibrate]]
 deps = ["ArnoldiMethod", "Distributed", "EnsembleKalmanProcesses", "JLD2", "LinearAlgebra", "LinearMaps", "Logging", "OrderedCollections", "Reexport", "Statistics", "TOML"]
-git-tree-sha1 = "2d343589879d6fd58b9e9a0a3b01a4c4277ab22a"
+git-tree-sha1 = "9ef8c86cc870d0efac56af93002716ea89de8a43"
 registries = "General"
 uuid = "4347a170-ebd6-470c-89d3-5c705c0cacc2"
-version = "0.6.0"
+version = "0.7.0"
 weakdeps = ["ClimaAnalysis", "Makie", "NaNStatistics"]
 
     [deps.ClimaCalibrate.extensions]

@@ -31,7 +31,6 @@ import ClimaCoupler: CalibrationTools
 import ClimaParams as CP
 import EnsembleKalmanProcesses.ParameterDistributions as PD
 import EnsembleKalmanProcesses.TOMLInterface as TI
-using Distributed
 
 const MODEL_INTERFACE_FILEPATH = joinpath(
     pkgdir(ClimaCoupler),
@@ -247,7 +246,7 @@ function run_sweep(experiment_path; submit)
     # means the members run in waves.
     @info "Submitting workers" n_workers n_members = length(members) worker_options
     ClimaCalibrate.add_workers(n_workers; worker_options...)
-    @everywhere include($MODEL_INTERFACE_FILEPATH)
+    ClimaCalibrate.@worker_setup include($MODEL_INTERFACE_FILEPATH)
 
     ClimaCalibrate.run_iteration(
         ClimaCalibrate.WorkerBackend(),

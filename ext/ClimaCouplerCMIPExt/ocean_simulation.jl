@@ -122,8 +122,9 @@ estimate_maximum_Δt(grid::OC.RectilinearGrid) = 30minutes # ?
 
 function estimate_maximum_Δt(grid)
     arch = OC.Architectures.architecture(grid)
-    Δx = mean(OC.xspacings(grid))
-    Δy = mean(OC.yspacings(grid))
+    cpu_grid = OC.on_architecture(OC.CPU(), grid)
+    Δx = mean(OC.xspacings(cpu_grid))
+    Δy = mean(OC.yspacings(cpu_grid))
     Δθ = rad2deg(mean([Δx, Δy])) / grid.radius
 
     # The maximum Δt is roughly 1hours * Δθ, giving:

@@ -54,16 +54,17 @@ A function that updates the cache of the simulation with the provided
 `new_cache`. This is used for restarting the simulation.
 
 - `get_field(::AbstractComponentSimulation, ::Val{property})`:
-Default `get_field` functions are provided for `energy` and `water` fields,
-described in the table below.
-These quantities are used to track conservation, and the defaults
-return `nothing`. To check conservation throughout a simulation, these
-functions must be extended for all models being run.
+Default `get_field` functions are provided for `energy`, `water`, and `runoff` fields,
+described in the table below, and the defaults return `nothing`.
+`energy` and `water` are used to track conservation; to check conservation throughout
+a simulation, these functions must be extended for all models being run.
+`runoff` is routed from the land model to the ocean by `FieldExchanger.route_runoff!`.
 
-| Coupler name | Description                                   | Units  | Default value |
-|--------------|-----------------------------------------------|--------|---------------|
-| `energy`     | vertically integrated energy per surface area | J m⁻²  | `nothing`     |
-| `water`      | vertically integrated water per surface area  | kg m⁻² | `nothing`     |
+| Coupler name | Description                                    | Units      | Default value |
+|--------------|------------------------------------------------|------------|---------------|
+| `energy`     | vertically integrated energy per surface area  | J m⁻²      | `nothing`     |
+| `water`      | vertically integrated water per surface area   | kg m⁻²     | `nothing`     |
+| `runoff`     | water leaving the land surface, per land area  | kg m⁻² s⁻¹ | `nothing`     |
 
 - `add_coupler_fields!(coupler_field_names, ::AbstractComponentSimulation)`:
 A set of default coupler exchange fields is initialized for each coupled simulation,

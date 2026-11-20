@@ -5,6 +5,7 @@ This module contains general functions for the exchange of fields between the at
 The main function of the `FieldExchanger` is `exchange!`, which does the following:
 - imports atmospheric fields into the coupler fields, via `import_atmos_fields!`
 - imports area fraction-weighted surface fields into the coupler fields, via `import_combined_surface_fields!`
+- routes the land runoff to the ocean, via `route_runoff!`
 - updates all component models with the newly-updated coupler fields, via `update_model_sims!`
 
 The specific fields that are exchanged depend on the requirements of the component models:
@@ -29,6 +30,7 @@ the atmosphere and each surface model.
 
 ```@docs
     FieldExchanger.exchange!
+    FieldExchanger.route_runoff!
     FieldExchanger.update_sim!
     FieldExchanger.update_model_sims!
     FieldExchanger.accumulated_coupler_fields

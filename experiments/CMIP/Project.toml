@@ -41,20 +41,21 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [sources]
 ClimaCoupler = {path = "../.."}
+ClimaLand = {rev = "main", url = "https://github.com/CliMA/ClimaLand.jl"}
 
 [compat]
 ArgParse = "1"
 CUDA = "6"
 CairoMakie = "0.15"
 ClimaAnalysis = "0.5.25"
-ClimaAtmos = "0.42.12"
+ClimaAtmos = "0.42.12, 0.43"
 ClimaCalibrate = "0.7"
 ClimaComms = "0.6.2"
 ClimaCore = "0.16, 1"
 ClimaDiagnostics = "0.4"
 ClimaLand = "1.12.2"
 ClimaParams = "1.0"
-ClimaSeaIce = "0.7.2"
+ClimaSeaIce = "0.7.3"
 ClimaTimeSteppers = "0.8.11, 0.9, 0.10, 1"
 ClimaUtilities = "0.1.32"
 GeoMakie = "0.7"

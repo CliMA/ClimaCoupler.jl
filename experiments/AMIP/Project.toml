@@ -36,6 +36,7 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [sources]
 ClimaCoupler = {path = "../.."}
+ClimaLand = {rev = "main", url = "https://github.com/CliMA/ClimaLand.jl"}
 
 [compat]
 CUDA = "6"

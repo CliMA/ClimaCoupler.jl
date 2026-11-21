@@ -19,7 +19,6 @@ rayleigh_sponge: true
 surface_setup: "DefaultMoninObukhov"
 t_end: "120days"
 time_varying_trace_gases: ["CO2", "O3"]
-toml: [toml/longrun_aquaplanet.toml]
 turbconv: "edonly_edmfx"
 viscous_sponge: true
 z_elem: 79

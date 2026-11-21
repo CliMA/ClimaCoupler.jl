@@ -35,15 +35,17 @@ import ClimaCoupler:
 import ClimaUtilities.TimeManager: ITime, date
 import ClimaComms
 import Dates
+import NVTX
 
 ###
 ### Functions required by ClimaCoupler.jl for an AbstractAtmosSimulation
 ###
-struct ClimaAtmosSimulation{P, D, I, OW} <: Interfacer.AbstractAtmosSimulation
+struct ClimaAtmosSimulation{P, D, I, OW, PR} <: Interfacer.AbstractAtmosSimulation
     params::P
     domain::D
     integrator::I
     output_writers::OW
+    precipitation::PR
 end
 
 function hasradiation(integrator)
@@ -122,7 +124,16 @@ function ClimaAtmosSimulation(atmos_config)
         @. ᶠradiation_flux = CC.Geometry.WVector(FT(0))
     end
 
-    sim = ClimaAtmosSimulation(integrator.p.params, spaces, integrator, output_writers)
+    surface_space = CC.Spaces.level(face_space, CC.Utilities.half)
+    precipitation =
+        (; rain = CC.Fields.zeros(surface_space), snow = CC.Fields.zeros(surface_space))
+    sim = ClimaAtmosSimulation(
+        integrator.p.params,
+        spaces,
+        integrator,
+        output_writers,
+        precipitation,
+    )
 
     # DSS state to ensure we have continuous fields
     @timed_log "ClimaAtmos: zeroed fluxes and applied DSS to the state" dss_state!(sim)
@@ -262,6 +273,33 @@ function surface_snow_flux(
     return integrator.p.precomputed.surface_snow_flux
 end
 
+"""
+    Interfacer.step!(sim::ClimaAtmosSimulation, t)
+
+Step the atmosphere to the coupler time `t`, and store in `sim.precipitation` the mean
+surface rain and snow fluxes over the steps taken. `sim.precipitation` is unchanged when
+no step is taken.
+"""
+NVTX.@annotate function Interfacer.step!(
+    sim::ClimaAtmosSimulation,
+    t::Union{Float64, ITime},
+)
+    n_steps = Interfacer.n_steps_until(sim, t)
+    n_steps == 0 && return nothing
+    (; rain, snow) = sim.precipitation
+    microphysics_model = sim.integrator.p.atmos.microphysics_model
+    rain .= 0
+    snow .= 0
+    for _ in 1:n_steps
+        Interfacer.step!(sim.integrator)
+        rain .+= surface_rain_flux(microphysics_model, sim.integrator)
+        snow .+= surface_snow_flux(microphysics_model, sim.integrator)
+    end
+    rain ./= n_steps
+    snow ./= n_steps
+    return nothing
+end
+
 surface_radiation_flux(::Nothing, integrator) = eltype(integrator.u)(0)
 surface_radiation_flux(::CA.RRTMGPI.AbstractRRTMGPMode, integrator) =
     CC.Fields.level(integrator.p.radiation.ᶠradiation_flux, CC.Utilities.half)
@@ -332,7 +370,7 @@ function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:diffuse_fraction
     return CC.Fields.array2field(diffuse_fraction, lowest_face_space)
 end
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_precipitation}) =
-    surface_rain_flux(sim.integrator.p.atmos.microphysics_model, sim.integrator)
+    sim.precipitation.rain
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:LW_d})
     # If we don't have radiation, downwelling LW is zero
     FT = eltype(sim.integrator.u)
@@ -353,7 +391,7 @@ Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:liquid_specific_humidity}
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:ice_specific_humidity}) =
     CC.Fields.level(sim.integrator.p.precomputed.ᶜq_ice, 1)
 Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:snow_precipitation}) =
-    surface_snow_flux(sim.integrator.p.atmos.microphysics_model, sim.integrator)
+    sim.precipitation.snow
 function Interfacer.get_field(sim::ClimaAtmosSimulation, ::Val{:SW_d})
     # If we don't have radiation, downwelling SW is zero
     FT = eltype(sim.integrator.u)

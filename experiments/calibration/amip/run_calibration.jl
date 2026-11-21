@@ -40,17 +40,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
     observation_vector = JLD2.load_object(observation_vector_filepath)
 
     (; sample_date_ranges) = CALIBRATE_CONFIG
-    obs_series = EKP.ObservationSeries(
-        Dict(
-            "observations" => observation_vector,
-            "names" => [
-                string(Dates.year(start_date)) for
-                (start_date, stop_date) in sample_date_ranges
-            ],
-            # One target per iteration, in order.
-            "minibatcher" =>
-                ClimaCalibrate.minibatcher_over_samples(length(observation_vector), 1),
-        ),
+    # One target per iteration, in order.
+    obs_series = ClimaCalibrate.observation_series_from_samples(
+        observation_vector,
+        1,
+        [string(Dates.year(start_date)) for (start_date, stop_date) in sample_date_ranges],
     )
 
     (; rng_seed, priors) = CALIBRATE_CONFIG
@@ -69,26 +63,25 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     (; n_iterations) = CALIBRATE_CONFIG
 
-    # The smoke test runs on CPU within an existing allocation, while a full
-    # calibration puts one ensemble member on each GPU.
-    device = TEST_CALIBRATION ? :cpu : :gpu
-    walltime = CALIBRATE_CONFIG.worker_walltime
-    env_vars = [
-        "CLIMACOMMS_CONTEXT" => "SINGLETON",
-        "CLIMACOMMS_DEVICE" => TEST_CALIBRATION ? "CPU" : "CUDA",
-    ]
-
-    ClimaCalibrate.add_workers(
-        EKP.get_N_ens(ekp);
-        device,
-        time = walltime,
-        env = env_vars,
-        mem = TEST_CALIBRATION ? "16GB" : "32GB",
-    )
-    ClimaCalibrate.@worker_setup include($model_interface_filepath)
+    # The smoke test runs the members serially in this process so that CI does
+    # not submit Slurm jobs from inside its own allocation. A full calibration
+    # puts one ensemble member on each GPU.
+    backend = if TEST_CALIBRATION
+        ClimaCalibrate.JuliaBackend()
+    else
+        ClimaCalibrate.add_workers(
+            EKP.get_N_ens(ekp);
+            device = :gpu,
+            time = CALIBRATE_CONFIG.worker_walltime,
+            env = ["CLIMACOMMS_CONTEXT" => "SINGLETON", "CLIMACOMMS_DEVICE" => "CUDA"],
+            mem = "32GB",
+        )
+        ClimaCalibrate.@worker_setup include($model_interface_filepath)
+        ClimaCalibrate.WorkerBackend()
+    end
 
     eki = ClimaCalibrate.calibrate(
-        ClimaCalibrate.WorkerBackend(),
+        backend,
         ekp,
         coupler_model_interface,
         n_iterations,

@@ -3,6 +3,7 @@ atmos_config_file: "config/atmos_configs/climaatmos_edonly.yml"
 checkpoint_dt: "30days"
 coupler_diagnostics_period: "30days"
 coupler_diagnostics_reduction: "average"
+coupler_toml: ["toml/amip_edonly.toml"]
 dt_atmos: "120secs" # 2 minutes
 dt_cloud_fraction: "1hours"
 dt_cpl: "360secs" # 6 minutes

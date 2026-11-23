@@ -35,7 +35,7 @@ steps:
       - |
         if [ -n "$${NEW_T_END:-}" ]; then
           echo "--- Set t_end to $$NEW_T_END"
-          bash .buildkite/nightly/set_t_end.sh "$$NEW_T_END" $$CONFIG_PATH/amip_coarse_progedmf_land.yml $$CONFIG_PATH/amip_coarse_progedmf_1m_land.yml $$LONGRUN_CONFIG_PATH/cmip_progedmf_land.yml $$BENCHMARK_CONFIG_PATH/amip_progedmf_1m_land_he16.yml
+          bash .buildkite/nightly/set_t_end.sh "$$NEW_T_END" $$CONFIG_PATH/amip_coarse_progedmf_land.yml $$CONFIG_PATH/amip_coarse_progedmf_1m_land.yml $$LONGRUN_CONFIG_PATH/cmip_progedmf_land.yml
         fi
       - "echo $$JULIA_DEPOT_PATH"
 

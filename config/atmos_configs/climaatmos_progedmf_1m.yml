@@ -1,12 +1,13 @@
 aerosol_radiation: true
+aerosol_radiation_nd: true
 approximate_linear_solve_iters: 2
 cloud_model: "quadrature"
 dt: "120secs"
 dt_rad: "1hours"
 dt_save_state_to_disk: "30days"
 dz_bottom: 28.0
-edmfx_detr_model: "Generalized"
-edmfx_entr_model: "Generalized"
+edmfx_detr_model: "GPBuoyancy"
+edmfx_entr_model: "GPInvZ"
 edmfx_filter: true
 edmfx_nh_pressure: true
 edmfx_sgs_diffusive_flux: true
@@ -31,5 +32,9 @@ viscous_sponge: true
 z_elem: 79
 z_max: 60000.0
 microphysics_model: "1M"
+snow_deposition_sublimation: "DepositionAndSublimation"
+cloud_ice_terminal_velocity: "Chen2022"
+sgs_variance_fidelity_model: "updraft"
 non_orographic_gravity_wave: true
+nogw_beres_source: true
 orographic_gravity_wave: "raw_topo_online"

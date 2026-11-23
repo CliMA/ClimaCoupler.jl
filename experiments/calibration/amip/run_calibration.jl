@@ -8,6 +8,12 @@ import EnsembleKalmanProcesses as EKP
 import EnsembleKalmanProcesses.ParameterDistributions as PD
 import JLD2
 
+# Workers on Vast.ai meet the driver in a bucket, see the backend below
+const ON_VAST = haskey(ENV, "CLIMA_BUCKET_ENDPOINT")
+if ON_VAST
+    using AWSS3
+end
+
 model_interface_filepath = joinpath(
     pkgdir(ClimaCoupler),
     "experiments",
@@ -15,19 +21,8 @@ model_interface_filepath = joinpath(
     "amip",
     "model_interface.jl",
 )
-include(model_interface_filepath)
-
-# Choose which calibration config to use
-config_dir = joinpath(pkgdir(ClimaCoupler), "experiments", "calibration", "amip", "config")
-default_config_path = joinpath(config_dir, "son2010_cre_toa.jl")
-
-test_calibration_config_path = joinpath(config_dir, "pipeline_test.jl")
-const TEST_CALIBRATION = haskey(ENV, "TEST_CALIBRATION")
-
-config_path = TEST_CALIBRATION ? test_calibration_config_path : default_config_path
-
-@info "Using calibration configuration in: $config_path"
-include(config_path)
+# The file picks the config, by TEST_CALIBRATION, and evaluates to the interface
+coupler_model_interface = include(model_interface_filepath)
 
 (; output_dir) = CALIBRATE_CONFIG
 isdir(output_dir) || mkdir(output_dir)
@@ -58,15 +53,31 @@ if abspath(PROGRAM_FILE) == @__FILE__
         scheduler = EKP.DataMisfitController(terminate_at = 1000000),
     )
 
-    coupler_model_interface =
-        CouplerModelInterface(CALIBRATE_CONFIG; emulate_diagnostics = TEST_CALIBRATION)
-
     (; n_iterations) = CALIBRATE_CONFIG
 
-    # The smoke test runs the members serially in this process so that CI does
-    # not submit Slurm jobs from inside its own allocation. A full calibration
-    # puts one ensemble member on each GPU.
-    backend = if TEST_CALIBRATION
+    # On Vast.ai each member runs on a rented instance that pulls it from the
+    # bucket. The smoke test runs the members serially in this process so that
+    # CI does not submit Slurm jobs from inside its own allocation. A full
+    # calibration puts one ensemble member on each GPU.
+    backend = if ON_VAST
+        ClimaCalibrate.SharedFilesBackend(;
+            files = ClimaCalibrate.SharedFiles.BucketFiles(
+                ENV["CLIMA_BUCKET_ENDPOINT"],
+                ENV["CLIMA_BUCKET"],
+            ),
+            outputs = [joinpath(get_job_id(CALIBRATE_CONFIG), "output_active")],
+            workers = ClimaCalibrate.Backend.Vast.Workers(
+                EKP.get_N_ens(ekp);
+                disk = TEST_CALIBRATION ? 100 : 200,
+                image = "nefrathenrici/clima-base:pr-5-bf60034",
+                env = Dict(
+                    "CLIMACOMMS_CONTEXT" => "SINGLETON",
+                    "CLIMACOMMS_DEVICE" => TEST_CALIBRATION ? "CPU" : "CUDA",
+                    (TEST_CALIBRATION ? ("TEST_CALIBRATION" => "1",) : ())...,
+                ),
+            ),
+        )
+    elseif TEST_CALIBRATION
         ClimaCalibrate.JuliaBackend()
     else
         ClimaCalibrate.add_workers(

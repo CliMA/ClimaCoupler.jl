@@ -2,7 +2,7 @@
 
 julia_version = "1.13.3"
 manifest_format = "2.1"
-project_hash = "927f8842815d8001484a2a2878c481e3a2a6b598"
+project_hash = "3e75c7ebddd2cfb5964725cd979e107a137bf589"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -23,6 +23,20 @@ git-tree-sha1 = "344f3d221a6bee75925b5c97a30cfd870f12a138"
 registries = "General"
 uuid = "14f7f29c-3bd6-536c-9a0b-7339e30b5a3e"
 version = "0.5.4"
+
+[[deps.AWS]]
+deps = ["Base64", "Compat", "Dates", "Downloads", "HTTP", "IniFile", "JSON", "MD5", "Mocking", "OrderedCollections", "Random", "SHA", "ScopedValues", "URIs", "UUIDs", "XMLDict"]
+git-tree-sha1 = "becfdb1a7117544aa30cce87cd7611df854a6858"
+registries = "General"
+uuid = "fbe9abb3-538b-5e4e-ba9e-bc94f4f92ebc"
+version = "1.100.0"
+
+[[deps.AWSS3]]
+deps = ["AWS", "ArrowTypes", "Base64", "Compat", "Dates", "EzXML", "FilePathsBase", "HTTP", "Mocking", "OrderedCollections", "Retry", "SHA", "SymDict", "URIs", "UUIDs", "XMLDict"]
+git-tree-sha1 = "ad29c22d57542fef7a3dd343d240a9283c34378f"
+registries = "General"
+uuid = "1c724243-ef5b-51ab-93f4-b0a88ac62a95"
+version = "0.11.7"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -181,6 +195,13 @@ weakdeps = ["SparseArrays"]
 
     [deps.ArrayLayouts.extensions]
     ArrayLayoutsSparseArraysExt = "SparseArrays"
+
+[[deps.ArrowTypes]]
+deps = ["Sockets", "UUIDs"]
+git-tree-sha1 = "404265cd8128a2515a81d5eae16de90fdef05101"
+registries = "General"
+uuid = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
+version = "2.3.0"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -477,14 +498,16 @@ version = "0.42.19"
     Musica = "d3d182ee-e566-4962-9279-3a9916be1802"
 
 [[deps.ClimaCalibrate]]
-deps = ["ArnoldiMethod", "Distributed", "EnsembleKalmanProcesses", "JLD2", "LinearAlgebra", "LinearMaps", "Logging", "OrderedCollections", "Reexport", "Statistics", "TOML"]
-git-tree-sha1 = "9ef8c86cc870d0efac56af93002716ea89de8a43"
-registries = "General"
+deps = ["ArnoldiMethod", "Dates", "Distributed", "EnsembleKalmanProcesses", "JLD2", "LinearAlgebra", "LinearMaps", "Logging", "OrderedCollections", "Reexport", "Statistics", "TOML"]
+git-tree-sha1 = "cc0818aae1f64e5a05d3dfa020ce92863095ec4c"
+repo-rev = "ne/shared-files-backend"
+repo-url = "https://github.com/CliMA/ClimaCalibrate.jl"
 uuid = "4347a170-ebd6-470c-89d3-5c705c0cacc2"
 version = "0.7.0"
-weakdeps = ["ClimaAnalysis", "Makie", "NaNStatistics"]
+weakdeps = ["AWSS3", "ClimaAnalysis", "Makie", "NaNStatistics"]
 
     [deps.ClimaCalibrate.extensions]
+    ClimaCalibrateAWSS3Ext = "AWSS3"
     ClimaCalibrateClimaAnalysisExt = ["ClimaAnalysis", "NaNStatistics"]
     ClimaCalibrateMakieExt = ["Makie"]
 
@@ -1065,6 +1088,13 @@ registries = "General"
 uuid = "411431e0-e8b7-467b-b5e0-f676ba4f2910"
 version = "0.1.6"
 
+[[deps.EzXML]]
+deps = ["Printf", "XML2_jll"]
+git-tree-sha1 = "7ea1aa5869e2626ccae84480e4f37185bc6f41d3"
+registries = "General"
+uuid = "8f5d6c58-4d21-5cfd-889c-e3ad7ee6a615"
+version = "1.2.3"
+
 [[deps.FFMPEG]]
 deps = ["FFMPEG_jll"]
 git-tree-sha1 = "7bd13840b4148949e290748071bbe6826b3eabcd"
@@ -1601,6 +1631,12 @@ registries = "General"
 uuid = "d25df0c9-e2be-5dd7-82c8-3ad0b3e990b9"
 version = "0.1.5"
 
+[[deps.IniFile]]
+git-tree-sha1 = "f550e6e32074c939295eb5ea6de31849ac2c9625"
+registries = "General"
+uuid = "83e8ac13-25f8-5344-8a64-a9f2b223428f"
+version = "0.5.1"
+
 [[deps.Insolation]]
 deps = ["Adapt", "Artifacts", "Dates", "DelimitedFiles", "Interpolations"]
 git-tree-sha1 = "fba4f7f74c65591cf54fe66b8769995b5cfca482"
@@ -1745,14 +1781,11 @@ git-tree-sha1 = "06d90f699285d055e34f0b014636a75a17ff2252"
 registries = "General"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 version = "1.13.4"
+weakdeps = ["ArrowTypes", "Serialization"]
 
     [deps.JSON.extensions]
     JSONArrowExt = ["ArrowTypes"]
     JSONSerializationExt = ["Serialization"]
-
-    [deps.JSON.weakdeps]
-    ArrowTypes = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
-    Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 
 [[deps.JSON3]]
 deps = ["Dates", "Mmap", "Parsers", "PrecompileTools", "StructTypes", "UUIDs"]
@@ -1760,12 +1793,10 @@ git-tree-sha1 = "34a52631602d7233eb1dca1a358ae82b656f9f2a"
 registries = "General"
 uuid = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 version = "1.14.4"
+weakdeps = ["ArrowTypes"]
 
     [deps.JSON3.extensions]
     JSON3ArrowExt = ["ArrowTypes"]
-
-    [deps.JSON3.weakdeps]
-    ArrowTypes = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
 
 [[deps.JpegTurbo]]
 deps = ["CEnum", "FileIO", "ImageCore", "JpegTurbo_jll", "TOML"]
@@ -2102,6 +2133,13 @@ registries = "General"
 uuid = "5ced341a-0733-55b8-9ab6-a4889d929147"
 version = "1.11.1+0"
 
+[[deps.MD5]]
+deps = ["Random", "SHA"]
+git-tree-sha1 = "1576f756617d31eb397a4a517b68562fd28dc2b4"
+registries = "General"
+uuid = "6ac74813-4b46-53a4-afec-0b5dc9d7885c"
+version = "0.2.3"
+
 [[deps.MKL_jll]]
 deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "oneTBB_jll"]
 git-tree-sha1 = "282cadc186e7b2ae0eeadbd7a4dffed4196ae2aa"
@@ -2299,6 +2337,13 @@ version = "1.2.1"
 [[deps.Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 version = "1.11.0"
+
+[[deps.Mocking]]
+deps = ["Compat", "ExprTools"]
+git-tree-sha1 = "2c140d60d7cb82badf06d8783800d0bcd1a7daa2"
+registries = "General"
+uuid = "78c3b35d-d492-501b-9361-3d52fe80e533"
+version = "0.8.1"
 
 [[deps.MosaicViews]]
 deps = ["MappedArrays", "OffsetArrays", "PaddedViews", "StackViews"]
@@ -2929,6 +2974,12 @@ registries = "General"
 uuid = "802f3686-a58f-41ce-bb0c-3c43c75bba36"
 version = "1.7.0"
 
+[[deps.Retry]]
+git-tree-sha1 = "41ac127cd281bb33e42aba46a9d3b25cd35fc6d5"
+registries = "General"
+uuid = "20febd7b-183b-5ae2-ac4a-720e7ce64774"
+version = "0.4.1"
+
 [[deps.Rmath]]
 deps = ["Random", "Rmath_jll"]
 git-tree-sha1 = "5b3d50eb374cea306873b371d3f8d3915a018f0b"
@@ -3314,6 +3365,13 @@ weakdeps = ["ClimaParams"]
     [deps.SurfaceFluxes.extensions]
     CreateParametersExt = "ClimaParams"
 
+[[deps.SymDict]]
+deps = ["Test"]
+git-tree-sha1 = "0108ccdaea3ef69d9680eeafc8d5ad198b896ec8"
+registries = "General"
+uuid = "2da68c74-98d7-5633-99d6-8493888d7b1e"
+version = "0.3.0"
+
 [[deps.TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
@@ -3525,6 +3583,13 @@ git-tree-sha1 = "80d3930c6347cfce7ccf96bd3bafdf079d9c0390"
 registries = "General"
 uuid = "02c8fc9c-b97f-50b9-bbe4-9be30ff0a78a"
 version = "2.13.9+0"
+
+[[deps.XMLDict]]
+deps = ["EzXML", "IterTools", "OrderedCollections"]
+git-tree-sha1 = "8e8cdc9c93e1f442eba471b56db6f86ffeb1a33a"
+registries = "General"
+uuid = "228000da-037f-5747-90a9-8195ccbf91a5"
+version = "0.4.2"
 
 [[deps.XZ_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]

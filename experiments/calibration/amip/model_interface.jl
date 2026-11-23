@@ -1,6 +1,9 @@
 import ClimaCoupler
 import ClimaCoupler: CalibrationTools
 import ClimaCalibrate
+import EnsembleKalmanProcesses as EKP
+import EnsembleKalmanProcesses.ParameterDistributions as PD
+using Dates
 
 include(joinpath(pkgdir(ClimaCoupler), "experiments", "AMIP", "code_loading.jl"))
 
@@ -108,3 +111,19 @@ include(
         "post_analyze_iteration.jl",
     ),
 )
+
+# The config of this run and the interface this file evaluates to. With
+# TEST_CALIBRATION set, the test config runs one iteration of emulated
+# diagnostics.
+const TEST_CALIBRATION = haskey(ENV, "TEST_CALIBRATION")
+include(
+    joinpath(
+        pkgdir(ClimaCoupler),
+        "experiments",
+        "calibration",
+        "amip",
+        "config",
+        TEST_CALIBRATION ? "pipeline_test.jl" : "son2010_cre_toa.jl",
+    ),
+)
+CouplerModelInterface(CALIBRATE_CONFIG; emulate_diagnostics = TEST_CALIBRATION)

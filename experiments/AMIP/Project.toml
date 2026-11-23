@@ -1,4 +1,5 @@
 [deps]
+AWSS3 = "1c724243-ef5b-51ab-93f4-b0a88ac62a95"
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Cairo = "159f3aea-2a34-519c-b102-8c37f9878175"
@@ -35,6 +36,7 @@ Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [sources]
+ClimaCalibrate = {rev = "ne/shared-files-backend", url = "https://github.com/CliMA/ClimaCalibrate.jl"}
 ClimaCoupler = {path = "../.."}
 
 [compat]

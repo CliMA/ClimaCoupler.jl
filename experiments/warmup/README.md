@@ -10,7 +10,7 @@ See "Do not put these in a developer's environment" below.
 
 Nothing in the CliMA stack ships `@compile_workload`s, so each launch re-infers and re-emits
 the whole setup and step path on one core. Measured on a coupled CMIP configuration
-(prognostic EDMF, Float64, CUDA; see `experiments/CMIP/startup/`):
+(prognostic EDMF, Float64, CUDA):
 
 | phase | wall | of which compilation |
 |---|---:|---:|

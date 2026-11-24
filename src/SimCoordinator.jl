@@ -412,9 +412,11 @@ function _build_coupled_simulation(config_dict::AbstractDict)
     @info(sim_mode)
     land_sim = ice_sim = ocean_sim = nothing
 
-    sst_path = sic_path = land_ic_path = albedo_path = nothing
+    sst_path = sic_path = albedo_path = nothing
     if sim_mode <: Interfacer.SubseasonalMode
-        (; sst_path, sic_path, land_ic_path, albedo_path, bucket_initial_condition) =
+        era5_initial_condition_dir =
+            Input.resolve_era5_dir(era5_initial_condition_dir, start_date)
+        (; sst_path, sic_path, albedo_path, bucket_initial_condition) =
             Input.get_era5_filepaths(
                 era5_initial_condition_dir,
                 start_date,
@@ -442,7 +444,7 @@ function _build_coupled_simulation(config_dict::AbstractDict)
         bucket_initial_condition,
         era5_albedo_file_path = albedo_path,
         land_spun_up_ic,
-        land_ic_path,
+        era5_initial_condition_dir,
         lai_source,
         dt_drivers = ITime(Utilities.time_to_seconds(config_dict["dt_rad"])),
     )

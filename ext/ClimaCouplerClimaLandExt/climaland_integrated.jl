@@ -277,6 +277,17 @@ Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:water}) =
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:surface_temperature}) =
     sim.integrator.p.T_sfc
 Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:roughness_model}) = :constant
+"""
+    Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:runoff})
+
+Return the total (surface plus subsurface) runoff of the soil runoff model as a
+liquid water mass flux [kg m⁻² s⁻¹]. A runoff model without runoff gives zero.
+"""
+function Interfacer.get_field(sim::ClimaLandSimulation, ::Val{:runoff})
+    (; u, p, t) = sim.integrator
+    ρ_liq = LP.ρ_cloud_liq(sim.model.soil.parameters.earth_param_set)
+    return ρ_liq .* CL.Diagnostics.compute_total_runoff!(nothing, u, p, t, sim.model)
+end
 
 # Update fields stored in land drivers
 function Interfacer.update_field!(sim::ClimaLandSimulation, ::Val{:diffuse_fraction}, field)

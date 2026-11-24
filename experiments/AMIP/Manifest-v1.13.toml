@@ -601,10 +601,10 @@ version = "1.16.0"
 
 [[deps.ClimaParams]]
 deps = ["Dates", "Preferences", "TOML"]
-git-tree-sha1 = "8883cee824f8eda55053159876600088d278cdf3"
+git-tree-sha1 = "398d79d966588a6a57b3af61bb399be949b01ad5"
 registries = "General"
 uuid = "5c42b081-d73a-476f-9059-fd94b934656c"
-version = "1.3.13"
+version = "1.3.14"
 
 [[deps.ClimaTimeSteppers]]
 deps = ["ClimaComms", "Krylov", "LinearAlgebra", "LinearOperators", "NVTX", "NullBroadcasts", "StaticArrays"]
@@ -642,10 +642,10 @@ version = "0.1.35"
 
 [[deps.CloudMicrophysics]]
 deps = ["Adapt", "ClimaParams", "DocStringExtensions", "FastGaussQuadrature", "ForwardDiff", "InteractiveUtils", "LazyArtifacts", "LogExpFunctions", "RootSolvers", "SpecialFunctions", "StaticArrays", "Thermodynamics", "UnrolledUtilities"]
-git-tree-sha1 = "2877c18337a3eb23033f238541cd7ffa0661996c"
+git-tree-sha1 = "f1c48d9d03df80052c21f16d7616b94b9dd76109"
 registries = "General"
 uuid = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
-version = "0.51.0"
+version = "0.51.1"
 
     [deps.CloudMicrophysics.extensions]
     EmulatorModelsExt = ["DataFrames", "MLJ"]
@@ -752,10 +752,10 @@ weakdeps = ["Dates", "LinearAlgebra"]
 
 [[deps.CompilerCaching]]
 deps = ["LMDB", "SHA", "Scratch"]
-git-tree-sha1 = "1de3647e392372f1a77e41ae705ceaa12473bc08"
+git-tree-sha1 = "f33ca8501b3ee7c3cd9a5121637cab7ffc600374"
 registries = "General"
 uuid = "9db33cc3-5358-4881-8759-fa4194144afd"
-version = "0.5.3"
+version = "0.5.4"
 
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -2768,10 +2768,10 @@ version = "1.1.0"
 
 [[deps.Roots]]
 deps = ["Accessors", "CommonSolve", "Printf"]
-git-tree-sha1 = "15f266d7b3039ca0608d2c53bb32225b96932310"
+git-tree-sha1 = "2c8f6d5798bbb31b65d2ef65e660ab7fc00f7683"
 registries = "General"
 uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
-version = "3.0.14"
+version = "3.0.15"
 
     [deps.Roots.extensions]
     RootsChainRulesCoreExt = "ChainRulesCore"
@@ -3395,10 +3395,10 @@ version = "1.6.0+0"
 
 [[deps.YAML]]
 deps = ["Base64", "Dates", "Printf", "StringEncodings"]
-git-tree-sha1 = "9c685a6e94e255019e2bf9486318147cd42fe34a"
+git-tree-sha1 = "8dbf6e221a110f5943d39b39d4aa0d0e0d169bdd"
 registries = "General"
 uuid = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
-version = "0.4.17"
+version = "0.4.18"
 
 [[deps.Zlib_jll]]
 deps = ["Libdl"]

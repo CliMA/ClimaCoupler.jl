@@ -37,6 +37,15 @@ the atmosphere and each surface model.
     FieldExchanger.set_caches!
 ```
 
+### Concurrent stepping
+
+See [Concurrent component stepping](@ref).
+
+```@docs
+    FieldExchanger.step_slow_sims!
+    FieldExchanger.wait_slow_sims!
+```
+
 ## FieldExchanger Internal Functions
 
 ```@docs

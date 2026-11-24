@@ -33,6 +33,7 @@ export CoupledSimulation,
     step!,
     sim_dt,
     will_step,
+    is_overlapped,
     set_cache!,
     remap,
     remap!,
@@ -50,6 +51,33 @@ export CoupledSimulation,
 An abstract super-type representing a simulation.
 """
 abstract type AbstractSimulation{FT} end
+
+"""
+    SlowStep
+
+An ice/ocean step running as a task, and the model time it is advancing to.
+"""
+struct SlowStep
+    task::Task
+    target::Float64
+end
+
+"""
+    SteppingSchedule(concurrent, overlap_slow)
+
+How the component models are stepped relative to one another.
+
+- `concurrent`: step the overlapped group in its own task.
+- `overlap_slow`: let one ice/ocean step span several coupling steps.
+- `in_flight`: the running `SlowStep`, or `nothing`.
+"""
+mutable struct SteppingSchedule
+    const concurrent::Bool
+    const overlap_slow::Bool
+    in_flight::Union{Nothing, SlowStep}
+    SteppingSchedule(concurrent::Bool, overlap_slow::Bool) =
+        new(concurrent, overlap_slow, nothing)
+end
 
 """
     CoupledSimulation
@@ -72,6 +100,7 @@ struct CoupledSimulation{
     TP,
     DH,
     SC <: Bool,
+    SS <: SteppingSchedule,
     NTFA <: NamedTuple,
 }
     start_date::D
@@ -88,6 +117,7 @@ struct CoupledSimulation{
     thermo_params::TP
     diags_handler::DH
     save_cache::SC
+    schedule::SS
     flux_accumulators::NTFA
 end
 
@@ -174,6 +204,14 @@ default_coupler_fields() = [
 ]
 
 """
+    slow_cache_name(name)
+
+Coupler field holding the overlapped surfaces' share of the summed coupler field
+`name`, carried across an in-flight ice/ocean step.
+"""
+slow_cache_name(name::Symbol) = Symbol(:slow_, name)
+
+"""
     init_coupler_fields(FT, coupler_field_names, boundary_space)
 
 Allocate a Field of NamedTuples on the provided boundary space to store
@@ -215,6 +253,15 @@ abstract type AbstractSurfaceSimulation <: AbstractComponentSimulation end
 abstract type AbstractSeaIceSimulation <: AbstractSurfaceSimulation end
 abstract type AbstractLandSimulation <: AbstractSurfaceSimulation end
 abstract type AbstractOceanSimulation <: AbstractSurfaceSimulation end
+
+"""
+    is_overlapped(sim)
+
+Whether `sim` is in the ocean/sea ice group, which steps in its own task under
+`step_concurrently` and across several coupling steps under
+`overlap_slow_surfaces`. Defaults to `false`.
+"""
+is_overlapped(::AbstractComponentSimulation) = false
 
 """
     AbstractImplicitFluxSimulation

@@ -473,6 +473,47 @@ function FluxCalculator.update_turbulent_fluxes!(sim::FluxRecordingSurface, fiel
     return nothing
 end
 
+# An overlapped surface, whose step is in flight; pushing to it is an error.
+struct FrozenSurface <: Interfacer.AbstractSurfaceSimulation end
+Interfacer.is_overlapped(::FrozenSurface) = true
+FieldExchanger.update_sim!(::FrozenSurface, csf) = error("pushed to a surface in flight")
+
+@testset "a frozen step still pushes to the slow surfaces that are not overlapped" begin
+    FT = Float64
+    boundary_space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = FT(6.371e6),
+        n_quad_points = 4,
+        h_elem = 4,
+    )
+    csf = Interfacer.init_coupler_fields(
+        FT,
+        Interfacer.default_coupler_fields(),
+        boundary_space,
+    )
+    csf.SW_d .= FT(3)
+    field_names = (:SW_d, :LW_d, :P_liq, :P_snow)
+    accs = (;
+        land = FluxCalculator.FluxAccumulator(boundary_space, field_names),
+        ocean = FluxCalculator.FluxAccumulator(boundary_space, field_names),
+    )
+    foreach(acc -> FluxCalculator.accumulate_coupler_fields!(acc, csf), accs)
+    received = (;
+        SW_d = CC.Fields.zeros(boundary_space),
+        P_liq = CC.Fields.zeros(boundary_space),
+        F_lh = CC.Fields.zeros(boundary_space),
+    )
+    sims = (; land = FluxRecordingSurface(received, 0), ocean = FrozenSurface())
+    FluxCalculator.push_ready_accumulators!(
+        sims,
+        accs,
+        0.0;
+        force = true,
+        slow_frozen = true,
+    )
+    @test all(parent(sims.land.received.SW_d) .≈ FT(3))
+end
+
 # A surface may specialize `push_and_reset!` to push through its own machinery and then
 # call `reset!` (the CMIP exchange-grid path does). The averaged coupler fluxes must
 # still reach it, so they are pushed by `push_ready_accumulators!`, which is the single
@@ -531,7 +572,7 @@ FluxCalculator.push_and_reset!(
     end
 end
 
-@testset "coupler and turbulent fluxes share one step count" begin
+@testset "coupler and turbulent fluxes are averaged and reset together" begin
     for FT in (Float32, Float64)
         boundary_space = CC.CommonSpaces.CubedSphereSpace(
             FT;
@@ -574,7 +615,7 @@ end
         sim = FluxRecordingSurface(received, 0)
         FluxCalculator.push_ready_accumulators!((; sim), (; sim = acc), 0.0; force = true)
 
-        # One shared step count drives both averages.
+        # Each sum is averaged over the steps it accumulated.
         n = length(contributions)
         @test all(parent(sim.received.SW_d) .≈ sum(contributions) / n)
         @test all(parent(sim.received.P_liq) .≈ (sum(contributions) + 3 * FT(200)) / n)
@@ -618,6 +659,7 @@ FluxCalculator.ocean_seaice_fluxes!(::SteppingOcean, ice_sim::CountingSeaIce) =
         nothing,                    # thermo_params
         nothing,                    # diags_handler
         true,                       # save_cache
+        Interfacer.SteppingSchedule(false, false), # schedule
         (;),                        # flux_accumulators
     )
 

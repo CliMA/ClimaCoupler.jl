@@ -107,6 +107,14 @@ function argparse_settings()
         help = "Component model time step [allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Inf\"]"
         arg_type = String
         default = "400secs"
+        "--step_concurrently"
+        help = "Step the component models concurrently if possible"
+        arg_type = Bool
+        default = false
+        "--overlap_slow_surfaces"
+        help = "Run each ocean/sea ice step across the coupling steps it spans, so the atmosphere sees a lagged ocean (requires `step_concurrently`)"
+        arg_type = Bool
+        default = false
         "--dt_atmos"
         help = "Atmos simulation time step (alternative to `dt`; no default) [allowed formats: \"Nsecs\", \"Nmins\", \"Nhours\", \"Ndays\", \"Inf\"]"
         arg_type = String
@@ -538,6 +546,13 @@ function get_coupler_args(config_dict::Dict)
     else
         component_dt_dict = config_dict["component_dt_dict"]
     end
+
+    step_concurrently = config_dict["step_concurrently"]
+    overlap_slow_surfaces = config_dict["overlap_slow_surfaces"]
+    overlap_slow_surfaces &&
+        !step_concurrently &&
+        error("overlap_slow_surfaces requires step_concurrently")
+
     # Save solution to integrator.sol at the beginning and end
     saveat = [t_start, t_end]
 
@@ -667,6 +682,8 @@ function get_coupler_args(config_dict::Dict)
         start_date,
         Δt_cpl,
         component_dt_dict,
+        step_concurrently,
+        overlap_slow_surfaces,
         saveat,
         checkpoint_dt,
         walltime_dt,

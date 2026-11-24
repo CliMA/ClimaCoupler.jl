@@ -83,6 +83,7 @@ for FT in (Float32, Float64)
             nothing, # thermo_params
             nothing, # diags_handler
             true, # save_cache
+            Interfacer.SteppingSchedule(false, false), # schedule
             (;), # flux_accumulators
         )
 
@@ -189,6 +190,7 @@ for FT in (Float32, Float64)
             nothing, # thermo_params
             nothing, # diags_handler
             true, # save_cache
+            Interfacer.SteppingSchedule(false, false), # schedule
             (;), # flux_accumulators
         )
 

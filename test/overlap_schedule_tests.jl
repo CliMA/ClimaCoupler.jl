@@ -64,7 +64,12 @@ end
 
 # Coupler fields, read only for the device the slow task synchronizes.
 stub_fields() = CC.Fields.zeros(
-    CC.CommonSpaces.CubedSphereSpace(Float64; radius = 6.371e6, n_quad_points = 2, h_elem = 1),
+    CC.CommonSpaces.CubedSphereSpace(
+        Float64;
+        radius = 6.371e6,
+        n_quad_points = 2,
+        h_elem = 1,
+    ),
 )
 
 function build_cs(ocean, ice, t0, Δt_cpl, t_end, overlap)
@@ -111,11 +116,8 @@ function drive!(cs, ocean, nsteps)
     for _ in 1:nsteps
         cs.t[] += cs.Δt_cpl
         cs.step[] += 1
-        cs.schedule.overlap_slow || FieldExchanger.step_slow_sims!(
-            cs.model_sims,
-            cs.t[],
-            ClimaComms.device(cs),
-        )
+        cs.schedule.overlap_slow ||
+            FieldExchanger.step_slow_sims!(cs.model_sims, cs.t[], ClimaComms.device(cs))
         frozen = SimCoordinator.join_slow_if_due!(cs)
         frozen || (visible = ocean.clock)
         push!(seen, visible)

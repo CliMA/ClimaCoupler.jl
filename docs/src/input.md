@@ -28,6 +28,16 @@ multiple configuration files can be used together:
 - **Atmos config file** (`--atmos_config_file`): Optional ClimaAtmos-specific configuration
 - **TOML parameter files** (`--coupler_toml`): One or more TOML files containing model parameters
 
+All components share one set of parameters, built in layers where later layers take
+precedence:
+
+1. ClimaParams defaults
+2. ClimaLand's `toml/default_parameters.toml`, when the land model is ClimaLand
+3. The files listed under the `toml` key of the atmosphere config file
+4. The `coupler_toml` files, in the order given
+
+Setup warns when layer 3 overrides a value from layer 2.
+
 Sometimes, the coupler config file includes options that are not defined in ClimaCoupler.jl,
 but affect only the atmosphere model. For example `output_default_diagnostics` controls
 only the atmosphere diagnostics, despite its generic name. The full set of options used by

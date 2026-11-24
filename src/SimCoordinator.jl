@@ -274,8 +274,21 @@ function _build_coupled_simulation(config_dict::AbstractDict)
         scm_surface_type,
     ) = Input.get_coupler_args(config_dict)
 
+    # ClimaParams defaults < land defaults < atmosphere `toml` < `coupler_toml`
+    land_files = Input.land_parameter_files(land_model)
+    atmos_files = Input.atmos_parameter_files(config_dict)
+    land_params = CP.merge_toml_files(land_files; override = true)
+    atmos_params = CP.merge_toml_files(atmos_files; override = true)
+    conflicts = filter(intersect(keys(land_params), keys(atmos_params))) do name
+        land_params[name]["value"] != atmos_params[name]["value"]
+    end
+    isempty(conflicts) ||
+        @warn "Atmosphere parameter files override land defaults" conflicts
+    land_defaults = CP.create_toml_dict(FT; override_file = land_params).data
+    defaults =
+        CP.create_toml_dict(FT; override_file = atmos_params, default_file = land_defaults).data
     override_file = CP.merge_toml_files(parameter_files; override = true)
-    coupled_param_dict = CP.create_toml_dict(FT; override_file)
+    coupled_param_dict = CP.create_toml_dict(FT; override_file, default_file = defaults)
     thermo_params = TDP.ThermodynamicsParameters(coupled_param_dict)
 
     dir_paths = Utilities.setup_output_dirs(

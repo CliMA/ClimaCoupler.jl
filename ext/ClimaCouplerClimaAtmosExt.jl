@@ -673,7 +673,7 @@ end
 ### ClimaAtmos.jl model-specific functions (not explicitly required by ClimaCoupler.jl)
 ###
 """
-    get_atmos_config_dict(coupler_config::Dict, atmos_output_dir)
+    get_atmos_config_dict(coupler_config::Dict, atmos_output_dir, coupled_param_dict, comms_ctx)
 
 Returns the specified atmospheric configuration (`atmos_config`) overwitten by arguments
 in the coupler dictionary (`coupler_config`).
@@ -685,17 +685,11 @@ Please see the documentation of `get_coupler_config_dict` for more details about
 
 This function makes the following changes to `coupler_config` when creating `atmos_config`:
 - Renaming for consistency with ClimaAtmos.jl
-- TOML parameter file selection (see details below)
 - Setting the atmos output directory to the provided `atmos_output_dir`
 - Adding extra atmosphere diagnostics
 - Manually setting the restart file suffix
 
-The TOML parameter file to use is chosen using the following priority:
-If a coupler TOML file is provided, it is used.
-Otherwise we use an atmos TOML file if it's provided.
-If neither file is provided, the default ClimaAtmos parameters are used.
-This is analogous to the logic in `get_coupler_config_dict` for selecting
-the coupler configuration TOML file.
+The atmosphere uses `coupled_param_dict` as its parameters.
 """
 function get_atmos_config_dict(
     coupler_config::Dict,
@@ -720,27 +714,11 @@ function get_atmos_config_dict(
         coupler_config["dt"]
     atmos_config["dt"] = dt_atmos
 
-    # Set up the atmosphere parameter dictionary (`toml_dict`)
-    # If we can't find the atmos TOML file at the relative path, prepend pkgdir(ClimaAtmos)
-    atmos_toml = map(atmos_config["toml"]) do file
-        isfile(file) ? file : joinpath(pkgdir(CA), file)
-    end
-    # Use atmos toml only if coupler toml is not defined
-    coupler_toml = atmos_config["coupler_toml"]
-    toml = isempty(coupler_toml) ? atmos_toml : coupler_toml
-    if !isempty(toml)
-        @info "Overwriting Atmos parameters from input TOML file(s): $toml"
-        atmos_config["toml"] = toml
-    end
-
     # If running in SCM mode, set the atmosphere space type and lat/lon
     coupler_config["domain_type"] == "column" && (atmos_config["config"] = "column")
 
-    # Override atmos parameters with coupled parameters
     FT = atmos_config["FLOAT_TYPE"] == "Float64" ? Float64 : Float32
-    override_file = CP.merge_toml_files(atmos_config["toml"], override = true)
-    atmos_toml = CP.create_toml_dict(FT; override_file)
-    toml_dict = CP.merge_override_default_values(coupled_param_dict, atmos_toml)
+    toml_dict = coupled_param_dict
 
     # Specify atmos output directory to be inside the coupler output directory.
     atmos_config["output_dir_style"] = "RemovePreexisting"
@@ -783,6 +761,15 @@ end
 Returns the default configuration dictionary for the ClimaAtmos model.
 """
 Input.atmos_default_config_dict() = CA.default_config_dict()
+
+"""
+    Input.atmos_parameter_files(config_dict)
+
+Returns the atmosphere parameter files under the `toml` key of `config_dict`. Files not
+found as given are looked up in ClimaAtmos.
+"""
+Input.atmos_parameter_files(config_dict) =
+    map(file -> isfile(file) ? file : joinpath(pkgdir(CA), file), config_dict["toml"])
 
 """
     get_thermo_params(sim::ClimaAtmosSimulation)

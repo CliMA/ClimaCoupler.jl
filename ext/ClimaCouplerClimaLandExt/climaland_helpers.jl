@@ -167,3 +167,11 @@ function _coupler_set_ic!(Y, p, t, model::CL.LandModel, T_sfc, surface_elevation
     p.T_sfc .= Y.canopy.energy.T
     p.ϵ_sfc .= 1
 end
+
+"""
+    Input.land_parameter_files(::Union{Val{:bucket}, Val{:integrated}})
+
+Returns the ClimaLand default parameter file.
+"""
+Input.land_parameter_files(::Union{Val{:bucket}, Val{:integrated}}) =
+    [LP.DEFAULT_PARAMS_FILEPATH]

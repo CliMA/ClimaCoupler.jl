@@ -443,6 +443,21 @@ function atmos_default_config_dict(_...)
 end
 
 """
+    atmos_parameter_files(config_dict)
+
+Return the atmosphere parameter files under the `toml` key of `config_dict`. Defined when
+the ClimaCouplerClimaAtmosExt extension is loaded.
+"""
+function atmos_parameter_files end
+
+"""
+    land_parameter_files(land_model)
+
+Return the default parameter files of `land_model`.
+"""
+land_parameter_files(_) = String[]
+
+"""
     update_t_start_for_restarts!(config_dict)
 
 Update `t_start` in `config_dict` for restarts.

@@ -43,7 +43,7 @@ end
         atmos_h,
         initial_T,
         use_land_diagnostics::Bool = true,
-        parameter_files = [],
+        coupled_param_dict = LP.create_toml_dict(FT),
         land_ic_path::Union{Nothing,String} = nothing,
         lai_source::String = "modis_monthly",
         gustiness::FT = FT(1),
@@ -84,17 +84,14 @@ function ClimaLandSimulation(
     use_land_diagnostics::Bool = true,
     land_diagnostics_period::Symbol = :monthly,
     land_diagnostics_reduction::Symbol = :average,
-    coupled_param_dict = CP.create_toml_dict(FT),
+    coupled_param_dict = LP.create_toml_dict(FT),
     land_ic_path::Union{Nothing, String} = nothing,
     lai_source::String = "modis_monthly",
     gustiness::FT = FT(1),
     dt_drivers::ITime = ITime(3600),
     extra_kwargs...,
 ) where {FT, TT <: Union{Float64, ITime}}
-    # Get default land parameters from ClimaLand.LandParameters
-    land_toml_dict = LP.create_toml_dict(FT)
-    # Override land parameters with coupled parameters
-    toml_dict = CP.merge_override_default_values(coupled_param_dict, land_toml_dict)
+    toml_dict = coupled_param_dict
 
     # Note that this does not take into account topography of the surface, which is OK for this land model.
     # But it must be taken into account when computing surface fluxes, for Δz.

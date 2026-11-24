@@ -28,7 +28,8 @@ Device-resident per-polygon scratch for the exchange-grid flux computation of
 one surface model (one instance for the ocean, one for sea ice): the gathered
 atmospheric and surface state (momentum in the UV basis; downwelling
 radiation `SW_d`/`LW_d` and precipitation `P_liq`/`P_snow`; `T_sfc` in [K]),
-the flux outputs (`F_*`), running time accumulators for the slow-surface path
+the flux outputs (`F_*`) and the screen-level (2 m) air temperature `T_2m`
+[K] of the flux solve, running time accumulators for the slow-surface path
 (`acc_*`, with `n_acc` counting contributions), and two generic scratch
 vectors.
 """
@@ -53,6 +54,7 @@ struct ExchangeFluxState{FT, VF <: AbstractVector{FT}}
     F_moisture::VF
     F_τu::VF
     F_τv::VF
+    T_2m::VF
     acc_F_sh::VF
     acc_F_lh::VF
     acc_F_moisture::VF
@@ -231,6 +233,7 @@ end
     fs.F_moisture,
     fs.F_τu,
     fs.F_τv,
+    fs.T_2m,
     fs.acc_F_sh,
     fs.acc_F_lh,
     fs.acc_F_moisture,
@@ -245,6 +248,7 @@ end
         fs.F_moisture[k] = out.F_turb_moisture
         fs.F_τu[k] = out.F_turb_ρτxz
         fs.F_τv[k] = out.F_turb_ρτyz
+        fs.T_2m[k] = out.T_2m
         fs.acc_F_sh[k] += out.F_sh
         fs.acc_F_lh[k] += out.F_lh
         fs.acc_F_moisture[k] += out.F_turb_moisture
@@ -350,6 +354,8 @@ end
             F_lh = z,
             F_turb_moisture = z,
             T_sfc_new = T_sfc_guess,
+            # Weighted by the zero ice concentration when aggregated
+            T_2m = T_atmos,
         )
     end
     update_T_sfc_cb = update_T_sfc(R, T_i, σ, ϵ, SW_d, LW_d, α_albedo, T_melt)
@@ -572,10 +578,11 @@ end
                                      fs::ExchangeFluxState, weight)
 
 Aggregate per-polygon fluxes onto the SE boundary space as a `weight`-weighted
-average, filling the `remapping.flux_scratch` fields for
-`FluxCalculator.update_flux_fields!`. `weight` selects the sub-surface the
-fluxes apply to — `1 - sic` for open ocean, `sic` for sea ice — so the nodal
-result is a per-unit-*weighted*-area flux. Uses `fs.scratch1` internally;
+average, filling the `remapping.flux_scratch` fields (the fluxes and the
+screen-level air temperature `T_2m`) for `FluxCalculator.update_flux_fields!`.
+`weight` selects the sub-surface the fluxes apply to — `1 - sic` for open ocean,
+`sic` for sea ice — so the nodal result is a per-unit-*weighted*-area flux (and
+temperature). Uses `fs.scratch1` internally;
 `weight` must not alias it.
 """
 NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
@@ -599,6 +606,8 @@ NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
     scatter_polys_to_nodes!(se_nodal_vec(fx.F_turb_ρτxz), eg, fs.scratch1)
     @. fs.scratch1 = weight * fs.F_τv
     scatter_polys_to_nodes!(se_nodal_vec(fx.F_turb_ρτyz), eg, fs.scratch1)
+    @. fs.scratch1 = weight * fs.T_2m
+    scatter_polys_to_nodes!(se_nodal_vec(fx.T_2m), eg, fs.scratch1)
 
     z = zero(CC.Spaces.undertype(axes(cov)))
     _dss_and_normalize!(fx.F_sh, cov, buf, z)
@@ -606,6 +615,7 @@ NVTX.@annotate function scatter_poly_fluxes_to_boundary!(
     _dss_and_normalize!(fx.F_turb_moisture, cov, buf, z)
     _dss_and_normalize!(fx.F_turb_ρτxz, cov, buf, z)
     _dss_and_normalize!(fx.F_turb_ρτyz, cov, buf, z)
+    _dss_and_normalize!(fx.T_2m, cov, buf, z)
 
     parent(remapping.temp_uv_vec.components.data.:1) .= parent(fx.F_turb_ρτxz)
     parent(remapping.temp_uv_vec.components.data.:2) .= parent(fx.F_turb_ρτyz)

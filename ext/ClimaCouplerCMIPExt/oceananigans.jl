@@ -426,6 +426,7 @@ function construct_remapper(grid_oc, boundary_space; use_intersection_grid = tru
             F_sh = CC.Fields.zeros(boundary_space),
             F_lh = CC.Fields.zeros(boundary_space),
             F_turb_moisture = CC.Fields.zeros(boundary_space),
+            T_2m = CC.Fields.zeros(boundary_space),
         )
         flux_dss_buffer = Utilities.init_dss_buffer(flux_scratch.F_sh)
     else

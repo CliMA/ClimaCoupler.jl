@@ -10,10 +10,12 @@ It contains the following objects:
 - `model::M`: The `ClimaLand.Bucket.BucketModel`.
 - `integrator::I`: The integrator used in timestepping this model.
 - `area_fraction::A`: A ClimaCore Field on the boundary space representing the surface area fraction of this component model.
-- `flux_buffer::FB`: A ClimaCore Field of NamedTuples on the bucket surface space, used as a
-    scratch space to hold the turbulent fluxes computed at each coupling step when using
-    flux accumulation. This is needed because bucket fluxes are computed on the bucket's
-    surface space via `CL.turbulent_fluxes_at_a_point`.
+- `flux_buffer::FB`: A ClimaCore Field of NamedTuples on the bucket surface space holding the
+    output of `CL.turbulent_fluxes_at_a_point` at each coupling step: the fluxes of
+    `p.bucket.turbulent_fluxes` and the state of the flux solve (`SOLVE_STATE_NAMES`), from
+    which the screen-level air temperature is reconstructed. Fast buckets copy the fluxes into
+    `p.bucket.turbulent_fluxes`; slow buckets accumulate them instead, so the time-averaged
+    fluxes already there are not overwritten.
 - `output_writer`: The diagnostic file writer.
 """
 struct BucketSimulation{
@@ -202,10 +204,14 @@ function BucketSimulation(
         updateat = dt_drivers,
     )
 
-    # Scratch buffer for `turbulent_fluxes_at_a_point` output when the bucket is a slow
-    # surface, so we don't clobber the time-averaged fluxes already in
-    # `p.bucket.turbulent_fluxes`. Unused for fast buckets.
-    flux_buffer = similar(simulation._integrator.p.bucket.turbulent_fluxes)
+    # Output of `turbulent_fluxes_at_a_point` at each coupling step: the bucket's fluxes and
+    # the state of the flux solve, for the screen-level air temperature
+    bucket_fluxes = simulation._integrator.p.bucket.turbulent_fluxes
+    buffer_names = (propertynames(bucket_fluxes)..., SOLVE_STATE_NAMES...)
+    flux_buffer = CC.Fields.Field(
+        NamedTuple{buffer_names, NTuple{length(buffer_names), FT}},
+        axes(bucket_fluxes),
+    )
 
     return BucketSimulation(
         model,
@@ -215,6 +221,10 @@ function BucketSimulation(
         output_writer,
     )
 end
+
+# The state of the bucket's flux solve kept in `flux_buffer`, from which
+# `ClimaLand.screen_level_values` reconstructs the screen-level air temperature
+const SOLVE_STATE_NAMES = (:T_sfc, :q_sfc, :ustar, :ζ, :Δz_eff)
 
 # extensions required by Interfacer
 Interfacer.get_field(sim::BucketSimulation, ::Val{:area_fraction}) = sim.area_fraction
@@ -362,16 +372,18 @@ This function computes surface fluxes between the bucket simulation and the atmo
 The bucket computes its turbulent fluxes into its own cache fields rather than into the
 coupler fields, so we cannot use the generic `FluxCalculator.update_flux_fields!`. Instead:
 
-1. Compute the turbulent fluxes at each coupler step via `turbulent_fluxes_at_a_point` directly
-   into `bucket_dest`. For fast buckets (`dt_land <= dt_cpl`), `bucket_dest = p.bucket.turbulent_fluxes`.
-   For slow buckets, `bucket_dest = sim.flux_buffer` so we don't overwrite the time-averaged fluxes
-   already in `p.bucket.turbulent_fluxes`.
+1. Compute the turbulent fluxes and the state of the flux solve at each coupler step via
+   `turbulent_fluxes_at_a_point` into `sim.flux_buffer`. Fast buckets (`dt_land <= dt_cpl`)
+   copy the fluxes into `p.bucket.turbulent_fluxes`; slow buckets leave the time-averaged
+   fluxes already there untouched.
 2. Remap each component to the coupler boundary-space `sim.remapped_fluxes`, including the
    `vapor_flux` (m/s) → `F_turb_moisture` (kg/m²/s) unit conversion. For slow buckets,
    also add the fluxes to the accumulator, which will be sent to the bucket just before it steps.
+3. Reconstruct the screen-level (2 m) air temperature from the flux solve and add its
+   area-weighted contribution to `csf.T_2m`.
 
 # Arguments
-- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`.
+- `csf`: [CC.Fields.Field] containing a NamedTuple of turbulent flux fields: `F_turb_ρτxz`, `F_turb_ρτyz`, `F_lh`, `F_sh`, `F_turb_moisture`, and the screen-level air temperature `T_2m`.
 - `sim`: [BucketSimulation] the bucket simulation to compute fluxes for.
 - `atmos_sim`: [Interfacer.AbstractAtmosSimulation] the atmosphere simulation to compute fluxes with.
 - `thermo_params`: [ClimaParams.ThermodynamicParameters] the thermodynamic parameters for the simulation.
@@ -386,9 +398,9 @@ function FluxCalculator.compute_surface_fluxes!(
 )
     Y, p, model = sim.integrator.u, sim.integrator.p, sim.model
 
-    # For fast buckets, write directly to the cache. For slow buckets, use `flux_buffer`
-    # to hold the intermediate fluxes while we accumulate them.
-    bucket_dest = isnothing(accumulator) ? p.bucket.turbulent_fluxes : sim.flux_buffer
+    # The fluxes and the state of the flux solve; fast buckets copy the fluxes into
+    # `p.bucket.turbulent_fluxes` below, slow buckets accumulate them.
+    bucket_dest = sim.flux_buffer
 
     coupled_atmos = sim.model.atmos
     T_sfc = CL.component_temperature(model, Y, p)
@@ -401,11 +413,10 @@ function FluxCalculator.compute_surface_fluxes!(
     update_∂T_sfc∂T = CL.get_∂T_sfc∂T_function(model, Y, p)
     update_∂q_sfc∂T = CL.get_∂q_sfc∂T_function(model, Y, p)
     earth_param_set = CL.get_earth_param_set(model)
-    momentum_fluxes = Val(CL.return_momentum_fluxes(coupled_atmos))
     gustiness = SF.ConstantGustinessSpec(coupled_atmos.gustiness)
 
     bucket_dest .= CL.turbulent_fluxes_at_a_point.(
-        momentum_fluxes,
+        Val(propertynames(bucket_dest)),
         p.drivers.P,
         p.drivers.T,
         p.drivers.q,
@@ -421,8 +432,16 @@ function FluxCalculator.compute_surface_fluxes!(
         update_∂T_sfc∂T,
         update_∂q_sfc∂T,
         gustiness,
+        # `coupled_atmos.h` is the height above the ground
+        SF.ReferenceAboveSurface(),
         earth_param_set,
     )
+    if isnothing(accumulator)
+        bucket_fluxes = p.bucket.turbulent_fluxes
+        for name in propertynames(bucket_fluxes)
+            getproperty(bucket_fluxes, name) .= getproperty(bucket_dest, name)
+        end
+    end
 
     # Per-component: remap bucket-space src into `csf.scalar_temp1`, area-mask, add the
     # area-weighted contribution to `csf.F_*`, and (slow case) also add the masked value
@@ -462,6 +481,28 @@ function FluxCalculator.compute_surface_fluxes!(
     isnothing(accumulator) || (@. accumulator.F_turb_ρτyz += csf.scalar_temp1)
 
     isnothing(accumulator) || (accumulator.n_steps[] += 1)
+
+    # Screen-level (2 m) air temperature, reconstructed from the flux solve as ClimaLand
+    # does for its soil (`ClimaLand.screen_level_values`). Allocates the bucket-space result.
+    FT = CC.Spaces.undertype(axes(csf))
+    (; z_0m, z_0b) = model.parameters
+    screen_level = @. CL.screen_level_values(
+        bucket_dest.T_sfc,
+        bucket_dest.q_sfc,
+        bucket_dest.ustar,
+        bucket_dest.ζ,
+        bucket_dest.Δz_eff,
+        z_0m,
+        z_0b,
+        p.drivers.T,
+        p.drivers.q,
+        CL.screen_height(FT),
+        CL.anemometer_height(FT),
+        earth_param_set,
+    )
+    Interfacer.remap!(csf.scalar_temp1, screen_level.T)
+    @. csf.T_2m +=
+        ifelse(area_fraction ≈ 0, zero(csf.scalar_temp1), csf.scalar_temp1 * area_fraction)
 
     return nothing
 end

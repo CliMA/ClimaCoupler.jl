@@ -117,7 +117,8 @@ for FT in (Float32, Float64)
             energy_bc = zeros(boundary_space),
             ρq_tot_bc = zeros(boundary_space),
             uₕ_bc = ones(boundary_space),
-            z = ones(boundary_space),
+            # first interior level above the screen level
+            z = ones(boundary_space) .* FT(10),
             height_sfc = zeros(boundary_space),
             u = ones(boundary_space),
             v = ones(boundary_space),
@@ -229,6 +230,10 @@ for FT in (Float32, Float64)
         @test fields.F_lh ≈ fluxes_expected.F_lh
         @test fields.F_sh ≈ fluxes_expected.F_sh
         @test fields.F_turb_moisture ≈ fluxes_expected.F_turb_moisture
+        # The screen-level temperature is the area-weighted mean over the two
+        # (identical) surfaces, between the surface (300 K) and the air (310 K)
+        @test fields.T_2m ≈ fluxes_expected.T_2m
+        @test all(FT(300) .< parent(fields.T_2m) .< FT(310))
     end
 
     @testset "get_surface_params for FT=$FT" begin

@@ -4,6 +4,19 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Screen-level (2 m) air temperature of each surface for the atmosphere's `tas`
+`:T_2m` is a default coupler field: the area-weighted screen-level air temperature of
+the surfaces, which ClimaAtmos outputs as its `tas` diagnostic (`sfc_conditions.T_2m`).
+Each surface reconstructs it from the Monin-Obukhov profiles of its own flux solve, so it
+uses the surface's own temperature, roughness, and stability:
+- surfaces whose fluxes the coupler computes (ocean, sea ice, including the exchange-grid
+  fluxes) with `SurfaceFluxes.screen_level_values`, returned by
+  `FluxCalculator.get_surface_fluxes` as `T_2m`;
+- the integrated land model with ClimaLand's `t2m` diagnostic, the mean over soil, snow,
+  and canopy;
+- the bucket with `ClimaLand.screen_level_values`, from its flux solve.
+Requires SurfaceFluxes 1.5 and a ClimaAtmos version with `sfc_conditions.T_2m`.
+
 #### Average ClimaAtmos precipitation over the atmosphere steps of a coupling step
 The `liquid_precipitation` and `snow_precipitation` that `ClimaAtmosSimulation` passes to the surfaces
 are the mean over the atmosphere steps taken in one coupling step, not just the last value.

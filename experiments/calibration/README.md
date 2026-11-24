@@ -7,28 +7,20 @@ whole experiment: the model YAML file, the loss fields, the dates, the priors an
 
 ```julia
 observables = [
-    Observable(
-        name = "swcre",
-        reduce = seasonal_average ∘ zonal_average,
-        model_error_fraction = 0.3,
-    ),
-    Observable(
-        name = "rtmt",
-        reduce = seasonal_average ∘ global_mean,
-        noise_sd = 0.2,
-    ),
-],
+    Observable("swcre", seasonal_average ∘ zonal_average; model_error_fraction = 0.3),
+    Observable("rtmt", seasonal_average ∘ global_mean; noise_sd = 0.2),
+]
 ```
 
 `reduce` is any function from an `OutputVar` to an `OutputVar`, applied to the
 observations and the model output alike (`mask_and_reduce` in `preprocessing.jl`):
 `zonal_average`, `global_mean`, your own, or a composition such as
-`seasonal_average ∘ zonal_average` for seasonal means. Maps take
-`model_error_fraction`, the model error as a fraction of the observed mean
-(`make_observation_vector` in `generate_observations.jl`). A global mean takes
-`noise_sd`, which sets its weight against the maps. Comment out an entry to drop
-a field. Observations and model output stay in physical units. See the
-`Observable` and `CalibrateConfig` docstrings for every setting.
+`seasonal_average ∘ zonal_average` for seasonal means. `model_error_fraction` estimates an
+`SVDplusD` covariance across `covariance_date_ranges` with model error as a fraction of the
+reduced observable's mean (`make_observation_vector` in `generate_observations.jl`).
+`noise_sd` gives diagonal noise with standard deviation `noise_sd` in physical units.
+Comment out an entry to drop a field. Observations and model output stay in physical units.
+See the `Observable` and `CalibrateConfig` docstrings for every setting.
 
 To calibrate on a new field, add its observation's loader to
 `default_data_loader` and, if the model does not output it directly in the same
@@ -36,15 +28,21 @@ units, a `model_var` method, both in `src/CalibrationTools.jl`.
 
 ## Configs:
 
-- `son2010_cre_toa.jl`: the default. swcre and lwcre zonal means plus the global
-  net TOA flux (`rtmt`), SON 2010 seasonal means, 2 iterations, members from
-  2010-07-01 to 2010-12-01, noise estimated over SON 2001-2010.
+- `year2010_rsut_rlut_pr.jl`: the default. rsut, rlut, and pr from December 2009 to
+  November 2010, each as its global annual mean, its annual map minus that mean,
+  and each season's map minus the annual map, with each of the nine parts weighted
+  as 29 effective entries. Members from 2009-11-01 to 2010-12-01, noise
+  estimated over the 23 December-to-November years from December 2000 to
+  November 2023.
 - `pipeline_test.jl`: an end-to-end test that runs a single iteration using `ta`
   and `hur` observations of October 2010. To use this config, you
   should set the environment variable `TEST_CALIBRATION` to anything before
   generating the observations and starting the calibration. It runs the
   ensemble members one after another on the CPU in the current process, so it
   needs no workers or job submissions.
+
+Set `CALIBRATION_CONFIG` in the environment to run another config file without editing
+`run_calibration.jl` or `generate_observations.jl`.
 
 ## Running a calibration
 

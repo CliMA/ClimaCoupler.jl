@@ -1,4 +1,5 @@
 using Dates: Week, Month, Year, Day, Millisecond
+import Distributed
 import JLD2
 import ClimaAnalysis
 import ClimaCoupler
@@ -59,12 +60,13 @@ end
 """
     load_and_preprocess_vars(simdir, short_names, config)
 
-Load the model output in `simdir` for the loss fields `short_names`, from
-`CalibrationTools.model_var`, and preprocess it.
+Load the model output in `simdir` for the observables `short_names`, from
+`CalibrationTools.model_var`, and preprocess it. Each field is loaded once, however many
+observables are computed from it.
 """
 function load_and_preprocess_vars(simdir::ClimaAnalysis.SimDir, short_names, config)
     vars = []
-    for short_name in short_names
+    for short_name in unique(observable(config, name).field for name in short_names)
         # A field on both pressure and altitude gives both; GEnsembleBuilder picks the one
         # the observation uses.
         append!(vars, CalibrationTools.model_var(simdir, short_name))
@@ -142,6 +144,28 @@ function ClimaCalibrate.observation_map(interface::CouplerModelInterface, iterat
     if count(isnan, g_ens) > 0.9 * length(g_ens)
         error("Too many NaNs")
     end
-    return EnsembleBuilder.is_complete(g_ens_builder) ? g_ens :
-           error("G ensemble matrix is not completed")
+    EnsembleBuilder.is_complete(g_ens_builder) ||
+        error("G ensemble matrix is not completed")
+
+    # If another iteration follows, retire any worker whose remaining job walltime is less
+    # than the time it has already spent running, so WorkerBackend's reconcile_workers!
+    # launches a fresh replacement worker instead of starting the next iteration on a
+    # worker that will time out mid-member.
+    if iteration < config.n_iterations
+        now = time()
+        walltime_secs = config.worker_walltime * 60.0
+        for row in ClimaCalibrate.worker_rows()
+            (isnothing(row.pid) || isnothing(row.ready_at) || !isnothing(row.ended_at)) &&
+                continue
+            elapsed = now - row.ready_at
+            remaining = walltime_secs - elapsed
+            if remaining < elapsed
+                @info "Retiring worker $(row.pid) (job $(row.job_id)) before iteration $(iteration + 1)" elapsed_min =
+                    round(elapsed / 60; digits = 1) remaining_min =
+                    round(remaining / 60; digits = 1)
+                Distributed.remotecall(exit, row.pid)
+            end
+        end
+    end
+    return g_ens
 end

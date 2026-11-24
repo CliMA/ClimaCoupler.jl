@@ -25,49 +25,109 @@ push!(ClimaAnalysis.Var.ALTITUDE_NAMES, "height")
 One loss field of a calibration. See the `Observable` constructor.
 """
 struct Observable{F}
-    "Short name of the field, as in `default_data_loader` and `model_var`"
+    "Name of the observable in the loss"
     name::String
 
     "Function from an `OutputVar` to an `OutputVar`, applied to the observation and the
     model output alike"
     reduce::F
 
-    "Model error as a fraction of the observed mean, for a field that keeps latitude"
+    "Model error as a fraction of the reduced observable's mean across covariance dates"
     model_error_fraction::Union{Nothing, Float64}
 
-    "Standard deviation of independent noise in the field's units, for a field reduced to
-    one value per date"
+    "Per-entry error scale in the field's units, for independent diagonal noise"
     noise_sd::Union{Nothing, Float64}
+
+    "Short name of the field the observable is computed from, by default `name`"
+    field::String
+
+    "Effective observation count (block weight in effective-entry units), or `nothing` to
+    count every entry"
+    effective_entries::Union{Nothing, Float64}
 end
 
+_reduction_name(f::ComposedFunction) =
+    "$(_reduction_name(f.outer))_$(_reduction_name(f.inner))"
+function _reduction_name(f)
+    n = string(nameof(f))
+    startswith(n, "#") &&
+        error("Give Observable an explicit name when reduce is an anonymous function")
+    return n
+end
+
+_default_observable_name(field::String, reduce) =
+    reduce === identity ? field : "$(field)_$(_reduction_name(reduce))"
+
 """
-    Observable(; name, reduce, model_error_fraction = nothing, noise_sd = nothing)
+    Observable(field, reduce; kwargs...)
+    Observable(; name = nothing, field = nothing, reduce,
+               model_error_fraction = nothing, noise_sd = nothing,
+               effective_entries = nothing)
 
 One loss field of a calibration, for example
 
-    Observable(name = "swcre", reduce = zonal_average, model_error_fraction = 0.3)
-    Observable(name = "rtmt", reduce = global_mean, noise_sd = 0.2)
+    Observable("swcre", zonal_average; model_error_fraction = 0.3)
+    Observable("rtmt", global_mean; noise_sd = 0.2)
 
-`name` is the short name of the field. `reduce` is a function from an `OutputVar` to an
-`OutputVar`, applied identically to the observations and the model output, after the
-regridding and coverage masking both sides share. Compose it with `seasonal_average` to
-compare seasonal means, e.g. `seasonal_average ∘ zonal_average`, and set `extend` to match.
+`field` is the short name of the field in `default_data_loader` and `model_var`, and
+defaults to `name` when `name` is given. `name` is the observable's name in the loss, and
+defaults to `field` when `reduce === identity` or `"$(field)_$(nameof(reduce))"` otherwise.
 
-Give exactly one of `model_error_fraction` and `noise_sd`. A field that keeps latitude
-takes `model_error_fraction`, the model error as a fraction of the observed mean
-(`make_observation_vector` in `experiments/calibration/amip/generate_observations.jl`). A
-field reduced to one value per date takes `noise_sd`, independent noise in its own units,
-whose value sets its weight against the other fields.
+`reduce` is a function from an `OutputVar` to an `OutputVar`, applied identically to the
+observations and the model output after regridding and shared coverage masking. Compose it
+with `seasonal_average` to compare seasonal means, e.g. `seasonal_average ∘ zonal_average`.
+
+Give exactly one of `model_error_fraction` and `noise_sd`. `model_error_fraction` estimates
+an `SVDplusD` covariance across `covariance_date_ranges` with a model-error term equal to
+that fraction of the reduced observable's time mean (`make_observation_vector` in
+`experiments/calibration/amip/generate_observations.jl`). `noise_sd` uses a diagonal
+covariance with per-entry standard deviation `noise_sd` in the field's physical units. Each
+observable has its own noise covariance block.
+
+`effective_entries` weights the observable as that many independent unit-variance
+observations in both the loss and `EffectiveEntriesController`
+(`experiments/calibration/amip/step_size_rule.jl`), whatever its raw entry count
+`n_entries`:
+
+1. Divide its total whitened misfit by `n_entries` to get the average squared error per
+   entry (near 1 at baseline when `noise_sd` or `model_error_fraction` equals the baseline
+   RMSE).
+2. Multiply that average by `effective_entries` (implemented by scaling the block's noise
+   covariance by `n_entries / effective_entries`).
+
+When `nothing`, every entry counts with weight 1 and the covariance is unscaled.
 """
-function Observable(; name, reduce, model_error_fraction = nothing, noise_sd = nothing)
+Observable(field, reduce; kwargs...) = Observable(; field, reduce, kwargs...)
+
+function Observable(;
+    name = nothing,
+    reduce,
+    model_error_fraction = nothing,
+    noise_sd = nothing,
+    field = nothing,
+    effective_entries = nothing,
+)
+    isnothing(name) &&
+        isnothing(field) &&
+        error("Observable needs at least one of name and field")
+    obs_field = String(something(field, name))
+    obs_name =
+        isnothing(name) ? _default_observable_name(obs_field, reduce) : String(name)
     isnothing(model_error_fraction) == isnothing(noise_sd) &&
-        error("Observable $name needs exactly one of model_error_fraction and noise_sd")
+        error("Observable $obs_name needs exactly one of model_error_fraction and noise_sd")
+    isnothing(effective_entries) ||
+        effective_entries > 0 ||
+        error(
+            "Observable $obs_name needs positive effective_entries, got $effective_entries",
+        )
     to_float(x) = isnothing(x) ? nothing : Float64(x)
     return Observable(
-        String(name),
+        obs_name,
         reduce,
         to_float(model_error_fraction),
         to_float(noise_sd),
+        obs_field,
+        to_float(effective_entries),
     )
 end
 
@@ -148,19 +208,24 @@ Keyword arguments
 
 - `n_iterations`: The number of iterations to run the calibration for.
 
-- `sample_date_ranges`: The target date ranges, each once. Iterations cycle through them in
-  order, one per iteration. The dates should be the same as found in the time series data
-  of the observations after the `reduce` functions, e.g. `(DateTime(2010, 9, 1),
-  DateTime(2010, 9, 1))` for SON 2010 seasonal means.
+- `sample_date_ranges`: The target date ranges `(start, stop)`, each once. Iterations
+  cycle through them in order, one per iteration. Each member simulation runs from
+  `start - spinup` to `stop + extend`, and `snap_date_ranges` in
+  `experiments/calibration/amip/generate_observations.jl` shrinks `(start, stop)` to the
+  dates each reduced observable has inside that window. Because monthly diagnostics are
+  dated by the first of the month, give `(first_month, last_month)` with `extend =
+  Dates.Month(1)`, for example `(DateTime(2009, 12, 1), DateTime(2010, 11, 1))` for a
+  December-to-November year or `(DateTime(2010, 9, 1), DateTime(2010, 11, 1))` for SON
+  2010.
 
 - `covariance_date_ranges`: The date ranges whose observations estimate the noise
-  covariance, typically the same season in about ten years. Required to generate
+  covariance, using the same window span as `sample_date_ranges`. Required to generate
   observations.
 
-- `extend`: The amount of time to run the simulation after the end date
-  determined by `sample_date_ranges`. For seasonal averages, `extend` should be
-  `Dates.Month(3)` and for monthly averages, `extend` should be
-  `Dates.Month(1)`.
+- `extend`: The amount of time to run the simulation after the end date `stop` of
+  `sample_date_ranges`, typically `Dates.Month(1)` when `stop` is the first day of the last
+  target month (or `Dates.Month(3)` when `stop` is the first month of a single target
+  season).
 
 - `spinup`: The amount of time to run the simulation before the start date
   determined by `sample_date_ranges`.
@@ -191,7 +256,12 @@ function CalibrateConfig(;
     worker_walltime = 350,
 )
     isfile(config_file) || error("Configuration file ($config_file) does not exist")
-    isempty(observables) && error("The config needs at least one observable")
+    flat_observables = Observable[]
+    for item in observables
+        item isa AbstractVector ? append!(flat_observables, item) :
+        push!(flat_observables, item)
+    end
+    isempty(flat_observables) && error("The config needs at least one observable")
     isnothing(priors) && error("The config needs priors")
     isempty(sample_date_ranges) &&
         error("Cannot run calibration with no date ranges for the samples")
@@ -216,12 +286,12 @@ function CalibrateConfig(;
         )
     end
 
-    names = [o.name for o in observables]
+    names = [o.name for o in flat_observables]
     allunique(names) || error("Observables repeat a name: $names")
 
     return CalibrateConfig(
         config_file,
-        Vector{Observable}(observables),
+        flat_observables,
         Float64.(pressure_levels),
         n_iterations,
         sample_date_ranges,

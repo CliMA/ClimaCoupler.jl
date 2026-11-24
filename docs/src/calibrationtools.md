@@ -88,6 +88,86 @@ get(data_loader, "er")
 nothing # hide
 ```
 
+## Building a loss
+
+A calibration's loss is the list of `observables` in its [`CalibrateConfig`](@ref). Each
+[`Observable`](@ref) names a field, a `reduce` function applied identically to the
+observation and to the model output, and its error scale. The example
+`experiments/calibration/amip/config/year2010_rsut_rlut_pr.jl` uses everything below.
+
+### Reductions
+
+The functions are in `experiments/calibration/amip/preprocessing.jl`.
+
+| `reduce`             | Each value is                                                  |
+|----------------------|----------------------------------------------------------------|
+| `identity`           | a monthly mean, as the model writes them                       |
+| `seasonal_average`   | a seasonal mean (DJF, MAM, JJA, SON), dated by its first month |
+| `annual_average`     | a December-to-November mean, dated by its December             |
+| `global_mean`        | the area-weighted global mean                                  |
+| `zonal_average`      | the zonal mean                                                 |
+| `remove_global_mean` | a map minus its own global mean                                |
+| `annual_global_mean` | the global annual mean of a December-to-November year          |
+| `annual_pattern`     | a December-to-November annual map minus its global mean        |
+| `seasonal_anomaly`   | each season's map minus its year's mean                        |
+
+`annual_global_mean`, `annual_pattern`, and `seasonal_anomaly` split a year of seasonal maps
+into three orthogonal parts that add up to the seasonal maps and do not overlap, so a
+calibration on all three cannot trade a global mean bias against a spatial pattern or
+seasonal cycle. The helper `mean_pattern_seasonal_observables(field; global_mean_sd,
+annual_pattern_fraction, seasonal_cycle_fraction)` builds all three `Observable`s for
+`field`:
+
+```julia
+observables = [
+    mean_pattern_seasonal_observables(
+        "rsut";
+        global_mean_sd = 12.6,
+        annual_pattern_fraction = 0.42,
+        seasonal_cycle_fraction = 0.10,
+    )
+    mean_pattern_seasonal_observables(
+        "rlut";
+        global_mean_sd = 4.8,
+        annual_pattern_fraction = 0.187,
+        seasonal_cycle_fraction = 0.187,
+    )
+    mean_pattern_seasonal_observables(
+        "pr";
+        global_mean_sd = 0.85,
+        annual_pattern_fraction = 0.316,
+        seasonal_cycle_fraction = 0.534,
+    )
+]
+```
+
+### Error scales and block weighting
+
+Each observable has its own noise covariance block, estimated from the observation's
+interannual spread over `covariance_date_ranges` plus a structural model-error term:
+
+- `model_error_fraction` estimates an `SVDplusD` covariance across `covariance_date_ranges`
+  with a structural model error equal to that fraction of the reduced observable's time
+  mean. For a map whose sample mean crosses zero (such as `annual_pattern` or
+  `seasonal_anomaly`), `generate_observations.jl` automatically floors the squared mean at
+  its spatial median so zero crossings do not dominate the loss.
+- `noise_sd` uses a diagonal covariance with per-entry standard deviation `noise_sd` in
+  physical units.
+- Setting `effective_entries` on an [`Observable`](@ref) multiplies that observable's noise
+  covariance by `entries / effective_entries` when `generate_observations.jl` builds the
+  observation vector (via `SampleBuilder.PerCollectionWeighting` for `SVDplusD` or directly
+  on `ScalarDiagonal` for `DiagonalCovariance`). Dividing by `entries` normalizes any
+  observable (whether a 1-entry global mean, a 1-map annual pattern, or a 4-map seasonal
+  cycle) to its mean squared whitened residual per entry, and multiplying by
+  `effective_entries` weights that normalized block as `effective_entries` independent
+  unit-variance observations in both the loss and `EffectiveEntriesController` in
+  `experiments/calibration/amip/step_size_rule.jl`.
+- `mean_pattern_seasonal_observables` defaults to `effective_entries = 29` on all three
+  parts (giving the global mean, annual pattern, and seasonal cycle equal 1/3 block weight
+  and counting $29 + 29 + 29 = 87$ per field in `EffectiveEntriesController`, so
+  `global_mean_sd` is given directly as the per-entry baseline error scale without manual
+  `1 / sqrt(29)` rescaling).
+
 ## CalibrationTools API
 
 ```@docs

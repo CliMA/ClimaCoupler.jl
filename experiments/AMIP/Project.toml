@@ -39,7 +39,7 @@ ClimaCoupler = {path = "../.."}
 
 [compat]
 CUDA = "6"
-ClimaCalibrate = "0.6"
+ClimaCalibrate = "0.7"
 ClimaLand = "1.14"
 ClimaParams = "1.0"
 ClimaTimeSteppers = "0.8.11, 0.9, 0.10, 1"

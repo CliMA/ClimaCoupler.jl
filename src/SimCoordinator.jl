@@ -166,8 +166,11 @@ function launch_slow_if_due!(cs::Interfacer.CoupledSimulation, frozen::Bool)
     target = any(sim -> Interfacer.will_step(sim, t), overlapped) ? t : t + cs.Δt_cpl
     Float64(float(target)) > Float64(float(cs.tspan[end])) && return nothing
     model_sims = cs.model_sims
+    # Drain this task's stream so the slow task reads complete coupler fields.
+    device = ClimaComms.device(cs)
+    ClimaComms.@device_sync device nothing
     cs.schedule.in_flight = Interfacer.SlowStep(
-        Threads.@spawn(FieldExchanger.step_slow_sims!(model_sims, target)),
+        Threads.@spawn(FieldExchanger.step_slow_sims!(model_sims, target, device)),
         Float64(float(target)),
     )
     return nothing

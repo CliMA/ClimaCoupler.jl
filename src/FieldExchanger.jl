@@ -6,6 +6,7 @@ atmospheric and surface component models.
 """
 module FieldExchanger
 
+import ClimaComms
 import ClimaCore as CC
 
 import ..Interfacer, ..FluxCalculator, ..Utilities
@@ -367,9 +368,13 @@ function step_model_sims!(
     concurrent = step_concurrently && any(Interfacer.is_overlapped, model_sims)
 
     # The overlapped group steps in its own task while this one steps the rest.
-    slow_task =
-        (concurrent && !skip_slow) ? Threads.@spawn(step_slow_sims!(model_sims, t)) :
-        nothing
+    # Drain this task's stream first so the slow task reads complete coupler fields.
+    slow_task = nothing
+    if concurrent && !skip_slow
+        device = ClimaComms.device(coupler_fields)
+        ClimaComms.@device_sync device nothing
+        slow_task = Threads.@spawn(step_slow_sims!(model_sims, t, device))
+    end
 
     # Step all surface models (the ordering doesn't matter here)
     for sim in model_sims
@@ -411,20 +416,23 @@ function step_model_sims!(cs::Interfacer.CoupledSimulation)
 end
 
 """
-    step_slow_sims!(model_sims, t)
+    step_slow_sims!(model_sims, t, device)
 
-Advance the overlapped group (sea ice, then ocean) to time `t`.
+Advance the overlapped group (sea ice, then ocean) to time `t`, draining this
+task's stream on `device` before returning so a waiting task never reads partial state.
 """
-function step_slow_sims!(model_sims, t)
-    for sim in model_sims
-        sim isa Interfacer.AbstractSeaIceSimulation &&
-            Interfacer.is_overlapped(sim) &&
-            Interfacer.step!(sim, t)
-    end
-    for sim in model_sims
-        sim isa Interfacer.AbstractOceanSimulation &&
-            Interfacer.is_overlapped(sim) &&
-            Interfacer.step!(sim, t)
+function step_slow_sims!(model_sims, t, device)
+    ClimaComms.@device_sync device begin
+        for sim in model_sims
+            sim isa Interfacer.AbstractSeaIceSimulation &&
+                Interfacer.is_overlapped(sim) &&
+                Interfacer.step!(sim, t)
+        end
+        for sim in model_sims
+            sim isa Interfacer.AbstractOceanSimulation &&
+                Interfacer.is_overlapped(sim) &&
+                Interfacer.step!(sim, t)
+        end
     end
     return nothing
 end

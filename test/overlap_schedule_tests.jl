@@ -2,6 +2,8 @@
 
 using Test
 using ClimaCoupler
+import ClimaComms
+import ClimaCore as CC
 import Dates
 import ClimaUtilities.TimeManager: ITime, date
 const Interfacer = ClimaCoupler.Interfacer
@@ -60,10 +62,15 @@ function Interfacer.step!(s::StubIT, t::ITime)
     return nothing
 end
 
+# Coupler fields, read only for the device the slow task synchronizes.
+stub_fields() = CC.Fields.zeros(
+    CC.CommonSpaces.CubedSphereSpace(Float64; radius = 6.371e6, n_quad_points = 2, h_elem = 1),
+)
+
 function build_cs(ocean, ice, t0, Δt_cpl, t_end, overlap)
     return Interfacer.CoupledSimulation{Float64}(
         nothing,                       # start_date
-        nothing,                       # fields
+        stub_fields(),                 # fields
         nothing,                       # conservation_checks
         (t0, t_end),                   # tspan
         Δt_cpl,                        # Δt_cpl
@@ -104,7 +111,11 @@ function drive!(cs, ocean, nsteps)
     for _ in 1:nsteps
         cs.t[] += cs.Δt_cpl
         cs.step[] += 1
-        cs.schedule.overlap_slow || FieldExchanger.step_slow_sims!(cs.model_sims, cs.t[])
+        cs.schedule.overlap_slow || FieldExchanger.step_slow_sims!(
+            cs.model_sims,
+            cs.t[],
+            ClimaComms.device(cs),
+        )
         frozen = SimCoordinator.join_slow_if_due!(cs)
         frozen || (visible = ocean.clock)
         push!(seen, visible)

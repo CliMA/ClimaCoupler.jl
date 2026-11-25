@@ -4,6 +4,20 @@ ClimaCoupler.jl Release Notes
 `main`
 -------
 
+#### Surface-fraction, land-diagnostic, and cache-restart improvements
+`FieldExchanger.update_surface_fractions!` and `OceananigansSimulation`'s
+`align_surface_fractions!` evaluate dynamic ice and ocean area fractions into
+pre-allocated coupler scratch fields and check the area-fraction sum once at
+initialization.
+
+`ClimaLandSimulation` and `BucketSimulation` subsample time-averaged `:tendaily`
+and `:monthly` land diagnostics hourly when `dt < 1 hour`, matching multi-day
+and monthly atmosphere diagnostic schedules.
+
+`Checkpointer.restore!` and `Checkpointer.CacheIterator` skip
+`ClimaComms.AbstractGraphContext` handles and restore mutable scalar
+`Base.RefValue` entries in place.
+
 #### Concurrent and overlapped component stepping
 `step_concurrently` steps sea ice then ocean in a task of their own while the
 calling task steps land then atmosphere. Component models opt in to this with

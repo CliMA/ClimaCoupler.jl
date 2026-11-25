@@ -537,12 +537,12 @@ function FieldExchanger.align_surface_fractions!(
         ice_fraction = cs.fields.scalar_temp3
     end
 
-    @. cs.fields.scalar_temp2 = max(wet_fraction - ice_fraction, FT(0))
     ocean_fraction = cs.fields.scalar_temp2
+    @. ocean_fraction = max(wet_fraction - ice_fraction, FT(0))
     Interfacer.update_field!(ocean_sim, Val(:area_fraction), ocean_fraction)
 
-    @. cs.fields.scalar_temp1 = max(FT(1) - wet_fraction, FT(0))
     land_fraction = cs.fields.scalar_temp1
+    @. land_fraction = max(FT(1) - wet_fraction, FT(0))
     Interfacer.update_field!(cs.model_sims.land_sim, Val(:area_fraction), land_fraction)
     cs.fields.land_area_fraction .= land_fraction
 
@@ -557,8 +557,15 @@ function FieldExchanger.align_surface_fractions!(
     cs.fields.ice_area_fraction .= ice_fraction
     cs.fields.ocean_area_fraction .= ocean_fraction
 
-    @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
-    @assert maximum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
+    if isnothing(cs.step) || iszero(cs.step[])
+        FieldExchanger.check_surface_fraction_sum(
+            ice_fraction,
+            land_fraction,
+            ocean_fraction,
+            cs.fields.scalar_temp1,
+            FT,
+        )
+    end
     return true
 end
 

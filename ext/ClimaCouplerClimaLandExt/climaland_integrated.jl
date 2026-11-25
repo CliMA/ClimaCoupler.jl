@@ -178,17 +178,25 @@ function ClimaLandSimulation(
             start_date,
             global_attribs,
         )
-        diagnostics = @timed_log "ClimaLand: set up diagnostics" CL.default_diagnostics(
-            model,
-            start_date,
-            output_dir;
-            output_writer = output_writer,
-            output_vars = :short,
-            reduction_period = land_diagnostics_period,
-            reduction_type = land_diagnostics_reduction,
-            dt = float(dt),
-            date_last = sim_start_date,
-        )
+        diagnostics =
+            @timed_log "ClimaLand: set up diagnostics" _subsample_land_diagnostics(
+                CL.default_diagnostics(
+                    model,
+                    start_date,
+                    output_dir;
+                    output_writer = output_writer,
+                    output_vars = :short,
+                    reduction_period = land_diagnostics_period,
+                    reduction_type = land_diagnostics_reduction,
+                    dt = float(dt),
+                    date_last = sim_start_date,
+                ),
+                land_diagnostics_period,
+                land_diagnostics_reduction,
+                dt,
+                start_date,
+                float(tspan[1]),
+            )
     else
         output_writer = nothing
         diagnostics = nothing

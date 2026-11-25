@@ -166,15 +166,22 @@ function BucketSimulation(
             start_date,
             global_attribs,
         )
-        diagnostics = CL.default_diagnostics(
-            model,
+        diagnostics = _subsample_land_diagnostics(
+            CL.default_diagnostics(
+                model,
+                start_date,
+                output_dir;
+                output_writer = output_writer,
+                reduction_period = land_diagnostics_period,
+                reduction_type = land_diagnostics_reduction,
+                dt = float(dt),
+                date_last = start_date + Dates.Second(float(tspan[1])),
+            ),
+            land_diagnostics_period,
+            land_diagnostics_reduction,
+            dt,
             start_date,
-            output_dir;
-            output_writer = output_writer,
-            reduction_period = land_diagnostics_period,
-            reduction_type = land_diagnostics_reduction,
-            dt = float(dt),
-            date_last = start_date + Dates.Second(float(tspan[1])),
+            float(tspan[1]),
         )
     else
         diagnostics = nothing

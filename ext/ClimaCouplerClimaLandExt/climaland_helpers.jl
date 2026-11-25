@@ -167,3 +167,55 @@ function _coupler_set_ic!(Y, p, t, model::CL.LandModel, T_sfc, surface_elevation
     p.T_sfc .= Y.canopy.energy.T
     p.ϵ_sfc .= 1
 end
+
+"""
+    _subsample_land_diagnostics(
+        diagnostics,
+        reduction_period::Symbol,
+        reduction_type::Symbol,
+        dt,
+        start_date::Dates.DateTime,
+        t_start,
+    )
+
+Subsample time-averaged `ClimaLand` diagnostics hourly when `reduction_period`
+is `:tendaily` or `:monthly` and `float(dt) < 3600`, matching multi-day and
+monthly atmosphere diagnostic schedules while keeping `EveryStepSchedule` for
+shorter windows, non-average reductions, and timesteps of an hour or longer.
+"""
+function _subsample_land_diagnostics(
+    diagnostics,
+    reduction_period::Symbol,
+    reduction_type::Symbol,
+    dt,
+    start_date::Dates.DateTime,
+    t_start,
+)
+    if !(
+        reduction_type == :average &&
+        reduction_period in (:tendaily, :monthly) &&
+        float(dt) < 3600
+    )
+        return diagnostics
+    end
+    return map(diagnostics) do sd
+        if isnothing(sd.reduction_time_func) || !(
+            sd.compute_schedule_func isa CD.Schedules.DivisorSchedule &&
+            sd.compute_schedule_func.divisor == 1
+        )
+            return sd
+        end
+        compute_schedule =
+            TimeManager.calendar_dt_schedule(Dates.Hour(1), start_date, t_start)
+        return CD.ScheduledDiagnostic(;
+            variable = sd.variable,
+            output_schedule_func = sd.output_schedule_func,
+            compute_schedule_func = compute_schedule,
+            reduction_time_func = sd.reduction_time_func,
+            output_writer = sd.output_writer,
+            pre_output_hook! = sd.pre_output_hook!,
+            output_short_name = sd.output_short_name,
+            output_long_name = sd.output_long_name,
+        )
+    end
+end

@@ -60,20 +60,40 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # CI does not submit Slurm jobs from inside its own allocation. A full
     # calibration puts one ensemble member on each GPU.
     backend = if ON_VAST
+        ic_files = ClimaCalibrate.SharedFiles.BucketFiles(
+            ENV["CLIMA_BUCKET_ENDPOINT"],
+            ENV["CLIMA_BUCKET"],
+            "era5_initial_conditions",
+        )
+        for start_date in unique(first.(sample_date_ranges) .- CALIBRATE_CONFIG.spinup)
+            names = ClimaCoupler.Input.ERA5.output_filenames(start_date)
+            all(name -> ispath(ic_files, name), names) && continue
+            ic_dir = ClimaCoupler.Input.ERA5.fetch_initial_conditions(start_date)
+            for name in names
+                ispath(ic_files, name) ||
+                    ClimaCalibrate.SharedFiles.upload(ic_files, name, joinpath(ic_dir, name))
+            end
+        end
+
         ClimaCalibrate.SharedFilesBackend(;
+            lease = 900.0,
             files = ClimaCalibrate.SharedFiles.BucketFiles(
                 ENV["CLIMA_BUCKET_ENDPOINT"],
                 ENV["CLIMA_BUCKET"],
             ),
             outputs = [joinpath(get_job_id(CALIBRATE_CONFIG), "output_active")],
             workers = ClimaCalibrate.Backend.Vast.Workers(
-                EKP.get_N_ens(ekp);
-                disk = TEST_CALIBRATION ? 100 : 200,
+                parse(Int, get(ENV, "VAST_WORKERS", string(EKP.get_N_ens(ekp))));
+                gpu = get(ENV, "VAST_GPU", "RTX_3090"),
+                disk = 60,
                 image = "nefrathenrici/clima-base:pr-5-bf60034",
                 env = Dict(
                     "CLIMACOMMS_CONTEXT" => "SINGLETON",
                     "CLIMACOMMS_DEVICE" => TEST_CALIBRATION ? "CPU" : "CUDA",
-                    (TEST_CALIBRATION ? ("TEST_CALIBRATION" => "1",) : ())...,
+                    (
+                        TEST_CALIBRATION ? ("TEST_CALIBRATION" => "1",) :
+                        ("CLIMA_ARTIFACTS" => "historical_sst_sic",)
+                    )...,
                 ),
             ),
         )

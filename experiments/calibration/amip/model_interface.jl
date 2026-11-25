@@ -55,6 +55,21 @@ function ClimaCalibrate.forward_model(interface::CouplerModelInterface, iter, me
     end_date = last(sample_date_ranges[iter + 1]) + extend
     CalibrationTools.update_timespan!(config_dict, start_date, end_date)
 
+    if haskey(ENV, "CLIMA_FILES")
+        f = ClimaCalibrate.SharedFiles.BucketFiles(ENV["CLIMA_FILES"])
+        ic_files = ClimaCalibrate.SharedFiles.BucketFiles(
+            f.endpoint,
+            f.bucket,
+            "era5_initial_conditions",
+        )
+        ic_dir = ClimaCoupler.Input.ERA5.cache_dir()
+        for name in ClimaCoupler.Input.ERA5.output_filenames(start_date)
+            path = joinpath(ic_dir, name)
+            isfile(path) || ClimaCalibrate.SharedFiles.download(ic_files, name, path)
+        end
+        config_dict["era5_initial_condition_dir"] = ic_dir
+    end
+
     # Set member parameter file
     sampled_parameter_file = ClimaCalibrate.parameter_path(output_dir_root, iter, member)
     CalibrationTools.add_parameter_filepath!(config_dict, sampled_parameter_file)

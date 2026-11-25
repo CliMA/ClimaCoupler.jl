@@ -29,7 +29,6 @@ radiation_reset_rng_seed: true
 albedo_model: "CouplerAlbedo"
 surface_setup: "PrescribedSurface"
 strict_params: false
-era5_initial_condition_dir: /glade/campaign/univ/ucit0011/ClimaArtifacts2/artifacts/wxquest_initial_conditions/
 
 ### Land ###
 lai_source: "modis_monthly_climatology"

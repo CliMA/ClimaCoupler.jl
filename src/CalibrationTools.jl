@@ -966,17 +966,27 @@ To add an observation, add its loader here. Each field needs a model counterpart
 `model_var`.
 """
 function default_data_loader()
-    mac = MACDataLoader()
-    return CompositeDataLoader(
-        ERA5PressureLevelDataLoader(),
-        ERA5DataLoader(),
-        CERESDataLoader(),
-        ModisDataLoader(),
-        mac,
-        GPCPDataLoader();
-        # MODIS also provides `lwp`; MAC's is the one used.
-        varname_to_loader = Dict("lwp" => mac),
+    loaders = AbstractDataLoader[]
+    varname_to_loader = Dict{String, AbstractDataLoader}()
+    for T in (
+        ERA5PressureLevelDataLoader,
+        ERA5DataLoader,
+        CERESDataLoader,
+        ModisDataLoader,
+        MACDataLoader,
+        GPCPDataLoader,
     )
+        loader = try
+            T()
+        catch
+            nothing
+        end
+        isnothing(loader) && continue
+        push!(loaders, loader)
+        # MODIS also provides `lwp`; MAC's is the one used.
+        T === MACDataLoader && (varname_to_loader["lwp"] = loader)
+    end
+    return CompositeDataLoader(loaders...; varname_to_loader)
 end
 
 """

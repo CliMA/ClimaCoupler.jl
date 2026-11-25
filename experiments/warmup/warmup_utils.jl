@@ -1,25 +1,8 @@
 # Helpers `include`d by each warmup package (rather than a shared dependency, which would
 # change the package graph described in README.md).
 
-"""
-    warmup_dir()
-
-Return the path to `experiments/warmup`.
-"""
 warmup_dir() = @__DIR__
-
-"""
-    repo_dir()
-
-Return the repository root.
-"""
 repo_dir() = normpath(joinpath(@__DIR__, "..", ".."))
-
-"""
-    config_path(name)
-
-Return the path to the config `name` in `experiments/warmup/configs`.
-"""
 config_path(name) = joinpath(warmup_dir(), "configs", name)
 
 """

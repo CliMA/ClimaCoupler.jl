@@ -21,7 +21,7 @@ import ClimaLand
 
 include(joinpath(@__DIR__, "..", "..", "warmup_utils.jl"))
 
-# Rebuild the image when a config it reads changes, not only when the source does.
+# Rebuild when the config changes, not only the source.
 include_dependency(config_path("atmos_warmup.yml"))
 
 @setup_workload begin

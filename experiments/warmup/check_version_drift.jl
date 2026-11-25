@@ -12,14 +12,10 @@ const REPO = normpath(joinpath(@__DIR__, "..", ".."))
 const MANIFEST = "Manifest-v$(VERSION.major).$(VERSION.minor).toml"
 
 # Packages allowed to differ, with the reason. Only build-time tooling belongs here.
-const ALLOWED = Dict(
-    "PrecompileTools" =>
-        "a build-time tool that does not appear in the cached code, so the two " *
-        "environments may differ. Both must be >= 1.3 on Julia >= 1.12, where 1.2 " *
-        "caches no externally-owned code.",
-)
+const ALLOWED =
+    Dict("PrecompileTools" => "build-time only, absent from the cached code; see FLOORS")
 
-"Minimum version of each listed package, checked in both environments."
+# 1.2 caches no externally-owned code on Julia >= 1.12; see precompile_info.md.
 const FLOORS = Dict("PrecompileTools" => (VERSION >= v"1.12" ? v"1.3" : v"0"))
 
 """

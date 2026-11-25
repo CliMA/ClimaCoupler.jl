@@ -11,14 +11,14 @@ import ClimaComms
 ClimaComms.@import_required_backends
 import ClimaTimeSteppers
 import YAML
-# Layered: reuse the code cached by the warmup packages beneath this one.
+# Lower layers of the warmup stack, reused rather than re-cached.
 import AtmosWarmupSetup
 import AtmosWarmupExplicit
 using PrecompileTools
 
 include(joinpath(@__DIR__, "..", "..", "warmup_utils.jl"))
 
-# Rebuild the image when a config it reads changes, not only when the source does.
+# Rebuild when the config changes, not only the source.
 include_dependency(config_path("atmos_warmup.yml"))
 
 @setup_workload begin

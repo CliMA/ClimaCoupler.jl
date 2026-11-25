@@ -1,9 +1,8 @@
 # Precompilation: measurements and constraints
 
-Hard numbers behind the design of `experiments/warmup` and `experiments/CMIP/startup`. The
-code and its docstrings state the rules; this file records the evidence for them. Each
-section names the stack it was measured on, because most of these numbers move with Julia,
-CUDA and package versions.
+The measurements behind the rules in `README.md` and the warmup code. Each section names
+the stack it was measured on, since most of these numbers move with Julia, CUDA and package
+versions.
 
 ## Where startup time goes
 
@@ -20,9 +19,7 @@ Julia 1.11 / CUDA 5.11 / ClimaCore 0.16.
 * Startup is ~99 % single-core: Julia serializes codegen process-wide, so the only
   parallelism available is across processes, which is what `Pkg.precompile()` provides.
 * Within the 61-minute setup: inference 18.8 min, LLVM codegen 34.5 min. SnoopCompile sees
-  inference only, so it misses the larger half; `phase_probe.jl` samples C frames instead.
-* On a run this size `Profile.print` adds ~1 h of post-processing, and sampling correlated
-  with hangs when two heavy jobs ran concurrently. Hence `cmip_startup_nosample.jl`.
+  inference only, so it misses the larger half.
 
 ## Package image size limit (~2 GiB)
 

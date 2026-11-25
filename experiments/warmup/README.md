@@ -68,10 +68,8 @@ schedule that never fires is never compiled.
 
 ## Troubleshooting
 
-`check_warmup.jl` reports a workload that threw (recorded in `workload_report.txt`), an image
-over the size limit (stale on disk despite `status = ok`), and an image that cached almost
-nothing. Fix the lowest failing package in the table first, since the packages above it then
-cache its code themselves. Delete the affected images before rebuilding: Pkg considers an
-image from a failed workload up to date.
+`check_warmup.jl` names the unusable images. Fix the lowest failing package in the table
+first, since the packages above it re-cache its code, and delete the affected images before
+rebuilding: Pkg considers an image from a failed workload up to date.
 
 Timings, image sizes and limits are in [`precompile_info.md`](precompile_info.md).

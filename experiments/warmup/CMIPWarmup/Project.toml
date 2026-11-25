@@ -26,9 +26,5 @@ SeaIceWarmup = "c0000003-0000-4000-8000-000000000013"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
-# PrecompileTools 1.2 does not cache externally-owned code on Julia >= 1.12: it collects
-# inference roots and calls `precompile`, while 1.3 uses `jl_tag_newly_inferred_*`, which
-# is what marks another package's CodeInstances for serialization. Measured on Julia
-# 1.13.3: 1500 externally-owned specializations gave a 0.02 MiB image under 1.2.1 and
-# 143.55 MiB under 1.3.4. Everything this directory caches is externally owned.
+# 1.2 caches no externally-owned code on Julia >= 1.12; see precompile_info.md.
 PrecompileTools = "1.3"

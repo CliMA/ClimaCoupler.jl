@@ -11,7 +11,7 @@ const REPO = normpath(joinpath(@__DIR__, "..", ".."))
 
 # Deviations we intend. Each key maps to the reason it differs; anything else is drift.
 const ATMOS_EXPECTED = Dict(
-    "initial_condition" => "WeatherModel needs an ERA5 artifact that is cluster-only; see README",
+    "initial_condition" => "WeatherModel needs a cluster-only ERA5 artifact",
     "t_end" => "the workload runs briefly",
     # The coupler applies these itself in `get_atmos_config_dict`, so a standalone
     # atmosphere workload has to replicate them or it caches the wrong types.
@@ -103,15 +103,7 @@ println()
 if total == 0
     println("Warmup configs match production apart from the recorded deviations.")
 else
-    println(
-        "$total drifted setting(s). Either update the warmup config to match production,",
-    )
-    println(
-        "or, if the difference is intentional, record it in this script with its reason.",
-    )
-    println(
-        "Settings that are type parameters (gravity-wave model, microphysics, turbconv,",
-    )
-    println("radiation mode) silently invalidate the whole cache when they drift.")
+    println("$total drifted setting(s): update the warmup config, or record an intended")
+    println("difference in this script with its reason.")
     exit(1)
 end

@@ -8,7 +8,7 @@ It is intended to be launched via:
 
 ```bash
 nsys profile --start-later=true --capture-range=cudaProfilerApi \
-    --trace=nvtx,mpi,cuda,osrt --cuda-memory-usage=true --kill=none \
+    --trace=nvtx,mpi,cuda,osrt --kill=none \
     --output=report \
     julia --project=experiments/CMIP experiments/CMIP/profile_simulation.jl \
     --config_file config/benchmark_configs/cmip_progedmf_land_profile.yml

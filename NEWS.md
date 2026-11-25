@@ -27,6 +27,16 @@ follows rather than summing them.
 The `liquid_precipitation` and `snow_precipitation` that `ClimaAtmosSimulation` passes to the surfaces
 are the mean over the atmosphere steps taken in one coupling step, not just the last value.
 
+#### Component parameter defaults (behavior change)
+All components now share one set of parameters: ClimaParams defaults, then ClimaLand
+defaults, then the atmosphere config `toml` files, then `coupler_toml`. Setup warns when the
+atmosphere `toml` files override ClimaLand defaults.
+- Land: ClimaLand's default parameters now take precedence over ClimaParams defaults, which
+  changes land physics.
+- Atmosphere: files under the atmosphere config `toml` key now take effect, even when
+  `coupler_toml` is set. Setup errors if one is missing. The coupled `amip_progedmf`
+  benchmarks now use `toml/amip_progedmf.toml`, like the standalone atmosphere benchmark.
+
 #### Use `update_constrain_state_every: "step"` for 0M ProgEDMF
 `config/atmos_configs/climaatmos_progedmf.yml` sets `update_constrain_state_every: "step"` (the previous
 ClimaAtmos default). With `"stage"` (the default since CliMA/ClimaAtmos.jl#4968), coupled 1° 0M ProgEDMF

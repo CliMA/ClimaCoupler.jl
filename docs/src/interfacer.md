@@ -216,6 +216,10 @@ method is only defined when the ClimaCouplerClimaAtmosExt extension is loaded, a
 the default configuration dictionary for ClimaAtmos. If `ClimaAtmos.jl` is not loaded, users
 must define this function themselves.
 
+- `atmos_parameter_files(config_dict)`:
+Return the atmosphere parameter files listed in `config_dict`. The default method is only
+defined when the ClimaCouplerClimaAtmosExt extension is loaded.
+
 ### AbstractAtmosSimulation - required functions to run with the ClimaLandSimulation
 
 Coupling with the integrated `ClimaLandSimulation` requires the following functions, in addition

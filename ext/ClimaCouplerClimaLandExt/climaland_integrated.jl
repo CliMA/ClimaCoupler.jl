@@ -44,7 +44,7 @@ end
         initial_T,
         use_land_diagnostics::Bool = true,
         parameter_files = [],
-        land_ic_path::Union{Nothing,String} = nothing,
+        era5_initial_condition_dir::Union{Nothing,String} = nothing,
         lai_source::String = "modis_monthly",
         gustiness::FT = FT(1),
         dt_drivers::ITime = ITime(3600),
@@ -62,6 +62,9 @@ update the zenith angle. The CouplerSimulation setup sets this equal to
 the callback period that the atmosphere uses to update radiation.
 
 # Arguments
+- `era5_initial_condition_dir = nothing`: Directory of ERA5 initial conditions. Unless
+  `land_spun_up_ic` is set, the land starts from the ERA5-Land state of `start_date` in it,
+  with its snow. Without it, the land starts from the atmosphere's state with no snow.
 - `lai_source::String = "modis_monthly"`: Source for leaf area index data. Options:
   - `"modis_monthly"`: Time-varying LAI from full MODIS monthly data (default)
   - `"modis_monthly_climatology"`: Time-varying LAI from MODIS monthly climatology (uses PeriodicCalendar)
@@ -85,7 +88,7 @@ function ClimaLandSimulation(
     land_diagnostics_period::Symbol = :monthly,
     land_diagnostics_reduction::Symbol = :average,
     coupled_param_dict = CP.create_toml_dict(FT),
-    land_ic_path::Union{Nothing, String} = nothing,
+    era5_initial_condition_dir::Union{Nothing, String} = nothing,
     lai_source::String = "modis_monthly",
     gustiness::FT = FT(1),
     dt_drivers::ITime = ITime(3600),
@@ -192,7 +195,12 @@ function ClimaLandSimulation(
     end
 
     # Define functions to set initial conditions
-    if !land_spun_up_ic && !isnothing(land_ic_path)
+    if !land_spun_up_ic && !isnothing(era5_initial_condition_dir)
+        land_ic_path = Input.era5_paths(era5_initial_condition_dir, start_date).land_ic_path
+        isfile(land_ic_path) || error(
+            "No ERA5-Land initial condition at $land_ic_path. Fetch it with " *
+            "ClimaCoupler.Input.ERA5.fetch_initial_conditions(start_date; dir).",
+        )
         @info "ClimaLand: using land IC file" land_ic_path
         set_ic_land! = CL.Simulations.make_set_initial_state_from_era5land(land_ic_path)
         extrapolation_bc =

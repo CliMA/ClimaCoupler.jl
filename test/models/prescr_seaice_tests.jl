@@ -146,7 +146,7 @@ for FT in (Float32, Float64)
             zero(FT),
             FT(1000),
             FT(400),
-            params.α_melt,
+            params.α_melt_nh,
             params.h_nh,
             params,
             dt,
@@ -177,7 +177,8 @@ for FT in (Float32, Float64)
             T_freeze,
             ΔT_melt,
             α_cold,
-            α_melt,
+            α_melt_nh,
+            α_melt_sh,
         ) = p.params
         T_sfc = Models.ice_surface_temperature(T_bulk, T_base, T_sfc_min, T_freeze)
         dT_expected_nh =
@@ -189,25 +190,39 @@ for FT in (Float32, Float64)
         @test minimum(dY) ≈ FT(min(dT_expected_nh, dT_expected_sh))
         @test maximum(dY) ≈ FT(0)
 
-        # check temperature-dependent albedo ramp and hemispheric thickness helper
-        @test Models.ice_surface_albedo(T_freeze, T_freeze, ΔT_melt, α_cold, α_melt) ==
-              α_melt
+        # check temperature-dependent albedo ramp and hemispheric helpers
+        @test Models.ice_surface_albedo(T_freeze, T_freeze, ΔT_melt, α_cold, α_melt_nh) ==
+              α_melt_nh
         @test Models.ice_surface_albedo(
             T_freeze - ΔT_melt,
             T_freeze,
             ΔT_melt,
             α_cold,
-            α_melt,
+            α_melt_nh,
         ) == α_cold
         @test Models.ice_surface_albedo(
             T_freeze - ΔT_melt / FT(2),
             T_freeze,
             ΔT_melt,
             α_cold,
-            α_melt,
-        ) ≈ FT(0.5) * (α_cold + α_melt)
+            α_melt_nh,
+        ) ≈ FT(0.5) * (α_cold + α_melt_nh)
         @test Models.ice_thickness(FT(70), p.params) == h_nh
         @test Models.ice_thickness(FT(-65), p.params) == h_sh
+        @test Models.ice_melt_albedo(FT(70), p.params) == α_melt_nh
+        @test Models.ice_melt_albedo(FT(-65), p.params) == α_melt_sh
+
+        # check that `update_ice_albedo!` applies the hemispheric melt albedo pointwise:
+        # with T_sfc capped at T_freeze the albedo is exactly α_melt_nh (lat ≥ 0) or
+        # α_melt_sh (lat < 0)
+        Y_melt = copy(Y)
+        Y_melt.T_bulk .= T_freeze + FT(10)
+        Models.update_ice_albedo!(Y_melt, p)
+        lats = Array(parent(CC.Fields.coordinate_field(space).lat))
+        α_sfc = Array(parent(p.α_sfc))
+        @test any(lats .< 0) && any(lats .>= 0)
+        @test all(α_sfc[lats .>= 0] .== α_melt_nh)
+        @test all(α_sfc[lats .< 0] .== α_melt_sh)
     end
 
     @testset "dss_state! AbstractSeaIceSimulation for FT=$FT" begin
@@ -281,8 +296,62 @@ end
 
     Interfacer.step!(sim, 1200.0)
     T_sfc = Array(parent(Interfacer.get_field(sim, Val(:surface_temperature))))[1]
-    (; T_freeze, ΔT_melt, α_cold, α_melt) = sim.params
+    (; T_freeze, ΔT_melt, α_cold, α_melt_nh) = sim.params
     @test Array(parent(sim.integrator.p.α_sfc))[1] ≈
-          Models.ice_surface_albedo(T_sfc, T_freeze, ΔT_melt, α_cold, α_melt)
+          Models.ice_surface_albedo(T_sfc, T_freeze, ΔT_melt, α_cold, α_melt_nh)
     @test Array(parent(sim.integrator.p.α_sfc))[1] < α_0
+end
+
+@testset "PrescribedIceSimulation ice-free reset to T_base and SIC sanitization" begin
+    FT = Float32
+    coupled_param_dict = CP.create_toml_dict(FT)
+    comms_ctx = ClimaComms.context()
+    space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = coupled_param_dict["planet_radius"],
+        n_quad_points = 4,
+        h_elem = 4,
+    )
+    sim = Models.PrescribedIceSimulation(
+        FT;
+        tspan = (0.0, 86400.0),
+        dt = 600.0,
+        saveat = [0.0, 86400.0],
+        boundary_space = space,
+        coupled_param_dict,
+        thermo_params = TDP.ThermodynamicsParameters(coupled_param_dict),
+        comms_ctx,
+        # Start inside the time range of the lowres SIC artifact (1870-1871) so the SIC
+        # varies seasonally and new ice forms between the two reads below.
+        start_date = Dates.DateTime(1870, 2, 1),
+        land_fraction = CC.Fields.zeros(space),
+        binary_area_fraction = false,
+        domain_type = "global",
+    )
+
+    # Ice-free cells initialize at T_base, reset to T_base on read_sic_data! with
+    # immediate land clamping, and stay at T_base when new seasonal ice forms (Aug 1).
+    # `≈` rather than `==`: the constructor DSSes the state, and the weighted average at
+    # shared element nodes need not reproduce `T_base` bit-for-bit.
+    ice_free = Array(parent(sim.integrator.p.area_fraction)) .<= zero(FT)
+    @test any(ice_free) &&
+          all(T -> T ≈ sim.params.T_base, Array(parent(sim.integrator.u.T_bulk))[ice_free])
+
+    T_stale = sim.params.T_base - FT(15)
+    sim.integrator.u.T_bulk .= T_stale
+    sim.integrator.p.land_fraction .= FT(0.25)
+    Models.read_sic_data!(sim.integrator)
+    sic_feb = Array(parent(sim.integrator.p.area_fraction))
+    T_feb = Array(parent(sim.integrator.u.T_bulk))
+    @test all(zero(FT) .<= sic_feb .<= FT(0.75))
+    @test all(T_feb[sic_feb .<= zero(FT)] .== sim.params.T_base)
+    @test all(T_feb[sic_feb .> zero(FT)] .== T_stale)
+
+    sim.integrator.p.land_fraction .= zero(FT)
+    sim.integrator.t = 181.0 * 86400.0
+    Models.read_sic_data!(sim.integrator)
+    sic_aug = Array(parent(sim.integrator.p.area_fraction))
+    newly_formed = (sic_feb .<= zero(FT)) .& (sic_aug .> zero(FT))
+    @test any(newly_formed) &&
+          all(Array(parent(sim.integrator.u.T_bulk))[newly_formed] .== sim.params.T_base)
 end

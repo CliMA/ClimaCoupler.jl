@@ -56,6 +56,18 @@ The nightly and weekly AMIP configs (0M and 1M ProgEDMF) use `dt: "180secs"` and
   - **Breaking:** the sea-ice cache gains `α_sfc` and `h_ice`, so cache checkpoints
     written before this change cannot be restored with `restart_cache = true`.
 
+#### Prescribed sea ice: hemispheric melt albedo and freezing-point start for new ice
+- [#2245](https://github.com/CliMA/ClimaCoupler.jl/pull/2245): `PrescribedIceSimulation`
+  changes its physics and its `IceSlabParameters` API.
+  - The melt albedo at `T_sfc = T_freeze` is set by hemisphere: `α_melt_nh = 0.55`
+    (melt ponds) for latitudes ≥ 0 and `α_melt_sh = 0.72` (wet snow, which largely
+    persists through the Antarctic summer) for latitudes < 0.
+  - Ice-free cells hold `T_bulk = T_base`, the freezing point of seawater, at
+    initialization and after each daily SIC update, so newly formed ice starts at
+    `T_sfc = T_base` instead of a stale or fallback temperature.
+  - **Breaking:** the `IceSlabParameters` field and keyword argument `α_melt` is replaced
+    by `α_melt_nh` and `α_melt_sh`.
+
 #### Move CI and the experiment environments to Julia 1.13 and CUDA 6
 Buildkite runs Julia 1.13.3, and the experiment environments ship `Manifest-v1.13.toml` instead of
 `Manifest-v1.11.toml`. The AMIP and CMIP environments require CUDA 6.

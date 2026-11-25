@@ -1,3 +1,5 @@
+# A 150 s step and no pressure-level diagnostics, so a 13-month member fits a 12 h job
+# (about 10.7 h on one GPU).
 FLOAT_TYPE: "Float32"
 
 ### Grid ###
@@ -12,9 +14,9 @@ topography: "Earth"
 start_date: "20100101"
 initial_condition: "WeatherModel"
 t_end: "39days"
-dt: "120secs"
-dt_cpl: "120secs"
-dt_seaice: "120secs"
+dt: "150secs"
+dt_cpl: "150secs"
+dt_seaice: "150secs"
 checkpoint_dt: "900days"
 
 ### Coupler ###
@@ -29,7 +31,6 @@ radiation_reset_rng_seed: true
 albedo_model: "CouplerAlbedo"
 surface_setup: "PrescribedSurface"
 strict_params: false
-era5_initial_condition_dir: /glade/campaign/univ/ucit0011/ClimaArtifacts2/artifacts/wxquest_initial_conditions/
 
 ### Land ###
 lai_source: "modis_monthly_climatology"
@@ -46,8 +47,3 @@ extra_atmos_diagnostics:
   - short_name: [tas, pr, mslp, rsut, rsutcs, rlut, rlutcs, rsdt, lwp]
     period: monthly
     reduction_time: average
-  - short_name: [ta, hur, pfull]
-    period: monthly
-    reduction_time: average
-    pressure_coordinates: true
-    compute_every: 6hours

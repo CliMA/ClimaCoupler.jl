@@ -14,7 +14,7 @@ import ClimaComms
 # Loaded because `experiments/CMIP/code_loading.jl` loads it; see `AtmosWarmupSetup`.
 import CairoMakie, GeoMakie, Makie, Poppler_jll, Printf
 
-export prologue, check_matches_coupled
+export prologue
 
 """
     prologue(config_dict; with_atmos = true)
@@ -99,21 +99,5 @@ function prologue(config_dict::AbstractDict; with_atmos::Bool = true)
     )
 end
 
-"""
-    check_matches_coupled(label, built, expected_type)
-
-Throw unless `typeof(built) === expected_type`: a workload building a different type than
-a coupled run caches code the run cannot use.
-"""
-function check_matches_coupled(label, built, expected_type)
-    actual = typeof(built)
-    actual === expected_type && return true
-    error("""
-          $label built $(actual)
-          but a coupled run builds $(expected_type).
-          The warmup config has drifted from the production config; the cached
-          specializations would not be usable.
-          """)
-end
 
 end # module

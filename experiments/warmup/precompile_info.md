@@ -91,8 +91,9 @@ Several model selections are type parameters, so a warmup config that drifts fro
 yields an image the run cannot use, and the run silently recompiles.
 
 * `FLOAT_TYPE` and `topography` are set in the coupler config, not the atmosphere one, so a
-  standalone atmosphere workload defaulted to `Float32` and `Val{:NoWarp}`. Caught by
-  `CouplerWarmupCommon.check_matches_coupled`.
+  standalone atmosphere workload defaulted to `Float32` and `Val{:NoWarp}`. The atmosphere
+  config replicates them, which means `check_config_drift.jl` cannot compare them against the
+  production *atmosphere* config -- it cross-checks them against the coupled config instead.
 * Production switched `orographic_gravity_wave` from `raw_topo` to `raw_topo_online` on
   2026-10-02; the warmup config kept the old value for a month. Now caught by
   `check_config_drift.jl`.

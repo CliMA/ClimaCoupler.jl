@@ -86,6 +86,42 @@ const PAIRS = [
     ),
 ]
 
+"""
+    coupler_override_drift(atmos, coupled)
+
+Return `(key, why)` pairs where a value the atmosphere config replicates from the coupler
+disagrees with the coupled config.
+
+`drift` deliberately skips these keys: the coupler sets them itself, so the atmosphere
+config must differ from the *production atmosphere* config. That makes them invisible to
+the comparison above, which is how `FLOAT_TYPE` and `topography` once defaulted to
+`Float32` and `Val{:NoWarp}` in a standalone atmosphere workload. They are not free to be
+anything, though -- they have to agree with the coupled config, which is itself checked
+against production. So cross-check them here.
+"""
+function coupler_override_drift(atmos, coupled)
+    issues = Tuple{String, String}[]
+    for (key, reason) in ATMOS_EXPECTED
+        reason == "coupler override" || continue
+        haskey(coupled, key) || continue   # not every override is a coupled-config key
+        haskey(atmos, key) || begin
+            push!(
+                issues,
+                (
+                    key,
+                    "coupled config sets $(repr(coupled[key])), atmosphere config omits it",
+                ),
+            )
+            continue
+        end
+        atmos[key] == coupled[key] || push!(
+            issues,
+            (key, "atmosphere $(repr(atmos[key])), coupled $(repr(coupled[key]))"),
+        )
+    end
+    sort!(issues, by = first)
+end
+
 total = sum(PAIRS) do (label, prodpath, warmpath, expected)
     issues = drift(YAML.load_file(prodpath), YAML.load_file(warmpath), expected)
     println(
@@ -97,6 +133,20 @@ total = sum(PAIRS) do (label, prodpath, warmpath, expected)
         println("  ", rpad(key, 32), why)
     end
     length(issues)
+end
+
+# The cross-check above runs on the warmup configs themselves, not against production.
+let atmos = YAML.load_file(PAIRS[1][3]), coupled = YAML.load_file(PAIRS[2][3])
+    issues = coupler_override_drift(atmos, coupled)
+    println(
+        "coupler overrides: ",
+        isempty(issues) ? "atmosphere config agrees with the coupled config" :
+        "$(length(issues)) disagree",
+    )
+    for (key, why) in issues
+        println("  ", rpad(key, 32), why)
+    end
+    global total += length(issues)
 end
 
 println()

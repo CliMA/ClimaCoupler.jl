@@ -1,10 +1,10 @@
 name = "AtmosWarmupStep"
-uuid = "a1b2c3d4-0003-4000-8000-000000000003"
+uuid = "1743eeaa-a7d7-4e3b-8548-eb6904e95a4c"
 version = "0.1.0"
 
 [deps]
-AtmosWarmupExplicit = "a1b2c3d4-0002-4000-8000-000000000002"
-AtmosWarmupSetup = "a1b2c3d4-0001-4000-8000-000000000001"
+AtmosWarmupExplicit = "df4b8057-0d49-4f59-bc9e-f5ab829c06b5"
+AtmosWarmupSetup = "3222a5fb-2530-425e-8942-6166c66df63f"
 ClimaAtmos = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
 ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
 ClimaTimeSteppers = "595c0a79-7f3d-439a-bc5a-b232dc3bde79"

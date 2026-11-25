@@ -2,7 +2,7 @@
 
 julia_version = "1.13.3"
 manifest_format = "2.1"
-project_hash = "06d692410a133347f1064c9478e3e04bb1488682"
+project_hash = "5dc6f834186061fcf534b0946d01d5991466948e"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -193,19 +193,19 @@ version = "1.11.0"
 [[deps.AtmosWarmupExplicit]]
 deps = ["AtmosWarmupSetup", "CUDA", "ClimaAtmos", "ClimaComms", "ClimaTimeSteppers", "MPI", "PrecompileTools", "YAML"]
 path = "AtmosWarmupExplicit"
-uuid = "a1b2c3d4-0002-4000-8000-000000000002"
+uuid = "df4b8057-0d49-4f59-bc9e-f5ab829c06b5"
 version = "0.1.0"
 
 [[deps.AtmosWarmupSetup]]
 deps = ["Adapt", "CUDA", "CairoMakie", "ClimaAtmos", "ClimaComms", "ClimaCoupler", "ClimaLand", "ClimaSeaIce", "ClimaTimeSteppers", "ConservativeRegridding", "GeoMakie", "KernelAbstractions", "MPI", "Makie", "Oceananigans", "Poppler_jll", "PrecompileTools", "Printf", "YAML"]
 path = "AtmosWarmupSetup"
-uuid = "a1b2c3d4-0001-4000-8000-000000000001"
+uuid = "3222a5fb-2530-425e-8942-6166c66df63f"
 version = "0.1.0"
 
 [[deps.AtmosWarmupStep]]
 deps = ["AtmosWarmupExplicit", "AtmosWarmupSetup", "CUDA", "ClimaAtmos", "ClimaComms", "ClimaTimeSteppers", "MPI", "PrecompileTools", "YAML"]
 path = "AtmosWarmupStep"
-uuid = "a1b2c3d4-0003-4000-8000-000000000003"
+uuid = "1743eeaa-a7d7-4e3b-8548-eb6904e95a4c"
 version = "0.1.0"
 
 [[deps.Atomix]]
@@ -343,7 +343,7 @@ version = "0.2.10"
 [[deps.CMIPWarmup]]
 deps = ["Adapt", "AtmosWarmupExplicit", "AtmosWarmupSetup", "AtmosWarmupStep", "CUDA", "ClimaAtmos", "ClimaComms", "ClimaCoupler", "ClimaLand", "ClimaSeaIce", "ClimaUtilities", "ConservativeRegridding", "CouplerWarmupCommon", "KernelAbstractions", "LandWarmup", "MPI", "OceanWarmup", "Oceananigans", "PrecompileTools", "SeaIceWarmup", "YAML"]
 path = "CMIPWarmup"
-uuid = "c0000004-0000-4000-8000-000000000014"
+uuid = "7723b754-5bd2-42df-9e2d-c9e684ede6e5"
 version = "0.1.0"
 
 [[deps.CRC32c]]
@@ -885,7 +885,7 @@ version = "0.1.0+0"
 [[deps.CouplerWarmupCommon]]
 deps = ["CairoMakie", "ClimaComms", "ClimaCoupler", "ClimaParams", "GeoMakie", "Makie", "Poppler_jll", "Printf", "Thermodynamics"]
 path = "CouplerWarmupCommon"
-uuid = "b7e4c201-9a63-4d85-8f12-3c6a0b94e7d2"
+uuid = "deb0bad1-5ea4-4b71-9f19-1774e7a8b704"
 version = "0.1.0"
 
 [[deps.CpuId]]
@@ -1950,7 +1950,7 @@ version = "1.4.1"
 [[deps.LandWarmup]]
 deps = ["Adapt", "AtmosWarmupSetup", "CUDA", "ClimaAtmos", "ClimaComms", "ClimaCoupler", "ClimaLand", "ClimaSeaIce", "ClimaUtilities", "ConservativeRegridding", "CouplerWarmupCommon", "KernelAbstractions", "MPI", "Oceananigans", "PrecompileTools", "YAML"]
 path = "LandWarmup"
-uuid = "c0000002-0000-4000-8000-000000000012"
+uuid = "babc388d-fbe3-4a69-851c-f97eff083403"
 version = "0.1.0"
 
 [[deps.LazyArtifacts]]
@@ -2427,7 +2427,7 @@ version = "0.5.5"
 [[deps.OceanWarmup]]
 deps = ["Adapt", "AtmosWarmupSetup", "CUDA", "ClimaAtmos", "ClimaComms", "ClimaCoupler", "ClimaLand", "ClimaSeaIce", "ClimaUtilities", "ConservativeRegridding", "CouplerWarmupCommon", "KernelAbstractions", "MPI", "Oceananigans", "PrecompileTools", "YAML"]
 path = "OceanWarmup"
-uuid = "c0000001-0000-4000-8000-000000000011"
+uuid = "cd06e103-372c-4627-8fbb-88cff0647123"
 version = "0.1.0"
 
 [[deps.Oceananigans]]
@@ -3028,7 +3028,7 @@ version = "1.3.0"
 [[deps.SeaIceWarmup]]
 deps = ["Adapt", "AtmosWarmupSetup", "CUDA", "ClimaAtmos", "ClimaComms", "ClimaCoupler", "ClimaLand", "ClimaSeaIce", "ClimaUtilities", "ConservativeRegridding", "CouplerWarmupCommon", "KernelAbstractions", "MPI", "OceanWarmup", "Oceananigans", "PrecompileTools", "YAML"]
 path = "SeaIceWarmup"
-uuid = "c0000003-0000-4000-8000-000000000013"
+uuid = "964d3ef2-24b8-4887-bc94-e4177c3f1f31"
 version = "0.1.0"
 
 [[deps.SeawaterPolynomials]]

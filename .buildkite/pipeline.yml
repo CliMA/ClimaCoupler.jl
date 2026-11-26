@@ -159,7 +159,7 @@ steps:
           slurm_mem: 32GB
 
       - label: "GPU CMIP restarts (state and cache)"
-        command: "julia -O0 --color=yes --project=experiments/CMIP/ experiments/test/restart_cmip.jl"
+        command: "julia -O0 --check-bounds=yes --color=yes --project=experiments/CMIP/ experiments/test/restart_cmip.jl"
         retry: *retry_policy
         env:
           CLIMACOMMS_DEVICE: "CUDA"

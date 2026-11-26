@@ -1,0 +1,22 @@
+name = "AtmosWarmupStep"
+uuid = "1743eeaa-a7d7-4e3b-8548-eb6904e95a4c"
+version = "0.1.0"
+
+[deps]
+AtmosWarmupExplicit = "df4b8057-0d49-4f59-bc9e-f5ab829c06b5"
+AtmosWarmupSetup = "3222a5fb-2530-425e-8942-6166c66df63f"
+ClimaAtmos = "b2c96348-7fb7-4fe0-8da9-78d88439e717"
+ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
+ClimaTimeSteppers = "595c0a79-7f3d-439a-bc5a-b232dc3bde79"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
+YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
+
+[compat]
+# PrecompileTools 1.2 does not cache externally-owned code on Julia >= 1.12: it collects
+# inference roots and calls `precompile`, while 1.3 uses `jl_tag_newly_inferred_*`, which
+# is what marks another package's CodeInstances for serialization. Measured on Julia
+# 1.13.3: 1500 externally-owned specializations gave a 0.02 MiB image under 1.2.1 and
+# 143.55 MiB under 1.3.4. Everything this directory caches is externally owned.
+PrecompileTools = "1.3"

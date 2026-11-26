@@ -44,7 +44,8 @@ Base.@kwdef struct IceSlabParameters{FT <: AbstractFloat}
     T_freeze::FT            # freezing/melting temperature of sea-ice surface [K]
     k_ice::FT               # thermal conductivity of sea ice [W / m / K] (less in HM71)
     α_cold::FT              # cold snow-covered sea-ice albedo
-    α_melt::FT              # sea-ice albedo with melt ponds at T_freeze
+    α_melt_nh::FT           # NH summer melt-pond sea-ice albedo at T_freeze
+    α_melt_sh::FT           # SH summer wet-snow sea-ice albedo at T_freeze
     ΔT_melt::FT             # temperature range below T_freeze over which albedo ramps [K]
     ϵ::FT                   # emissivity of sea ice
     σ::FT                   # Stefan-Boltzmann constant [W / m2 / K4]
@@ -57,8 +58,9 @@ Base.broadcastable(p::IceSlabParameters) = tuple(p)
     IceSlabParameters{FT}(coupled_param_dict; h_nh = FT(2), h_sh = FT(1),
                           ρ = FT(900), c = FT(2100), T_base = FT(271.2),
                           z0m = FT(1e-4), z0b = FT(1e-4), T_freeze = FT(273.15),
-                          k_ice = FT(2), α_cold = FT(0.78), α_melt = FT(0.55),
-                          ΔT_melt = FT(3), ϵ = FT(1), T_sfc_min = FT(200))
+                          k_ice = FT(2), α_cold = FT(0.78), α_melt_nh = FT(0.55),
+                          α_melt_sh = FT(0.72), ΔT_melt = FT(3), ϵ = FT(1),
+                          T_sfc_min = FT(200))
 
 Initialize the `IceSlabParameters` object with the coupled parameters.
 
@@ -75,7 +77,10 @@ Initialize the `IceSlabParameters` object with the coupled parameters.
 - `k_ice`: thermal conductivity of sea ice [W / m / K] (default: 2)
 - `α_cold`: cold snow-covered sea-ice albedo for `T_sfc ≤ T_freeze - ΔT_melt`
   (default: 0.78)
-- `α_melt`: sea-ice albedo with melt ponds at `T_sfc = T_freeze` (default: 0.55)
+- `α_melt_nh`: Northern Hemisphere (`lat ≥ 0`) sea-ice albedo with melt ponds at
+  `T_sfc = T_freeze` (default: 0.55)
+- `α_melt_sh`: Southern Hemisphere (`lat < 0`) summer wet-snow sea-ice albedo at
+  `T_sfc = T_freeze` (default: 0.72)
 - `ΔT_melt`: melt-ramp width below `T_freeze` [K] (default: 3)
 - `ϵ`: emissivity of sea ice (default: 1)
 - `T_sfc_min`: minimum allowed surface temperature [K] (default: 200)
@@ -95,7 +100,8 @@ function IceSlabParameters{FT}(
     T_freeze = FT(273.15),
     k_ice = FT(2),
     α_cold = FT(0.78),
-    α_melt = FT(0.55),
+    α_melt_nh = FT(0.55),
+    α_melt_sh = FT(0.72),
     ΔT_melt = FT(3),
     ϵ = FT(1),
     T_sfc_min = FT(200),
@@ -111,7 +117,8 @@ function IceSlabParameters{FT}(
         T_freeze,
         k_ice,
         α_cold,
-        α_melt,
+        α_melt_nh,
+        α_melt_sh,
         ΔT_melt,
         ϵ,
         σ = coupled_param_dict["stefan_boltzmann_constant"],
@@ -130,17 +137,28 @@ ice_thickness(lat::FT, params::IceSlabParameters{FT}) where {FT} =
     ifelse(lat < zero(FT), params.h_sh, params.h_nh)
 
 """
+    ice_melt_albedo(lat, params::IceSlabParameters)
+
+Prescribed summer melt sea-ice albedo at latitude `lat` [degrees]:
+`params.α_melt_nh` in the Northern Hemisphere (`lat ≥ 0`, where surface melt
+ponds form) and `params.α_melt_sh` in the Southern Hemisphere (`lat < 0`, where
+snow cover largely persists through summer).
+
+TODO: make the melt pond albedo dependent on the environment conditions rather than latitude.
+"""
+ice_melt_albedo(lat::FT, params::IceSlabParameters{FT}) where {FT} =
+    ifelse(lat < zero(FT), params.α_melt_sh, params.α_melt_nh)
+
+"""
     slab_ice_space_init(::Type{FT}, space, params, sic_data, start_date, t_start, ice_fraction)
 
 Initialize ice bulk temperature from the ISTL1 variable in `sic_data` if available.
 ISTL1 from ERA5 (ice surface temperature layer 1, 0-7cm) is used as a proxy for surface temperature,
 then back-calculates T_bulk assuming a linear temperature profile: T_bulk = (T_sfc + T_base) / 2.
 
-Only uses ISTL1 temperatures where there is ice (ice_fraction > 0). In ice-free regions,
-uses the fallback temperature to avoid initializing with values at/above freezing which
-can cause numerical issues.
-
-Falls back to constant initialization (T_freeze - 5K) if ISTL1 is not present or data is not finite.
+Only uses ISTL1 (or fallback `T_base - 5 K`) where there is ice (`ice_fraction > 0`).
+In ice-free regions (`ice_fraction ≤ 0`), initializes `T_bulk = T_base` so newly
+forming sea ice starts at the seawater freezing temperature (`T_sfc = T_base`).
 """
 function slab_ice_space_init(
     ::Type{FT},
@@ -151,7 +169,7 @@ function slab_ice_space_init(
     t_start,
     ice_fraction,
 ) where {FT}
-    (; T_base, T_freeze) = params
+    (; T_base) = params
     T_fallback = T_base - FT(5.0)
 
     # Initialize ice temperature if available
@@ -168,9 +186,6 @@ function slab_ice_space_init(
         # Back-calculate T_bulk from T_sfc assuming linear temperature profile
         T_bulk = @. (T_sfc_data + T_base) / FT(2)
 
-        # Only use ISTL1 temperatures where there is ice; use fallback elsewhere
-        @. T_bulk = ifelse(ice_fraction > 0, T_bulk, T_fallback)
-
         # Fall back to constant where data is not finite
         @. T_bulk = ifelse(isfinite(T_bulk), T_bulk, T_fallback)
 
@@ -183,6 +198,9 @@ function slab_ice_space_init(
     end
 
     @. T_bulk_init = ifelse(isnan(T_bulk_init), T_fallback, T_bulk_init)
+    # Set ice-free cells to seawater freezing (T_base) so newly forming sea ice
+    # starts at T_sfc = T_base rather than a stale cold fallback temperature.
+    @. T_bulk_init = ifelse(ice_fraction > zero(FT), T_bulk_init, T_base)
 
     Y = CC.Fields.FieldVector(T_bulk = T_bulk_init)
     return Y
@@ -282,20 +300,14 @@ function PrescribedIceSimulation(
 
     # Get initial SIC values and use them to calculate ice fraction
     ice_fraction = CC.Fields.zeros(boundary_space)
-    if domain_type == "column"
-        ice_fraction .= FT(1)
-    else
-        evaluate!(ice_fraction, SIC_timevaryinginput, tspan[1])
-
-        # Ensure ice fraction is finite and not NaN
-        @. ice_fraction = ifelse(isfinite(ice_fraction), ice_fraction, FT(0))
-        # binary ice fraction (threshold at 0.5)
-        if binary_area_fraction
-            @. ice_fraction = ifelse(ice_fraction > FT(0.5), FT(1), FT(0))
-        end
-        # max/min needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-        @. ice_fraction = max(min(ice_fraction, FT(1) - land_fraction), FT(0))
-    end
+    update_area_fraction!(
+        ice_fraction,
+        SIC_timevaryinginput,
+        tspan[1],
+        land_fraction,
+        binary_area_fraction,
+        domain_type,
+    )
 
     params = IceSlabParameters{FT}(coupled_param_dict)
 
@@ -363,13 +375,58 @@ function PrescribedIceSimulation(
 end
 
 """
+    update_area_fraction!(area_fraction, SIC_timevaryinginput, t, land_fraction,
+                          binary_area_fraction, domain_type)
+
+Update the sea-ice area fraction in place. In column mode it is set to `1`.
+Otherwise the sea-ice concentration is read at time `t`, non-finite values are
+replaced with `0`, optional binary thresholding at `0.5` is applied, and the result
+is clamped to `[0, 1 - land_fraction]`.
+"""
+function update_area_fraction!(
+    area_fraction,
+    SIC_timevaryinginput,
+    t,
+    land_fraction,
+    binary_area_fraction::Bool,
+    domain_type::String,
+)
+    FT = eltype(area_fraction)
+    if domain_type == "column"
+        @. area_fraction = one(FT)
+    else
+        evaluate!(area_fraction, SIC_timevaryinginput, t)
+        @. area_fraction = ifelse(isfinite(area_fraction), area_fraction, zero(FT))
+        if binary_area_fraction
+            @. area_fraction = ifelse(area_fraction > FT(0.5), one(FT), zero(FT))
+        end
+        # Cap ice fraction by available non-land fraction; max avoids Float32 errors (#271)
+        @. area_fraction = max(min(area_fraction, one(FT) - land_fraction), zero(FT))
+    end
+    return nothing
+end
+
+"""
     read_sic_data!(integrator)
 
-Read in the sea ice concentration data at the current time.
+Read in and sanitize the sea-ice concentration data at the current time, and reset
+ice-free grid cells to the basal seawater freezing temperature (`T_base`) so
+newly forming sea ice starts at `T_sfc = T_base`.
 This function is intended to be used within a callback.
 """
 function read_sic_data!(integrator)
-    evaluate!(integrator.p.area_fraction, integrator.p.SIC_timevaryinginput, integrator.t)
+    (; u, p, t) = integrator
+    FT = eltype(u)
+    update_area_fraction!(
+        p.area_fraction,
+        p.SIC_timevaryinginput,
+        t,
+        p.land_fraction,
+        p.binary_area_fraction,
+        p.domain_type,
+    )
+    @. u.T_bulk = ifelse(p.area_fraction ≈ zero(FT), p.params.T_base, u.T_bulk)
+    return nothing
 end
 
 """
@@ -377,13 +434,14 @@ end
 
 Sea-ice broadband surface albedo as a continuous linear ramp between cold
 snow-covered sea ice (`α_cold` for `T_sfc ≤ T_freeze - ΔT_melt`) and summer
-ice with melt ponds (`α_melt` at `T_sfc = T_freeze`).
+melting sea ice (`α_melt` at `T_sfc = T_freeze`).
 
 The piecewise-linear temperature ramp follows the standard single-slab GCM
 parameterization of [Ingram et al. (1989)](https://doi.org/10.1029/JD094iD06p08609)
 and [Briegleb et al. (2004)](https://doi.org/10.5065/D65Q4T4Z), with default
-effective pack-ice parameters (`α_cold = 0.78`, `α_melt = 0.55`, `ΔT_melt = 3 K`)
-calibrated against CERES EBAF surface radiative fluxes.
+effective pack-ice parameters (`α_cold = 0.78`, `α_melt_nh = 0.55`,
+`α_melt_sh = 0.72`, `ΔT_melt = 3 K`) calibrated against CERES EBAF surface
+radiative fluxes and Brandt et al. (2005).
 """
 function ice_surface_albedo(
     T_sfc::FT,
@@ -400,16 +458,18 @@ end
     update_ice_albedo!(u, p)
 
 Update the cached sea-ice surface albedo `p.α_sfc` in-place from the current
-prognostic bulk temperature `u.T_bulk`.
+prognostic bulk temperature `u.T_bulk` and the hemispheric melt albedo
+[`ice_melt_albedo`](@ref), evaluated from each point's latitude.
 """
 function update_ice_albedo!(u, p)
-    (; T_base, T_sfc_min, T_freeze, ΔT_melt, α_cold, α_melt) = p.params
+    (; T_base, T_sfc_min, T_freeze, ΔT_melt, α_cold) = p.params
+    lats = CC.Fields.coordinate_field(axes(u.T_bulk)).lat
     @. p.α_sfc = ice_surface_albedo(
         ice_surface_temperature(u.T_bulk, T_base, T_sfc_min, T_freeze),
         T_freeze,
         ΔT_melt,
         α_cold,
-        α_melt,
+        ice_melt_albedo(lats, p.params),
     )
     return nothing
 end
@@ -590,21 +650,6 @@ for temperature (curbed at the freezing point, discarding surplus melt energy).
 function ice_rhs!(dY, Y, p, t)
     FT = eltype(Y)
     params = p.params
-
-    # Update the cached area fraction with the current SIC
-    if p.domain_type == "column"
-        @. p.area_fraction = FT(1)
-    else
-        @. p.area_fraction = ifelse(isfinite(p.area_fraction), p.area_fraction, FT(0))
-        # binary ice fraction (threshold at 0.5)
-        if p.binary_area_fraction
-            @. p.area_fraction = ifelse(p.area_fraction > FT(0.5), FT(1), FT(0))
-        end
-
-        # Overwrite ice fraction with the static land area fraction anywhere we have nonzero land area
-        #  max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-        @. p.area_fraction = max(min(p.area_fraction, FT(1) - p.land_fraction), FT(0))
-    end
 
     dt_ft = FT(p.dt)
     @. dY.T_bulk = ice_energy_balance_tendency(

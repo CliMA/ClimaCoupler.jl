@@ -38,6 +38,7 @@ If a surface model is not present, the area fraction is set to 0.
 function update_surface_fractions!(
     cs::Interfacer.CoupledSimulation;
     slow_frozen::Bool = false,
+    check_sum::Bool = isnothing(cs.step) || iszero(cs.step[]),
 )
     slow_frozen && return nothing
 
@@ -48,7 +49,7 @@ function update_surface_fractions!(
        align_surface_fractions!(cs.model_sims.ocean_sim, cs)
         return nothing
     end
-    _update_surface_fractions_from_land_fraction!(cs)
+    _update_surface_fractions_from_land_fraction!(cs; check_sum)
     return nothing
 end
 
@@ -70,60 +71,89 @@ function align_surface_fractions!(ocean_sim, cs::Interfacer.CoupledSimulation)
     return false
 end
 
-function _update_surface_fractions_from_land_fraction!(cs::Interfacer.CoupledSimulation)
+"""
+    check_surface_fraction_sum(
+        ice_fraction, land_fraction, ocean_fraction, scratch, ::Type{FT},
+    ) where {FT}
+
+Assert that `ice_fraction + land_fraction + ocean_fraction ≈ 1` everywhere on
+the boundary space, evaluating the pointwise sum into `scratch`.
+"""
+function check_surface_fraction_sum(
+    ice_fraction,
+    land_fraction,
+    ocean_fraction,
+    scratch,
+    ::Type{FT},
+) where {FT}
+    @. scratch = ice_fraction + land_fraction + ocean_fraction
+    @assert minimum(scratch) ≈ FT(1)
+    @assert maximum(scratch) ≈ FT(1)
+    return nothing
+end
+
+function _update_surface_fractions_from_land_fraction!(
+    cs::Interfacer.CoupledSimulation;
+    check_sum::Bool = true,
+)
     FT = CC.Spaces.undertype(Interfacer.boundary_space(cs))
+    (; fields, model_sims) = cs
+    zero_FT = zero(FT)
+    one_FT = one(FT)
 
     # land fraction is static
-    if haskey(cs.model_sims, :land_sim)
-        land_fraction = Interfacer.get_field(cs.model_sims.land_sim, Val(:area_fraction))
+    if haskey(model_sims, :land_sim)
+        land_fraction = Interfacer.get_field(model_sims.land_sim, Val(:area_fraction))
     else
-        cs.fields.scalar_temp1 .= 0
-        land_fraction = cs.fields.scalar_temp1
+        temp1 = fields.scalar_temp1
+        temp1 .= zero_FT
+        land_fraction = temp1
     end
 
     # ice and ocean fractions are dynamic
-    if haskey(cs.model_sims, :ice_sim)
-        ice_sim = cs.model_sims.ice_sim
-        Interfacer.get_field!(cs.fields.scalar_temp2, ice_sim, Val(:ice_concentration))
-        ice_concentration = cs.fields.scalar_temp2
-
+    temp2 = fields.scalar_temp2
+    if haskey(model_sims, :ice_sim)
+        ice_sim = model_sims.ice_sim
+        Interfacer.get_field!(temp2, ice_sim, Val(:ice_concentration))
         # max needed to avoid Float32 errors (see issue #271; Heisenbug on HPC)
-        Interfacer.update_field!(
-            ice_sim,
-            Val(:area_fraction),
-            max.(min.(ice_concentration, FT(1) .- land_fraction), FT(0)),
-        )
+        @. temp2 = max(min(temp2, one_FT - land_fraction), zero_FT)
+        Interfacer.update_field!(ice_sim, Val(:area_fraction), temp2)
         ice_fraction = Interfacer.get_field(ice_sim, Val(:area_fraction))
     else
-        cs.fields.scalar_temp2 .= 0
-        ice_fraction = cs.fields.scalar_temp2
+        temp2 .= zero_FT
+        ice_fraction = temp2
     end
 
-    if haskey(cs.model_sims, :ocean_sim)
-        ocean_sim = cs.model_sims.ocean_sim
-        Interfacer.update_field!(
-            ocean_sim,
-            Val(:area_fraction),
-            max.(FT(1) .- ice_fraction .- land_fraction, FT(0)),
-        )
+    temp3 = fields.scalar_temp3
+    if haskey(model_sims, :ocean_sim)
+        ocean_sim = model_sims.ocean_sim
+        @. temp3 = max(one_FT - ice_fraction - land_fraction, zero_FT)
+        Interfacer.update_field!(ocean_sim, Val(:area_fraction), temp3)
         ocean_fraction = Interfacer.get_field(ocean_sim, Val(:area_fraction))
 
         # Apply any additional constraints on the ocean and ice fractions if necessary
-        if haskey(cs.model_sims, :ice_sim)
-            resolve_area_fractions!(ocean_sim, cs.model_sims.ice_sim, land_fraction)
+        if haskey(model_sims, :ice_sim)
+            resolve_area_fractions!(ocean_sim, model_sims.ice_sim, land_fraction)
         end
     else
-        cs.fields.scalar_temp3 .= 0
-        ocean_fraction = cs.fields.scalar_temp3
+        temp3 .= zero_FT
+        ocean_fraction = temp3
     end
 
     # update the ice and ocean area fraction coupler fields (land is static)
-    cs.fields.ice_area_fraction .= ice_fraction
-    cs.fields.ocean_area_fraction .= ocean_fraction
+    fields.ice_area_fraction .= ice_fraction
+    fields.ocean_area_fraction .= ocean_fraction
 
-    # check that the sum of area fractions is 1
-    @assert minimum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
-    @assert maximum(ice_fraction .+ land_fraction .+ ocean_fraction) ≈ FT(1)
+    if check_sum
+        check_surface_fraction_sum(
+            ice_fraction,
+            land_fraction,
+            ocean_fraction,
+            fields.scalar_temp1,
+            FT,
+        )
+    end
+    return nothing
 end
 
 """

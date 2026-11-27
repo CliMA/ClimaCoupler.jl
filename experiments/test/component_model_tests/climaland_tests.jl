@@ -202,3 +202,99 @@ end
         end
     end
 end
+
+@testset "ClimaLand long-period diagnostic compute subsampling" begin
+    import ClimaDiagnostics as CD
+    ClimaLandExt = Base.get_extension(ClimaCoupler, :ClimaCouplerClimaLandExt)
+
+    coupled_param_dict = CP.create_toml_dict(FT)
+    start_date = Dates.DateTime(2008, 1, 1)
+    boundary_space = CC.CommonSpaces.CubedSphereSpace(
+        FT;
+        radius = coupled_param_dict["planet_radius"],
+        n_quad_points = 4,
+        h_elem = 2,
+    )
+    area_fraction = CC.Fields.ones(boundary_space)
+    atmos_h = CC.Fields.zeros(boundary_space) .+ FT(2)
+    initial_T = CC.Fields.zeros(boundary_space) .+ FT(280)
+
+    function scheduled_diags(sim)
+        for cb in sim.integrator.callback.discrete_callbacks
+            hasproperty(cb.affect!, :diagnostics_handler) &&
+                return cb.affect!.diagnostics_handler.scheduled_diagnostics
+        end
+        error("No diagnostics_handler found")
+    end
+
+    mktempdir() do outdir
+        # Monthly average with dt = 450 s (< 3600 s) subsamples hourly, and a
+        # mid-hour restart (`tspan[1] = 900 s`) keeps calendar-hour phase.
+        bucket_monthly = Interfacer.LandSimulation(
+            FT,
+            Val(:bucket);
+            dt = 450.0,
+            tspan = (900.0, 4500.0),
+            start_date,
+            output_dir = joinpath(outdir, "monthly"),
+            area_fraction,
+            surface_space = boundary_space,
+            atmos_h,
+            initial_T,
+            albedo_type = "function",
+            land_diagnostics_period = :monthly,
+            land_diagnostics_reduction = :average,
+        )
+        sds_monthly = scheduled_diags(bucket_monthly)
+        @test !isempty(sds_monthly)
+        @test all(sds_monthly) do sd
+            sd.compute_schedule_func isa CD.Schedules.EveryCalendarDtSchedule &&
+                sd.compute_schedule_func.dt == Dates.Hour(1) &&
+                sd.compute_schedule_func.date_last[] == start_date
+        end
+        # Stateful schedules are distinct per diagnostic.
+        @test sds_monthly[1].compute_schedule_func !== sds_monthly[2].compute_schedule_func
+
+        # Coarse dt >= 3600 s keeps EveryStepSchedule.
+        bucket_coarse_dt = Interfacer.LandSimulation(
+            FT,
+            Val(:bucket);
+            dt = 3600.0,
+            tspan = (0.0, 7200.0),
+            start_date,
+            output_dir = joinpath(outdir, "coarse_dt"),
+            area_fraction,
+            surface_space = boundary_space,
+            atmos_h,
+            initial_T,
+            albedo_type = "function",
+            land_diagnostics_period = :monthly,
+            land_diagnostics_reduction = :average,
+        )
+        @test all(scheduled_diags(bucket_coarse_dt)) do sd
+            sd.compute_schedule_func isa CD.Schedules.DivisorSchedule &&
+                sd.compute_schedule_func.divisor == 1
+        end
+
+        # Daily average keeps EveryStepSchedule.
+        bucket_daily = Interfacer.LandSimulation(
+            FT,
+            Val(:bucket);
+            dt = 450.0,
+            tspan = (0.0, 1800.0),
+            start_date,
+            output_dir = joinpath(outdir, "daily"),
+            area_fraction,
+            surface_space = boundary_space,
+            atmos_h,
+            initial_T,
+            albedo_type = "function",
+            land_diagnostics_period = :daily,
+            land_diagnostics_reduction = :average,
+        )
+        @test all(scheduled_diags(bucket_daily)) do sd
+            sd.compute_schedule_func isa CD.Schedules.DivisorSchedule &&
+                sd.compute_schedule_func.divisor == 1
+        end
+    end
+end

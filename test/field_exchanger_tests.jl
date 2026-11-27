@@ -1,4 +1,4 @@
-import Test: @test, @testset
+import Test: @test, @testset, @test_throws
 import ClimaCore as CC
 import ClimaCoupler: Interfacer, FieldExchanger, FluxCalculator
 import Thermodynamics.Parameters as TDP
@@ -67,6 +67,24 @@ function Interfacer.update_field!(
     field::CC.Fields.Field,
 )
     sim.cache.area_fraction .= field
+end
+
+mutable struct RecordingAreaStub{C} <: Interfacer.AbstractSurfaceSimulation
+    cache::C
+    last_field::Any
+end
+Interfacer.get_field(sim::RecordingAreaStub, ::Val{:area_fraction}) =
+    sim.cache.area_fraction
+Interfacer.get_field(sim::RecordingAreaStub, ::Val{:ice_concentration}) =
+    sim.cache.area_fraction
+function Interfacer.update_field!(
+    sim::RecordingAreaStub,
+    ::Val{:area_fraction},
+    field::CC.Fields.Field,
+)
+    sim.last_field = field
+    sim.cache.area_fraction .= field
+    return nothing
 end
 
 # ocean sim providing its own surface fractions via align_surface_fractions!
@@ -257,6 +275,67 @@ for FT in (Float32, Float64)
         # Test that fractions updated correctly (ice and land unchanged, ocean updated)
         @test all(CC.Fields.field2array(ice_fraction)[1:(nelements ÷ 2)] .== FT(0.5))
         @test all(CC.Fields.field2array(ocean_fraction)[1:(nelements ÷ 2)] .== FT(0.5))
+
+        # Dynamic updates reuse `scalar_temp2` and `scalar_temp3` in place, and
+        # steps with `cs.step[] > 0` skip the global min/max sum reduction.
+        ice_rec = RecordingAreaStub((; area_fraction = copy(ice_d)), nothing)
+        ocean_rec = RecordingAreaStub((; area_fraction = copy(ocean_d)), nothing)
+        cs_rec = Interfacer.CoupledSimulation{FT}(
+            nothing,
+            coupler_fields,
+            nothing,
+            (Int(0), Int(1000)),
+            Int(200),
+            Ref(Int(0)),
+            Ref(1),
+            Ref(-1),
+            (;
+                ice_sim = ice_rec,
+                ocean_sim = ocean_rec,
+                land_sim = DummyStub((; area_fraction = land_fraction)),
+            ),
+            (;),
+            (;),
+            nothing,
+            nothing,
+            true,
+            Interfacer.SteppingSchedule(false, false),
+            (;),
+        )
+        FieldExchanger.update_surface_fractions!(cs_rec)
+        @test ice_rec.last_field === coupler_fields.scalar_temp2
+        @test ocean_rec.last_field === coupler_fields.scalar_temp3
+        @test all(parent(ice_rec.cache.area_fraction) .=== parent(ice_fraction))
+        @test all(parent(ocean_rec.cache.area_fraction) .=== parent(ocean_fraction))
+
+        # Unnormalized fractions without an ocean residual fail the sum check
+        # at initialization (`step == 0`) and when `check_sum = true`, while
+        # `step > 0` skips the reduction by default.
+        cs_bad = Interfacer.CoupledSimulation{FT}(
+            nothing,
+            coupler_fields,
+            nothing,
+            (Int(0), Int(1000)),
+            Int(200),
+            Ref(Int(0)),
+            Ref(0),
+            Ref(-1),
+            (; land_sim = DummyStub((; area_fraction = land_fraction))),
+            (;),
+            (;),
+            nothing,
+            nothing,
+            true,
+            Interfacer.SteppingSchedule(false, false),
+            (;),
+        )
+        @test_throws AssertionError FieldExchanger.update_surface_fractions!(cs_bad)
+        cs_bad.step[] = 1
+        @test isnothing(FieldExchanger.update_surface_fractions!(cs_bad))
+        @test_throws AssertionError FieldExchanger.update_surface_fractions!(
+            cs_bad;
+            check_sum = true,
+        )
     end
 
     @testset "test align_surface_fractions! hook" begin

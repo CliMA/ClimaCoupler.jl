@@ -153,10 +153,35 @@ end
         comms_ctx,
     )
 
-    # Test restore! does nothing for comms contexts, data types
+    # Test restore! does nothing for comms contexts, graph contexts, data types
     v1 = ClimaComms.context()
     v2 = ClimaComms.context()
     @test isnothing(Checkpointer.restore!(v1, v2, comms_ctx))
+
+    struct TestGraphContextA <: ClimaComms.AbstractGraphContext
+        handle::Int
+    end
+    struct TestGraphContextB <: ClimaComms.AbstractGraphContext
+        handle::Int
+    end
+    gc1 = TestGraphContextA(1)
+    gc2 = TestGraphContextB(2)
+    @test Checkpointer.stop(gc1)
+    @test isnothing(Checkpointer.restore!(gc1, gc2, comms_ctx))
+    dss_buf1 = CC.Spaces.create_dss_buffer(ones(space_checkpointer))
+    dss_buf2 = CC.Spaces.create_dss_buffer(zeros(space_checkpointer))
+    @test isnothing(Checkpointer.restore!(dss_buf1, dss_buf2, comms_ctx))
+
+    # Mutable scalar Base.RefValue counters restore in place across values
+    r1 = Ref(0)
+    r2 = Ref(2)
+    @test Checkpointer.is_leaf(r1)
+    Checkpointer.restore!(r1, r2, comms_ctx)
+    @test r1[] == 2
+    b1 = Ref(false)
+    b2 = Ref(true)
+    Checkpointer.restore!(b1, b2, comms_ctx)
+    @test b1[]
 
     v1 = Float64
     v2 = Float32

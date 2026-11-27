@@ -534,6 +534,7 @@ end
             AbstractTimeVaryingInput,
             ClimaComms.AbstractCommsContext,
             ClimaComms.AbstractDevice,
+            ClimaComms.AbstractGraphContext,
             CC.Spaces.AbstractSpace,
             CC.Grids.AbstractGrid,
             UnionAll,
@@ -543,6 +544,7 @@ end
             AbstractTimeVaryingInput,
             ClimaComms.AbstractCommsContext,
             ClimaComms.AbstractDevice,
+            ClimaComms.AbstractGraphContext,
             CC.Spaces.AbstractSpace,
             CC.Grids.AbstractGrid,
             UnionAll,
@@ -561,6 +563,7 @@ function restore!(
         AbstractTimeVaryingInput,
         ClimaComms.AbstractCommsContext,
         ClimaComms.AbstractDevice,
+        ClimaComms.AbstractGraphContext,
         CC.Spaces.AbstractSpace,
         CC.Grids.AbstractGrid,
         UnionAll,
@@ -570,6 +573,7 @@ function restore!(
         AbstractTimeVaryingInput,
         ClimaComms.AbstractCommsContext,
         ClimaComms.AbstractDevice,
+        ClimaComms.AbstractGraphContext,
         CC.Spaces.AbstractSpace,
         CC.Grids.AbstractGrid,
         UnionAll,
@@ -711,6 +715,30 @@ function restore!(v1::StaticArrays.StaticArray, v2::Array, comms_ctx; name, igno
 end
 
 """
+    restore!(
+        v1::Base.RefValue{T},
+        v2::Base.RefValue{T},
+        _comms_ctx;
+        name = "",
+        ignore = Set(),
+    ) where {
+        T <: Union{Number, Symbol, Dates.DateTime, Dates.UTInstant, Dates.Millisecond},
+    }
+
+Overwrite mutable scalar `Ref` state in place when restoring a cache.
+"""
+function restore!(
+    v1::Base.RefValue{T},
+    v2::Base.RefValue{T},
+    _comms_ctx;
+    name = "",
+    ignore = Set(),
+) where {T <: Union{Number, Symbol, Dates.DateTime, Dates.UTInstant, Dates.Millisecond}}
+    v1[] = v2[]
+    return nothing
+end
+
+"""
     CacheIterator{F, G}
 
 An iterator that recursively iterate through the object's field hierarchy.
@@ -792,6 +820,7 @@ function stop(
         AbstractTimeVaryingInput,
         ClimaComms.AbstractCommsContext,
         ClimaComms.AbstractDevice,
+        ClimaComms.AbstractGraphContext,
         CC.Spaces.AbstractSpace,
         CC.Grids.AbstractGrid,
         UnionAll,
@@ -825,6 +854,12 @@ is_leaf(
         Dates.DateTime,
         Dates.UTInstant,
         Dates.Millisecond,
+    },
+) = true
+
+is_leaf(
+    ::Base.RefValue{
+        <:Union{Number, Symbol, Dates.DateTime, Dates.UTInstant, Dates.Millisecond},
     },
 ) = true
 
